@@ -1,0 +1,2361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAT Investors — Deal Analyzer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #1a1f2e 0%, #252d3d 100%); border-bottom: 1px solid #2d3748; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #f6ad55, #ed8936); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: #1a1f2e; }
+  .logo-text h1 { font-size: 20px; font-weight: 700; color: #f6ad55; }
+  .logo-text p { font-size: 12px; color: #718096; }
+  .address-input { flex: 1; max-width: 480px; margin: 0 32px; }
+  .address-input input { width: 100%; background: #0f1117; border: 1px solid #3d4a5c; border-radius: 10px; padding: 12px 18px; color: #e2e8f0; font-size: 15px; font-weight: 500; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .address-input input:focus { border-color: #f6ad55; box-shadow: 0 0 0 3px rgba(246,173,85,0.12); }
+  .strategy-tabs { display: flex; gap: 6px; background: #0f1117; padding: 5px; border-radius: 10px; border: 1px solid #2d3748; }
+  .tab { padding: 8px 18px; border-radius: 7px; border: none; background: transparent; color: #718096; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+  .tab.active { background: #f6ad55; color: #1a1f2e; box-shadow: 0 2px 8px rgba(246,173,85,0.3); }
+
+  /* Main layout */
+  .main { padding: 24px 32px; display: grid; grid-template-columns: 300px 1fr; gap: 24px; }
+
+  /* Inputs panel */
+  .inputs-panel { display: flex; flex-direction: column; gap: 16px; }
+  .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 14px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #718096; margin-bottom: 16px; }
+
+  .input-group { margin-bottom: 14px; }
+  .input-group:last-child { margin-bottom: 0; }
+  .input-label { font-size: 12px; color: #a0aec0; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .input-label span { color: #f6ad55; font-weight: 600; }
+  .input-wrap { position: relative; }
+  .input-wrap .prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #718096; font-size: 14px; }
+  .input-wrap input[type="number"] {
+    width: 100%; background: #0f1117; border: 1px solid #2d3748; border-radius: 8px;
+    padding: 10px 12px 10px 28px; color: #e2e8f0; font-size: 15px; font-weight: 600;
+    outline: none; transition: border-color 0.2s;
+  }
+  .input-wrap input[type="number"]:focus { border-color: #f6ad55; }
+  input[type="range"] { width: 100%; accent-color: #f6ad55; margin-top: 6px; }
+
+  /* Right panel */
+  .right-panel { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Metrics row */
+  .metrics-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .metric-card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px; padding: 16px; text-align: center; position: relative; overflow: hidden; }
+  .metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .metric-card.green::before { background: #48bb78; }
+  .metric-card.yellow::before { background: #f6ad55; }
+  .metric-card.red::before { background: #fc8181; }
+  .metric-card.blue::before { background: #63b3ed; }
+  .metric-card.purple::before { background: #b794f4; }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 10px; }
+  .metric-value { font-size: 26px; font-weight: 800; }
+  .metric-value.green { color: #68d391; }
+  .metric-value.yellow { color: #f6ad55; }
+  .metric-value.red { color: #fc8181; }
+  .metric-value.blue { color: #63b3ed; }
+  .metric-value.purple { color: #b794f4; }
+  .metric-sub { font-size: 11px; color: #718096; margin-top: 4px; }
+
+  /* Analysis grid */
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* Cost stack */
+  .cost-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2d3748; font-size: 13px; }
+  .cost-row:last-child { border-bottom: none; }
+  .cost-row.total { border-top: 2px solid #2d3748; border-bottom: none; padding-top: 12px; margin-top: 4px; font-weight: 700; font-size: 14px; color: #f6ad55; }
+  .cost-row.subtotal { font-weight: 600; color: #a0aec0; }
+  .cost-name { color: #a0aec0; }
+  .cost-value { font-weight: 600; color: #e2e8f0; }
+
+  /* Verdict — see improved styles in collapsible section below */
+
+  /* Offer table */
+  .offer-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; }
+  .offer-row.strong { background: rgba(72, 187, 120, 0.1); border: 1px solid rgba(72, 187, 120, 0.3); }
+  .offer-row.max { background: rgba(246, 173, 85, 0.1); border: 1px solid rgba(246, 173, 85, 0.3); }
+  .offer-row.walkaway { background: rgba(252, 129, 74, 0.1); border: 1px solid rgba(252, 129, 74, 0.4); }
+  .offer-label { font-size: 12px; color: #a0aec0; }
+  .offer-value { font-size: 16px; font-weight: 800; }
+  .offer-row.strong .offer-value { color: #68d391; }
+  .offer-row.max .offer-value { color: #f6ad55; }
+  .offer-row.walkaway .offer-value { color: #fc8181; }
+
+  /* Profit table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #0f1117; padding: 10px 12px; text-align: right; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #2d3748; }
+  th:first-child { text-align: left; }
+  td { padding: 9px 12px; text-align: right; border-bottom: 1px solid #1a1f2e; }
+  td:first-child { text-align: left; color: #a0aec0; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  tr.highlight { background: rgba(246, 173, 85, 0.08); }
+  .profit-positive { color: #68d391; font-weight: 700; }
+  .profit-negative { color: #fc8181; font-weight: 700; }
+  .profit-thin { color: #f6ad55; font-weight: 700; }
+
+  /* Risk indicators */
+  .risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .risk-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #0f1117; border-radius: 8px; border: 1px solid #2d3748; }
+  .risk-name { font-size: 12px; color: #a0aec0; }
+  .risk-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  .risk-badge.low { background: rgba(72, 187, 120, 0.15); color: #68d391; }
+  .risk-badge.medium { background: rgba(246, 173, 85, 0.15); color: #f6ad55; }
+  .risk-badge.high { background: rgba(252, 129, 129, 0.15); color: #fc8181; }
+  .risk-badge.unknown { background: rgba(160, 174, 192, 0.15); color: #a0aec0; }
+
+  /* Next actions */
+  .action-list { list-style: none; }
+  .action-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #2d3748; font-size: 13px; }
+  .action-item:last-child { border-bottom: none; }
+  .action-num { width: 22px; height: 22px; background: #f6ad55; color: #1a1f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+  .action-text { color: #a0aec0; line-height: 1.5; }
+  .action-text strong { color: #e2e8f0; }
+
+  /* BRRRR section */
+  .brrrr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .cf-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #2d3748; font-size: 13px; }
+  .cf-row:last-child { border-bottom: none; }
+  .cf-row.total-row { font-weight: 700; font-size: 14px; margin-top: 4px; }
+  .cf-row .cf-label { color: #a0aec0; }
+  .cf-row .cf-monthly { color: #e2e8f0; font-weight: 600; }
+  .cf-row.total-row .cf-monthly { color: #f6ad55; }
+  .ratio-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2d3748; font-size: 13px; }
+  .ratio-item:last-child { border-bottom: none; }
+  .ratio-label { color: #a0aec0; }
+  .ratio-value { font-weight: 700; }
+
+  /* Tabs for flip/brrrr results */
+  .result-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .rtab { padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #2d3748; color: #718096; background: transparent; transition: all 0.2s; }
+  .rtab.active { background: #f6ad55; border-color: #f6ad55; color: #1a1f2e; }
+
+  /* Divider label */
+  .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: #2d3748; }
+
+  /* Footer */
+  .footer { padding: 16px 32px; border-top: 1px solid #2d3748; text-align: center; font-size: 11px; color: #4a5568; }
+
+  /* Email Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 16px; width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.5); }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-header h2 { font-size: 16px; font-weight: 700; color: #f6ad55; }
+  .modal-close { background: none; border: none; color: #718096; font-size: 22px; cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: #e2e8f0; }
+  .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+  .email-field { margin-bottom: 16px; }
+  .email-field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 6px; }
+  .email-subject-box { background: #0f1117; border: 1px solid #2d3748; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #e2e8f0; font-weight: 600; }
+  .email-body-box { background: #0f1117; border: 1px solid #2d3748; border-radius: 8px; padding: 14px; font-size: 13px; color: #a0aec0; line-height: 1.8; white-space: pre-wrap; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 320px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid #2d3748; display: flex; gap: 10px; flex-shrink: 0; }
+  .btn-copy { flex: 1; padding: 11px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.2s; }
+  .btn-copy-subject { background: #2d3748; color: #a0aec0; }
+  .btn-copy-subject:hover { background: #3d4a5c; color: #e2e8f0; }
+  .btn-copy-body { background: #f6ad55; color: #1a1f2e; }
+  .btn-copy-body:hover { background: #ed8936; }
+  .btn-copy-all { background: #48bb78; color: #1a1f2e; }
+  .btn-copy-all:hover { background: #38a169; }
+  .situation-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stab { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #2d3748; color: #718096; background: transparent; transition: all 0.2s; }
+  .stab.active { background: #f6ad55; border-color: #f6ad55; color: #1a1f2e; }
+  .email-generate-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #2d6a4f, #1b4332); border: 1px solid #48bb78; border-radius: 10px; color: #68d391; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 4px; letter-spacing: 0.5px; }
+  .email-generate-btn:hover { background: linear-gradient(135deg, #40916c, #2d6a4f); box-shadow: 0 4px 20px rgba(72,187,120,0.2); }
+
+  /* Tooltips */
+  .stab { position: relative; }
+  .stab::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0f1117;
+    border: 1px solid #2d3748;
+    color: #a0aec0;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    width: 220px;
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .stab::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #2d3748;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 101;
+  }
+  .stab:hover::after, .stab:hover::before { opacity: 1; }
+
+  /* Collapsible card */
+  .collapse-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+  .collapse-toggle .toggle-icon { font-size: 11px; color: #4a5568; transition: transform 0.2s; }
+  .collapse-toggle.collapsed .toggle-icon { transform: rotate(-90deg); }
+  .collapsible-body { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s; max-height: 500px; opacity: 1; }
+  .collapsible-body.collapsed { max-height: 0; opacity: 0; }
+
+  /* Verdict — larger, more dominant */
+  .verdict-box { border-radius: 16px; padding: 28px 24px; text-align: center; margin-bottom: 20px; }
+  .verdict-box.buy { background: linear-gradient(135deg, #1c4532, #22543d); border: 1px solid #48bb78; }
+  .verdict-box.pass { background: linear-gradient(135deg, #4a1c1c, #742a2a); border: 1px solid #fc8181; }
+  .verdict-box.renegotiate { background: linear-gradient(135deg, #4a3728, #7b4a1e); border: 1px solid #f6ad55; }
+  .verdict-box.conditional { background: linear-gradient(135deg, #1a3a4a, #1a4a5a); border: 1px solid #63b3ed; }
+  .verdict-label { font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 10px; opacity: 0.6; }
+  .verdict-title { font-size: 42px; font-weight: 900; letter-spacing: 4px; line-height: 1; }
+  .verdict-title.buy { color: #68d391; }
+  .verdict-title.pass { color: #fc8181; }
+  .verdict-title.renegotiate { color: #f6ad55; }
+  .verdict-title.conditional { color: #63b3ed; }
+  .verdict-reason { font-size: 14px; margin-top: 12px; opacity: 0.85; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+  /* CTA buttons — prominent */
+  .cta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .cta-btn { padding: 16px 20px; border-radius: 12px; border: none; cursor: pointer; font-size: 15px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px; }
+  .cta-btn-email { background: linear-gradient(135deg, #2d6a4f, #1b4332); border: 1px solid #48bb78; color: #68d391; }
+  .cta-btn-email:hover { background: linear-gradient(135deg, #40916c, #2d6a4f); box-shadow: 0 4px 20px rgba(72,187,120,0.25); transform: translateY(-1px); }
+  .cta-btn-phone { background: linear-gradient(135deg, #1a2d5a, #1a1f3a); border: 1px solid #63b3ed; color: #63b3ed; }
+  .cta-btn-phone:hover { background: linear-gradient(135deg, #2a4a7f, #1a2d5a); box-shadow: 0 4px 20px rgba(99,179,237,0.25); transform: translateY(-1px); }
+
+  /* Section label improvement */
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: #2d3748; }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .metrics-row { grid-template-columns: repeat(3, 1fr); }
+    .main { grid-template-columns: 260px 1fr; }
+  }
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .analysis-grid { grid-template-columns: 1fr; }
+    .brrrr-grid { grid-template-columns: 1fr; }
+    .cta-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">H</div>
+    <div class="logo-text">
+      <h1>HAT Investors</h1>
+      <p>Deal Analyzer</p>
+    </div>
+  </div>
+  <div class="address-input">
+    <input type="text" id="address" placeholder="Enter property address..." value="3526 Sheldrake Drive, Jacksonville, FL 32223">
+  </div>
+  <div class="strategy-tabs">
+    <button class="tab active" onclick="setStrategy('both')">Both</button>
+    <button class="tab" onclick="setStrategy('flip')">Flip</button>
+    <button class="tab" onclick="setStrategy('brrrr')">BRRRR</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- LEFT: Inputs -->
+  <div class="inputs-panel">
+
+    <div class="card">
+      <div class="card-title">Deal Inputs</div>
+
+      <div class="input-group">
+        <div class="input-label">Purchase Price <span id="lbl-pp">$235,000</span></div>
+        <div class="input-wrap"><span class="prefix">$</span>
+          <input type="number" id="pp" value="235000" step="1000" oninput="sync('pp');calc()">
+        </div>
+        <input type="range" id="pp-range" min="50000" max="400000" step="1000" value="235000" oninput="syncRange('pp');calc()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">Renovation Cost <span id="lbl-reno">$70,000</span></div>
+        <div class="input-wrap"><span class="prefix">$</span>
+          <input type="number" id="reno" value="70000" step="1000" oninput="sync('reno');calc()">
+        </div>
+        <input type="range" id="reno-range" min="0" max="200000" step="1000" value="70000" oninput="syncRange('reno');calc()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">After Repair Value (ARV) <span id="lbl-arv">$405,000</span></div>
+        <div class="input-wrap"><span class="prefix">$</span>
+          <input type="number" id="arv" value="405000" step="1000" oninput="sync('arv');calc()">
+        </div>
+        <input type="range" id="arv-range" min="100000" max="600000" step="1000" value="405000" oninput="syncRange('arv');calc()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">Monthly Rent <span id="lbl-rent">$2,200</span></div>
+        <div class="input-wrap"><span class="prefix">$</span>
+          <input type="number" id="rent" value="2200" step="50" oninput="sync('rent');calc()">
+        </div>
+        <input type="range" id="rent-range" min="500" max="4000" step="50" value="2200" oninput="syncRange('rent');calc()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">Flip Holding Period <span id="lbl-hold-flip">3 months</span></div>
+        <input type="range" id="hold-flip" min="1" max="12" step="1" value="3" oninput="updateHoldLabel('flip');calc()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">BRRRR Holding Period <span id="lbl-hold-brrrr">6 months</span></div>
+        <input type="range" id="hold-brrrr" min="1" max="18" step="1" value="6" oninput="updateHoldLabel('brrrr');calc()">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title collapse-toggle collapsed" onclick="toggleCollapse(this)" style="margin-bottom:0; cursor:pointer;">
+        HML Assumptions (Rob) <span class="toggle-icon">▼</span>
+      </div>
+      <div class="collapsible-body collapsed" style="margin-top:0;">
+        <div style="height:12px;"></div>
+        <div class="cost-row"><span class="cost-name">Purchase financed</span><span class="cost-value">90%</span></div>
+        <div class="cost-row"><span class="cost-name">Reno financed</span><span class="cost-value">100%</span></div>
+        <div class="cost-row"><span class="cost-name">Interest rate</span><span class="cost-value">12% / yr</span></div>
+        <div class="cost-row"><span class="cost-name">Points</span><span class="cost-value">2%</span></div>
+        <div class="cost-row"><span class="cost-name">Refi rate (BRRRR)</span><span class="cost-value">6.9% / 30yr</span></div>
+        <div class="cost-row"><span class="cost-name">Refi LTV</span><span class="cost-value">70% of ARV</span></div>
+        <div class="cost-row"><span class="cost-name">Selling costs</span><span class="cost-value">7% of ARV</span></div>
+        <div class="cost-row"><span class="cost-name">Min flip profit</span><span class="cost-value">$30,000</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cost Stack</div>
+      <div class="cost-row"><span class="cost-name">Purchase Price</span><span class="cost-value" id="cs-pp">—</span></div>
+      <div class="cost-row"><span class="cost-name">Renovation</span><span class="cost-value" id="cs-reno">—</span></div>
+      <div class="cost-row"><span class="cost-name">HML Loan Total</span><span class="cost-value" id="cs-loan">—</span></div>
+      <div class="cost-row subtotal"><span class="cost-name">Down Payment (10%)</span><span class="cost-value" id="cs-down">—</span></div>
+      <div class="cost-row subtotal"><span class="cost-name">Points (2%)</span><span class="cost-value" id="cs-points">—</span></div>
+      <div class="cost-row subtotal"><span class="cost-name">Title & Lender Fees</span><span class="cost-value">$2,450</span></div>
+      <div class="cost-row subtotal"><span class="cost-name">Purchase Costs Total</span><span class="cost-value" id="cs-purch-costs">—</span></div>
+      <div class="cost-row total"><span class="cost-name">💰 Total Cash Needed</span><span class="cost-value" id="cs-cash-needed">—</span></div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="right-panel">
+
+    <!-- Verdict -->
+    <div id="verdict-box" class="verdict-box pass">
+      <div class="verdict-label">⚡ Investment Decision</div>
+      <div id="verdict-title" class="verdict-title pass">PASS</div>
+      <div id="verdict-reason" class="verdict-reason">Loading...</div>
+    </div>
+
+    <!-- Strategy Comparison -->
+    <div>
+      <div class="section-label">Flip vs. BRRRR — Which Strategy Wins?</div>
+      <div class="card" style="padding: 16px;">
+        <div id="strategy-winner-banner" style="padding: 10px 16px; border-radius: 8px; margin-bottom: 14px; font-size: 14px; font-weight: 700;"></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div id="strategy-flip-col" style="background: #0f1117; border-radius: 10px; padding: 14px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 10px;">🔨 Flip</div>
+            <div class="cf-row"><span class="cf-label">Net Profit</span><span id="sc-flip-profit" class="cf-monthly">—</span></div>
+            <div class="cf-row"><span class="cf-label">Cash Needed</span><span id="sc-flip-cash" class="cf-monthly">—</span></div>
+            <div class="cf-row"><span class="cf-label">ROI (Ann.)</span><span id="sc-flip-roi" class="cf-monthly">—</span></div>
+            <div class="cf-row" style="border-bottom:none;"><span class="cf-label">Exit timeline</span><span id="sc-flip-hold" class="cf-monthly">—</span></div>
+            <div id="sc-flip-badge" style="margin-top:10px; text-align:center; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700;">—</div>
+          </div>
+          <div id="strategy-brrrr-col" style="background: #0f1117; border-radius: 10px; padding: 14px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 10px;">🏠 BRRRR</div>
+            <div class="cf-row"><span class="cf-label">Monthly Cash Flow</span><span id="sc-brrrr-cf" class="cf-monthly">—</span></div>
+            <div class="cf-row"><span class="cf-label">Cash on Cash</span><span id="sc-brrrr-coc" class="cf-monthly">—</span></div>
+            <div class="cf-row"><span class="cf-label">Cash Left in Deal</span><span id="sc-brrrr-cash" class="cf-monthly">—</span></div>
+            <div class="cf-row" style="border-bottom:none;"><span class="cf-label">Refi Cash Out</span><span id="sc-brrrr-cashout" class="cf-monthly">—</span></div>
+            <div id="sc-brrrr-badge" style="margin-top:10px; text-align:center; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700;">—</div>
+          </div>
+        </div>
+        <div id="strategy-note" style="margin-top: 12px; font-size: 13px; color: #a0aec0; padding: 10px 14px; background: #0f1117; border-radius: 8px; line-height: 1.6;"></div>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div>
+      <div class="section-label">Key Metrics</div>
+      <div class="metrics-row">
+        <div class="metric-card" id="mc-profit">
+          <div class="metric-label">Flip Profit</div>
+          <div class="metric-value" id="mv-profit">—</div>
+          <div class="metric-sub" id="ms-profit">3-month hold</div>
+        </div>
+        <div class="metric-card" id="mc-roi">
+          <div class="metric-label">Flip ROI</div>
+          <div class="metric-value" id="mv-roi">—</div>
+          <div class="metric-sub">annualized</div>
+        </div>
+        <div class="metric-card" id="mc-cf">
+          <div class="metric-label">BRRRR Cash Flow</div>
+          <div class="metric-value" id="mv-cf">—</div>
+          <div class="metric-sub">per month</div>
+        </div>
+        <div class="metric-card" id="mc-coc">
+          <div class="metric-label">Cash on Cash</div>
+          <div class="metric-value" id="mv-coc">—</div>
+          <div class="metric-sub">BRRRR yr 1</div>
+        </div>
+        <div class="metric-card" id="mc-cashleft">
+          <div class="metric-label">Cash Left in Deal</div>
+          <div class="metric-value" id="mv-cashleft">—</div>
+          <div class="metric-sub">after refi</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Offer Strategy -->
+    <div>
+      <div class="section-label">Offer Strategy</div>
+      <div class="card" style="padding: 16px;">
+        <div class="offer-row strong">
+          <div>
+            <div class="offer-label">Strong Offer — great margin</div>
+          </div>
+          <div class="offer-value" id="offer-strong">—</div>
+        </div>
+        <div class="offer-row max">
+          <div>
+            <div class="offer-label">Maximum Offer — thin but works</div>
+          </div>
+          <div class="offer-value" id="offer-max">—</div>
+        </div>
+        <div class="offer-row walkaway">
+          <div>
+            <div class="offer-label">Walk-Away Price — do not go above</div>
+          </div>
+          <div class="offer-value" id="offer-walkaway">—</div>
+        </div>
+        <div style="margin-top: 12px; padding: 10px 14px; background: #0f1117; border-radius: 8px; font-size: 12px; color: #718096;">
+          Current asking price is <strong id="asking-delta" style="color:#f6ad55">—</strong> the walk-away price.
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA Buttons — Email + Phone -->
+    <div class="cta-row">
+      <button class="cta-btn cta-btn-email" onclick="openEmailModal()">📧 Generate Agent Email</button>
+      <button class="cta-btn cta-btn-phone" onclick="openPhoneModal()">📞 Generate Phone Script</button>
+    </div>
+
+    <!-- Flip + BRRRR side by side -->
+    <div class="analysis-grid">
+
+      <!-- Flip Analysis -->
+      <div class="card">
+        <div class="card-title">Flip Analysis</div>
+        <div class="cost-row"><span class="cost-name">Sale Proceeds (×93%)</span><span class="cost-value" id="f-proceeds">—</span></div>
+        <div class="cost-row"><span class="cost-name">Loan Repayment</span><span class="cost-value" id="f-loan-rep">—</span></div>
+        <div class="cost-row"><span class="cost-name">Holding Costs</span><span class="cost-value" id="f-holding">—</span></div>
+        <div class="cost-row"><span class="cost-name">Cash Invested</span><span class="cost-value" id="f-cash-inv">—</span></div>
+        <div class="cost-row total"><span class="cost-name">Net Profit</span><span id="f-profit" class="cost-value">—</span></div>
+        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">ROI</div>
+            <div id="f-roi" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+          </div>
+          <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">Ann. ROI</div>
+            <div id="f-ann-roi" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div class="card-title">Profit Projections</div>
+          <div class="table-wrap">
+            <table id="flip-table">
+              <thead>
+                <tr><th>Hold</th><th>Holding $</th><th>Profit</th><th>ROI</th></tr>
+              </thead>
+              <tbody id="flip-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- BRRRR Analysis -->
+      <div class="card">
+        <div class="card-title">BRRRR Analysis</div>
+        <div class="cost-row"><span class="cost-name">Refi Loan (70% ARV)</span><span class="cost-value" id="b-refi-loan">—</span></div>
+        <div class="cost-row"><span class="cost-name">Refi Costs (3%)</span><span class="cost-value" id="b-refi-costs">—</span></div>
+        <div class="cost-row"><span class="cost-name">Loan Repayment</span><span class="cost-value" id="b-loan-rep">—</span></div>
+        <div class="cost-row"><span class="cost-name">Holding Costs (6mo)</span><span class="cost-value" id="b-holding">—</span></div>
+        <div class="cost-row total"><span class="cost-name">Refi Cash Out</span><span id="b-refi-cashout" class="cost-value">—</span></div>
+        <div class="cost-row" style="padding-top:8px;"><span class="cost-name">Initial Cash Needed</span><span class="cost-value" id="b-initial-cash">—</span></div>
+        <div class="cost-row total"><span class="cost-name">💰 Total Cash Invested</span><span id="b-total-cash" class="cost-value">—</span></div>
+
+        <div style="margin-top: 16px;">
+          <div class="card-title">Cash Flow (Post-Refi)</div>
+          <div class="cf-row"><span class="cf-label">Gross Rent</span><span class="cf-monthly" id="b-rent">—</span></div>
+          <div class="cf-row"><span class="cf-label">Property Taxes</span><span class="cf-monthly">-$208</span></div>
+          <div class="cf-row"><span class="cf-label">Insurance</span><span class="cf-monthly">-$100</span></div>
+          <div class="cf-row"><span class="cf-label">NOI</span><span class="cf-monthly" id="b-noi">—</span></div>
+          <div class="cf-row"><span class="cf-label">Refi Mortgage</span><span class="cf-monthly" id="b-mortgage">—</span></div>
+          <div class="cf-row total-row"><span class="cf-label">Monthly Cash Flow</span><span class="cf-monthly" id="b-cf">—</span></div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+            <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">Cap Rate</div>
+              <div id="b-caprate" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+            </div>
+            <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">Cash on Cash</div>
+              <div id="b-coc" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+            </div>
+            <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">DCR</div>
+              <div id="b-dcr" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+            </div>
+            <div style="background: #0f1117; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px;">GRM</div>
+              <div id="b-grm" style="font-size: 18px; font-weight: 800; color: #f6ad55; margin-top: 4px;">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary + Reno Sensitivity + Bottom Line -->
+    <div>
+      <div class="section-label">Deal Summary</div>
+      <div class="card" id="summary-card">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <!-- Situation -->
+          <div>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 10px;">The Situation</div>
+            <div id="summary-situation" style="font-size: 14px; color: #a0aec0; line-height: 1.7;"></div>
+          </div>
+          <!-- What needs to be true -->
+          <div>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 10px;">What Needs to Be True</div>
+            <div id="summary-conditions" style="font-size: 14px; color: #a0aec0; line-height: 1.7;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reno Sensitivity -->
+    <div>
+      <div class="section-label">Can Reducing Reno Fix It?</div>
+      <div class="card" style="padding: 16px;">
+        <div id="reno-verdict-banner" style="padding: 10px 16px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; font-weight: 700;"></div>
+
+        <!-- Flip sensitivity -->
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 8px;">🔨 Flip — Reno Sensitivity</div>
+        <div class="table-wrap">
+          <table id="reno-table">
+            <thead>
+              <tr><th>Reno Budget</th><th>HML Loan</th><th>Cash Needed</th><th>Flip Profit</th><th>Verdict</th></tr>
+            </thead>
+            <tbody id="reno-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- BRRRR rent-ready sensitivity -->
+        <div style="margin-top: 20px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 6px;">🏠 BRRRR — Rent-Ready Reno Savings</div>
+          <div style="font-size: 12px; color: #4a5568; margin-bottom: 10px;">BRRRR uses rent-ready renovation (cosmetic only) — typically $10K–$30K less than full flip scope. Does a reduced reno make BRRRR viable?</div>
+          <div id="brrrr-reno-banner" style="padding: 8px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 700;"></div>
+          <div class="table-wrap">
+            <table id="brrrr-reno-table">
+              <thead>
+                <tr><th>Reno (Rent-Ready)</th><th>Savings</th><th>Cash Flow/mo</th><th>COC</th><th>Cash Invested</th><th>Verdict</th></tr>
+              </thead>
+              <tbody id="brrrr-reno-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Line -->
+    <div>
+      <div class="section-label">Bottom Line</div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table style="width:100%; border-collapse: collapse;">
+          <tbody id="bottom-line-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Risk + Actions -->
+    <div class="analysis-grid">
+      <div class="card">
+        <div class="card-title">Risk Assessment</div>
+        <div class="risk-grid" id="risk-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Next Actions</div>
+        <ul class="action-list" id="action-list"></ul>
+      </div>
+    </div>
+
+    <!-- MAO Reference -->
+    <div class="card" style="padding: 16px;">
+      <div class="card-title">MAO Reference (75% Rule)</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+        <div style="background: #0f1117; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">MAO ($30K min profit)</div>
+          <div id="mao-30" style="font-size: 20px; font-weight: 800; color: #f6ad55;">—</div>
+        </div>
+        <div style="background: #0f1117; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">MAO ($40K min profit)</div>
+          <div id="mao-40" style="font-size: 20px; font-weight: 800; color: #f6ad55;">—</div>
+        </div>
+        <div style="background: #0f1117; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Gap from Asking</div>
+          <div id="mao-gap" style="font-size: 20px; font-weight: 800; color: #fc8181;">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Email Modal -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📧 Agent Email — Send to Listing Agent</h2>
+      <button class="modal-close" onclick="closeEmailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size: 12px; color: #718096; margin-bottom: 14px;">Choose the situation — email adapts automatically to the deal numbers.</div>
+      <div class="situation-tabs" id="situation-tabs">
+        <button class="stab active" onclick="switchEmailTab('offer'    , this)"
+          data-tooltip="First contact with listing agent.&#10;At asking → confident, terms-led.&#10;Below asking → transparent math breakdown.&#10;Always highlights your 6 buyer advantages.">📋 Initial Offer</button>
+        <button class="stab"        onclick="switchEmailTab('negotiate', this)"
+          data-tooltip="Use after seller pushes back on price.&#10;Small gap → meet in middle or swap terms.&#10;Medium gap → full math + what you give back.&#10;Large gap → breakdown to share with seller.">💬 Counter / Negotiate</button>
+        <button class="stab"        onclick="switchEmailTab('compete'  , this)"
+          data-tooltip="Use when seller has multiple offers.&#10;Reframes certainty vs. price — exposes&#10;risks of financed buyers: appraisal,&#10;inspection re-trade, 45-day delays.">🏆 Beat Other Offers</button>
+        <button class="stab"        onclick="switchEmailTab('motivated', this)"
+          data-tooltip="For distressed, estate, or tired sellers.&#10;Empathy first — solve their problem.&#10;Leads with fast close + as-is relief,&#10;not with numbers or pressure.">🤝 Motivated Seller</button>
+        <button class="stab"        onclick="switchEmailTab('followup' , this)"
+          data-tooltip="When seller hasn't responded.&#10;Controlled urgency — you have other&#10;options but prefer this deal. Restates&#10;all terms. Leaves door open gracefully.">⏰ Follow-Up</button>
+      </div>
+      <div id="email-strategy-panel" style="margin-bottom:16px; display:none;">
+        <div style="background:#0f1117; border:1px solid #2d3748; border-radius:10px; overflow:hidden;">
+          <div id="email-strategy-header" style="padding:10px 14px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #2d3748;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+            <div style="padding:12px 14px; border-right:1px solid #2d3748;">
+              <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#718096; margin-bottom:6px;">🎯 Your Goal</div>
+              <div id="email-strategy-goal" style="font-size:12px; color:#a0aec0; line-height:1.6;"></div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#718096; margin-bottom:6px;">🧠 Psychological Approach</div>
+              <div id="email-strategy-psych" style="font-size:12px; color:#a0aec0; line-height:1.6;"></div>
+            </div>
+          </div>
+          <div style="padding:10px 14px; border-top:1px solid #2d3748; background:#0a0d14;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#718096; margin-bottom:6px;">✅ Key Points to Hit &nbsp;|&nbsp; ❌ What to Avoid</div>
+            <div id="email-strategy-dos" style="font-size:12px; color:#a0aec0; line-height:1.7;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="email-field">
+        <div class="email-field-label">Subject Line</div>
+        <div class="email-subject-box" id="email-subject">—</div>
+      </div>
+      <div class="email-field">
+        <div class="email-field-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Email Body <span style="color:#4a5568; font-weight:400; text-transform:none; letter-spacing:0;">(your agent sends this to listing agent)</span></span>
+          <span id="email-length-label" style="font-size:11px; color:#f6ad55; font-weight:700; text-transform:uppercase; letter-spacing:1px;">Full</span>
+        </div>
+        <div style="display:flex; gap:10px; align-items:stretch;">
+          <div class="email-body-box" id="email-body" style="flex:1; min-height:320px;">—</div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0;">
+            <span style="font-size:9px; color:#4a5568; text-transform:uppercase; letter-spacing:1px; writing-mode:horizontal-tb;">Full</span>
+            <input type="range" id="email-length-slider" min="1" max="5" value="5" step="1"
+              style="writing-mode:vertical-lr; direction:rtl; height:240px; width:20px; accent-color:#f6ad55; cursor:pointer;"
+              oninput="onEmailLengthChange()">
+            <span style="font-size:9px; color:#4a5568; text-transform:uppercase; letter-spacing:1px; writing-mode:horizontal-tb;">Brief</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 11px; color: #4a5568; margin-top: 8px;">✏️ Copy and paste into your email client. Customize agent name, listing agent name, and any bracketed fields before sending.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-copy btn-copy-subject" onclick="copyField('subject')">Copy Subject</button>
+      <button class="btn-copy btn-copy-body"    onclick="copyField('body')"   >Copy Email Body</button>
+      <button class="btn-copy btn-copy-all"     onclick="copyField('all')"    >Copy Both</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phone Script Modal -->
+<div class="modal-overlay" id="phone-modal">
+  <div class="modal-box" style="max-width:780px;">
+    <div class="modal-header">
+      <h2>📞 Phone Script — Call to Listing Agent</h2>
+      <button class="modal-close" onclick="closePhoneModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px; color:#718096; margin-bottom:14px;">Word-for-word scripts. Read naturally — pause where marked. Adapt names and details in brackets.</div>
+      <div class="situation-tabs" id="phone-tabs">
+        <button class="stab active" onclick="switchPhoneTab('firstcall', this)"
+          data-tooltip="First time calling about this property.&#10;Goal: qualify the seller and plant&#10;the seed before submitting an offer.">📋 First Contact</button>
+        <button class="stab" onclick="switchPhoneTab('followoffer', this)"
+          data-tooltip="You submitted an offer — no response.&#10;Goal: find out where you stand&#10;and re-anchor your strengths.">📬 After Offer Sent</button>
+        <button class="stab" onclick="switchPhoneTab('negotiate', this)"
+          data-tooltip="Seller pushed back or countered.&#10;Goal: hold your number, justify&#10;the gap, close the deal on the call.">💬 Negotiate on the Call</button>
+        <button class="stab" onclick="switchPhoneTab('compete', this)"
+          data-tooltip="Multiple offers situation.&#10;Goal: reframe certainty vs price.&#10;Make them fear losing your offer.">🏆 Competing Offers</button>
+      </div>
+      <div id="phone-suggest-banner" style="margin-bottom:14px; padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.5; background:rgba(99,179,237,0.08); border:1px solid rgba(99,179,237,0.25); color:#63b3ed;"></div>
+
+      <!-- Objective + Tone bar -->
+      <div id="phone-objective-bar" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+        <div style="background:#0f1117; border:1px solid #2d3748; border-radius:8px; padding:10px 14px;">
+          <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#718096; margin-bottom:4px;">🎯 Call Objective</div>
+          <div id="phone-objective" style="font-size:12px; color:#a0aec0; line-height:1.5;"></div>
+        </div>
+        <div style="background:#0f1117; border:1px solid #2d3748; border-radius:8px; padding:10px 14px;">
+          <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#718096; margin-bottom:4px;">🎭 Tone & Posture</div>
+          <div id="phone-tone" style="font-size:12px; color:#a0aec0; line-height:1.5;"></div>
+        </div>
+      </div>
+
+      <!-- Script body -->
+      <div id="phone-script-body" style="background:#0f1117; border:1px solid #2d3748; border-radius:8px; padding:16px; font-size:13px; line-height:2; color:#a0aec0; white-space:pre-wrap; font-family:'Segoe UI',system-ui,sans-serif; min-height:380px; max-height:480px; overflow-y:auto;"></div>
+
+      <div style="margin-top:10px; font-size:11px; color:#4a5568;">
+        💡 Bracketed text <span style="color:#f6ad55;">[like this]</span> = fill in before calling. &nbsp;|&nbsp;
+        <span style="color:#63b3ed;">« PAUSE »</span> = stop talking, let them respond. &nbsp;|&nbsp;
+        <span style="color:#68d391;">IF THEY SAY</span> = objection handling branches.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-copy btn-copy-body" onclick="copyPhoneScript()" style="flex:1;">Copy Script</button>
+      <button class="btn-copy btn-copy-all" onclick="copyPhoneScript('full')" style="flex:1; background:#63b3ed; color:#1a1f2e;">Copy with Objective + Tone</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">HAT Investors · Deal Analyzer · Jacksonville, FL · All calculations use Rob @ 3 Shacks Capital defaults</div>
+
+<script>
+// Collapsible card toggle
+function toggleCollapse(headerEl) {
+  headerEl.classList.toggle('collapsed');
+  const body = headerEl.nextElementSibling;
+  body.classList.toggle('collapsed');
+}
+
+let strategy = 'both';
+
+function setStrategy(s) {
+  strategy = s;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  calc();
+}
+
+function fmt(n, decimals = 0) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function fmtPct(n, decimals = 1) {
+  if (n === null || isNaN(n) || !isFinite(n)) return '—';
+  return n.toFixed(decimals) + '%';
+}
+
+function colorClass(val, thresholds) {
+  // thresholds: [good, warn] — above good = green, above warn = yellow, below = red
+  if (val >= thresholds[0]) return 'green';
+  if (val >= thresholds[1]) return 'yellow';
+  return 'red';
+}
+
+function sync(id) {
+  const val = parseFloat(document.getElementById(id).value) || 0;
+  document.getElementById(id + '-range').value = val;
+  document.getElementById('lbl-' + id).textContent = fmt(val);
+}
+
+function syncRange(id) {
+  const val = parseFloat(document.getElementById(id + '-range').value) || 0;
+  document.getElementById(id).value = val;
+  document.getElementById('lbl-' + id).textContent = fmt(val);
+}
+
+function updateHoldLabel(type) {
+  const val = document.getElementById('hold-' + type).value;
+  document.getElementById('lbl-hold-' + type).textContent = val + ' month' + (val == 1 ? '' : 's');
+}
+
+function setEl(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setElHTML(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = val;
+}
+
+function setClass(id, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = el.className.replace(/\b(green|yellow|red|blue|purple)\b/g, '').trim();
+  if (cls) el.classList.add(cls);
+}
+
+function calc() {
+  const pp    = parseFloat(document.getElementById('pp').value) || 0;
+  const reno  = parseFloat(document.getElementById('reno').value) || 0;
+  const arv   = parseFloat(document.getElementById('arv').value) || 0;
+  const rent  = parseFloat(document.getElementById('rent').value) || 0;
+  const holdFlip  = parseInt(document.getElementById('hold-flip').value) || 3;
+  const holdBRRRR = parseInt(document.getElementById('hold-brrrr').value) || 6;
+
+  // ── Core HML ──
+  const loanPurch = pp * 0.90;
+  const loanTotal = loanPurch + reno;
+  const points    = loanTotal * 0.02;
+  const fixedFees = 1600 + 500 + 200 + 150; // 2450
+  const purchCosts = points + fixedFees;
+  const downPmt   = pp * 0.10;
+  const cashNeeded = downPmt + purchCosts;
+  const monthlyLoan = loanTotal * 0.01;
+  const monthlyHold = monthlyLoan + 208 + 100; // loan + tax + ins
+
+  // ── Cost stack display ──
+  setEl('cs-pp', fmt(pp));
+  setEl('cs-reno', fmt(reno));
+  setEl('cs-loan', fmt(loanTotal));
+  setEl('cs-down', fmt(downPmt));
+  setEl('cs-points', fmt(points));
+  setEl('cs-purch-costs', fmt(purchCosts));
+  setEl('cs-cash-needed', fmt(cashNeeded));
+
+  // ── FLIP ──
+  const holdFlipCost  = monthlyHold * holdFlip;
+  const allInFlip     = pp + reno + purchCosts + holdFlipCost;
+  const saleProceeds  = arv * 0.93;
+  const flipProfit    = saleProceeds - loanTotal - holdFlipCost - cashNeeded;
+  const flipROI       = cashNeeded > 0 ? (flipProfit / cashNeeded) * 100 : 0;
+  const flipAnnROI    = holdFlip > 0 ? flipROI / holdFlip * 12 : 0;
+
+  setEl('f-proceeds', fmt(saleProceeds));
+  setEl('f-loan-rep', fmt(loanTotal));
+  setEl('f-holding', fmt(holdFlipCost));
+  setEl('f-cash-inv', fmt(cashNeeded));
+
+  const profitEl = document.getElementById('f-profit');
+  profitEl.textContent = (flipProfit < 0 ? '-' : '') + fmt(flipProfit);
+  profitEl.className = 'cost-value ' + (flipProfit >= 30000 ? 'profit-positive' : flipProfit >= 0 ? 'profit-thin' : 'profit-negative');
+
+  setEl('f-roi', fmtPct(flipROI));
+  setEl('f-ann-roi', fmtPct(flipAnnROI));
+
+  // Flip projections table
+  const flipRows = [1,2,3,4,5,6,8,12];
+  let tbody = '';
+  flipRows.forEach(mo => {
+    const hc = monthlyHold * mo;
+    const pr = saleProceeds - loanTotal - hc - cashNeeded;
+    const roi = cashNeeded > 0 ? (pr / cashNeeded) * 100 : 0;
+    const cls = pr >= 30000 ? 'profit-positive' : pr >= 0 ? 'profit-thin' : 'profit-negative';
+    const highlight = mo === holdFlip ? ' class="highlight"' : '';
+    tbody += `<tr${highlight}><td>${mo} mo${mo===holdFlip?' ★':''}</td><td>${fmt(hc)}</td><td class="${cls}">${(pr<0?'-':'') + fmt(pr)}</td><td>${fmtPct(roi)}</td></tr>`;
+  });
+  document.getElementById('flip-tbody').innerHTML = tbody;
+
+  // ── BRRRR ──
+  const holdBRCost   = monthlyHold * holdBRRRR;
+  const refiLoan     = arv * 0.70;
+  const refiCosts    = refiLoan * 0.03;
+  const refiCashOut  = refiLoan - refiCosts - loanTotal - holdBRCost;
+  const totalCashInv = refiCashOut >= 0 ? Math.max(0, cashNeeded - refiCashOut) : cashNeeded + Math.abs(refiCashOut);
+  const refiMortgage = refiLoan * 0.006607;
+  const monthlyNOI   = rent - 208 - 100;
+  const monthlyCF    = rent - refiMortgage - 208 - 100;
+  const annualCF     = monthlyCF * 12;
+  const annNOI       = rent * 12 - 2500 - 1200;
+  const allInBRRRR   = pp + reno + purchCosts + holdBRCost;
+  const capRatePurch = allInBRRRR > 0 ? (annNOI / allInBRRRR) * 100 : 0;
+  const capRateMkt   = arv > 0 ? (annNOI / arv) * 100 : 0;
+  const coc          = totalCashInv > 0 ? (annualCF / totalCashInv) * 100 : 0;
+  const dcr          = refiMortgage > 0 ? monthlyNOI / refiMortgage : 0;
+  const grm          = rent > 0 ? arv / (rent * 12) : 0;
+
+  setEl('b-refi-loan', fmt(refiLoan));
+  setEl('b-refi-costs', fmt(refiCosts));
+  setEl('b-loan-rep', fmt(loanTotal));
+  setEl('b-holding', fmt(holdBRCost));
+  const brcEl = document.getElementById('b-refi-cashout');
+  brcEl.textContent = (refiCashOut < 0 ? '-' : '+') + fmt(Math.abs(refiCashOut));
+  brcEl.style.color = refiCashOut >= 0 ? '#68d391' : '#fc8181';
+  setEl('b-initial-cash', fmt(cashNeeded));
+  setEl('b-total-cash', fmt(totalCashInv));
+  setEl('b-rent', fmt(rent));
+  setEl('b-noi', fmt(monthlyNOI));
+  const mortEl = document.getElementById('b-mortgage');
+  mortEl.textContent = '-' + fmt(refiMortgage);
+  const cfEl = document.getElementById('b-cf');
+  cfEl.textContent = (monthlyCF < 0 ? '-' : '') + fmt(Math.abs(monthlyCF));
+  cfEl.style.color = monthlyCF >= 200 ? '#68d391' : monthlyCF >= 0 ? '#f6ad55' : '#fc8181';
+  setEl('b-caprate', fmtPct(capRatePurch));
+  setEl('b-coc', fmtPct(coc));
+  setEl('b-dcr', dcr.toFixed(2));
+  setEl('b-grm', grm.toFixed(2));
+
+  // ── Offer Strategy ──
+  // Solve for PP that gives $30K and $40K flip profit
+  // flipProfit = saleProceeds - loanTotal - holdFlipCost - cashNeeded
+  // = arv*0.93 - (0.9p+r) - (monthlyHold*h) - (0.1p + 0.02*(0.9p+r) + 2450)
+  // saleProceeds and reno are fixed — solve for p:
+  // Need: arv*0.93 - minProfit = (0.9p+r) + monthlyHold*h + 0.1p + 0.02*(0.9p+r) + 2450
+  // monthlyHold = (0.9p+r)*0.01 + 308 → depends on p too
+  // Let's do iterative (or algebraic):
+  // Let loan = 0.9p + r
+  // monthlyHold = loan*0.01 + 308
+  // holdCost = monthlyHold * h = (loan*0.01 + 308)*h
+  // cashNeeded = 0.1p + loan*0.02 + 2450
+  // profit = arv*0.93 - loan - holdCost - cashNeeded
+  // = arv*0.93 - (0.9p+r) - (0.9p+r)*0.01*h - 308h - 0.1p - (0.9p+r)*0.02 - 2450
+  // = arv*0.93 - 2450 - 308h - (0.9p+r)(1 + 0.01h + 0.02) - 0.1p
+  // = arv*0.93 - 2450 - 308h - 0.9p(1.02 + 0.01h) - r(1.02+0.01h) - 0.1p
+  // = arv*0.93 - 2450 - 308h - r(1.02+0.01h) - p[0.9(1.02+0.01h) + 0.1]
+  // Set profit = minProfit and solve for p:
+  // p = [arv*0.93 - 2450 - 308h - r(1.02+0.01h) - minProfit] / [0.9(1.02+0.01h) + 0.1]
+  function maxPP(minProfit) {
+    const h = holdFlip;
+    const factor = 1.02 + 0.01 * h;
+    const num = arv * 0.93 - 2450 - 308 * h - reno * factor - minProfit;
+    const den = 0.9 * factor + 0.1;
+    return num / den;
+  }
+
+  const offerStrong   = maxPP(40000);
+  const offerMax      = maxPP(30000);
+  const offerWalkaway = offerMax;
+
+  setEl('offer-strong', offerStrong > 0 ? fmt(Math.round(offerStrong / 1000) * 1000) : 'N/A');
+  setEl('offer-max', offerMax > 0 ? fmt(Math.round(offerMax / 1000) * 1000) : 'N/A');
+  setEl('offer-walkaway', offerWalkaway > 0 ? fmt(Math.round(offerWalkaway / 1000) * 1000) : 'N/A');
+
+  const gap = pp - offerWalkaway;
+  const askingDeltaEl = document.getElementById('asking-delta');
+  if (gap > 1000) {
+    askingDeltaEl.textContent = fmt(gap) + ' ABOVE';
+    askingDeltaEl.style.color = '#fc8181';
+  } else if (gap < -1000) {
+    askingDeltaEl.textContent = fmt(Math.abs(gap)) + ' BELOW';
+    askingDeltaEl.style.color = '#68d391';
+  } else {
+    askingDeltaEl.textContent = 'AT';
+    askingDeltaEl.style.color = '#f6ad55';
+  }
+
+  // ── MAO ──
+  const mao30 = 0.75 * arv - reno - 2450 - 30000;
+  const mao40 = 0.75 * arv - reno - 2450 - 40000;
+  setEl('mao-30', mao30 > 0 ? fmt(mao30) : 'N/A');
+  setEl('mao-40', mao40 > 0 ? fmt(mao40) : 'N/A');
+  const maoGap = pp - mao30;
+  const maoGapEl = document.getElementById('mao-gap');
+  if (maoGap > 0) { maoGapEl.textContent = fmt(maoGap) + ' over'; maoGapEl.style.color = '#fc8181'; }
+  else { maoGapEl.textContent = fmt(Math.abs(maoGap)) + ' under'; maoGapEl.style.color = '#68d391'; }
+
+  // ── Key metric cards ──
+  const profitColor = flipProfit >= 40000 ? 'green' : flipProfit >= 30000 ? 'yellow' : 'red';
+  document.getElementById('mc-profit').className = 'metric-card ' + profitColor;
+  const profitDisplay = document.getElementById('mv-profit');
+  profitDisplay.textContent = (flipProfit < 0 ? '-' : '') + fmt(Math.abs(flipProfit));
+  profitDisplay.className = 'metric-value ' + profitColor;
+  setEl('ms-profit', holdFlip + '-month hold');
+
+  const roiColor = flipAnnROI >= 100 ? 'green' : flipAnnROI >= 50 ? 'yellow' : 'red';
+  document.getElementById('mc-roi').className = 'metric-card ' + roiColor;
+  const roiDisplay = document.getElementById('mv-roi');
+  roiDisplay.textContent = fmtPct(flipAnnROI);
+  roiDisplay.className = 'metric-value ' + roiColor;
+
+  const cfColor = monthlyCF >= 200 ? 'green' : monthlyCF >= 0 ? 'yellow' : 'red';
+  document.getElementById('mc-cf').className = 'metric-card ' + cfColor;
+  const cfDisplay = document.getElementById('mv-cf');
+  cfDisplay.textContent = (monthlyCF < 0 ? '-' : '') + fmt(Math.abs(monthlyCF));
+  cfDisplay.className = 'metric-value ' + cfColor;
+
+  const cocColor = coc >= 8 ? 'green' : coc >= 4 ? 'yellow' : 'red';
+  document.getElementById('mc-coc').className = 'metric-card ' + cocColor;
+  const cocDisplay = document.getElementById('mv-coc');
+  cocDisplay.textContent = fmtPct(coc);
+  cocDisplay.className = 'metric-value ' + cocColor;
+
+  const cashLeftColor = totalCashInv <= 30000 ? 'green' : totalCashInv <= 60000 ? 'yellow' : 'red';
+  document.getElementById('mc-cashleft').className = 'metric-card ' + cashLeftColor;
+  const cashLeftDisplay = document.getElementById('mv-cashleft');
+  cashLeftDisplay.textContent = fmt(totalCashInv);
+  cashLeftDisplay.className = 'metric-value ' + cashLeftColor;
+
+  // ── Verdict ──
+  let verdict, verdictClass, reason;
+  const flipOk  = flipProfit >= 30000;
+  const flipGood = flipProfit >= 40000;
+  const brrrrOk = monthlyCF >= 100 && coc >= 5 && totalCashInv <= 60000;
+  const brrrrGood = monthlyCF >= 200 && coc >= 8 && totalCashInv <= 40000;
+
+  if (flipGood || brrrrGood) {
+    verdict = 'BUY'; verdictClass = 'buy';
+    reason = flipGood && brrrrGood
+      ? `Strong deal on both strategies. Flip nets ${fmt(flipProfit)} · BRRRR yields ${fmtPct(coc)} COC with ${fmt(totalCashInv)} invested.`
+      : flipGood
+        ? `Flip nets ${fmt(flipProfit)} profit — well above the $30K threshold. ${brrrrOk ? 'BRRRR also works as a backup.' : ''}`
+        : `BRRRR yields ${fmtPct(coc)} COC with only ${fmt(totalCashInv)} left in the deal. Strong rental play.`;
+  } else if (flipOk || brrrrOk) {
+    verdict = 'CONDITIONAL BUY'; verdictClass = 'conditional';
+    reason = `Deal works but margin is thin. Flip profit: ${fmt(flipProfit)}. Verify ARV with closed comps and confirm reno scope before committing.`;
+  } else if (pp > offerMax && offerMax > 50000) {
+    verdict = 'RENEGOTIATE'; verdictClass = 'renegotiate';
+    reason = `Deal doesn't work at $${pp.toLocaleString()}. Numbers support a maximum offer of ${fmt(Math.round(offerMax/1000)*1000)}. Counter at that level or walk.`;
+  } else {
+    verdict = 'PASS'; verdictClass = 'pass';
+    reason = `Numbers don't work at current price. Flip loses ${fmt(Math.abs(flipProfit))} · BRRRR leaves ${fmt(totalCashInv)} in the deal at ${fmtPct(coc)} COC. Walk away or counter aggressively.`;
+  }
+
+  const vbox = document.getElementById('verdict-box');
+  vbox.className = 'verdict-box ' + verdictClass;
+  const vtitle = document.getElementById('verdict-title');
+  vtitle.className = 'verdict-title ' + verdictClass;
+  vtitle.textContent = verdict;
+  setEl('verdict-reason', reason);
+
+  // ── Strategy Comparison ──
+  const flipWins  = flipProfit >= 30000;
+  const flipStrng = flipProfit >= 40000;
+  const brrrrWins = monthlyCF >= 100 && coc >= 5;
+  const brrrrStrng= monthlyCF >= 200 && coc >= 8 && totalCashInv <= 40000;
+
+  // Flip col
+  const scFlipProfit = document.getElementById('sc-flip-profit');
+  scFlipProfit.textContent = (flipProfit < 0 ? '-' : '') + fmt(Math.abs(flipProfit));
+  scFlipProfit.style.color = flipStrng ? '#68d391' : flipWins ? '#f6ad55' : '#fc8181';
+  setEl('sc-flip-cash', fmt(cashNeeded));
+  setEl('sc-flip-roi', fmtPct(flipAnnROI));
+  setEl('sc-flip-hold', holdFlip + ' months');
+  const scFlipBadge = document.getElementById('sc-flip-badge');
+  if (flipStrng) { scFlipBadge.textContent = '✅ STRONG FLIP'; scFlipBadge.style.background = 'rgba(72,187,120,0.15)'; scFlipBadge.style.color = '#68d391'; }
+  else if (flipWins) { scFlipBadge.textContent = '⚠️ THIN FLIP'; scFlipBadge.style.background = 'rgba(246,173,85,0.15)'; scFlipBadge.style.color = '#f6ad55'; }
+  else { scFlipBadge.textContent = '❌ FLIP DOESN\'T WORK'; scFlipBadge.style.background = 'rgba(252,129,129,0.15)'; scFlipBadge.style.color = '#fc8181'; }
+
+  // BRRRR col
+  const scBrCF = document.getElementById('sc-brrrr-cf');
+  scBrCF.textContent = (monthlyCF < 0 ? '-' : '') + fmt(Math.abs(monthlyCF));
+  scBrCF.style.color = brrrrStrng ? '#68d391' : brrrrWins ? '#f6ad55' : '#fc8181';
+  const scBrCoc = document.getElementById('sc-brrrr-coc');
+  scBrCoc.textContent = fmtPct(coc);
+  scBrCoc.style.color = brrrrStrng ? '#68d391' : brrrrWins ? '#f6ad55' : '#fc8181';
+  setEl('sc-brrrr-cash', fmt(totalCashInv));
+  const scBrCashout = document.getElementById('sc-brrrr-cashout');
+  scBrCashout.textContent = (refiCashOut >= 0 ? '+' : '-') + fmt(Math.abs(refiCashOut));
+  scBrCashout.style.color = refiCashOut >= 0 ? '#68d391' : '#fc8181';
+  const scBrBadge = document.getElementById('sc-brrrr-badge');
+  if (brrrrStrng) { scBrBadge.textContent = '✅ STRONG BRRRR'; scBrBadge.style.background = 'rgba(72,187,120,0.15)'; scBrBadge.style.color = '#68d391'; }
+  else if (brrrrWins) { scBrBadge.textContent = '⚠️ MARGINAL BRRRR'; scBrBadge.style.background = 'rgba(246,173,85,0.15)'; scBrBadge.style.color = '#f6ad55'; }
+  else { scBrBadge.textContent = '❌ BRRRR DOESN\'T WORK'; scBrBadge.style.background = 'rgba(252,129,129,0.15)'; scBrBadge.style.color = '#fc8181'; }
+
+  // ── Strategy Winner — purely number-driven ──
+  // Score each strategy 0–3 based on its own metrics
+  // Flip: scored on profit and annualized ROI
+  // BRRRR: scored on COC, monthly CF, and cash left in deal
+  const flipScore = flipProfit >= 40000 ? 3 : flipProfit >= 30000 ? 2 : flipProfit >= 15000 ? 1 : 0;
+  const brrrrScore = (monthlyCF >= 200 ? 1 : 0) + (coc >= 8 ? 1 : 0) + (totalCashInv <= 40000 ? 1 : 0);
+  // Also use annualized ROI vs COC as a tiebreaker (both are annual % on cash)
+  const flipBetter  = flipAnnROI > coc;
+
+  const winnerBanner = document.getElementById('strategy-winner-banner');
+  const stratNote = document.getElementById('strategy-note');
+
+  if (flipScore === 0 && brrrrScore === 0) {
+    winnerBanner.textContent = '❌ NEITHER STRATEGY WORKS at current price + reno. See BRRRR rent-ready options below.';
+    winnerBanner.style.background = 'rgba(252,129,129,0.12)'; winnerBanner.style.border = '1px solid rgba(252,129,129,0.3)'; winnerBanner.style.color = '#fc8181';
+    stratNote.textContent = 'Flip loses ' + fmt(Math.abs(flipProfit)) + '. BRRRR yields ' + fmtPct(coc) + ' COC with ' + fmt(totalCashInv) + ' left in deal — both below target. Purchase price must drop or reno must be cut significantly. Check BRRRR rent-ready sensitivity below.';
+  } else if (flipScore >= 2 && brrrrScore >= 2) {
+    // Both work — pick winner by comparing annualized ROI vs COC (apples-to-apples annual %)
+    const winner = flipBetter ? 'FLIP' : 'BRRRR';
+    const winEmoji = flipBetter ? '🔨' : '🏠';
+    winnerBanner.textContent = '🏆 BOTH WORK — ' + winEmoji + ' ' + winner + ' wins on numbers: ' + (flipBetter ? fmtPct(flipAnnROI) + ' ann. ROI vs ' + fmtPct(coc) + ' COC' : fmtPct(coc) + ' COC vs ' + fmtPct(flipAnnROI) + ' ann. ROI');
+    winnerBanner.style.background = 'rgba(72,187,120,0.12)'; winnerBanner.style.border = '1px solid rgba(72,187,120,0.3)'; winnerBanner.style.color = '#68d391';
+    stratNote.textContent = flipBetter
+      ? 'Flip: ' + fmt(flipProfit) + ' profit in ' + holdFlip + ' months (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo cash flow, ' + fmt(totalCashInv) + ' left in deal. Flip deploys capital faster at a higher annual return rate.'
+      : 'BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo cash flow, ' + fmt(totalCashInv) + ' left in deal. Flip: ' + fmt(flipProfit) + ' in ' + holdFlip + ' months (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR returns more per dollar invested annually and retains the asset.';
+  } else if (flipScore >= 2 && brrrrScore < 2) {
+    winnerBanner.textContent = '🔨 NUMBERS SAY: FLIP — Flip hits target (' + fmt(flipProfit) + ' profit); BRRRR does not (' + fmtPct(coc) + ' COC, need ≥8%).';
+    winnerBanner.style.background = 'rgba(246,173,85,0.12)'; winnerBanner.style.border = '1px solid rgba(246,173,85,0.3)'; winnerBanner.style.color = '#f6ad55';
+    stratNote.textContent = 'Flip: ' + fmt(flipProfit) + ' net profit in ' + holdFlip + ' months (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR cash flow is ' + fmt(monthlyCF) + '/mo at ' + fmtPct(coc) + ' COC — below the 8% target. Rent of ' + fmt(rent) + '/mo is insufficient to support the full reno cost via BRRRR. Check rent-ready sensitivity below.';
+  } else if (brrrrScore >= 2 && flipScore < 2) {
+    winnerBanner.textContent = '🏠 NUMBERS SAY: BRRRR — BRRRR hits target (' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo); flip does not (' + fmt(flipProfit) + ' profit).';
+    winnerBanner.style.background = 'rgba(99,179,237,0.12)'; winnerBanner.style.border = '1px solid rgba(99,179,237,0.3)'; winnerBanner.style.color = '#63b3ed';
+    stratNote.textContent = 'BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo cash flow, ' + fmt(totalCashInv) + ' left in deal after refi. Flip only produces ' + fmt(flipProfit) + ' — below the $30K threshold. The rent (' + fmt(rent) + '/mo) supports the BRRRR hold strategy better than the ARV supports a profitable flip.';
+  } else {
+    // Both marginal — pick the less bad one
+    const margWinner = flipScore >= brrrrScore ? 'FLIP' : 'BRRRR';
+    const margEmoji = flipScore >= brrrrScore ? '🔨' : '🏠';
+    winnerBanner.textContent = '⚠️ BOTH MARGINAL — ' + margEmoji + ' ' + margWinner + ' is the less bad option. Neither hits target returns.';
+    winnerBanner.style.background = 'rgba(246,173,85,0.12)'; winnerBanner.style.border = '1px solid rgba(246,173,85,0.3)'; winnerBanner.style.color = '#f6ad55';
+    stratNote.textContent = 'Flip: ' + fmt(flipProfit) + ' profit (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo. Both are below target — renegotiate purchase price or check BRRRR rent-ready reno sensitivity below before committing.';
+  }
+
+  // ── Deal Summary ──
+  const summaryData = {
+    buy: {
+      situation: `This deal works well on <strong style="color:#68d391">both strategies</strong>. The numbers are solid — profit is above the $30K threshold and the capital required is controlled. ARV and reno budget still need verification before going hard.`,
+      conditions: `<ul style="padding-left:16px; margin:0;"><li>Confirm ARV with closed comps</li><li>Validate reno scope with contractor walkthrough</li><li>Confirm Rob's financing availability</li></ul>`
+    },
+    conditional: {
+      situation: `This deal is <strong style="color:#63b3ed">close but not quite there</strong>. The fundamentals are sound — the purchase price is good and the spread exists. However, one key assumption needs to be verified before committing. Margin of safety is thin.`,
+      conditions: `<ul style="padding-left:16px; margin:0;"><li>ARV must be confirmed by closed comps — not just agent opinion</li><li>Reno budget must be validated by contractor walkthrough</li><li>Any overrun kills the deal at current pricing</li></ul>`
+    },
+    renegotiate: {
+      situation: `This deal <strong style="color:#f6ad55">has potential but is overpriced</strong>. The ARV spread exists, but costs eat the profit at the current purchase price. A price reduction of ${fmt(Math.round((pp - offerMax)/1000)*1000)} closes the gap and makes the numbers work.`,
+      conditions: `<ul style="padding-left:16px; margin:0;"><li>Seller must come down to ${fmt(Math.round(offerMax/1000)*1000)} or below</li><li>ARV needs to be confirmed — any downward revision tightens margins further</li><li>Do not go above walk-away price under any circumstance</li></ul>`
+    },
+    pass: {
+      situation: `This deal <strong style="color:#fc8181">does not work at current pricing</strong>. The spread between purchase + renovation and ARV is too thin to generate acceptable returns. Even under optimistic assumptions, profit does not meet the $30K minimum threshold.`,
+      conditions: `<ul style="padding-left:16px; margin:0;"><li>Would need ARV of ${fmt(Math.round((loanTotal + holdFlipCost + cashNeeded + 30000)/0.93/1000)*1000)}+ to work at current price</li><li>Or purchase price must drop to ${fmt(Math.round(offerMax/1000)*1000)} or below</li><li>Pass unless seller significantly reduces asking price</li></ul>`
+    }
+  };
+  const sd = summaryData[verdictClass] || summaryData.pass;
+  document.getElementById('summary-situation').innerHTML = sd.situation;
+  document.getElementById('summary-conditions').innerHTML = sd.conditions;
+
+  // ── Reno Sensitivity ──
+  const renoLevels = [
+    reno,
+    Math.round(reno * 0.875 / 1000) * 1000,
+    Math.round(reno * 0.75 / 1000) * 1000,
+    Math.round(reno * 0.625 / 1000) * 1000,
+    Math.round(reno * 0.5 / 1000) * 1000
+  ].filter((v, i, a) => a.indexOf(v) === i && v >= 10000).slice(0, 5);
+
+  let renoRows = '';
+  let anyFixed = false;
+  renoLevels.forEach(r => {
+    const rLoan = pp * 0.9 + r;
+    const rPoints = rLoan * 0.02;
+    const rPurchCosts = rPoints + fixedFees;
+    const rCashNeeded = pp * 0.1 + rPurchCosts;
+    const rMonthlyHold = rLoan * 0.01 + 308;
+    const rHoldCost = rMonthlyHold * holdFlip;
+    const rProfit = saleProceeds - rLoan - rHoldCost - rCashNeeded;
+    const isCurrent = r === reno;
+    const works = rProfit >= 30000;
+    const strong = rProfit >= 40000;
+    if (works && !isCurrent) anyFixed = true;
+    const verdictIcon = strong ? '✅ Very Strong' : works ? '✅ Works' : '❌ Below threshold';
+    const profitCls = strong ? 'profit-positive' : works ? 'profit-thin' : 'profit-negative';
+    renoRows += `<tr${isCurrent ? ' class="highlight"' : ''}>
+      <td>${isCurrent ? '★ ' : ''}${fmt(r)}${isCurrent ? ' (current)' : ''}</td>
+      <td>${fmt(rLoan)}</td>
+      <td>${fmt(rCashNeeded)}</td>
+      <td class="${profitCls}">${(rProfit<0?'-':'') + fmt(Math.abs(rProfit))}</td>
+      <td style="font-weight:700; font-size:12px;">${verdictIcon}</td>
+    </tr>`;
+  });
+  document.getElementById('reno-tbody').innerHTML = renoRows;
+
+  // ── BRRRR Rent-Ready Reno Sensitivity ──
+  // Show current full reno + reductions of $10K, $15K, $20K, $25K, $30K
+  const brrrrRenoLevels = [reno, reno-10000, reno-15000, reno-20000, reno-25000, reno-30000]
+    .filter(v => v > 0)
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  let brrrrRenoRows = '';
+  let anyBrrrrFixed = false;
+  brrrrRenoLevels.forEach(br => {
+    const brLoanTotal = pp * 0.9 + br;
+    const brPoints    = brLoanTotal * 0.02;
+    const brPurchCosts= brPoints + fixedFees;
+    const brCashNeeded= pp * 0.1 + brPurchCosts;
+    const brMonthlyHold = brLoanTotal * 0.01 + 308;
+    const brHoldCost  = brMonthlyHold * holdBRRRR;
+    const brRefiLoan  = arv * 0.70;
+    const brRefiCosts = brRefiLoan * 0.03;
+    const brRefiCashOut = brRefiLoan - brRefiCosts - brLoanTotal - brHoldCost;
+    const brTotalCashInv = brRefiCashOut >= 0 ? Math.max(0, brCashNeeded - brRefiCashOut) : brCashNeeded + Math.abs(brRefiCashOut);
+    const brRefiMortgage = brRefiLoan * 0.006607;
+    const brMonthlyCF = rent - brRefiMortgage - 208 - 100;
+    const brCOC = brTotalCashInv > 0 ? (brMonthlyCF * 12 / brTotalCashInv) * 100 : 0;
+    const isCurrent = br === reno;
+    const savings = reno - br;
+    const works = brMonthlyCF >= 100 && brCOC >= 5;
+    const strong = brMonthlyCF >= 200 && brCOC >= 8;
+    if (works && !isCurrent) anyBrrrrFixed = true;
+    const bvIcon = strong ? '✅ Strong' : works ? '✅ Marginal' : '❌ No';
+    const cfCls = strong ? 'profit-positive' : works ? 'profit-thin' : 'profit-negative';
+    brrrrRenoRows += `<tr${isCurrent ? ' class="highlight"' : ''}>
+      <td>${isCurrent ? '★ ' : ''}${fmt(br)}${isCurrent ? ' (full)' : ' (rent-ready)'}</td>
+      <td style="color:#a0aec0;">${savings === 0 ? '—' : '-' + fmt(savings)}</td>
+      <td class="${cfCls}">${(brMonthlyCF<0?'-':'') + fmt(Math.abs(brMonthlyCF))}/mo</td>
+      <td class="${cfCls}">${fmtPct(brCOC)}</td>
+      <td>${fmt(brTotalCashInv)}</td>
+      <td style="font-weight:700; font-size:12px;">${bvIcon}</td>
+    </tr>`;
+  });
+  document.getElementById('brrrr-reno-tbody').innerHTML = brrrrRenoRows;
+
+  const brrrrRenoBanner = document.getElementById('brrrr-reno-banner');
+  if (brrrrWins) {
+    brrrrRenoBanner.style.background = 'rgba(72,187,120,0.12)'; brrrrRenoBanner.style.border = '1px solid rgba(72,187,120,0.3)'; brrrrRenoBanner.style.color = '#68d391';
+    brrrrRenoBanner.textContent = '✅ BRRRR already works at full reno scope — rent-ready reduction only improves the numbers.';
+  } else if (anyBrrrrFixed) {
+    brrrrRenoBanner.style.background = 'rgba(246,173,85,0.12)'; brrrrRenoBanner.style.border = '1px solid rgba(246,173,85,0.3)'; brrrrRenoBanner.style.color = '#f6ad55';
+    brrrrRenoBanner.textContent = '⚠️ YES — BRRRR works with reduced rent-ready reno. Do a minimal scope walkthrough before committing.';
+  } else {
+    brrrrRenoBanner.style.background = 'rgba(252,129,129,0.12)'; brrrrRenoBanner.style.border = '1px solid rgba(252,129,129,0.3)'; brrrrRenoBanner.style.color = '#fc8181';
+    brrrrRenoBanner.textContent = '❌ BRRRR does not work even at reduced reno — cash flow is insufficient at current rent + price.';
+  }
+
+  const banner = document.getElementById('reno-verdict-banner');
+  if (flipProfit >= 30000) {
+    banner.style.background = 'rgba(72,187,120,0.12)';
+    banner.style.border = '1px solid rgba(72,187,120,0.3)';
+    banner.style.color = '#68d391';
+    banner.textContent = '✅ Current reno budget already works — deal clears the $30K threshold.';
+  } else if (anyFixed) {
+    banner.style.background = 'rgba(246,173,85,0.12)';
+    banner.style.border = '1px solid rgba(246,173,85,0.3)';
+    banner.style.color = '#f6ad55';
+    banner.textContent = '⚠️ YES — Reducing reno fixes this deal. Get a contractor in before making an offer.';
+  } else {
+    banner.style.background = 'rgba(252,129,129,0.12)';
+    banner.style.border = '1px solid rgba(252,129,129,0.3)';
+    banner.style.color = '#fc8181';
+    banner.textContent = '❌ NO — Reno is not the lever. Even at half the reno budget, the purchase price is the problem.';
+  }
+
+  // ── Bottom Line ──
+  const blRows = [
+    ['Do this deal at current price?',   flipProfit >= 30000 ? '✅ Yes' : flipProfit >= 20000 ? '⚠️ Conditional' : '❌ No',  flipProfit >= 30000 ? '#68d391' : flipProfit >= 20000 ? '#f6ad55' : '#fc8181'],
+    ['Is there a deal here at all?',     offerMax > 30000 ? '✅ Yes — at the right price' : '❌ No — ARV too low', offerMax > 30000 ? '#68d391' : '#fc8181'],
+    ['Is reno the lever?',               anyFixed ? '✅ Yes — get contractor in' : flipProfit >= 30000 ? '✅ Already works' : '❌ No — price is the lever', anyFixed || flipProfit >= 30000 ? '#f6ad55' : '#fc8181'],
+    ['Your opening offer',               fmt(Math.round(offerStrong/1000)*1000), '#f6ad55'],
+    ['Walk-away price',                  fmt(Math.round(offerMax/1000)*1000), '#fc8181'],
+    ['First step',                       anyFixed ? 'Contractor walkthrough to confirm reno budget' : flipProfit >= 30000 ? 'Verify ARV with closed comps' : 'Call listing agent — counter at ' + fmt(Math.round(offerMax/1000)*1000), '#63b3ed'],
+  ];
+  document.getElementById('bottom-line-tbody').innerHTML = blRows.map((r, i) =>
+    `<tr style="border-bottom: 1px solid #2d3748;">
+      <td style="padding: 12px 16px; font-size: 13px; color: #718096; width: 45%; background:${i%2===0?'#1a1f2e':'#161b28'};">${r[0]}</td>
+      <td style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: ${r[2]}; background:${i%2===0?'#1a1f2e':'#161b28'};">${r[1]}</td>
+    </tr>`
+  ).join('');
+
+  // ── Risk Assessment ──
+  const spread = arv - pp - reno;
+  const arvRisk = spread < 10000 ? 'high' : spread < 30000 ? 'medium' : 'low';
+  const renoRisk = reno > 80000 ? 'high' : reno > 50000 ? 'medium' : 'low';
+  const marginRisk = flipProfit < 0 ? 'high' : flipProfit < 30000 ? 'medium' : 'low';
+  const capitalRisk = totalCashInv > 80000 ? 'high' : totalCashInv > 50000 ? 'medium' : 'low';
+  const cfRisk = monthlyCF < 0 ? 'high' : monthlyCF < 150 ? 'medium' : 'low';
+  const timingRisk = holdFlip > 6 ? 'high' : holdFlip > 4 ? 'medium' : 'low';
+
+  document.getElementById('risk-grid').innerHTML = `
+    <div class="risk-item"><span class="risk-name">ARV / Spread</span><span class="risk-badge ${arvRisk}">${arvRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">Rehab Budget</span><span class="risk-badge ${renoRisk}">${renoRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">Profit Margin</span><span class="risk-badge ${marginRisk}">${marginRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">Capital at Risk</span><span class="risk-badge ${capitalRisk}">${capitalRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">BRRRR Cash Flow</span><span class="risk-badge ${cfRisk}">${cfRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">Timing / Hold</span><span class="risk-badge ${timingRisk}">${timingRisk.toUpperCase()}</span></div>
+    <div class="risk-item"><span class="risk-name">Financing</span><span class="risk-badge low">LOW</span></div>
+    <div class="risk-item"><span class="risk-name">Title / Permits</span><span class="risk-badge unknown">UNKNOWN</span></div>
+  `;
+
+  // ── Next Actions ──
+  const actions = [];
+  if (verdict === 'PASS' || verdict === 'RENEGOTIATE') {
+    actions.push('<strong>Verify ARV first</strong> — get your agent to pull closed comps (sold in last 6 months, renovated, same zip). If ARV is higher than $' + arv.toLocaleString() + ', recalculate.');
+    actions.push('<strong>Phone call to listing agent</strong> — do not submit a written lowball. Call, say you\'re a cash/HML buyer who closes fast, and test their floor: "Would the seller consider $' + (Math.round(offerMax/1000)*1000).toLocaleString() + '?"');
+    actions.push('<strong>Counter at $' + (Math.round(offerMax/1000)*1000).toLocaleString() + ' maximum</strong> — this is your walk-away. Do not negotiate above this number under any circumstance.');
+    actions.push('<strong>Get contractor estimate</strong> — before any offer, confirm the $' + reno.toLocaleString() + ' reno budget with a walkthrough. Overruns at thin margins are deal-killers.');
+  } else if (verdict === 'CONDITIONAL BUY') {
+    actions.push('<strong>Confirm ARV with closed comps</strong> — margin is thin, cannot afford a downward revision.');
+    actions.push('<strong>Get contractor walkthrough</strong> — validate reno budget before going hard on deposit.');
+    actions.push('<strong>Submit offer at $' + (Math.round(offerStrong/1000)*1000).toLocaleString() + '</strong> — strong offer with room to negotiate up to $' + (Math.round(offerMax/1000)*1000).toLocaleString() + '.');
+    actions.push('<strong>Confirm Rob\'s availability</strong> — make sure financing is ready to move fast.');
+  } else {
+    actions.push('<strong>Submit offer at $' + (Math.round(offerStrong/1000)*1000).toLocaleString() + '</strong> — numbers support this confidently.');
+    actions.push('<strong>Order inspection / contractor walkthrough</strong> — validate reno scope and protect against surprises.');
+    actions.push('<strong>Notify Rob</strong> — give him the deal summary and confirm terms.');
+    actions.push('<strong>Title search</strong> — check for liens, open permits, or clouded title before going hard.');
+  }
+
+  document.getElementById('action-list').innerHTML = actions.map((a, i) =>
+    `<li class="action-item"><div class="action-num">${i+1}</div><div class="action-text">${a}</div></li>`
+  ).join('');
+}
+
+// ── Email Length Slider ──
+const EMAIL_LEVEL_LABELS = ['', 'Brief', 'Short', 'Standard', 'Detailed', 'Full'];
+
+function onEmailLengthChange() {
+  const level = parseInt(document.getElementById('email-length-slider').value);
+  document.getElementById('email-length-label').textContent = EMAIL_LEVEL_LABELS[level];
+  renderEmail(_currentEmailTab);
+}
+
+function applyEmailLength(body, level) {
+  if (level >= 5) return body;
+  const paras = body.split(/\n\n+/).filter(s => s.trim().length > 0);
+  if (paras.length <= 4) return body;
+  const head = paras.slice(0, 2);
+  const tail = paras.slice(-2);
+  const middle = paras.slice(2, -2);
+  if (level === 1) return [...head, ...tail].join('\n\n');
+  const keepCount = Math.round(middle.length * (level - 1) / 3);
+  return [...head, ...middle.slice(0, keepCount), ...tail].join('\n\n');
+}
+
+// ── Email Generator ──
+let _currentEmailTab = 'offer';
+
+function suggestEmailTab() {
+  const pp      = parseFloat(document.getElementById('pp').value) || 0;
+  const reno    = parseFloat(document.getElementById('reno').value) || 0;
+  const arv     = parseFloat(document.getElementById('arv').value) || 0;
+  const holdFlip= parseInt(document.getElementById('hold-flip').value) || 3;
+  const loanTotal   = pp * 0.9 + reno;
+  const points      = loanTotal * 0.02;
+  const cashNeeded  = pp * 0.1 + points + 2450;
+  const holdCost    = (loanTotal * 0.01 + 308) * holdFlip;
+  const flipProfit  = arv * 0.93 - loanTotal - holdCost - cashNeeded;
+  const offerMax    = Math.round(maxPP_email(arv, reno, holdFlip, 30000) / 1000) * 1000;
+  const gap         = pp - offerMax;
+  const gapPct      = pp > 0 ? (gap / pp) * 100 : 0;
+
+  let tab, reason;
+  if (flipProfit >= 40000) {
+    tab = 'offer';
+    reason = '✅ <strong>Use: Initial Offer.</strong> The deal is strong at current price — flip profit ' + '$' + Math.round(flipProfit).toLocaleString() + '. Lead with confidence. Your terms (fast close, high deposit, as-is) will make this an easy yes for the seller. No need to justify the price.';
+  } else if (flipProfit >= 30000) {
+    tab = 'offer';
+    reason = '✅ <strong>Use: Initial Offer.</strong> Deal works at asking — flip profit ' + '$' + Math.round(flipProfit).toLocaleString() + '. Submit the offer cleanly. Lead with your buyer strength (speed, certainty, deposit) to compete with any financed buyers.';
+  } else if (gap > 0 && gap <= 12000) {
+    tab = 'negotiate';
+    reason = '⚠️ <strong>Use: Counter / Negotiate.</strong> You are ' + '$' + Math.round(gap).toLocaleString() + ' apart from the walk-away price. This is a bridgeable gap. Propose meeting in the middle or offer the seller better terms (flexible close, higher deposit) in exchange for holding your price. Don\'t just trade numbers.';
+  } else if (gap > 12000) {
+    tab = 'negotiate';
+    reason = '⚠️ <strong>Use: Counter / Negotiate.</strong> Significant gap of ' + '$' + Math.round(gap).toLocaleString() + ' (' + gapPct.toFixed(1) + '% of asking). The seller needs to understand <em>why</em> your number is where it is — not just that it is lower. Use the transparent math breakdown. Ask the listing agent to share it directly with the seller.';
+  } else {
+    tab = 'offer';
+    reason = '📋 <strong>Use: Initial Offer.</strong> Start by establishing your buyer profile and terms. A strong first impression sets the tone for any negotiation that follows.';
+  }
+  return { tab, reason };
+}
+
+function openEmailModal() {
+  const { tab, reason } = suggestEmailTab();
+  _currentEmailTab = tab;
+  const tabOrder = ['offer','negotiate','compete','motivated','followup'];
+  document.querySelectorAll('.stab').forEach((t, i) => {
+    t.classList.toggle('active', tabOrder[i] === tab);
+  });
+  // Show recommendation banner
+  let banner = document.getElementById('email-suggest-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'email-suggest-banner';
+    banner.style.cssText = 'margin-bottom:14px; padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.5; background:rgba(246,173,85,0.08); border:1px solid rgba(246,173,85,0.25); color:#f6ad55;';
+    const tabs = document.getElementById('situation-tabs');
+    tabs.parentNode.insertBefore(banner, tabs.nextSibling);
+  }
+  banner.innerHTML = '💡 <strong>Recommended approach:</strong> ' + reason;
+  document.getElementById('email-length-slider').value = 5;
+  document.getElementById('email-length-label').textContent = 'Full';
+  renderEmail(tab);
+  document.getElementById('email-modal').classList.add('open');
+}
+function closeEmailModal() { document.getElementById('email-modal').classList.remove('open'); }
+function switchEmailTab(tab, el) {
+  _currentEmailTab = tab;
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderEmail(tab);
+}
+function copyField(which) {
+  const subj = document.getElementById('email-subject').textContent;
+  const body = document.getElementById('email-body').textContent;
+  const text = which === 'subject' ? subj : which === 'body' ? body : 'Subject: ' + subj + '\n\n' + body;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target; const orig = btn.textContent;
+    btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+function maxPP_email(arv, reno, h, minProfit) {
+  const factor = 1.02 + 0.01 * h;
+  return (arv * 0.93 - 2450 - 308 * h - reno * factor - minProfit) / (0.9 * factor + 0.1);
+}
+
+function renderEmail(tab) {
+  const pp      = parseFloat(document.getElementById('pp').value) || 0;
+  const reno    = parseFloat(document.getElementById('reno').value) || 0;
+  const arv     = parseFloat(document.getElementById('arv').value) || 0;
+  const rent    = parseFloat(document.getElementById('rent').value) || 0;
+  const holdFlip  = parseInt(document.getElementById('hold-flip').value) || 3;
+  const holdBR    = parseInt(document.getElementById('hold-brrrr').value) || 6;
+  const address   = document.getElementById('address').value || '[Property Address]';
+  const fmtN = n => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+
+  const loanTotal   = pp * 0.9 + reno;
+  const points      = loanTotal * 0.02;
+  const cashNeeded  = pp * 0.1 + points + 2450;
+  const monthlyHold = loanTotal * 0.01 + 308;
+  const holdCost    = monthlyHold * holdFlip;
+  const saleProc    = arv * 0.93;
+  const sellingCosts= Math.round(arv * 0.07);
+  const purchClosing= Math.round(points + 2450);
+  const flipProfit  = saleProc - loanTotal - holdCost - cashNeeded;
+  const flipAnnROI  = cashNeeded > 0 ? (flipProfit / cashNeeded) / holdFlip * 12 * 100 : 0;
+
+  const holdBRCost  = monthlyHold * holdBR;
+  const refiLoan    = arv * 0.70;
+  const refiCashOut = refiLoan - refiLoan*0.03 - loanTotal - holdBRCost;
+  const totalCashInv= refiCashOut >= 0 ? Math.max(0, cashNeeded - refiCashOut) : cashNeeded + Math.abs(refiCashOut);
+  const monthlyCF   = rent - refiLoan * 0.006607 - 208 - 100;
+  const coc         = totalCashInv > 0 ? (monthlyCF * 12 / totalCashInv) * 100 : 0;
+
+  const offerStrong = Math.round(maxPP_email(arv, reno, holdFlip, 40000) / 1000) * 1000;
+  const offerMax    = Math.round(maxPP_email(arv, reno, holdFlip, 30000) / 1000) * 1000;
+  const gap         = pp - offerMax;
+  const gapPct      = pp > 0 ? (gap / pp) * 100 : 0;
+  const midpoint    = Math.round((pp + offerMax) / 2000) * 1000;
+
+  const flipOk    = flipProfit >= 30000;
+  const flipStrng = flipProfit >= 40000;
+  const brrrrOk   = monthlyCF >= 100 && coc >= 5;
+  const brrrrStrng= monthlyCF >= 200 && coc >= 8;
+  let rec = 'flip';
+  if (brrrrStrng && !flipStrng) rec = 'brrrr';
+  else if (brrrrStrng && flipStrng && coc > flipAnnROI) rec = 'brrrr';
+  else if (!flipOk && brrrrOk) rec = 'brrrr';
+
+  const needsNeg  = gap > 3000;
+  const bigGap    = gap > 20000;
+  const smallGap  = gap > 0 && gap <= 10000;
+  const dealWorks = flipOk || brrrrOk;
+
+  const c = { pp, reno, arv, rent, holdFlip, holdBR, address, fmtN,
+    loanTotal, points, cashNeeded, monthlyHold, holdCost, saleProc, sellingCosts, purchClosing,
+    flipProfit, flipAnnROI, monthlyCF, coc, totalCashInv,
+    offerStrong, offerMax, gap, gapPct, midpoint,
+    flipOk, flipStrng, brrrrOk, brrrrStrng, rec,
+    needsNeg, bigGap, smallGap, dealWorks };
+
+  const offerPriceDisplay = needsNeg ? fmtN(offerMax) : fmtN(pp);
+
+  const tactics = {
+    offer: {
+      headerColor: '#68d391', headerBg: 'rgba(72,187,120,0.08)',
+      header: '📋 INITIAL OFFER — Confident Buyer Positioning',
+      goal: `Submit a strong, credible offer that makes the listing agent want to present it to their seller immediately. You want them to say: "This buyer is serious, fast, and won't cause problems."`,
+      psych: `Authority + certainty. Sellers and agents are tired of buyers who talk a big game and disappear at inspection. Establish yourself as the professional, predictable choice. Your terms are your leverage — speed, deposit, and no re-trading are worth real money to a seller.`,
+      dos: `✅ Lead with your buyer strengths before the price\n✅ Mention the $5K–$7.5K earnest money explicitly — it signals commitment\n✅ State you decide on-site — no 15-day inspection period games\n✅ Offer ${offerPriceDisplay}${needsNeg ? ' and show the math so they understand it' : ' — the deal supports it'}\n❌ Don't open with price — open with who you are\n❌ Don't over-explain if the deal works at asking — confidence closes deals\n❌ Don't mention you are an investor early if it can be avoided`,
+      fn: emailOffer
+    },
+    negotiate: {
+      headerColor: '#f6ad55', headerBg: 'rgba(246,173,85,0.08)',
+      header: '💬 COUNTER / NEGOTIATE — Transparent Math, Not Pressure',
+      goal: `Close a ${fmtN(gap)} price gap by making the seller feel informed and respected, not cornered. You want them to see the number and think "I understand why — this is real" instead of "they're just trying to steal it."`,
+      psych: `Transparency as persuasion. Most sellers resist lowball offers because they feel disrespected. If you show the math openly — ARV, reno, carrying costs, selling costs — the number stops feeling like an opinion and starts feeling like a fact. The seller stops negotiating against you and starts negotiating against reality.${smallGap ? ' With a small gap, also use loss aversion — both sides lose if this falls apart over ' + fmtN(gap) + '.' : ''}`,
+      dos: `✅ Show the full cost stack — ARV → selling costs → reno → carrying costs → max price\n✅ Invite them to challenge your assumptions (ARV, reno) — shows you're confident in your numbers\n✅ Offer strong terms in exchange for the price: fast close, high deposit, as-is\n${smallGap ? '✅ Propose meeting in the middle — ' + fmtN(midpoint) + ' — give both sides a win\n' : ''}❌ Don't just counter with a number — always attach a reason\n❌ Don't threaten to walk unless you mean it\n❌ Don't apologize for the offer — own the math`,
+      fn: emailNegotiate
+    },
+    compete: {
+      headerColor: '#63b3ed', headerBg: 'rgba(99,179,237,0.08)',
+      header: '🏆 BEAT OTHER OFFERS — Certainty Over Price',
+      goal: `Win a competitive situation without necessarily being the highest price. Reframe what "best offer" means — shift the seller's focus from the number to the probability of closing. Make them afraid of what happens if our offer walks and the financed buyer fails.`,
+      psych: `Loss aversion + contrast effect. Sellers in multiple-offer situations focus on the highest number. Your job is to make them feel the risk of that choice. A $5K higher offer that takes 45 days and re-trades at inspection is worth less than your offer in their hand in 10 days. Paint that picture vividly — let them feel the pain of a failed deal before it happens.`,
+      dos: `✅ Explicitly compare to a conventional buyer: appraisal risk, 45-day timeline, inspection re-trade\n✅ Emphasize $5K–$7.5K earnest money — hard deposit, they keep it if we walk\n✅ State "we decide at the showing" — no second visits, no ambiguity\n✅ Close in 5–10 days from title clear — make this feel real and specific\n❌ Don't attack the other offer directly — let the logic do the work\n❌ Don't reveal how much you know about the competing offer\n❌ Don't beg — project strength and let the terms speak`,
+      fn: emailCompete
+    },
+    motivated: {
+      headerColor: '#b794f4', headerBg: 'rgba(183,148,244,0.08)',
+      header: '🤝 MOTIVATED SELLER — Empathy Before Business',
+      goal: `Connect with a seller who is stressed, tired, or in a difficult situation. Make them feel heard and relieved — not processed. The goal is for them to think: "This buyer gets it. They're not going to make this harder than it needs to be."`,
+      psych: `Empathy + relief framing. Distressed sellers (estate sales, divorces, financial pressure, tired landlords) are not primarily thinking about maximizing price — they are thinking about ending the stress. If you position yourself as the path to relief, you become the easy choice even at a lower price. Never lead with numbers. Lead with understanding their situation.`,
+      dos: `✅ Open with acknowledgment — selling a distressed property is hard\n✅ Emphasize as-is: "we take it exactly as it is — seller removes nothing they don't want to"\n✅ Highlight certainty: "no wondering if the deal will fall through"\n✅ Offer flexible timeline: close in 5 days OR give them 60 days — seller decides\n✅ Mention high earnest money — shows you are committed\n❌ Don't open with price or math — that comes after trust is established\n❌ Don't use the word "lowball" or acknowledge the offer is below market\n❌ Don't be clinical — this email should feel human`,
+      fn: emailMotivated
+    },
+    followup: {
+      headerColor: '#718096', headerBg: 'rgba(113,128,150,0.08)',
+      header: '⏰ FOLLOW-UP — Controlled Urgency, No Desperation',
+      goal: `Remind the seller you exist without sounding desperate. Restate your best terms, hint that your capital is not waiting forever, and give them an easy, face-saving way to re-engage — or to tell you they went elsewhere so you can move on.`,
+      psych: `Scarcity + reciprocity. The seller knows you want the property. Your job is to flip the dynamic slightly — you have options, you prefer this deal, but you won't wait indefinitely. This creates mild urgency without pressure. Also use reciprocity: "we've been transparent and professional — we'd appreciate just knowing where things stand."`,
+      dos: `✅ Remind them of the offer terms — fast close, high deposit, as-is — without repeating the whole pitch\n✅ Mention you're actively looking at other properties (true, and creates urgency)\n✅ Give them an easy out: "if you went another direction, just let us know"\n✅ Keep it short — long follow-ups signal desperation\n❌ Don't apologize for following up\n❌ Don't increase the offer in a follow-up — it signals weakness\n❌ Don't send more than 2 follow-ups without new information`,
+      fn: emailFollowup
+    },
+  };
+
+  const t = tactics[tab];
+  const email = t.fn(c);
+
+  // Populate strategy panel
+  const panel = document.getElementById('email-strategy-panel');
+  panel.style.display = 'block';
+  const hdr = document.getElementById('email-strategy-header');
+  hdr.textContent = t.header;
+  hdr.style.color = t.headerColor;
+  hdr.style.background = t.headerBg;
+  document.getElementById('email-strategy-goal').textContent  = t.goal;
+  document.getElementById('email-strategy-psych').textContent = t.psych;
+  document.getElementById('email-strategy-dos').style.whiteSpace = 'pre-line';
+  document.getElementById('email-strategy-dos').textContent   = t.dos;
+
+  document.getElementById('email-subject').textContent = email.subject;
+  const level = parseInt(document.getElementById('email-length-slider').value) || 5;
+  document.getElementById('email-body').textContent = applyEmailLength(email.body, level);
+}
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL 1 — INITIAL OFFER
+// Psychology: Establish authority early. Sellers trust buyers who
+// sound like they've done this before and won't waste their time.
+// Terms (speed, deposit, certainty) are presented as the real value.
+// If below asking: math is shown transparently, framed as "we did
+// the work so you don't have to guess."
+// ══════════════════════════════════════════════════════════════
+function emailOffer(c) {
+  const {address, pp, arv, reno, flipProfit, offerMax, gap, holdFlip, holdCost,
+         sellingCosts, saleProc, purchClosing, flipStrng, flipOk, brrrrOk, brrrrStrng,
+         rec, needsNeg, bigGap, smallGap, fmtN} = c;
+
+  const offerPrice = needsNeg ? offerMax : pp;
+  const subject = needsNeg
+    ? `Offer — ${address} — ${fmtN(offerPrice)} Cash / Fast Close`
+    : `Offer — ${address} — ${fmtN(offerPrice)} — Ready to Execute`;
+
+  const atAsking = !needsNeg;
+  const tone = (flipStrng || brrrrStrng) ? 'strong' : (flipOk || brrrrOk) ? 'ok' : 'below';
+
+  const opener =
+    atAsking && tone === 'strong'
+      ? `I hope you're having a good day. I'm writing on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We've reviewed the property thoroughly and we are ready to go — full price offer at ${fmtN(offerPrice)}, and we want to make this as easy as possible for the seller.`
+      : atAsking
+        ? `I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We have completed our analysis and are submitting an offer at ${fmtN(offerPrice)}. We are prepared to move quickly and close cleanly.`
+        : `I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We have done a thorough analysis of the property — renovation scope, market comps, and all carrying costs — and are submitting an offer of ${fmtN(offerPrice)}. I want to walk you through exactly how we got there so you can present this confidently to the seller.`;
+
+  const termsBlock = `
+OUR BUYER PROFILE — WHY THIS OFFER IS STRONGER THAN IT MAY APPEAR ON PAPER
+
+✔ CASH EQUIVALENT — We close with hard money financing through Rob Shackleford at 3 Shacks Capital Partners. This is pre-approved, committed capital — not subject to underwriting, appraisal, or bank approval. For the seller, it carries the same certainty as a cash offer.
+
+✔ CLOSE IN DAYS, NOT WEEKS — Once the title is clear, we can close in 5–10 business days. We are not waiting on inspectors, appraisers, or loan officers. We have done enough deals to know what we're buying — we make our decisions on-site.
+
+✔ INSPECTION DONE AT SHOWING — We bring our contractor to the showing. We evaluate the property on the spot. We do not come back with a list of repairs after the contract is signed. Our offer already reflects the property's condition. No surprises, no re-trades.
+
+✔ STRONG EARNEST MONEY — We are prepared to put $5,000–$10,000 in earnest money at signing to demonstrate we are serious. This is not a speculative offer — we are ready to perform.
+
+✔ AS-IS PURCHASE — We buy the property as-is. No repair requests, no inspection credits, no back-and-forth after signing. The seller closes and moves on.
+
+✔ FLEXIBLE CLOSING DATE — We can close on the seller's timeline, whether that is 10 days or 60 days. We adapt to them — they do not need to adapt to us.`;
+
+  let mathBlock = '';
+  if (needsNeg) {
+    mathBlock = `
+WHY ${fmtN(offerPrice)} — THE HONEST MATH
+
+I want to be direct about why our offer is where it is. This is not a starting number — it is our number, derived from the project economics:
+
+  ARV (market value after full renovation, comps-based):   ${fmtN(arv)}
+  Less 7% selling costs (agent, title, transfer):         -${fmtN(sellingCosts)}
+  Net proceeds at exit:                                    ${fmtN(saleProc)}
+
+  Less renovation to bring to market standard:            -${fmtN(reno)}
+  Less ${holdFlip}-month carrying costs (financing, taxes, insurance): -${fmtN(holdCost)}
+  Less purchase closing costs:                            -${fmtN(purchClosing)}
+  ─────────────────────────────────────────────────────────
+  Maximum supportable purchase price:                      ${fmtN(offerPrice)}
+
+${bigGap
+  ? `At the asking price of ${fmtN(pp)}, this project does not generate a return that justifies the risk and capital invested. We are not trying to underpay the seller — we are bound by what the market will return after a full renovation. If the seller has data suggesting the ARV is meaningfully higher than ${fmtN(arv)}, or the renovation scope is lighter than our estimate, we want to see it. We will update our analysis if the facts support it.`
+  : `The ${fmtN(gap)} difference between our offer and the asking price represents real, unavoidable project costs — not a negotiating cushion. We have priced this offer to work, not to leave room to move up.`
+}`;
+  }
+
+  const strategyLine = rec === 'brrrr' && brrrrOk
+    ? `\nOur intent is to renovate and hold this as a long-term rental. We are not quick-flippers looking for the fastest exit — we are long-term holders building a portfolio in Jacksonville. That means a smoother, more predictable transaction for the seller.`
+    : `\nWe are renovation investors. Our model is to acquire, fully renovate, and resell. The neighborhood gets an improved home, and the seller gets a clean, fast transaction with a buyer who does what they say they will do.`;
+
+  const closer = `\nIf the seller would like to move forward, we can have a contract on your desk within 24 hours.
+
+Happy to jump on a call if that would help. Looking forward to your response.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  return { subject, body: opener + termsBlock + mathBlock + strategyLine + closer };
+}
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL 2 — COUNTER / NEGOTIATE
+// Psychology: Never just trade numbers. Make the seller feel
+// understood and respected. Show the math so they feel informed,
+// not cornered. Offer meaningful concessions on terms (not price)
+// to close the gap. Frame re-trading as irrational for both sides.
+// ══════════════════════════════════════════════════════════════
+function emailNegotiate(c) {
+  const {address, pp, arv, reno, offerMax, offerStrong, gap, gapPct, bigGap, smallGap, midpoint,
+         holdFlip, holdCost, sellingCosts, saleProc, purchClosing, flipProfit, fmtN} = c;
+
+  let subject, body;
+
+  if (smallGap) {
+    subject = `Re: ${address} — Let's Close This Gap`;
+    body =
+`Hi [Listing Agent Name],
+
+Thank you for the response. I have good news: we are very close.
+
+We are ${fmtN(gap)} apart on a transaction of this size — that is less than ${gapPct.toFixed(1)}% of the purchase price. Deals fall apart over gaps like this all the time, and both sides lose. I do not want that to happen here.
+
+Here is what I would like to propose:
+
+OPTION A — MEET IN THE MIDDLE
+We move up to ${fmtN(midpoint)}, the seller comes down to meet us. Neither side gives everything — both sides get a deal done. We can have an amended offer over within the hour.
+
+OPTION B — WE HOLD PRICE, SELLER GETS BETTER TERMS
+We stay at ${fmtN(offerMax)}, but we give the seller:
+  ✔ Close in 5–10 business days from executed contract (once title is clear)
+  ✔ $7,500 earnest money — hard, released immediately to show good faith
+  ✔ Seller picks the exact closing date — we flex entirely to their schedule
+  ✔ Zero repair requests or credits after signing — completely as-is
+  ✔ No financing contingency of any kind — we perform or we forfeit the deposit
+
+I want to be honest: our renovation budget for this property is ${fmtN(reno)}. That is a real cost we absorb after closing. We are already buying the risk — we just need the math to work on the front end.
+
+What can we do to get this across the finish line? I am available for a call right now if that would help.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  } else if (bigGap) {
+    subject = `Re: ${address} — Our Full Analysis — Please Share With Seller`;
+    body =
+`Hi [Listing Agent Name],
+
+Thank you for getting back to us. I understand we have a significant gap to bridge — ${fmtN(gap)}, or ${gapPct.toFixed(1)}% of the asking price — and I do not want to just volley numbers back and forth. That does not help anyone.
+
+Instead, I want to share our complete analysis with full transparency. I would ask that you share this directly with the seller so they can understand how we arrived at our number. This is not a lowball — it is the output of a detailed project underwriting.
+
+━━━ INVESTMENT ANALYSIS — ${address.toUpperCase()} ━━━
+
+STEP 1: WHAT WILL IT SELL FOR AFTER RENOVATION? (ARV)
+Based on closed sales in the immediate area, renovated homes in comparable condition are selling for approximately ${fmtN(arv)}.
+  [Fill in: Comp 1 — Address, Sold Price, $/sqft, Date]
+  [Fill in: Comp 2 — Address, Sold Price, $/sqft, Date]
+  [Fill in: Comp 3 — Address, Sold Price, $/sqft, Date]
+This is a realistic number — not a best-case scenario.
+
+STEP 2: WHAT DOES IT COST TO GET THERE? (RENOVATION)
+To bring this property to the standard of those comps, we estimate ${fmtN(reno)} in renovation costs. This includes [major items from your walkthrough]. This is based on our contractor's assessment, not a guess.
+
+STEP 3: WHAT ARE THE CARRYING COSTS?
+During the ${holdFlip}-month renovation and sale process:
+  Financing, taxes, and insurance:   ${fmtN(holdCost)}
+  Selling costs at closing (7%):     ${fmtN(sellingCosts)}
+  Purchase closing costs:            ${fmtN(purchClosing)}
+
+STEP 4: THE MATH
+  After-repair value:               ${fmtN(arv)}
+  Less selling costs:              -${fmtN(sellingCosts)}
+  Net sale proceeds:                ${fmtN(saleProc)}
+  Less renovation:                 -${fmtN(reno)}
+  Less carrying costs:             -${fmtN(holdCost)}
+  Less purchase closing costs:     -${fmtN(purchClosing)}
+  ─────────────────────────────────
+  Maximum we can pay:               ${fmtN(offerMax)}
+  Seller is asking:                 ${fmtN(pp)}
+  Implied loss at asking price:    -${fmtN(Math.abs(flipProfit))}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is not a negotiating position. At ${fmtN(pp)}, we lose money. That is not something any rational investor does.
+
+WHAT WOULD CHANGE THIS
+If the seller can demonstrate:
+  (a) Comps supporting an ARV meaningfully above ${fmtN(arv)} — we will re-run the numbers
+  (b) A credible renovation estimate below ${fmtN(reno)} — we will adjust
+  (c) A different buyer willing to pay more — that buyer either has a different model or has not done this analysis
+
+We are not going away. We want to close this deal at a price that makes sense for both sides. Our offer of ${fmtN(offerMax)} stands, and it comes with:
+  ✔ Close in 5–10 days once title is clear
+  ✔ $7,500 earnest money at signing
+  ✔ Inspection completed at showing — no re-trading after contract
+  ✔ Seller selects closing date
+  ✔ Completely as-is — zero repair requests
+
+Can we schedule a 15-minute call? These conversations go faster person-to-person.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  } else {
+    subject = `Re: ${address} — Our Position & What We Offer in Return`;
+    body =
+`Hi [Listing Agent Name],
+
+Thank you for coming back to us on ${address}. I respect the seller's position and want to be equally direct about ours.
+
+Our number is ${fmtN(offerMax)}. Here is the full math so the seller can see exactly why:
+
+  ARV (post-renovation, comp-supported):              ${fmtN(arv)}
+  Less 7% selling costs:                             -${fmtN(sellingCosts)}
+  Net proceeds on exit:                               ${fmtN(saleProc)}
+  Less renovation (${fmtN(reno)} — contractor estimate):     -${fmtN(reno)}
+  Less ${holdFlip}-month carrying costs:                        -${fmtN(holdCost)}
+  Less purchase closing costs:                       -${fmtN(purchClosing)}
+  ──────────────────────────────────────────────────
+  Maximum viable purchase price:                      ${fmtN(offerMax)}
+
+At ${fmtN(pp)}, we absorb a loss of ${fmtN(Math.abs(flipProfit))} before we have swung a hammer. That is not a deal we can do — not because we do not want the property, but because the arithmetic does not allow it.
+
+WHAT WE ARE GIVING THE SELLER IN RETURN FOR MEETING US AT ${fmtN(offerMax)}
+
+This is not a take-it-or-leave-it situation. We are offering the seller something that a higher retail offer cannot match:
+
+  ✔ SPEED — Close in 5–10 business days once title is clear. No delays, no back-and-forth with underwriters.
+  ✔ CERTAINTY — Hard money pre-approved. No financing fall-through risk. Our deposit is at risk, not the seller's time.
+  ✔ HIGH EARNEST MONEY — $7,500 deposited at signing. We are putting real money on the line.
+  ✔ ZERO INSPECTION DRAMA — We evaluate on-site. We do not tie up the property for 15 days only to come back asking for $10K in credits.
+  ✔ AS-IS — The seller takes nothing with them they do not want to take. We handle everything after closing.
+  ✔ SELLER'S CLOSING DATE — Name it, we accommodate it.
+
+A retail buyer who offers ${fmtN(pp)} with conventional financing needs 30–45 days, may not appraise, and will likely ask for repairs. Our offer at ${fmtN(offerMax)} is cleaner, faster, and more certain. In many cases, that difference is worth more than the price gap.
+
+We would like to move forward. What does the seller need to see to say yes?
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+  }
+
+  return { subject, body };
+}
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL 3 — BEAT OTHER OFFERS / COMPETING SITUATION
+// Psychology: The seller thinks a higher offer is better. Reframe
+// certainty as the real currency. Expose the hidden risks of
+// financed or retail offers. Position our terms as the insurance
+// the seller does not know they need.
+// ══════════════════════════════════════════════════════════════
+function emailCompete(c) {
+  const {address, pp, offerMax, offerStrong, arv, reno, flipProfit, gap, needsNeg, fmtN} = c;
+  const offerPrice = needsNeg ? offerMax : pp;
+  const subject = `Re: ${address} — Why Our Offer Wins (Even If It's Not the Highest)`;
+
+  const body =
+`Hi [Listing Agent Name],
+
+I understand the seller may be considering multiple offers. I would like to take a moment to explain why our offer should be given serious weight — even if it is not the highest number on the table.
+
+IN REAL ESTATE, THE HIGHEST OFFER IS NOT ALWAYS THE BEST OFFER.
+
+Here is what I mean:
+
+THE RISK OF A HIGHER FINANCED OFFER
+If the seller accepts a conventional buyer at a higher price, here is what actually happens:
+  → 30–45 day closing timeline (or longer if there are issues)
+  → The property must appraise at or above the purchase price — if it does not, the deal collapses or the price drops anyway
+  → Inspection period of 10–15 days where the buyer can walk or renegotiate
+  → Lender-required repairs that the seller must complete before closing
+  → Bank underwriting can deny the loan even after conditional approval
+  → The seller is back on the market, 6 weeks later, with a stigmatized listing
+
+The "highest offer" often does not close. When it does, the seller has frequently given back the difference in concessions, repairs, or re-trades.
+
+WHAT WE BRING INSTEAD
+
+✔ PRE-APPROVED HARD MONEY — Our lender, Rob Shackleford at 3 Shacks Capital Partners, has reviewed our financials and is ready to fund. There is no underwriting to pass. No appraisal required. This is committed capital.
+
+✔ CLOSE IN 5–10 DAYS AFTER TITLE IS CLEAR — Not 30 days. Not 45 days. We are ready the moment the title company gives us the green light.
+
+✔ WE DECIDE ON THE SPOT — Our inspection is done at the showing. We bring our contractor, we walk the property, and we make our decision before we leave. We do not tie up the property for two weeks to think about it.
+
+✔ $7,500 EARNEST MONEY — Hard deposit at signing. If we walk without cause, the seller keeps it. That is how serious we are.
+
+✔ ZERO REPAIR REQUESTS — We buy as-is. Completely. Whatever the property needs, we handle it after closing. The seller owes us nothing.
+
+✔ SELLER CONTROLS THE TIMELINE — We can close in 5 days or 60 days. Seller chooses. We accommodate.
+
+THE REAL QUESTION FOR THE SELLER
+Would they rather have ${fmtN(offerPrice)} with certainty in their hands in 10 days — or spend another month hoping a higher offer survives inspection, appraisal, and underwriting?
+
+We are not asking the seller to take less. We are asking them to take a sure thing over a maybe.
+
+If the seller would like to proceed or wants to discuss, I am available immediately.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  return { subject, body };
+}
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL 4 — MOTIVATED SELLER
+// Psychology: Empathy before business. Sellers in distress want
+// to feel heard and respected, not processed. Lead with their
+// situation, not your numbers. Offer relief, not a lecture.
+// The deal terms become the solution to their problem.
+// ══════════════════════════════════════════════════════════════
+function emailMotivated(c) {
+  const {address, pp, offerMax, arv, reno, gap, needsNeg, flipOk, brrrrOk, fmtN} = c;
+  const offerPrice = needsNeg ? offerMax : pp;
+  const subject = `${address} — We Can Close Quickly and Make This Simple`;
+
+  const body =
+`Hi [Listing Agent Name],
+
+I hope you're doing well. I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}.
+
+We understand that selling a property — especially one that needs work — can be stressful. There are a lot of moving parts, and it is not always clear which buyer is truly serious and which will disappear once the inspection comes back.
+
+We want to be the easy choice.
+
+WHO WE ARE
+HAT Investors is an active real estate investment group in Jacksonville. We have done this many times before. We buy properties that need work, we renovate them, and we either resell them or hold them long-term. We are not flippers looking to squeeze every dollar — we are professional operators who need deals to work and close.
+
+WHAT WE OFFER THE SELLER
+
+The property is in a condition that rules out most retail buyers. Mortgage lenders often will not finance homes in significant disrepair, which limits the seller's pool to cash buyers and investors. We are that pool — and we are here.
+
+Here is what our offer looks like in practice:
+
+  ✔ OFFER PRICE: ${fmtN(offerPrice)}
+  ✔ AS-IS — We take the property exactly as it is. The seller does not need to fix, clean, or remove anything they do not want to.
+  ✔ FAST CLOSE — We can close in 5–10 business days once the title is clear. If the seller needs more time to transition, we give it to them — up to 60 days.
+  ✔ CASH EQUIVALENT — Hard money financing, pre-approved, no bank delays. The seller does not have to wonder if the deal will fall through.
+  ✔ NO INSPECTION SURPRISES — We assessed the property at the showing. What we offer is what we pay. No calls two weeks later asking for repairs or credits.
+  ✔ EARNEST MONEY — We deposit $5,000–$7,500 at signing to demonstrate we are committed.
+  ✔ ZERO HASSLE — We handle everything after the contract is signed. The seller shows up to closing and receives their check.
+
+We recognize this may not be the highest number the seller hoped for. The property's condition limits what any responsible buyer can pay — that is the reality of the market. What we can offer is certainty, speed, and a transaction with no drama.
+
+We are ready to move the moment the seller is.
+
+If the seller has specific concerns — timing, a lease that needs to run out, belongings to remove — please let us know. We have worked around situations like these before, and we are flexible.
+
+Looking forward to hearing from you.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  return { subject, body };
+}
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL 5 — FOLLOW-UP
+// Psychology: Scarcity without aggression. Remind them we exist
+// and have other options — without sounding like we're bluffing.
+// Restate our strongest terms. Give them an easy out if they
+// chose differently. Leave the door open.
+// ══════════════════════════════════════════════════════════════
+function emailFollowup(c) {
+  const {address, pp, offerMax, gap, needsNeg, flipOk, brrrrOk, fmtN} = c;
+  const offerPrice = needsNeg ? offerMax : pp;
+  const subject = `Following Up — ${address} — Still Ready to Move`;
+
+  const urgency = flipOk || brrrrOk
+    ? `To be candid with you: this property works well for us, and our offer remains our best one. We are actively looking at other properties in Jacksonville, and our capital is not sitting idle. We would close here if the seller is ready — but we cannot keep this at the top of our list indefinitely.`
+    : `Our position on price has not changed, and it will not. The renovation scope and comparable sales continue to support ${fmtN(offerMax)} as our ceiling. If the seller has reconsidered, or if there has been a change in their situation, I am ready to talk today.`;
+
+  const body =
+`Hi [Listing Agent Name],
+
+I hope you're well. I wanted to follow up on our offer for ${address}. I know you have a lot on your plate, so I will keep this brief.
+
+Our offer of ${fmtN(offerPrice)} is still on the table — unchanged, no conditions added. Our financing is confirmed, our contractor is available, and we can be at the closing table in 5–10 days from a signed contract.
+
+${urgency}
+
+REMINDER OF WHAT WE BRING
+  ✔ ${fmtN(offerPrice)} — no games, no re-trades
+  ✔ Close in 5–10 days once title is clear
+  ✔ $5,000–$7,500 earnest money at signing
+  ✔ As-is — zero repair requests
+  ✔ Seller picks closing date
+  ✔ Pre-approved hard money — no financing fall-through risk
+
+If the seller has moved in another direction, I completely understand — just let me know so I can update my records. And if that deal falls through, please keep us in mind. We will still be here.
+
+Either way, thank you for your time throughout this process. You have been professional and easy to work with.
+
+Best regards,
+[Your Agent Name]
+[Your Agent Phone] | [Your Agent Email]
+On behalf of Tomer Carmelli — HAT Investors`;
+
+  return { subject, body };
+}
+
+// Close modal on backdrop click
+document.getElementById('email-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEmailModal();
+});
+
+// ══════════════════════════════════════════════════════════════
+// PHONE SCRIPT GENERATOR
+// ══════════════════════════════════════════════════════════════
+let _currentPhoneTab = 'firstcall';
+
+function openPhoneModal() {
+  const { tab, reason } = suggestPhoneTab();
+  _currentPhoneTab = tab;
+  const tabOrder = ['firstcall','followoffer','negotiate','compete'];
+  document.querySelectorAll('#phone-tabs .stab').forEach((t,i) => {
+    t.classList.toggle('active', tabOrder[i] === tab);
+  });
+  document.getElementById('phone-suggest-banner').innerHTML = '💡 <strong>Recommended:</strong> ' + reason;
+  renderPhoneScript(tab);
+  document.getElementById('phone-modal').classList.add('open');
+}
+function closePhoneModal() { document.getElementById('phone-modal').classList.remove('open'); }
+function switchPhoneTab(tab, el) {
+  _currentPhoneTab = tab;
+  document.querySelectorAll('#phone-tabs .stab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderPhoneScript(tab);
+}
+function copyPhoneScript(mode) {
+  const obj  = document.getElementById('phone-objective').textContent;
+  const tone = document.getElementById('phone-tone').textContent;
+  const body = document.getElementById('phone-script-body').textContent;
+  const text = mode === 'full'
+    ? 'OBJECTIVE: ' + obj + '\nTONE: ' + tone + '\n\n' + body
+    : body;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target; const orig = btn.textContent;
+    btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+
+function suggestPhoneTab() {
+  const pp      = parseFloat(document.getElementById('pp').value) || 0;
+  const reno    = parseFloat(document.getElementById('reno').value) || 0;
+  const arv     = parseFloat(document.getElementById('arv').value) || 0;
+  const holdFlip= parseInt(document.getElementById('hold-flip').value) || 3;
+  const loanT   = pp * 0.9 + reno;
+  const pts     = loanT * 0.02;
+  const cashN   = pp * 0.1 + pts + 2450;
+  const hc      = (loanT * 0.01 + 308) * holdFlip;
+  const profit  = arv * 0.93 - loanT - hc - cashN;
+  const offerMax= Math.round(maxPP_email(arv, reno, holdFlip, 30000) / 1000) * 1000;
+  const gap     = pp - offerMax;
+
+  let tab, reason;
+  if (profit >= 30000) {
+    tab = 'firstcall';
+    reason = '✅ <strong>First Contact call.</strong> Deal works at asking — call with confidence to secure a showing and plant your buyer strengths before submitting.';
+  } else if (gap > 0 && gap <= 15000) {
+    tab = 'negotiate';
+    reason = '⚠️ <strong>Negotiate on the Call.</strong> Gap of $' + Math.round(gap).toLocaleString() + ' — close it verbally. Sellers say yes on calls more often than in emails.';
+  } else if (gap > 15000) {
+    tab = 'negotiate';
+    reason = '⚠️ <strong>Negotiate on the Call.</strong> Significant gap of $' + Math.round(gap).toLocaleString() + ' — walk them through the math verbally before sending a written counter.';
+  } else {
+    tab = 'firstcall';
+    reason = '📋 <strong>First Contact call.</strong> Qualify the seller and set up a walkthrough before committing to a number.';
+  }
+  return { tab, reason };
+}
+
+function getPhoneContext() {
+  const pp      = parseFloat(document.getElementById('pp').value) || 0;
+  const reno    = parseFloat(document.getElementById('reno').value) || 0;
+  const arv     = parseFloat(document.getElementById('arv').value) || 0;
+  const holdFlip= parseInt(document.getElementById('hold-flip').value) || 3;
+  const address = document.getElementById('address').value || '[Property Address]';
+  const fmtN    = n => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+  const loanT   = pp * 0.9 + reno;
+  const pts     = loanT * 0.02;
+  const cashN   = pp * 0.1 + pts + 2450;
+  const hc      = (loanT * 0.01 + 308) * holdFlip;
+  const profit  = arv * 0.93 - loanT - hc - cashN;
+  const offerMax= Math.round(maxPP_email(arv, reno, holdFlip, 30000) / 1000) * 1000;
+  const offerStrong = Math.round(maxPP_email(arv, reno, holdFlip, 40000) / 1000) * 1000;
+  const gap     = pp - offerMax;
+  const midpoint= Math.round((pp + offerMax) / 2000) * 1000;
+  const dealWorks = profit >= 30000;
+  const needsNeg  = gap > 3000;
+  return { pp, reno, arv, holdFlip, address, fmtN, profit, offerMax, offerStrong, gap, midpoint, dealWorks, needsNeg };
+}
+
+function renderPhoneScript(tab) {
+  const ctx = getPhoneContext();
+  const scripts = {
+    firstcall:   phoneScriptFirstCall(ctx),
+    followoffer: phoneScriptFollowOffer(ctx),
+    negotiate:   phoneScriptNegotiate(ctx),
+    compete:     phoneScriptCompete(ctx),
+  };
+  const s = scripts[tab];
+  document.getElementById('phone-objective').textContent = s.objective;
+  document.getElementById('phone-tone').textContent      = s.tone;
+  document.getElementById('phone-script-body').textContent = s.script;
+}
+
+// ── LEGEND helpers ──
+const P  = '\n\n« PAUSE — let them respond »\n\n';
+const PP = '\n\n« LONG PAUSE — stay silent until they speak »\n\n';
+const br = '\n─────────────────────────────────────────\n';
+
+// ══════════════════════════════════════════════════════════════
+// SCRIPT 1: FIRST CONTACT
+// Goal: qualify the seller, get access, plant buyer strengths.
+// Psychology: Pattern interrupt — don't sound like every other
+// agent. Be direct, specific, and professional from word one.
+// Most agents call with "is the property still available?"
+// You call with specific knowledge and a clear purpose.
+// ══════════════════════════════════════════════════════════════
+function phoneScriptFirstCall(c) {
+  const {address, pp, offerMax, fmtN, dealWorks, needsNeg, profit} = c;
+  const offerHint = needsNeg ? fmtN(offerMax) : fmtN(pp);
+
+  const objective = `Qualify the listing agent, get a feel for seller motivation and flexibility, secure a walkthrough, and position yourself as the strongest buyer before a number is even discussed.`;
+  const tone = `Warm, confident, unhurried. You have done this before. You are not desperate for this specific deal — you are evaluating whether it's a fit. That posture makes you more attractive, not less.`;
+
+  const script =
+`BEFORE THE CALL — HAVE READY:
+  • Property address and MLS number
+  • Your offer range in mind (${needsNeg ? fmtN(offerMax) + ' max' : 'around ' + fmtN(pp)})
+  • Your lender's name (Rob Shackleford, 3 Shacks Capital Partners)
+  • A specific time you can do a walkthrough
+${br}
+[OPENING — when they pick up]
+
+"Hi, is this [Agent Name]? Great. My name is [Your Name], I'm an agent working with Tomer Carmelli — he's an investor who buys and renovates properties in Jacksonville. I'm calling about [address]. Is this still available?"
+${P}
+[IF YES — continue]
+
+"Perfect. We've looked at it and it fits what we're actively buying right now. Before I put together a formal offer, I have a couple of quick questions — is now an okay time for two minutes?"
+${P}
+${br}
+[QUALIFY THE SELLER — ask these in a conversational way, one at a time]
+
+"How long has the seller owned the property?"
+${P}
+"Are they local, or is this an out-of-state situation?"
+${P}
+"Do you know what their main priority is — is it the price, or is timeline and certainty more important to them right now?"
+
+« PAUSE — this answer is gold. Listen carefully. »
+
+[IF THEY SAY PRICE IS THE PRIORITY]
+"Got it. We're competitive on price — and I'll be direct with you, we may come in below full ask, but I think when the seller sees what we bring to the table on the terms side, it'll be worth a conversation."
+
+[IF THEY SAY TIMELINE / CERTAINTY]
+"That's actually where we shine. We can close in 5 to 10 business days from a signed contract — we use hard money, no bank, no appraisal, no financing contingency. The seller picks the date."
+${br}
+[PLANT YOUR BUYER STRENGTHS — do this naturally, not like a checklist]
+
+"I want to give you a quick picture of who my client is, because it matters for deals like this.
+
+Tomer closes with hard money — Rob Shackleford at 3 Shacks Capital here in Jacksonville. Pre-approved, committed capital. No underwriting surprises.
+
+We do our inspection at the showing. We bring our contractor, we walk the property, and we make our decision before we leave. We don't tie up the property for two weeks.
+
+We put down $5,000 to $7,500 in earnest money at signing — hard money, shows we're serious.
+
+And we buy completely as-is. No repair lists after the contract, no credits, no back-and-forth. The seller closes and it's done."
+${P}
+"Does that sound like the kind of buyer the seller is looking for?"
+${PP}
+${br}
+[GET ACCESS — always end with a clear next step]
+
+"Can we set up a walkthrough? We just need 30 minutes — my client and our contractor. We can do [day] or [day], whatever works."
+${P}
+[IF THEY PUSH ON PRICE NOW]
+
+"I don't want to throw out a number before we've seen it — our offer reflects the real condition of the property and I want to make sure we're accurate. Once we do the walkthrough, I can have a written offer to you within 24 hours."
+${br}
+[CLOSING THE CALL]
+
+"Great. I'll send you a quick email with our contact info and lender details right after this call. Looking forward to working with you — these deals go smoothly when both sides are straight with each other, and that's how we operate."`;
+
+  return { objective, tone, script };
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCRIPT 2: FOLLOW UP AFTER OFFER SENT
+// Psychology: Reciprocity + mild scarcity. You've been patient
+// and professional. Now you deserve an update. Restate your
+// strengths without re-pitching. Give them an easy yes or no.
+// ══════════════════════════════════════════════════════════════
+function phoneScriptFollowOffer(c) {
+  const {address, pp, offerMax, fmtN, dealWorks, needsNeg, profit} = c;
+  const offerPrice = needsNeg ? fmtN(offerMax) : fmtN(pp);
+
+  const objective = `Find out where the offer stands. Re-anchor your buyer strengths. Create mild urgency without desperation. Get a yes, a counter, or a clear no so you can move on.`;
+  const tone = `Calm, unhurried, and slightly matter-of-fact. You are not chasing — you are following up as a professional courtesy. If they went another direction, that's fine. But you'd like to know.`;
+
+  const script =
+`[OPENING]
+
+"Hi [Agent Name], it's [Your Name] — I represent Tomer Carmelli, we submitted an offer on [address] last [day/week]. Do you have 60 seconds?"
+${P}
+${br}
+[IF THEY HAVEN'T PRESENTED IT YET]
+
+"No problem at all — just wanted to make sure it was on your radar. A quick reminder of what we submitted: ${offerPrice}, as-is, hard money — we can close in 5 to 10 days from a signed contract. Earnest money of $5K to $7.5K at signing.
+
+When do you think you'll be able to get in front of the seller?"
+${P}
+"Perfect. I'll follow up [day]. And if anything changes before then — other offers come in, seller wants to move faster — please call me first. We can respond same day."
+${br}
+[IF SELLER IS CONSIDERING OTHER OFFERS]
+
+"I understand. Can I ask — is the seller weighing price against terms, or is it purely price?"
+${P}
+[IF PRICE]
+"Here's the thing — our offer may not be the highest number, but it's the most certain one. A financed buyer at a higher price needs 30 to 45 days, has to appraise, and will likely come back after inspection asking for concessions. We don't do any of that. What we offer is what we pay, and we close fast.
+
+Would it help the seller to see a side-by-side comparison of what our offer actually puts in their pocket vs. a higher financed offer after timeline and concessions?"
+
+[IF TERMS]
+"Then we're exactly what the seller needs. Tell me what the ideal closing date looks like and I'll build our offer around it."
+${br}
+[IF SELLER WENT ANOTHER DIRECTION]
+
+"I appreciate you letting me know — that's professional and I respect it. Quick question: was it purely price, or was there something else we could have done better?"
+${P}
+"Understood. And if that deal falls through — which happens more than people expect — please keep us in mind. We'll still be here and we can move fast. I'll send you a quick email so you have our contact handy."
+${br}
+[CLOSE]
+
+"Thanks for your time. You've been easy to work with on this — I hope we get the chance to do a deal together soon."`;
+
+  return { objective, tone, script };
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCRIPT 3: NEGOTIATE ON THE CALL
+// Psychology: Transparency + the "feel-felt-found" technique.
+// Never argue on price. Walk them through the math like a friend
+// explaining something — not a salesman defending a position.
+// The goal is to get them to see your number as inevitable, not
+// as something you chose.
+// ══════════════════════════════════════════════════════════════
+function phoneScriptNegotiate(c) {
+  const {address, pp, offerMax, offerStrong, fmtN, profit, gap, midpoint} = c;
+  const smallGap = gap > 0 && gap <= 12000;
+
+  const objective = `Close the price gap on the call — either by walking the seller through the math, proposing a midpoint, or trading terms for price. Get to a verbal yes before hanging up.`;
+  const tone = `Direct but collaborative. You are not fighting the seller — you are solving a math problem together. Calm, unhurried. Never defensive about your number — treat it as a fact, not an opinion.`;
+
+  const script =
+`[OPENING]
+
+"Hi [Agent Name], it's [Your Name] — calling about [address]. I know we're a bit apart on price and I wanted to have a real conversation about it rather than just trade numbers back and forth in email. Do you have five minutes?"
+${P}
+${br}
+[SET THE FRAME — before any numbers]
+
+"I want to be straight with you, and I'd ask you to be straight with me. My client is a serious buyer — we've closed multiple properties in Jacksonville this year, we have our financing ready, and we can close fast. We're not playing games. But our offer is based on a very specific set of numbers, and I want to walk you through them."
+${br}
+[WALK THROUGH THE MATH — slowly, conversationally]
+
+"Here's what our analysis shows on [address]:
+
+After we renovate it to market standard, we think it sells for around ${fmtN(c.arv)}. That's based on recent closed comps in the neighborhood.
+
+From that, we subtract about ${fmtN(Math.round(c.arv * 0.07))} in selling costs — agent commissions, title, transfer fees.
+
+Then the renovation itself — we're looking at ${fmtN(c.reno)} to bring this property to the condition that supports that sale price. That's not a guess — that's a contractor scope.
+
+Then carrying costs while we hold and renovate — financing, taxes, insurance — adds another ${fmtN(Math.abs(c.gap > 0 ? c.gap : c.pp * 0.05))}."
+
+« PAUSE — let the math sink in »
+
+"When you add all of that up, the number we can pay to make this work is ${fmtN(offerMax)}. That's not where we want to start negotiating — that's our ceiling."
+${PP}
+${br}
+[HANDLE THE RESPONSE]
+
+IF THEY SAY: "The seller won't take that."
+→ "I understand. Can I ask — what does the seller think the renovation costs are? Because if they have a lower number, I want to see it. We'd genuinely update our offer if the scope is lighter than we think."
+
+IF THEY SAY: "Can you come up a little?"
+→ ${smallGap
+  ? `"Here's what I can do. We're ${fmtN(gap)} apart. I can come up to ${fmtN(midpoint)} if the seller can meet us there. That's the midpoint — both sides give a little, and we close this deal today. Can you put that in front of them?"`
+  : `"I want to be honest with you — I can't move much on price because the renovation cost is what it is. What I CAN do is make the terms as good as possible for the seller. Faster close, higher earnest money, seller picks the date. Would that kind of flexibility move the needle for them?"`}
+
+IF THEY SAY: "We have other interested buyers."
+→ "That may be true — and I respect that. But here's the question I'd put to the seller: is the other buyer ready to close in 10 days with no financing contingency and no re-trading after inspection? Because that's what we're offering. A higher number that falls apart at appraisal or inspection isn't really a higher number."
+${br}
+[TRADE TERMS FOR PRICE — if needed]
+
+"Let me offer something else. If the seller needs a number closer to ${fmtN(pp)}, here's what I can put on the table in exchange:
+  — Close in 5 days from title clear — seller has certainty immediately
+  — $7,500 earnest money, hard, non-refundable after 3-day review
+  — As-is, zero repair requests, zero credits
+  — Seller picks exact closing date
+
+That's a package worth real money to a seller. Is there a version of that conversation that works?"
+${PP}
+${br}
+[CLOSE THE CALL]
+
+"I want to close this deal. I think it works for both sides if we can get the seller to see that certainty and speed have real value. Can you get back to me today or tomorrow with their reaction? I'd rather work this out by phone than go back and forth in email for a week."`;
+
+  return { objective, tone, script };
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCRIPT 4: COMPETING OFFERS
+// Psychology: Loss aversion + contrast effect. Make the seller
+// feel the pain of the alternative BEFORE they choose it.
+// Reframe the question from "who offered most?" to "who will
+// actually close?" Most people are more motivated by avoiding
+// loss than gaining gain — use that.
+// ══════════════════════════════════════════════════════════════
+function phoneScriptCompete(c) {
+  const {address, pp, offerMax, fmtN, dealWorks, needsNeg} = c;
+  const offerPrice = needsNeg ? fmtN(offerMax) : fmtN(pp);
+
+  const objective = `Win the deal without being the highest price. Reframe the seller's decision from "who offered the most" to "who will actually close." Make them feel the risk of the alternative.`;
+  const tone = `Confident, calm, and slightly detached — as if you've seen this movie before and you know how it ends. Not aggressive. Just very clear about what's real and what isn't.`;
+
+  const script =
+`[OPENING]
+
+"Hi [Agent Name], it's [Your Name]. I heard you may have multiple offers on [address] and I wanted to call personally rather than just sit in the pile. Do you have two minutes?"
+${P}
+${br}
+[REFRAME IMMEDIATELY — before they tell you about the other offer]
+
+"I've been in this business long enough to know that the highest offer and the best offer are often two very different things. I'm not going to pretend our offer is the highest number — but I want to make sure the seller understands what they're actually choosing between."
+${P}
+${br}
+[PAINT THE PICTURE OF THE ALTERNATIVE]
+
+"If the seller goes with a conventional financed buyer at a higher price, here's what actually happens:
+
+They're looking at 30 to 45 days minimum — sometimes longer if there are any underwriting issues. The property has to appraise at or above the purchase price. If it doesn't, the deal either collapses or the price comes down anyway.
+
+Then there's a 10 to 15 day inspection period where the buyer can walk or demand repairs. And even after all of that, the lender can decline the loan.
+
+I've seen sellers lose 60 days, go back on market with a stigmatized listing, and end up taking less than our original offer. That's a real outcome."
+${PP}
+"Now here's what we bring:
+
+Our financing is pre-approved hard money — Rob Shackleford at 3 Shacks Capital. No underwriting, no appraisal required, committed capital. Same certainty as cash.
+
+We close in 5 to 10 days from title clear. The seller names the date.
+
+We put down $5,000 to $7,500 in earnest money at signing — hard deposit. If we walk without cause, the seller keeps it.
+
+We decide at the showing. We bring our contractor, we walk the property, we make our decision before we leave. No two-week inspection window.
+
+And we buy completely as-is. No repair list after signing. No credits. No calls from the buyer's agent at 9pm asking for the water heater to be replaced."
+${PP}
+${br}
+[THE DIRECT QUESTION]
+
+"So the question I'd put to the seller — and I'd ask you to put it to them directly — is this:
+
+Is the other offer worth the risk of being back on market in 45 days? Because our offer at ${offerPrice} with certainty in 10 days might put more in their pocket in the end, when you account for two more months of carrying costs and the chance they have to renegotiate anyway."
+${PP}
+${br}
+[IF THEY PUSH — escalate the terms offer]
+
+"If it helps close the gap — we'll increase our earnest money to $10,000 released immediately. Non-refundable. That's our skin in the game. We don't do that with deals we're not serious about."
+${br}
+[CLOSE]
+
+"I'd ask for one thing: before the seller signs with the other buyer, give us a call. Five minutes. If they want certainty and speed, we're the answer. If they're willing to gamble on a financed buyer, I understand — but I want them to make that choice with full information.
+
+Can you make that happen?"`;
+
+  return { objective, tone, script };
+}
+
+document.getElementById('phone-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePhoneModal();
+});
+
+// ── Load deal from embedded data (injected by agent) ──
+function loadDeal(data) {
+  if (!data) return;
+  if (data.address) document.getElementById('address').value = data.address;
+  ['pp','reno','arv','rent'].forEach(id => {
+    if (data[id] !== undefined) {
+      document.getElementById(id).value = data[id];
+      document.getElementById(id + '-range').value = data[id];
+      document.getElementById('lbl-' + id).textContent = fmt(data[id]);
+    }
+  });
+  if (data.hold_flip)  { document.getElementById('hold-flip').value  = data.hold_flip; }
+  if (data.hold_brrrr) { document.getElementById('hold-brrrr').value = data.hold_brrrr; }
+}
+
+// ── DEAL DATA — agent updates this object for each deal ──
+const DEAL = {
+  address:    "11266 Andrea Dr, Jacksonville, FL 32218",
+  pp:         159990,
+  reno:       65000,
+  arv:        250000,
+  rent:       1500,
+  hold_flip:  3,
+  hold_brrrr: 6
+};
+
+// Init — read URL params first (CRM integration), fall back to embedded DEAL object
+const _p = new URLSearchParams(window.location.search);
+const _dealData = {
+  address:    _p.get('address')               || DEAL.address,
+  pp:         parseFloat(_p.get('pp'))        || DEAL.pp,
+  reno:       parseFloat(_p.get('reno'))      || DEAL.reno,
+  arv:        parseFloat(_p.get('arv'))       || DEAL.arv,
+  rent:       parseFloat(_p.get('rent'))      || DEAL.rent,
+  hold_flip:  parseInt(_p.get('hold_flip'))   || DEAL.hold_flip,
+  hold_brrrr: parseInt(_p.get('hold_brrrr'))  || DEAL.hold_brrrr,
+};
+loadDeal(_dealData);
+updateHoldLabel('flip');
+updateHoldLabel('brrrr');
+calc();
+</script>
+</body>
+</html>

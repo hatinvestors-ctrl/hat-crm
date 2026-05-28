@@ -1,0 +1,21 @@
+{
+	"dbConnectionString": "postgres://localhost:56092/postgres",
+	"siteId": "c2cbe5f0-de2c-402b-a1f9-93f8f1070f9f",
+	"geolocation": {
+		"data": {
+			"city": "Rehovot",
+			"country": {
+				"code": "IL",
+				"name": "Israel"
+			},
+			"subdivision": {
+				"code": "M",
+				"name": "Central District"
+			},
+			"timezone": "Asia/Jerusalem",
+			"latitude": 31.8943,
+			"longitude": 34.8192
+		},
+		"timestamp": 1780004183883
+	}
+}

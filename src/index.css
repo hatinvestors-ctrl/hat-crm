@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* ─── HAT CRM — Design Tokens ───────────────────────────────────────
+   Dark theme. OKLCH. Neutrals tinted toward brand hue (250° — calm blue).
+   One brand accent. State colors used only for terminal states or attention.
+   Type scale: 1.2 ratio. System font stack.
+─────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* ── Surfaces (background tints, darkest → lightest) ── */
+  --color-bg:           oklch(0.155 0.008 250);   /* page background */
+  --color-bg-elev:      oklch(0.185 0.010 250);   /* card / panel */
+  --color-bg-elev-2:    oklch(0.220 0.012 250);   /* hover / nested */
+  --color-bg-input:     oklch(0.200 0.010 250);   /* form fields */
+  --color-bg-sidebar:   oklch(0.135 0.008 250);   /* sidebar (darker than page) */
+
+  /* ── Borders / hairlines ── */
+  --color-line:         oklch(0.275 0.012 250);   /* default border */
+  --color-line-strong:  oklch(0.350 0.014 250);   /* emphasized border */
+
+  /* ── Text ── */
+  --color-text:         oklch(0.965 0.005 250);   /* primary — near white, tinted */
+  --color-text-muted:   oklch(0.720 0.010 250);   /* secondary — captions, labels */
+  --color-text-dim:     oklch(0.540 0.012 250);   /* tertiary — meta, timestamps */
+  --color-text-faint:   oklch(0.420 0.010 250);   /* placeholders, disabled */
+
+  /* ── Brand accent (calm blue) ── */
+  --color-accent:       oklch(0.680 0.165 250);   /* primary actions, focus */
+  --color-accent-hover: oklch(0.730 0.165 250);
+  --color-accent-soft:  oklch(0.300 0.080 250);   /* accent background tint */
+  --color-accent-text:  oklch(0.800 0.130 250);   /* accent label on dark surface */
+
+  /* ── Semantic state (use sparingly — terminal states only) ── */
+  --color-success:      oklch(0.720 0.155 155);   /* closed / won */
+  --color-success-soft: oklch(0.290 0.060 155);
+  --color-success-text: oklch(0.825 0.140 155);
+
+  --color-warn:         oklch(0.785 0.155 75);    /* follow-up / attention */
+  --color-warn-soft:    oklch(0.300 0.060 75);
+  --color-warn-text:    oklch(0.860 0.130 75);
+
+  --color-danger:       oklch(0.670 0.190 25);    /* dead / destroy */
+  --color-danger-soft:  oklch(0.290 0.085 25);
+  --color-danger-text:  oklch(0.790 0.150 25);
+
+  /* ── Typography ── */
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono: "SF Mono", "JetBrains Mono", "Fira Code", "Consolas", ui-monospace, monospace;
+
+  /* Type scale (1.2 ratio, fixed rem) */
+  --font-size-xs:   0.75rem;     /* 12 */
+  --font-size-sm:   0.8125rem;   /* 13 — dense product UI */
+  --font-size-md:   0.9375rem;   /* 15 — body */
+  --font-size-lg:   1.0625rem;   /* 17 — section heading */
+  --font-size-xl:   1.25rem;     /* 20 — page heading */
+  --font-size-2xl:  1.5rem;      /* 24 — large numbers */
+  --font-size-3xl:  1.875rem;    /* 30 — hero */
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+}
+
+/* ── Global resets ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  background-color: var(--color-bg);
+}
+
+body {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+}
+
+/* tabular numbers everywhere a class isn't applied (helps tables) */
+:where(table, .tabular-nums) { font-variant-numeric: tabular-nums; }
+
+/* ── Focus rings ── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar — thin, tinted, fades into surface ── */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border: 2px solid var(--color-bg);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-line-strong); }
+
+/* ── Selection ── */
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* ── Date-picker input fix for dark theme ── */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+
+/* ── Disable browser autofill background ── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-bg-input) inset;
+  caret-color: var(--color-text);
+}

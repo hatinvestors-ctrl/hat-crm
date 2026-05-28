@@ -1,0 +1,14 @@
+{
+  "name": "hat-daily-redfin-import",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "setup": "node setup-oauth.mjs",
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0"
+  }
+}
