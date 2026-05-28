@@ -78,6 +78,7 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
   }, [workspaceId, profile?.id])
 
   return (
+    <>
     <aside className="w-60 shrink-0 bg-[color:var(--color-bg-sidebar)] border-r border-[color:var(--color-line)] flex flex-col h-screen sticky top-0">
       {/* Brand + workspace switcher */}
       <div className="px-3 py-3 border-b border-[color:var(--color-line)]">
@@ -245,5 +246,6 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
     </aside>
 
     <QuickAnalysisModal open={quickAnalysisOpen} onClose={() => setQuickAnalysisOpen(false)} />
+    </>
   )
 }
