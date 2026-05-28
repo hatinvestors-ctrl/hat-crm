@@ -402,9 +402,8 @@ export default async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const { lead_id, address, purchase_price, arv, renovation_cost, strategy = 'flip' } = body
+    const { lead_id, address, purchase_price, arv, renovation_cost, strategy = 'flip', skip_save = false } = body
 
-    if (!lead_id)        return new Response(JSON.stringify({ ok: false, error: 'lead_id is required.' }), { status: 400, headers: HEADERS })
     if (!purchase_price) return new Response(JSON.stringify({ ok: false, error: 'purchase_price is required.' }), { status: 400, headers: HEADERS })
     if (!arv)            return new Response(JSON.stringify({ ok: false, error: 'arv is required.' }), { status: 400, headers: HEADERS })
 
@@ -447,7 +446,9 @@ export default async (req) => {
       analyzed_at:       new Date().toISOString(),
     }
 
-    await saveAnalysis(lead_id, analysisObj)
+    if (!skip_save && lead_id) {
+      await saveAnalysis(lead_id, analysisObj)
+    }
 
     return new Response(JSON.stringify({ ok: true, analysis: analysisObj }), { status: 200, headers: HEADERS })
   } catch (err) {

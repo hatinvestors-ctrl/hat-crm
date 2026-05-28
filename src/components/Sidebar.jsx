@@ -3,6 +3,7 @@ import { NavLink, useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Badge from './ui/Badge'
 import { categorizeLeads } from '../lib/staleness'
+import QuickAnalysisModal from './QuickAnalysisModal'
 
 const Icon = ({ d, size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,6 +35,7 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
   const { workspaceId } = useParams()
   const base = `/w/${workspaceId}`
   const [recentLeads, setRecentLeads] = useState([])
+  const [quickAnalysisOpen, setQuickAnalysisOpen] = useState(false)
   const [needsActionCount, setNeedsActionCount] = useState(0)
   const [hotCount, setHotCount] = useState(0)
   const [triageCount, setTriageCount] = useState(0)
@@ -169,6 +171,17 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
         )}
       </nav>
 
+      {/* Quick Analysis button */}
+      <div className="px-2 pb-1">
+        <button
+          onClick={() => setQuickAnalysisOpen(true)}
+          className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90 transition-opacity"
+        >
+          <span>⚡</span>
+          Quick Analysis
+        </button>
+      </div>
+
       {/* Active pipeline (like GitHub "Top repositories") */}
       <div className="px-2 py-2 mt-1 flex-1 min-h-0 overflow-y-auto">
         <div className="flex items-center justify-between px-2 mb-1">
@@ -230,5 +243,7 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
         </div>
       </div>
     </aside>
+
+    <QuickAnalysisModal open={quickAnalysisOpen} onClose={() => setQuickAnalysisOpen(false)} />
   )
 }
