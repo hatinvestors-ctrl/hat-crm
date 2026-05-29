@@ -7,6 +7,7 @@ import TaskComment from './TaskComment'
 import TaskAttachments from './TaskAttachments'
 import { supabase } from '../../lib/supabase'
 import { TASK_STATUSES, TASK_PRIORITIES } from '../../lib/constants'
+import SearchableSelect from '../ui/SearchableSelect'
 import { logTaskChanges } from '../../lib/taskHelpers'
 
 export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onDeleted, workspaceId, userId, userRole, members, projects, memberMap, projectMap }) {
@@ -128,17 +129,45 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
                 </select>
               </div>
 
-              <div>
-                <label className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Assignee</label>
-                <select
-                  value={task.assignee_id || ''}
-                  disabled={!canEdit}
-                  onChange={e => patch({ assignee_id: e.target.value || null })}
-                  className={inputCls + ' mt-1'}
-                >
-                  <option value="">Unassigned</option>
-                  {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>)}
-                </select>
+              <div className="col-span-2">
+                <label className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Assignees</label>
+                <div className="mt-1 flex flex-wrap gap-1 min-h-[32px] p-1.5 bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded">
+                  {(task.assignee_ids || []).map(uid => {
+                    const m = members.find(x => x.user_id === uid)
+                    const name = m?.profiles?.full_name || 'Member'
+                    return (
+                      <span key={uid} className="inline-flex items-center gap-1 px-2 h-6 text-[11px] rounded-full bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">
+                        {name}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => patch({ assignee_ids: (task.assignee_ids || []).filter(id => id !== uid) })}
+                            className="opacity-60 hover:opacity-100 ml-0.5"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </span>
+                    )
+                  })}
+                  {canEdit && (
+                    <select
+                      value=""
+                      onChange={e => {
+                        const uid = e.target.value
+                        if (!uid || (task.assignee_ids || []).includes(uid)) return
+                        patch({ assignee_ids: [...(task.assignee_ids || []), uid] })
+                      }}
+                      className="h-6 px-1 text-[11px] bg-transparent border-none text-[color:var(--color-text-dim)] focus:outline-none cursor-pointer"
+                    >
+                      <option value="">+ Add assignee</option>
+                      {members
+                        .filter(m => !(task.assignee_ids || []).includes(m.user_id))
+                        .map(m => <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>)
+                      }
+                    </select>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -153,18 +182,19 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
               </div>
 
               <div className="col-span-2">
-                <label className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Project</label>
-                <select
-                  value={task.project_id || ''}
-                  disabled={!canEdit}
-                  onChange={e => patch({ project_id: e.target.value || null })}
-                  className={inputCls + ' mt-1'}
-                >
-                  <option value="">— No project —</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.address || '(no address)'}</option>
-                  ))}
-                </select>
+                <label className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Property</label>
+                <div className="mt-1">
+                  <SearchableSelect
+                    value={task.project_id || ''}
+                    onChange={v => patch({ project_id: v || null })}
+                    disabled={!canEdit}
+                    options={[
+                      { value: '', label: 'General (no property)' },
+                      ...projects.map(p => ({ value: p.id, label: p.address || '(no address)' })),
+                    ]}
+                    placeholder="General (no property)"
+                  />
+                </div>
               </div>
             </div>
 
