@@ -396,9 +396,6 @@ export default async (req) => {
   if (!ANTHROPIC_API_KEY) {
     return new Response(JSON.stringify({ ok: false, error: 'ANTHROPIC_API_KEY not configured.' }), { status: 500, headers: HEADERS })
   }
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: 'Supabase credentials not configured.' }), { status: 500, headers: HEADERS })
-  }
 
   try {
     const body = await req.json().catch(() => ({}))
@@ -447,6 +444,9 @@ export default async (req) => {
     }
 
     if (!skip_save && lead_id) {
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        return new Response(JSON.stringify({ ok: false, error: 'Supabase credentials not configured.' }), { status: 500, headers: HEADERS })
+      }
       await saveAnalysis(lead_id, analysisObj)
     }
 
