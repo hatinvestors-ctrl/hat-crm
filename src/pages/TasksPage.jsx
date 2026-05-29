@@ -8,10 +8,10 @@ import TaskBoard from '../components/tasks/TaskBoard'
 import TaskFilters from '../components/tasks/TaskFilters'
 import TaskDetailDrawer from '../components/tasks/TaskDetailDrawer'
 import { supabase } from '../lib/supabase'
-import { PROJECT_STATUSES, TASK_STATUSES } from '../lib/constants'
+import { TASK_STATUSES } from '../lib/constants'
 import { nextPositionForColumn, positionBetween, logTaskActivity } from '../lib/taskHelpers'
 
-const URL_FILTER_KEYS = ['project_id', 'assignee_id', 'due', 'priority', 'search']
+const URL_FILTER_KEYS = ['project_id', 'assignee_id', 'due', 'priority', 'search', 'status', 'created']
 
 function filtersFromParams(params) {
   const f = {}
@@ -23,6 +23,13 @@ function filtersFromParams(params) {
 }
 
 function todayISO() { return new Date().toISOString().slice(0, 10) }
+function weekStartISO() {
+  const d = new Date()
+  const day = d.getDay()
+  const offset = day === 0 ? -6 : 1 - day
+  const start = new Date(d); start.setDate(d.getDate() + offset)
+  return start.toISOString().slice(0, 10)
+}
 function endOfWeekISO() {
   const d = new Date()
   const day = d.getDay() // 0 Sun..6 Sat
@@ -103,7 +110,6 @@ export default function TasksPage() {
       .from('leads')
       .select('id, address, city, status')
       .eq('workspace_id', workspaceId)
-      .in('status', PROJECT_STATUSES)
       .order('address', { ascending: true })
       .then(({ data }) => setProjects(data || []))
   }, [workspaceId])
@@ -121,16 +127,21 @@ export default function TasksPage() {
   const filteredTasks = useMemo(() => {
     const today = todayISO()
     const weekEnd = endOfWeekISO()
+    const weekStart = weekStartISO()
     return tasks.filter(t => {
       if (filters.project_id === '__none__') {
         if (t.project_id) return false
       } else if (filters.project_id && t.project_id !== filters.project_id) return false
 
       if (filters.assignee_id === 'me') {
-        if (t.assignee_id !== user.id) return false
+        if (!(t.assignee_ids || []).includes(user.id)) return false
       } else if (filters.assignee_id === 'unassigned') {
-        if (t.assignee_id) return false
-      } else if (filters.assignee_id && t.assignee_id !== filters.assignee_id) return false
+        if ((t.assignee_ids || []).length > 0) return false
+      } else if (filters.assignee_id) {
+        if (!(t.assignee_ids || []).includes(filters.assignee_id)) return false
+      }
+
+      if (filters.status && t.status !== filters.status) return false
 
       if (filters.priority && t.priority !== filters.priority) return false
 
@@ -142,6 +153,13 @@ export default function TasksPage() {
         if (!t.due_date || t.due_date < today || t.due_date > weekEnd) return false
       } else if (filters.due === 'none') {
         if (t.due_date) return false
+      }
+
+      if (filters.created) {
+        const created = t.created_at?.slice(0, 10)
+        if (filters.created === 'today' && created !== today) return false
+        if (filters.created === 'this_week' && (created < weekStart || created > today)) return false
+        if (filters.created === 'this_month' && created?.slice(0, 7) !== today.slice(0, 7)) return false
       }
 
       if (filters.search) {
@@ -164,7 +182,7 @@ export default function TasksPage() {
       position: pos,
       created_by: user.id,
       project_id: (filters.project_id && filters.project_id !== '__none__') ? filters.project_id : null,
-      assignee_id: filters.assignee_id === 'me' ? user.id : null,
+      assignee_ids: filters.assignee_id === 'me' ? [user.id] : (filters.assignee_id && filters.assignee_id !== 'unassigned' ? [filters.assignee_id] : []),
     }
     const { data, error } = await supabase.from('tasks').insert(insert).select('*').single()
     if (error) { alert(error.message); return }
