@@ -1,4 +1,5 @@
-import { TASK_PRIORITIES } from '../../lib/constants'
+import { TASK_PRIORITIES, TASK_STATUSES } from '../../lib/constants'
+import SearchableSelect from '../ui/SearchableSelect'
 
 export default function TaskFilters({ filters, onChange, members, projects, currentUserId }) {
   const set = (k, v) => onChange({ ...filters, [k]: v || undefined })
@@ -14,21 +15,30 @@ export default function TaskFilters({ filters, onChange, members, projects, curr
     const m = members.find(x => x.user_id === filters.assignee_id)
     activeChips.push({ key: 'assignee_id', label: `Assignee: ${m?.profiles?.full_name || '…'}` })
   }
-  if (filters.due) activeChips.push({ key: 'due', label: `Due: ${filters.due.replace('_',' ')}` })
+  if (filters.status) activeChips.push({ key: 'status', label: `Status: ${TASK_STATUSES.find(s => s.value === filters.status)?.label || filters.status}` })
+  if (filters.due) activeChips.push({ key: 'due', label: `Due: ${filters.due.replace('_', ' ')}` })
   if (filters.priority) activeChips.push({ key: 'priority', label: `Priority: ${filters.priority}` })
-  if (filters.search) activeChips.push({ key: 'search', label: `“${filters.search}”` })
+  if (filters.created) activeChips.push({ key: 'created', label: `Created: ${filters.created.replace('_', ' ')}` })
+  if (filters.search) activeChips.push({ key: 'search', label: `"${filters.search}"` })
 
   const selectCls = 'h-7 px-2 text-[12px] bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] cursor-pointer'
 
+  const projectOptions = [
+    { value: '', label: 'All Projects' },
+    { value: '__none__', label: '— General (no project) —' },
+    ...projects.map(p => ({ value: p.id, label: p.address || '(no address)' })),
+  ]
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select value={filters.project_id || ''} onChange={e => set('project_id', e.target.value)} className={selectCls}>
-        <option value="">All Projects</option>
-        <option value="__none__">— No project —</option>
-        {projects.map(p => (
-          <option key={p.id} value={p.id}>{p.address || '(no address)'}</option>
-        ))}
-      </select>
+      <div className="w-48">
+        <SearchableSelect
+          value={filters.project_id || ''}
+          onChange={v => set('project_id', v)}
+          options={projectOptions}
+          placeholder="All Projects"
+        />
+      </div>
 
       <select value={filters.assignee_id || ''} onChange={e => set('assignee_id', e.target.value)} className={selectCls}>
         <option value="">All Assignees</option>
@@ -36,6 +46,13 @@ export default function TaskFilters({ filters, onChange, members, projects, curr
         <option value="unassigned">Unassigned</option>
         {members.map(m => (
           <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+        ))}
+      </select>
+
+      <select value={filters.status || ''} onChange={e => set('status', e.target.value)} className={selectCls}>
+        <option value="">All Statuses</option>
+        {TASK_STATUSES.map(s => (
+          <option key={s.value} value={s.value}>{s.label}</option>
         ))}
       </select>
 
@@ -52,6 +69,13 @@ export default function TaskFilters({ filters, onChange, members, projects, curr
         {TASK_PRIORITIES.map(p => (
           <option key={p.value} value={p.value}>{p.label}</option>
         ))}
+      </select>
+
+      <select value={filters.created || ''} onChange={e => set('created', e.target.value)} className={selectCls}>
+        <option value="">Any Time</option>
+        <option value="today">Created Today</option>
+        <option value="this_week">Created This Week</option>
+        <option value="this_month">Created This Month</option>
       </select>
 
       <input
