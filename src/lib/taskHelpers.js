@@ -38,16 +38,18 @@ export async function logTaskComment(taskId, userId, content) {
 }
 
 // Log diff for tracked fields when updating a task. Returns inserted count.
-const TRACKED = ['status', 'assignee_id', 'due_date', 'priority', 'project_id', 'title']
+const TRACKED = ['status', 'assignee_ids', 'due_date', 'priority', 'project_id', 'title']
 
 function describeChange(field, oldVal, newVal, memberMap = {}, projectMap = {}) {
   switch (field) {
     case 'status':
       return `Status: ${TASK_STATUS_MAP[oldVal]?.label || oldVal || '—'} → ${TASK_STATUS_MAP[newVal]?.label || newVal}`
-    case 'assignee_id': {
-      const a = memberMap[oldVal]?.full_name || (oldVal ? 'someone' : 'Unassigned')
-      const b = memberMap[newVal]?.full_name || (newVal ? 'someone' : 'Unassigned')
-      return `Assignee: ${a} → ${b}`
+    case 'assignee_ids': {
+      const toNames = (ids) => {
+        if (!ids || ids.length === 0) return 'Unassigned'
+        return ids.map(id => memberMap[id]?.full_name || 'someone').join(', ')
+      }
+      return `Assignees: ${toNames(oldVal)} → ${toNames(newVal)}`
     }
     case 'due_date':
       return `Due: ${oldVal || '—'} → ${newVal || '—'}`
