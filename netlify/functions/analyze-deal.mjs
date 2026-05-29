@@ -397,7 +397,7 @@ export default async (req) => {
     return new Response(JSON.stringify({ ok: false, error: 'ANTHROPIC_API_KEY not configured.' }), { status: 500, headers: HEADERS })
   }
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: 'Supabase credentials not configured.' }), { status: 500, headers: HEADERS })
+    return new Response(JSON.stringify({ ok: false, error: `Supabase credentials not configured. URL=${!!SUPABASE_URL} KEY=${!!SUPABASE_KEY} SRK=${!!process.env.SUPABASE_SERVICE_ROLE_KEY}` }), { status: 500, headers: HEADERS })
   }
 
   try {
