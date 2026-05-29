@@ -40,10 +40,12 @@ const TONE_STYLES = {
 }
 
 export default function TodayPage() {
-  const { workspace, workspaceId, members } = useOutletContext()
+  const { workspace, workspaceId, members, user } = useOutletContext()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
+  const [myTasks, setMyTasks] = useState([])
+  const [taskProjects, setTaskProjects] = useState([])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -61,6 +63,26 @@ export default function TodayPage() {
       })
     return () => { cancelled = true }
   }, [workspaceId])
+
+  useEffect(() => {
+    if (!workspaceId || !user?.id) return
+    const today = new Date().toISOString().slice(0, 10)
+    supabase
+      .from('tasks')
+      .select('id, title, due_date, status, assignee_ids, project_id')
+      .eq('workspace_id', workspaceId)
+      .contains('assignee_ids', [user.id])
+      .neq('status', 'done')
+      .lte('due_date', today)
+      .order('due_date', { ascending: true })
+      .then(({ data }) => setMyTasks(data || []))
+
+    supabase
+      .from('leads')
+      .select('id, address')
+      .eq('workspace_id', workspaceId)
+      .then(({ data }) => setTaskProjects(data || []))
+  }, [workspaceId, user?.id])
 
   const snoozeLead = async (e, leadId, hours) => {
     e.preventDefault()
@@ -90,7 +112,18 @@ export default function TodayPage() {
     setBusyId(null)
   }
 
+  const markTaskDone = async (e, taskId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const { error } = await supabase.from('tasks').update({ status: 'done' }).eq('id', taskId)
+    if (!error) setMyTasks(prev => prev.filter(t => t.id !== taskId))
+  }
+
   const memberMap = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
+  const taskProjectMap = Object.fromEntries(taskProjects.map(p => [p.id, p]))
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const overdueTasks = myTasks.filter(t => t.due_date < todayStr)
+  const todayTasks   = myTasks.filter(t => t.due_date === todayStr)
   const { byBucket, totalCount } = categorizeLeads(leads, workspace?.settings)
 
   if (loading) return <LoadingSpinner fullPage label="Scanning your pipeline…" />
@@ -206,6 +239,85 @@ export default function TodayPage() {
               )
             })}
           </div>
+        )}
+
+        {(overdueTasks.length > 0 || todayTasks.length > 0) && (
+          <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
+            <header className="px-4 py-3 border-b border-[color:var(--color-line)]">
+              <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">My Tasks</h3>
+              <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Tasks assigned to you that are due today or overdue</p>
+            </header>
+
+            {overdueTasks.length > 0 && (
+              <div>
+                <div className="px-4 py-1.5 bg-[color:var(--color-danger-soft)] border-b border-[color:var(--color-line)]">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-danger-text)]">Overdue — {overdueTasks.length}</span>
+                </div>
+                <ul className="divide-y divide-[color:var(--color-line)]">
+                  {overdueTasks.map(task => (
+                    <li key={task.id}>
+                      <a
+                        href={`/w/${workspaceId}/tasks/${task.id}`}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
+                          {task.project_id && taskProjectMap[task.project_id] && (
+                            <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] text-[color:var(--color-danger-text)]">{task.due_date}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => markTaskDone(e, task.id)}
+                            className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors"
+                          >
+                            ✓ Done
+                          </button>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {todayTasks.length > 0 && (
+              <div>
+                <div className="px-4 py-1.5 bg-[color:var(--color-warn-soft)] border-b border-[color:var(--color-line)]">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-warn-text)]">Due Today — {todayTasks.length}</span>
+                </div>
+                <ul className="divide-y divide-[color:var(--color-line)]">
+                  {todayTasks.map(task => (
+                    <li key={task.id}>
+                      <a
+                        href={`/w/${workspaceId}/tasks/${task.id}`}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
+                          {task.project_id && taskProjectMap[task.project_id] && (
+                            <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] text-[color:var(--color-warn-text)]">Today</span>
+                          <button
+                            type="button"
+                            onClick={(e) => markTaskDone(e, task.id)}
+                            className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors"
+                          >
+                            ✓ Done
+                          </button>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
         )}
       </div>
     </>
