@@ -13,6 +13,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
   const update = useLeadUpdate(lead, userId, members, onUpdated)
 
   const [strategy,     setStrategy]     = useState(lead.deal_analysis?.strategy || 'flip')
+  const [monthlyRent,  setMonthlyRent]  = useState(lead.monthly_rent || '')
   const [analyzing,    setAnalyzing]    = useState(false)
   const [analyzeError, setAnalyzeError] = useState(null)
 
@@ -31,6 +32,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           purchase_price:  lead.asking_price || lead.offer_price,
           arv:             lead.arv,
           renovation_cost: lead.renovation_cost,
+          monthly_rent:    strategy === 'brrrr' ? (parseFloat(monthlyRent) || null) : null,
           strategy,
         }),
       })
@@ -107,6 +109,19 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               </button>
             ))}
           </div>
+          {strategy === 'brrrr' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-[color:var(--color-text-dim)]">Rent $</span>
+              <input
+                type="number"
+                value={monthlyRent}
+                onChange={e => setMonthlyRent(e.target.value)}
+                placeholder="2000"
+                className="w-20 h-6 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+              />
+              <span className="text-[11px] text-[color:var(--color-text-dim)]">/mo</span>
+            </div>
+          )}
           {hasAnalysis && !analyzing && (
             <span className="text-[10.5px] text-[color:var(--color-text-dim)]">
               {new Date(lead.deal_analysis.analyzed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

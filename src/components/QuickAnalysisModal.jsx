@@ -26,7 +26,7 @@ function ScoreRing({ score }) {
   )
 }
 
-const EMPTY = { address: '', purchase_price: '', arv: '', renovation_cost: '', strategy: 'flip' }
+const EMPTY = { address: '', purchase_price: '', arv: '', renovation_cost: '', monthly_rent: '', strategy: 'flip' }
 
 export default function QuickAnalysisModal({ open, onClose }) {
   const [form,      setForm]      = useState(EMPTY)
@@ -67,6 +67,7 @@ export default function QuickAnalysisModal({ open, onClose }) {
           purchase_price:  parseFloat(form.purchase_price),
           arv:             parseFloat(form.arv),
           renovation_cost: parseFloat(form.renovation_cost) || 0,
+          monthly_rent:    form.strategy === 'brrrr' ? (parseFloat(form.monthly_rent) || null) : null,
           strategy:        form.strategy,
           skip_save:       true,
         }),
@@ -158,23 +159,37 @@ export default function QuickAnalysisModal({ open, onClose }) {
               </div>
 
               {/* Strategy */}
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Strategy</label>
-                <div className="flex rounded-md border border-[color:var(--color-line)] overflow-hidden text-[11.5px] font-semibold w-fit">
-                  {['flip', 'brrrr'].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setForm(f => ({ ...f, strategy: s }))}
-                      className={`px-4 py-1.5 transition-colors uppercase tracking-wide ${
-                        form.strategy === s
-                          ? 'bg-[color:var(--color-accent)] text-white'
-                          : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+              <div className="flex items-end gap-3 flex-wrap">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Strategy</label>
+                  <div className="flex rounded-md border border-[color:var(--color-line)] overflow-hidden text-[11.5px] font-semibold w-fit">
+                    {['flip', 'brrrr'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setForm(f => ({ ...f, strategy: s }))}
+                        className={`px-4 py-1.5 transition-colors uppercase tracking-wide ${
+                          form.strategy === s
+                            ? 'bg-[color:var(--color-accent)] text-white'
+                            : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {form.strategy === 'brrrr' && (
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Monthly Rent *</label>
+                    <input
+                      type="number"
+                      value={form.monthly_rent}
+                      onChange={set('monthly_rent')}
+                      placeholder="2000"
+                      className="w-32 bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded-md px-3 py-1.5 text-[13px] text-[color:var(--color-text)] placeholder-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                    />
+                  </div>
+                )}
               </div>
 
               {error && <p className="text-[11.5px] text-[color:var(--color-danger-text)]">{error}</p>}

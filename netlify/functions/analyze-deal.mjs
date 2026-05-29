@@ -336,13 +336,16 @@ Numbers-first, no fluff. Short and actionable. Flag clearly if inputs are estima
 - Include: distance, similarity %, beds/baths, sq ft, listed rent, rent/sqft, last seen
 - State estimated rent range and midpoint used in analysis`
 
-function buildUserPrompt({ address, purchase_price, arv, renovation_cost, strategy }) {
+function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) {
   const strategyLabel = strategy === 'brrrr' ? 'BRRRR' : 'flip'
+  const rentLine = strategyLabel === 'BRRRR' && monthly_rent
+    ? `\n- Expected Monthly Rent: $${Number(monthly_rent).toLocaleString()}`
+    : strategyLabel === 'BRRRR' ? '\n- Expected Monthly Rent: Not provided (estimate based on market)' : ''
   return `Analyze this ${strategyLabel} deal (be concise — skip sensitivity tables and scenario tables):
 - Address: ${address || 'Not provided'}
 - Purchase Price: $${Number(purchase_price).toLocaleString()}
 - Renovation Cost: $${Number(renovation_cost).toLocaleString()}
-- ARV: $${Number(arv).toLocaleString()}
+- ARV: $${Number(arv).toLocaleString()}${rentLine}
 - Strategy: ${strategyLabel}
 
 Give a brief analysis (3-4 paragraphs max), then append a JSON summary block in exactly this format (no other text after it):
@@ -399,7 +402,7 @@ export default async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const { lead_id, address, purchase_price, arv, renovation_cost, strategy = 'flip', skip_save = false } = body
+    const { lead_id, address, purchase_price, arv, renovation_cost, monthly_rent = null, strategy = 'flip', skip_save = false } = body
 
     if (!purchase_price) return new Response(JSON.stringify({ ok: false, error: 'purchase_price is required.' }), { status: 400, headers: HEADERS })
     if (!arv)            return new Response(JSON.stringify({ ok: false, error: 'arv is required.' }), { status: 400, headers: HEADERS })
@@ -416,7 +419,7 @@ export default async (req) => {
         model: 'claude-sonnet-4-6',
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserPrompt({ address, purchase_price, arv, renovation_cost, strategy }) }],
+        messages: [{ role: 'user', content: buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) }],
       }),
     })
 
