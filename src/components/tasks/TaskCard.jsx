@@ -21,7 +21,8 @@ const TONE_DUE = {
   neutral: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)]',
 }
 
-export default function TaskCard({ task, project, assignee, onOpen, activityCount = 0, attachmentCount = 0 }) {
+// assignees: array of profile objects { full_name, ... }
+export default function TaskCard({ task, project, assignees = [], onOpen, activityCount = 0, attachmentCount = 0 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const style = {
@@ -32,8 +33,9 @@ export default function TaskCard({ task, project, assignee, onOpen, activityCoun
 
   const priority = TASK_PRIORITY_MAP[task.priority]
   const due = dueLabel(task.due_date)
-  const initial = (assignee?.full_name || '').charAt(0).toUpperCase() || '?'
   const isDone = task.status === 'done'
+  const visibleAssignees = assignees.slice(0, 3)
+  const extraCount = assignees.length - visibleAssignees.length
 
   return (
     <div
@@ -82,17 +84,30 @@ export default function TaskCard({ task, project, assignee, onOpen, activityCoun
             </span>
           )}
         </div>
-        {assignee ? (
-          <span
-            title={assignee.full_name}
-            className="w-5 h-5 rounded-full bg-[color:var(--color-accent)] text-white inline-flex items-center justify-center text-[10px] font-semibold shrink-0"
-          >
-            {initial}
-          </span>
-        ) : (
+
+        {assignees.length === 0 ? (
           <span title="Unassigned" className="w-5 h-5 rounded-full bg-[color:var(--color-bg-elev-2)] border border-dashed border-[color:var(--color-line)] inline-flex items-center justify-center text-[color:var(--color-text-dim)] shrink-0">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
           </span>
+        ) : (
+          <div className="flex items-center shrink-0">
+            <div className="flex -space-x-1">
+              {visibleAssignees.map((a, i) => (
+                <span
+                  key={i}
+                  title={a?.full_name}
+                  className="w-5 h-5 rounded-full bg-[color:var(--color-accent)] text-white inline-flex items-center justify-center text-[10px] font-semibold ring-1 ring-[color:var(--color-bg)]"
+                >
+                  {(a?.full_name || '?').charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </div>
+            {extraCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] inline-flex items-center justify-center text-[9px] font-semibold ring-1 ring-[color:var(--color-bg)] -ml-1">
+                +{extraCount}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

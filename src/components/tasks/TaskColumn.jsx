@@ -34,7 +34,7 @@ export default function TaskColumn({ status, tasks, memberMap, projectMap, activ
               key={task.id}
               task={task}
               project={projectMap[task.project_id]}
-              assignee={memberMap[task.assignee_id]}
+              assignees={(task.assignee_ids || []).map(uid => memberMap[uid]).filter(Boolean)}
               onOpen={onOpenTask}
               activityCount={activityCounts[task.id] || 0}
               attachmentCount={attachmentCounts[task.id] || 0}

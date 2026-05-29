@@ -91,7 +91,7 @@ export default function TaskBoard({ tasks, memberMap, projectMap, activityCounts
             <TaskCard
               task={activeTask}
               project={projectMap[activeTask.project_id]}
-              assignee={memberMap[activeTask.assignee_id]}
+              assignees={(activeTask.assignee_ids || []).map(uid => memberMap[uid]).filter(Boolean)}
               activityCount={activityCounts[activeTask.id] || 0}
               attachmentCount={attachmentCounts[activeTask.id] || 0}
             />
