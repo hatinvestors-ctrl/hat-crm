@@ -110,7 +110,9 @@ export default function TodayPage() {
         .gte('created_at', `${activityDate}T00:00:00`)
         .lte('created_at', `${activityDate}T23:59:59`)
         .order('created_at', { ascending: false })
-      if (activityUser) q = q.eq('user_id', activityUser)
+      // Admins can filter by user; non-admins always see only their own activity
+      const effectiveUser = userRole === 'admin' ? activityUser : user.id
+      if (effectiveUser) q = q.eq('user_id', effectiveUser)
       const { data } = await q
       setActivityFeed(data || [])
       setActivityLoading(false)
