@@ -374,6 +374,7 @@ export default function LeadsPage() {
         onSaved={() => { setFormOpen(false); fetchLeads() }}
         workspaceId={workspaceId}
         userId={user.id}
+        userRole={userRole}
         members={members}
         workspaceDefaults={workspace.settings}
       />

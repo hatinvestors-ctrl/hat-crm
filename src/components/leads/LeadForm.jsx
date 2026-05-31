@@ -55,7 +55,7 @@ const EMPTY_LEAD = {
 }
 
 
-export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, userId, members = [], workspaceDefaults }) {
+export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, userId, userRole, members = [], workspaceDefaults }) {
   const [form, setForm] = useState(EMPTY_LEAD)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -161,7 +161,11 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
           visible_to_all: lead.visible_to_all || false,
         })
       } else {
-        setForm({ ...EMPTY_LEAD })
+        // Non-admin creating a new lead: auto-assign to themselves
+        setForm({
+          ...EMPTY_LEAD,
+          assigned_to: userRole !== 'admin' ? userId : '',
+        })
       }
       setError(null)
     }
@@ -311,12 +315,14 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                 onChange={e => update({ contract_signed_date: e.target.value })}
               />
             )}
-            <Select
-              label="Assigned To"
-              options={memberOptions}
-              value={form.assigned_to}
-              onChange={e => update({ assigned_to: e.target.value })}
-            />
+            {userRole === 'admin' && (
+              <Select
+                label="Assigned To"
+                options={memberOptions}
+                value={form.assigned_to}
+                onChange={e => update({ assigned_to: e.target.value })}
+              />
+            )}
           </div>
         </section>
 

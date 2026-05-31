@@ -4,7 +4,7 @@ import { buildZillowUrl } from '../../lib/zillow'
 import { safeUrl } from '../../lib/urlSafety'
 import { supabase } from '../../lib/supabase'
 
-export default function LeadDetailHeader({ lead, members, canEdit, onEdit, onUpdated }) {
+export default function LeadDetailHeader({ lead, members, canEdit, canAssign, onEdit, onUpdated }) {
   const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
   const assignee = userLookup[lead.assigned_to]
   const zillowUrl = safeUrl(lead.zillow_url) || buildZillowUrl(lead)
@@ -49,7 +49,7 @@ export default function LeadDetailHeader({ lead, members, canEdit, onEdit, onUpd
           <div className="text-[11px] text-[color:var(--color-text-dim)] mt-2 flex gap-3 flex-wrap">
             <span className="flex items-center gap-1">
               Assigned ·
-              {canEdit ? (
+              {canAssign ? (
                 <select
                   value={assigneeValue}
                   onChange={handleAssigneeChange}

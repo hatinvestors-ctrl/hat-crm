@@ -33,7 +33,8 @@ export default function LeadDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [activityRefresh, setActivityRefresh] = useState(0)
 
-  const canEdit = userRole !== 'readonly'
+  const canEdit   = userRole !== 'readonly'
+  const canAssign = userRole === 'admin'
   const canDelete = userRole === 'admin'
 
   const load = async () => {
@@ -94,6 +95,7 @@ export default function LeadDetailPage() {
           lead={lead}
           members={members}
           canEdit={canEdit}
+          canAssign={canAssign}
           onEdit={() => setEditOpen(true)}
           onUpdated={(updated) => setLead(updated)}
         />
@@ -173,6 +175,7 @@ export default function LeadDetailPage() {
         lead={lead}
         workspaceId={workspaceId}
         userId={user.id}
+        userRole={userRole}
         members={members}
         workspaceDefaults={workspace.settings}
       />
