@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deal Analysis Feature — HatInvestors CRM</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; line-height: 1.6; }
+
+  .cover { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+  .cover-logo { width: 64px; height: 64px; background: #7c6fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: white; margin: 0 auto 24px; }
+  .cover h1 { font-size: 42px; font-weight: 800; color: white; margin-bottom: 12px; }
+  .cover h1 span { color: #7c6fff; }
+  .cover p { font-size: 18px; color: #aaa; max-width: 600px; margin: 0 auto 32px; }
+  .cover-meta { display: flex; gap: 32px; justify-content: center; color: #666; font-size: 13px; }
+  .cover-meta span { display: flex; align-items: center; gap-6px; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 60px 40px; }
+  .section { margin-bottom: 80px; }
+  .section-badge { display: inline-block; background: #7c6fff22; color: #a599ff; border: 1px solid #7c6fff44; border-radius: 20px; padding: 4px 14px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 16px; }
+  h2 { font-size: 28px; font-weight: 700; color: white; margin-bottom: 8px; }
+  h3 { font-size: 18px; font-weight: 600; color: #d0d0d0; margin-bottom: 12px; margin-top: 32px; }
+  p { color: #bbb; margin-bottom: 16px; font-size: 15px; }
+  .lead { font-size: 17px; color: #ccc; margin-bottom: 24px; }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid #2a2a2a; margin: 48px 0; }
+
+  /* Feature highlight box */
+  .highlight { background: #1a1a1a; border: 1px solid #2a2a2a; border-left: 3px solid #7c6fff; border-radius: 8px; padding: 20px 24px; margin: 24px 0; }
+  .highlight h4 { color: #a599ff; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .highlight p { margin: 0; color: #bbb; font-size: 14px; }
+
+  /* Step list */
+  .steps { list-style: none; margin: 24px 0; }
+  .steps li { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .step-num { width: 28px; height: 28px; border-radius: 50%; background: #7c6fff; color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; shrink: 0; flex-shrink: 0; margin-top: 2px; }
+  .step-content h4 { color: #e0e0e0; font-size: 15px; margin-bottom: 4px; }
+  .step-content p { margin: 0; font-size: 14px; color: #999; }
+
+  /* UI Mockup styles */
+  .mockup-wrap { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; margin: 32px 0; }
+  .mockup-titlebar { background: #1e1e1e; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #2a2a2a; }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mockup-url { flex: 1; background: #2a2a2a; border-radius: 4px; height: 22px; margin: 0 12px; display: flex; align-items: center; padding: 0 10px; font-size: 11px; color: #666; }
+  .mockup-body { padding: 0; }
+
+  /* App layout mockup */
+  .app-layout { display: flex; min-height: 480px; }
+  .sidebar-mock { width: 200px; background: #111; border-right: 1px solid #2a2a2a; padding: 16px 8px; flex-shrink: 0; }
+  .sidebar-brand { display: flex; align-items: center; gap-8px; padding: 6px 8px; margin-bottom: 16px; }
+  .sidebar-brand-icon { width: 20px; height: 20px; background: #7c6fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: white; flex-shrink: 0; }
+  .sidebar-brand-name { font-size: 11px; font-weight: 700; color: #e0e0e0; margin-left: 6px; }
+  .sidebar-nav-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; font-size: 11px; color: #888; margin-bottom: 2px; }
+  .sidebar-nav-item.active { background: #1e1e1e; color: #e0e0e0; }
+  .sidebar-nav-item svg { width: 12px; height: 12px; }
+  .sidebar-quick { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; font-size: 11px; color: #a599ff; background: #7c6fff22; margin: 8px 0; font-weight: 600; }
+  .sidebar-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #444; padding: 8px 8px 4px; }
+  .sidebar-lead-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #666; }
+  .main-content { flex: 1; padding: 20px; background: #0f0f0f; }
+
+  /* Financial section mockup */
+  .card-mock { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #666; border-left: 2px solid #7c6fff; padding-left: 8px; margin-bottom: 14px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .field-item label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #555; margin-bottom: 3px; }
+  .field-item .value { font-size: 14px; color: #e0e0e0; }
+  .field-item .value.accent { color: #7c6fff; }
+  .analyze-row { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #2a2a2a; }
+  .strategy-toggle { display: flex; border: 1px solid #2a2a2a; border-radius: 5px; overflow: hidden; }
+  .strategy-btn { padding: 4px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .strategy-btn.active { background: #7c6fff; color: white; }
+  .strategy-btn.inactive { background: #1e1e1e; color: #666; }
+  .analyze-btn { background: #7c6fff; color: white; border: none; border-radius: 5px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .reanalyze-btn { background: transparent; color: #888; border: 1px solid #2a2a2a; border-radius: 5px; padding: 6px 14px; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+  /* Analysis panel mockup */
+  .verdict-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+  .verdict-row.buy { background: #14532d22; border: 1px solid #22c55e44; }
+  .verdict-row.pass { background: #7f1d1d22; border: 1px solid #ef444444; }
+  .verdict-row.cond { background: #78350f22; border: 1px solid #f59e0b44; }
+  .score-ring { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; font-weight: 800; }
+  .score-ring.buy { background: conic-gradient(#22c55e 0% 78%, #1a1a1a 78% 100%); color: #22c55e; }
+  .score-ring.pass { background: conic-gradient(#ef4444 0% 32%, #1a1a1a 32% 100%); color: #ef4444; }
+  .score-ring-inner { background: #1a1a1a; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .verdict-label { font-size: 13px; font-weight: 700; color: #22c55e; }
+  .verdict-label.pass { color: #ef4444; }
+  .verdict-text { font-size: 11px; color: #999; margin-top: 2px; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .metric-card { background: #111; border: 1px solid #2a2a2a; border-radius: 6px; padding: 8px; text-align: center; }
+  .metric-label { font-size: 8.5px; text-transform: uppercase; letter-spacing: .06em; color: #555; margin-bottom: 4px; }
+  .metric-value { font-size: 13px; font-weight: 700; color: #e0e0e0; }
+  .metric-value.green { color: #22c55e; }
+  .risk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .risk-chip { background: #78350f22; border: 1px solid #f59e0b44; color: #fcd34d; border-radius: 4px; padding: 2px 8px; font-size: 10px; }
+  .panel-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #2a2a2a; }
+  .timestamp { font-size: 10px; color: #555; }
+  .dashboard-btn { background: #1e1e1e; border: 1px solid #2a2a2a; color: #888; border-radius: 4px; padding: 4px 10px; font-size: 10px; }
+
+  /* Quick analysis modal mockup */
+  .modal-overlay { background: rgba(0,0,0,0.7); padding: 24px; border-radius: 12px; }
+  .modal-box { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 20px; max-width: 420px; margin: 0 auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid #2a2a2a; padding-bottom: 14px; }
+  .modal-title { font-size: 14px; font-weight: 700; color: white; }
+  .modal-subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .modal-close { color: #555; font-size: 18px; cursor: pointer; }
+  .form-group { margin-bottom: 12px; }
+  .form-label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #555; margin-bottom: 5px; }
+  .form-input { width: 100%; background: #111; border: 1px solid #2a2a2a; border-radius: 5px; padding: 7px 10px; font-size: 12px; color: #e0e0e0; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .analyze-full-btn { width: 100%; background: #7c6fff; color: white; border: none; border-radius: 6px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+
+  /* Architecture diagram */
+  .arch-diagram { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; padding: 32px; margin: 32px 0; }
+  .arch-row { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 8px; flex-wrap: wrap; }
+  .arch-box { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 10px 16px; text-align: center; min-width: 120px; }
+  .arch-box.accent { border-color: #7c6fff; background: #7c6fff15; }
+  .arch-box.green { border-color: #22c55e; background: #22c55e15; }
+  .arch-box.orange { border-color: #f59e0b; background: #f59e0b15; }
+  .arch-box-title { font-size: 11px; font-weight: 700; color: #e0e0e0; }
+  .arch-box-sub { font-size: 9px; color: #666; margin-top: 2px; }
+  .arch-arrow { color: #444; font-size: 18px; margin: 0 8px; align-self: center; }
+  .arch-arrow-down { color: #444; font-size: 18px; text-align: center; margin: 4px 0; }
+
+  /* Flow chart */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .flow-step { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 10px 20px; text-align: center; width: 280px; }
+  .flow-step.highlight { border-color: #7c6fff; background: #7c6fff15; }
+  .flow-step-title { font-size: 12px; font-weight: 600; color: #e0e0e0; }
+  .flow-step-sub { font-size: 10px; color: #666; margin-top: 2px; }
+  .flow-arrow { color: #444; font-size: 20px; line-height: 1.2; }
+
+  /* Feature list */
+  .feature-list { list-style: none; margin: 16px 0; }
+  .feature-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #1e1e1e; font-size: 14px; color: #bbb; }
+  .feature-list li:last-child { border-bottom: none; }
+  .feature-icon { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+  th { background: #1e1e1e; color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; padding: 10px 14px; text-align: left; border-bottom: 1px solid #2a2a2a; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1a1a1a; color: #bbb; }
+  tr:hover td { background: #151515; }
+
+  /* Tag */
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .tag.green { background: #14532d33; color: #86efac; }
+  .tag.blue { background: #1e3a5f33; color: #93c5fd; }
+  .tag.purple { background: #3b0764 33; color: #d8b4fe; }
+
+  /* TOC */
+  .toc { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 24px 28px; margin: 40px 0; }
+  .toc h3 { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 16px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { color: #7c6fff; font-size: 14px; margin-bottom: 8px; cursor: pointer; }
+  .toc li span { color: #666; font-size: 12px; margin-left: 8px; }
+
+  @media print { body { background: white; color: black; } }
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div class="cover-logo">H</div>
+  <h1>Deal Analysis <span>Feature</span></h1>
+  <p>A complete guide to the new AI-powered deal analysis capability built into HatInvestors CRM — from trigger to dashboard.</p>
+  <div class="cover-meta">
+    <span>📅 May 29, 2026</span>
+    <span>🏗 HatInvestors CRM</span>
+    <span>🤖 Powered by Claude AI</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="page">
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li>Overview <span>— What was built and why</span></li>
+      <li>How It Works <span>— The full flow from click to result</span></li>
+      <li>Analyze Deal from a Lead <span>— Built into every lead page</span></li>
+      <li>Saved Analysis Panel <span>— Results that persist</span></li>
+      <li>Re-Analyze <span>— Run a fresh analysis anytime</span></li>
+      <li>Interactive Dashboard <span>— Full financial model in browser</span></li>
+      <li>Quick Analysis <span>— Analyze without a CRM lead</span></li>
+      <li>Technical Architecture <span>— How the system is built</span></li>
+    </ol>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 1: OVERVIEW -->
+  <div class="section">
+    <div class="section-badge">01 — Overview</div>
+    <h2>What Was Built</h2>
+    <p class="lead">HatInvestors CRM now has a full AI-powered deal analysis engine built directly into the lead workflow. No external tools, no copy-pasting numbers — just click a button and get a complete financial analysis in seconds.</p>
+
+    <div class="highlight">
+      <h4>The Problem It Solves</h4>
+      <p>Previously, analyzing a deal required switching to a separate agent tool, manually entering numbers, and keeping results in a different system. Now the analysis lives on the lead record, persists across sessions, and opens a rich interactive dashboard with one click.</p>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="feature-icon">🤖</span><div><strong style="color:#e0e0e0">AI-Powered Analysis</strong> — Uses Claude AI with Tomer's exact financial model (HML defaults, holding costs, MAO formula, ROI calculations)</div></li>
+      <li><span class="feature-icon">💾</span><div><strong style="color:#e0e0e0">Saved to Lead Record</strong> — Analysis results are stored on the lead in Supabase and visible every time you open the lead</div></li>
+      <li><span class="feature-icon">📊</span><div><strong style="color:#e0e0e0">Interactive Dashboard</strong> — One click opens the full deal-analyzer.html dashboard pre-filled with the lead's numbers</div></li>
+      <li><span class="feature-icon">🔄</span><div><strong style="color:#e0e0e0">Re-Analyze Anytime</strong> — Numbers changed? Run a fresh analysis that replaces the previous one</div></li>
+      <li><span class="feature-icon">⚡</span><div><strong style="color:#e0e0e0">Quick Analysis</strong> — Analyze any property without adding it to the CRM first — accessible from the sidebar</div></li>
+      <li><span class="feature-icon">🏷</span><div><strong style="color:#e0e0e0">FLIP + BRRRR Strategies</strong> — Toggle between flip and BRRRR analysis before running</div></li>
+    </ul>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 2: HOW IT WORKS -->
+  <div class="section">
+    <div class="section-badge">02 — How It Works</div>
+    <h2>The Full Flow</h2>
+    <p>Here's what happens from the moment you click "Analyze Deal" to when the results appear on screen.</p>
+
+    <div class="arch-diagram">
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-step-title">👆 User clicks "✦ Analyze Deal"</div>
+          <div class="flow-step-sub">On the lead's Financial section</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step highlight">
+          <div class="flow-step-title">📡 POST → analyze-deal function</div>
+          <div class="flow-step-sub">lead_id, address, pp, arv, reno, strategy</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="flow-step-title">🤖 Claude AI (claude-sonnet-4-6)</div>
+          <div class="flow-step-sub">Full financial model analysis using HAT system prompt</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step highlight">
+          <div class="flow-step-title">📦 Parse JSON summary block</div>
+          <div class="flow-step-sub">verdict, score, profit, roi, risks, recommendation</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+          <div class="flow-step-title">💾 Save to Supabase</div>
+          <div class="flow-step-sub">leads.deal_analysis JSONB column</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step highlight">
+          <div class="flow-step-title">✅ DealAnalysisPanel renders</div>
+          <div class="flow-step-sub">Verdict, metrics, risks, full analysis, dashboard link</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 3: ANALYZE FROM LEAD -->
+  <div class="section">
+    <div class="section-badge">03 — Analyze from a Lead</div>
+    <h2>Built Into Every Lead Page</h2>
+    <p>The "Analyze Deal" button lives inside the Financial section of every lead. It uses the lead's existing financial data — no re-entry needed.</p>
+
+    <div class="mockup-wrap">
+      <div class="mockup-titlebar">
+        <div class="mockup-dot" style="background:#ff5f57"></div>
+        <div class="mockup-dot" style="background:#ffbd2e"></div>
+        <div class="mockup-dot" style="background:#28c840"></div>
+        <div class="mockup-url">localhost:8888/w/.../leads/619-golfair-blvd</div>
+      </div>
+      <div class="mockup-body">
+        <div class="app-layout">
+          <div class="sidebar-mock">
+            <div class="sidebar-brand">
+              <div class="sidebar-brand-icon">H</div>
+              <div class="sidebar-brand-name">HatInvestors CRM</div>
+            </div>
+            <div class="sidebar-nav-item">📊 Dashboard</div>
+            <div class="sidebar-nav-item">🕐 Today</div>
+            <div class="sidebar-nav-item">📥 Inbox</div>
+            <div class="sidebar-nav-item active">🏠 Leads</div>
+            <div class="sidebar-nav-item">✅ Tasks</div>
+            <div class="sidebar-quick">⚡ Quick Analysis</div>
+            <div class="sidebar-section-label">Active Pipeline</div>
+            <div class="sidebar-lead-item" style="color:#e0e0e0;background:#1e1e1e;border-radius:4px;">🏠 619 Golfair Blvd</div>
+            <div class="sidebar-lead-item">🏠 2467 W 25th St</div>
+            <div class="sidebar-lead-item">🏠 3053 Ray Rd</div>
+          </div>
+          <div class="main-content">
+            <div class="card-mock">
+              <div class="card-title">Financials</div>
+              <div class="field-grid">
+                <div class="field-item"><label>Asking Price</label><div class="value">$85,000</div></div>
+                <div class="field-item"><label>ARV</label><div class="value">$250,000</div></div>
+                <div class="field-item"><label>Renovation Cost</label><div class="value">$65,000</div></div>
+                <div class="field-item"><label>MAO · Max Allowable Offer</label><div class="value accent">$122,500</div></div>
+              </div>
+              <div style="font-size:10px;color:#444;margin-bottom:14px;">MAO = 75% × ARV − Renovation (auto-recalculates)</div>
+              <div class="analyze-row">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div class="strategy-toggle">
+                    <div class="strategy-btn active">FLIP</div>
+                    <div class="strategy-btn inactive">BRRRR</div>
+                  </div>
+                </div>
+                <button class="analyze-btn">✦ Analyze Deal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>What the button does</h3>
+    <ul class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Pick your strategy</h4>
+          <p>Toggle between FLIP and BRRRR using the two buttons. The strategy changes how Claude models the deal (holding period, refinance analysis, etc.)</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Click "✦ Analyze Deal"</h4>
+          <p>The button turns to "Analyzing…" with a spinner. The analysis takes 5–20 seconds depending on Claude's response time.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Results appear instantly</h4>
+          <p>The DealAnalysisPanel renders below the Financial section with verdict, score, metrics, risks, and a full text analysis.</p>
+        </div>
+      </li>
+    </ul>
+
+    <div class="highlight">
+      <h4>Required Fields</h4>
+      <p>The lead must have <strong>Asking Price</strong> and <strong>ARV</strong> filled in. Renovation Cost is optional (defaults to $0). The address is pulled automatically from the lead record.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 4: SAVED ANALYSIS PANEL -->
+  <div class="section">
+    <div class="section-badge">04 — Saved Analysis Panel</div>
+    <h2>Results That Persist</h2>
+    <p>After analysis runs, the results are saved to the lead's database record. Every time you open that lead, the panel is already there — no need to re-run.</p>
+
+    <div class="mockup-wrap">
+      <div class="mockup-titlebar">
+        <div class="mockup-dot" style="background:#ff5f57"></div>
+        <div class="mockup-dot" style="background:#ffbd2e"></div>
+        <div class="mockup-dot" style="background:#28c840"></div>
+        <div class="mockup-url">Deal Analysis Panel — BUY result</div>
+      </div>
+      <div class="mockup-body" style="padding:20px;">
+
+        <!-- Analyze row with re-analyze -->
+        <div class="analyze-row" style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="strategy-toggle">
+              <div class="strategy-btn active">FLIP</div>
+              <div class="strategy-btn inactive">BRRRR</div>
+            </div>
+            <span style="font-size:10px;color:#555;">May 29</span>
+          </div>
+          <button class="reanalyze-btn">↺ Re-analyze</button>
+        </div>
+
+        <!-- Verdict -->
+        <div class="verdict-row buy">
+          <div class="score-ring buy">
+            <div class="score-ring-inner" style="background:#111;">78</div>
+          </div>
+          <div>
+            <div class="verdict-label">✓ BUY <span style="font-size:9px;opacity:.5;font-weight:400;margin-left:4px;">FLIP</span></div>
+            <div class="verdict-text">Strong spread with $72K projected profit on ~$14K cash in. Heavy reno relative to purchase price is the key execution risk — validate scope and ARV comps before pulling the trigger.</div>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-label">Est. Profit</div><div class="metric-value green">$72,051</div></div>
+          <div class="metric-card"><div class="metric-label">ROI</div><div class="metric-value">52.3%</div></div>
+          <div class="metric-card"><div class="metric-label">Annualized ROI</div><div class="metric-value">209%</div></div>
+          <div class="metric-card"><div class="metric-label">Cash Needed</div><div class="metric-value">$13,780</div></div>
+        </div>
+
+        <!-- Risks -->
+        <div class="risk-chips">
+          <span class="risk-chip">⚠ Reno scope creep on gutted property</span>
+          <span class="risk-chip">⚠ ARV dependent on recent comps</span>
+          <span class="risk-chip">⚠ Permit delays extending hold period</span>
+        </div>
+
+        <!-- Expander -->
+        <div style="font-size:11px;color:#7c6fff;margin-bottom:12px;cursor:pointer;">▼ View full analysis</div>
+
+        <!-- Footer -->
+        <div class="panel-footer">
+          <span class="timestamp">Analyzed May 29, 2026</span>
+          <span class="dashboard-btn">Open Dashboard →</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>What each section shows</h3>
+    <table>
+      <tr><th>Element</th><th>What it means</th></tr>
+      <tr><td><strong>Score Ring</strong> (0–100)</td><td>Green ≥70 = strong deal. Yellow 45–69 = proceed with caution. Red &lt;45 = likely pass.</td></tr>
+      <tr><td><strong>BUY / PASS / CONDITIONAL</strong></td><td>Claude's verdict based on Tomer's financial model thresholds.</td></tr>
+      <tr><td><strong>Recommendation</strong></td><td>2–3 sentence plain-English summary of the deal and key reason for the verdict.</td></tr>
+      <tr><td><strong>Est. Profit</strong></td><td>Total profit after all costs: loan repayment, holding costs, selling costs (7% of ARV).</td></tr>
+      <tr><td><strong>ROI</strong></td><td>Return on cash invested. Target is ≥15%.</td></tr>
+      <tr><td><strong>Annualized ROI</strong></td><td>ROI scaled to a 12-month rate based on holding period.</td></tr>
+      <tr><td><strong>Cash Needed</strong></td><td>Down payment (10%) + all purchase costs. This is money out of pocket at closing.</td></tr>
+      <tr><td><strong>Key Risks</strong></td><td>2–3 specific risks that could hurt this deal's profitability.</td></tr>
+      <tr><td><strong>View Full Analysis</strong></td><td>Expands to show the complete written analysis from Claude, including all financial tables.</td></tr>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 5: RE-ANALYZE -->
+  <div class="section">
+    <div class="section-badge">05 — Re-Analyze</div>
+    <h2>Run a Fresh Analysis Anytime</h2>
+    <p>Numbers changed? New ARV estimate? Different strategy? You can re-run the analysis at any time. The new results replace the previous ones on the lead record.</p>
+
+    <div class="arch-diagram">
+      <div style="display:flex;gap:32px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div class="arch-box" style="margin-bottom:8px;">
+            <div class="arch-box-title">First Analysis</div>
+            <div class="arch-box-sub">Verdict: BUY · Score: 74</div>
+            <div class="arch-box-sub" style="margin-top:4px;font-size:9px;color:#444;">Analyzed May 28</div>
+          </div>
+          <div style="font-size:10px;color:#555;">Shows "↺ Re-analyze" button</div>
+        </div>
+        <div style="align-self:center;color:#444;font-size:24px;">→</div>
+        <div style="text-align:center;">
+          <div class="arch-box accent" style="margin-bottom:8px;">
+            <div class="arch-box-title" style="color:#a599ff;">Update numbers</div>
+            <div class="arch-box-sub">e.g. ARV revised to $270K</div>
+            <div class="arch-box-sub">Switch to BRRRR strategy</div>
+          </div>
+          <div style="font-size:10px;color:#555;">Edit fields in lead form</div>
+        </div>
+        <div style="align-self:center;color:#444;font-size:24px;">→</div>
+        <div style="text-align:center;">
+          <div class="arch-box green" style="margin-bottom:8px;">
+            <div class="arch-box-title" style="color:#86efac;">New Analysis</div>
+            <div class="arch-box-sub">Fresh results from Claude</div>
+            <div class="arch-box-sub" style="margin-top:4px;font-size:9px;color:#444;">Analyzed May 29</div>
+          </div>
+          <div style="font-size:10px;color:#555;">Previous analysis replaced</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlight">
+      <h4>Activity Timeline</h4>
+      <p>Every time an analysis is run (first time or re-run), a new entry appears in the lead's Activity Timeline: <em>"Deal analysis run — Verdict: BUY / $72,051 profit / 52.3% ROI"</em>. This creates a full history of all analyses run on a lead.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 6: DASHBOARD -->
+  <div class="section">
+    <div class="section-badge">06 — Interactive Dashboard</div>
+    <h2>Full Financial Dashboard</h2>
+    <p>The "Open Dashboard →" button opens the full deal-analyzer.html in a new tab, pre-populated with the lead's numbers. This is the same rich interactive tool used in the hat-ai-agents project.</p>
+
+    <div class="mockup-wrap">
+      <div class="mockup-titlebar">
+        <div class="mockup-dot" style="background:#ff5f57"></div>
+        <div class="mockup-dot" style="background:#ffbd2e"></div>
+        <div class="mockup-dot" style="background:#28c840"></div>
+        <div class="mockup-url">hatinvestors.netlify.app/deal-analyzer.html?pp=85000&arv=250000&reno=65000&address=619+Golfair+Blvd</div>
+      </div>
+      <div class="mockup-body" style="padding:24px;background:#111;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#555;margin-bottom:12px;">📥 Deal Inputs</div>
+            <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:12px;">
+              <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;">Address</div><div style="font-size:12px;color:#e0e0e0;">619 Golfair Blvd</div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div><div style="font-size:9px;color:#555;">Purchase Price</div><div style="font-size:12px;color:#e0e0e0;">$85,000</div></div>
+                <div><div style="font-size:9px;color:#555;">ARV</div><div style="font-size:12px;color:#e0e0e0;">$250,000</div></div>
+                <div><div style="font-size:9px;color:#555;">Renovation</div><div style="font-size:12px;color:#e0e0e0;">$65,000</div></div>
+                <div><div style="font-size:9px;color:#555;">Hold Period</div><div style="font-size:12px;color:#e0e0e0;">3 months</div></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#555;margin-bottom:12px;">📊 Results</div>
+            <div style="background:#1a1a1a;border:1px solid #22c55e44;border-radius:6px;padding:12px;">
+              <div style="font-size:13px;font-weight:700;color:#22c55e;margin-bottom:8px;">✓ BUY — Score 78</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                <div><div style="font-size:9px;color:#555;">Total Profit</div><div style="font-size:12px;color:#22c55e;font-weight:700;">$72,051</div></div>
+                <div><div style="font-size:9px;color:#555;">ROI</div><div style="font-size:12px;color:#e0e0e0;">52.3%</div></div>
+                <div><div style="font-size:9px;color:#555;">Ann. ROI</div><div style="font-size:12px;color:#e0e0e0;">209%</div></div>
+                <div><div style="font-size:9px;color:#555;">Cash Needed</div><div style="font-size:12px;color:#e0e0e0;">$13,780</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:12px;">
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#555;margin-bottom:8px;">📧 Agent Emails & 📞 Phone Scripts</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="background:#7c6fff22;border:1px solid #7c6fff44;color:#a599ff;border-radius:4px;padding:3px 8px;font-size:10px;">Initial Offer Email</span>
+            <span style="background:#7c6fff22;border:1px solid #7c6fff44;color:#a599ff;border-radius:4px;padding:3px 8px;font-size:10px;">Counter Offer Email</span>
+            <span style="background:#7c6fff22;border:1px solid #7c6fff44;color:#a599ff;border-radius:4px;padding:3px 8px;font-size:10px;">First Contact Script</span>
+            <span style="background:#7c6fff22;border:1px solid #7c6fff44;color:#a599ff;border-radius:4px;padding:3px 8px;font-size:10px;">Negotiate on Call</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p>The dashboard is pre-filled via URL parameters — <code style="background:#1e1e1e;padding:2px 6px;border-radius:3px;font-size:12px;color:#a599ff;">?pp=85000&arv=250000&reno=65000&address=619+Golfair+Blvd</code> — so it loads instantly with the correct numbers.</p>
+
+    <h3>What the dashboard includes</h3>
+    <ul class="feature-list">
+      <li><span class="feature-icon">📊</span>Full flip and BRRRR financial analysis with all line items</li>
+      <li><span class="feature-icon">📧</span>5 pre-written agent emails (Initial Offer, Counter, Beat Other Offers, Motivated Seller, Follow-Up)</li>
+      <li><span class="feature-icon">📞</span>4 phone scripts with objection handling and negotiation language</li>
+      <li><span class="feature-icon">🎯</span>Sensitivity tables showing profit at different holding periods and ARV scenarios</li>
+    </ul>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 7: QUICK ANALYSIS -->
+  <div class="section">
+    <div class="section-badge">07 — Quick Analysis</div>
+    <h2>Analyze Without a CRM Lead</h2>
+    <p>The ⚡ Quick Analysis button in the sidebar lets you analyze any property on the spot — no need to create a lead first. Perfect for evaluating deals at a glance before deciding to add them to the pipeline.</p>
+
+    <div class="mockup-wrap">
+      <div class="mockup-titlebar">
+        <div class="mockup-dot" style="background:#ff5f57"></div>
+        <div class="mockup-dot" style="background:#ffbd2e"></div>
+        <div class="mockup-dot" style="background:#28c840"></div>
+        <div class="mockup-url">Quick Analysis Modal</div>
+      </div>
+      <div class="mockup-body" style="padding:24px;background:#0a0a0a;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title">⚡ Quick Deal Analysis</div>
+              <div class="modal-subtitle">Analyze any property without adding it to the CRM</div>
+            </div>
+            <div class="modal-close">×</div>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Property Address</div>
+            <div class="form-input" style="color:#666;">123 Main St, Tampa, FL</div>
+          </div>
+          <div class="form-row">
+            <div>
+              <div class="form-label">Purchase Price *</div>
+              <div class="form-input" style="color:#666;">200000</div>
+            </div>
+            <div>
+              <div class="form-label">ARV *</div>
+              <div class="form-input" style="color:#666;">310000</div>
+            </div>
+            <div>
+              <div class="form-label">Renovation</div>
+              <div class="form-input" style="color:#666;">45000</div>
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div class="form-label">Strategy</div>
+            <div class="strategy-toggle" style="width:fit-content;">
+              <div class="strategy-btn active">FLIP</div>
+              <div class="strategy-btn inactive">BRRRR</div>
+            </div>
+          </div>
+          <button class="analyze-full-btn">✦ Analyze Deal</button>
+        </div>
+      </div>
+    </div>
+
+    <h3>Key differences from lead analysis</h3>
+    <table>
+      <tr><th>Feature</th><th>Lead Analysis</th><th>Quick Analysis</th></tr>
+      <tr><td>Where to find it</td><td>Financial section of a lead</td><td>Sidebar (always accessible)</td></tr>
+      <tr><td>Requires a lead</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Saves to database</td><td>Yes — persists on the lead</td><td>No — ephemeral only</td></tr>
+      <tr><td>Activity log entry</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Opens dashboard</td><td>Yes</td><td>Yes</td></tr>
+      <tr><td>FLIP / BRRRR toggle</td><td>Yes</td><td>Yes</td></tr>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <!-- SECTION 8: ARCHITECTURE -->
+  <div class="section">
+    <div class="section-badge">08 — Technical Architecture</div>
+    <h2>How It's Built</h2>
+    <p>The deal analysis feature is built across 6 files — a Netlify serverless function, a React panel component, a modified financial section, an activity logger, and a public dashboard.</p>
+
+    <div class="arch-diagram">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#555;margin-bottom:16px;">System Architecture</div>
+        <div class="arch-row">
+          <div class="arch-box accent">
+            <div class="arch-box-title">React Frontend</div>
+            <div class="arch-box-sub">FinancialSection.jsx</div>
+            <div class="arch-box-sub">DealAnalysisPanel.jsx</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box">
+            <div class="arch-box-title">Netlify Function</div>
+            <div class="arch-box-sub">analyze-deal.mjs</div>
+            <div class="arch-box-sub">POST endpoint</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box orange">
+            <div class="arch-box-title">Claude AI API</div>
+            <div class="arch-box-sub">claude-sonnet-4-6</div>
+            <div class="arch-box-sub">HAT system prompt</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;margin:8px 0;">
+          <div style="width:120px;text-align:center;color:#444;">↓</div>
+          <div style="width:8px;"></div>
+          <div style="width:120px;text-align:center;color:#444;">↓</div>
+          <div style="width:8px;"></div>
+          <div style="width:120px;text-align:center;color:#444;">↓</div>
+        </div>
+        <div class="arch-row">
+          <div class="arch-box">
+            <div class="arch-box-title">Lead Record</div>
+            <div class="arch-box-sub">Supabase leads table</div>
+            <div class="arch-box-sub">deal_analysis JSONB</div>
+          </div>
+          <div class="arch-arrow" style="color:#1a1a1a;">→</div>
+          <div class="arch-box green">
+            <div class="arch-box-title">Activity Log</div>
+            <div class="arch-box-sub">lead_activities table</div>
+            <div class="arch-box-sub">Timeline entry</div>
+          </div>
+          <div class="arch-arrow" style="color:#1a1a1a;">→</div>
+          <div class="arch-box">
+            <div class="arch-box-title">Dashboard</div>
+            <div class="arch-box-sub">deal-analyzer.html</div>
+            <div class="arch-box-sub">URL params pre-fill</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Files created or modified</h3>
+    <table>
+      <tr><th>File</th><th>Action</th><th>Purpose</th></tr>
+      <tr><td><code style="color:#a599ff;">netlify/functions/analyze-deal.mjs</code></td><td><span class="tag green">Created</span></td><td>Serverless function — calls Claude API, saves to Supabase</td></tr>
+      <tr><td><code style="color:#a599ff;">src/components/lead-detail/DealAnalysisPanel.jsx</code></td><td><span class="tag green">Created</span></td><td>React component — renders verdict, metrics, risks, expander</td></tr>
+      <tr><td><code style="color:#a599ff;">src/components/QuickAnalysisModal.jsx</code></td><td><span class="tag green">Created</span></td><td>Standalone analysis modal — no lead required</td></tr>
+      <tr><td><code style="color:#a599ff;">public/deal-analyzer.html</code></td><td><span class="tag green">Created</span></td><td>Interactive dashboard — copied from hat-ai-agents + URL params</td></tr>
+      <tr><td><code style="color:#a599ff;">src/components/lead-detail/FinancialSection.jsx</code></td><td><span class="tag blue">Modified</span></td><td>Added strategy toggle, analyze button, panel integration</td></tr>
+      <tr><td><code style="color:#a599ff;">src/components/Sidebar.jsx</code></td><td><span class="tag blue">Modified</span></td><td>Added ⚡ Quick Analysis button</td></tr>
+      <tr><td><code style="color:#a599ff;">src/lib/activityLogger.js</code></td><td><span class="tag blue">Modified</span></td><td>Added logDealAnalysis() function</td></tr>
+    </table>
+
+    <div class="highlight">
+      <h4>Financial Model</h4>
+      <p>The AI uses Tomer's exact financial model: HML defaults (Rob @ 3 Shacks — 90% purchase + 100% reno, 12% rate, 2% points), itemized purchase costs ($1,600 title + $500 lender insurance + $200 doc stamps + $150 intangible tax), holding costs ($208/mo taxes + $100/mo insurance + loan payment), MAO formula (75% × ARV − repairs − costs − min profit), and a 7% selling cost on flip proceeds.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- FOOTER -->
+  <div style="text-align:center;padding:40px 0;color:#444;font-size:12px;">
+    <div style="font-size:24px;margin-bottom:8px;">H</div>
+    <div>HatInvestors CRM — Deal Analysis Feature</div>
+    <div style="margin-top:4px;">Built May 29, 2026 · Powered by Claude AI</div>
+  </div>
+
+</div>
+</body>
+</html>

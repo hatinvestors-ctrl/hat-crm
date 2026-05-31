@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import WorkspaceSelectorPage from './pages/WorkspaceSelectorPage'
@@ -50,10 +51,12 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
-        <Route path="tasks" element={<TasksPage />} />
-        <Route path="tasks/:taskId" element={<TasksPage />} />
-        <Route path="import" element={<ImportPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route element={<AdminRoute />}>
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="tasks/:taskId" element={<TasksPage />} />
+          <Route path="import" element={<ImportPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
