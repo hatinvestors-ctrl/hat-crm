@@ -15,12 +15,20 @@ function buildDefaultBody(recipientName, lead, senderName) {
   return [
     greeting,
     '',
-    `I came across ${addr}${price} and I'd like to discuss this property further.`,
+    `My name is ${senderName || 'your name'} with HAT Investors — we're a local real estate company based in Jacksonville. We buy and renovate a high volume of properties across Jacksonville and are very active in the market.`,
     '',
-    `Are you open to offers below list price? Please let me know the best time to connect.`,
+    `I came across ${addr}${price} and wanted to reach out directly. We're cash buyers with the ability to close in 14–21 days, no financing contingency.`,
     '',
-    `Thank you,`,
+    `A few quick questions:`,
+    `- Is the seller open to offers below list?`,
+    `- Any known issues with the property?`,
+    `- How long has it been on market?`,
+    '',
+    `Happy to schedule a walk at your convenience. Look forward to connecting.`,
+    '',
+    `Best,`,
     senderName || '',
+    `HAT Investors`,
   ].join('\n')
 }
 
