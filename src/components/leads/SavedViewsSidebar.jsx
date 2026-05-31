@@ -4,8 +4,9 @@ import { supabase } from '../../lib/supabase'
 import { SYSTEM_VIEWS } from '../../lib/constants'
 import Button from '../ui/Button'
 import { todayISO, endOfWeekISO } from '../../lib/calculations'
+import { applyLeadVisibility } from '../../lib/leadVisibility'
 
-export default function SavedViewsSidebar({ workspaceId, userId, activeViewId, onSelectView, currentFilters, onSaveView, refreshKey }) {
+export default function SavedViewsSidebar({ workspaceId, userId, userRole, activeViewId, onSelectView, currentFilters, onSaveView, refreshKey }) {
   const [views, setViews] = useState([])
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [newViewName, setNewViewName] = useState('')
@@ -30,17 +31,18 @@ export default function SavedViewsSidebar({ workspaceId, userId, activeViewId, o
     return () => { cancelled = true }
   }, [workspaceId, refreshKey])
 
-  // Fetch lightweight lead snapshot for counts
+  // Fetch lightweight lead snapshot for counts (scoped to visible leads)
   useEffect(() => {
     if (!workspaceId) return
     let cancelled = false
-    supabase
+    let q = supabase
       .from('leads')
       .select('id, status, lead_source, assigned_to, is_hot, follow_up_date, redfin_trigger_type, created_at')
       .eq('workspace_id', workspaceId)
-      .then(({ data }) => { if (!cancelled) setAllLeads(data || []) })
+    q = applyLeadVisibility(q, userId, userRole)
+    q.then(({ data }) => { if (!cancelled) setAllLeads(data || []) })
     return () => { cancelled = true }
-  }, [workspaceId, refreshKey])
+  }, [workspaceId, userId, userRole, refreshKey])
 
   // Compute a count for each system view based on its filter spec.
   // Mirrors the resolveFilters + query logic in LeadsPage.

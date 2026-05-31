@@ -274,6 +274,7 @@ export default function LeadsPage() {
         <SavedViewsSidebar
           workspaceId={workspaceId}
           userId={user.id}
+          userRole={userRole}
           activeViewId={activeViewId}
           onSelectView={(id) => {
             setActiveViewId(id)
