@@ -128,7 +128,10 @@ export default function LeadsTable({ leads, members = [], workspaceId, sortBy, s
         <td className="px-3 py-2.5"><MlsPill status={lead.mls_status} dom={lead.days_on_market} /></td>
         <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums">{formatCurrency(lead.list_price || lead.asking_price)}</td>
         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">
-          {assignee?.full_name || <span className="text-[color:var(--color-text-dim)]">—</span>}
+          {lead.visible_to_all
+            ? <span className="inline-flex items-center px-1.5 h-[18px] rounded text-[10.5px] font-semibold bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">ALL</span>
+            : assignee?.full_name || <span className="text-[color:var(--color-text-dim)]">—</span>
+          }
         </td>
         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)] capitalize">
           {(lead.lead_source || '').replace(/_/g, ' ') || '—'}

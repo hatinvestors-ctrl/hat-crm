@@ -47,6 +47,7 @@ const EMPTY_LEAD = {
   follow_up_date: '',
   contract_signed_date: '',
   assigned_to: '',
+  visible_to_all: false,
   notes: '',
   mls_status: null,
   mls_last_checked: null,
@@ -153,7 +154,12 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
   useEffect(() => {
     if (open) {
       if (lead) {
-        setForm({ ...EMPTY_LEAD, ...lead, assigned_to: lead.assigned_to || '' })
+        setForm({
+          ...EMPTY_LEAD,
+          ...lead,
+          assigned_to: lead.visible_to_all ? '__all__' : (lead.assigned_to || ''),
+          visible_to_all: lead.visible_to_all || false,
+        })
       } else {
         setForm({ ...EMPTY_LEAD })
       }
@@ -205,6 +211,14 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
         'follow_up_date', 'contract_signed_date', 'assigned_to', 'notes']
       nullable.forEach(k => { if (payload[k] === '') payload[k] = null })
 
+      // Handle "All Members" assignment
+      if (payload.assigned_to === '__all__') {
+        payload.visible_to_all = true
+        payload.assigned_to = null
+      } else {
+        payload.visible_to_all = false
+      }
+
       // Coerce numbers to actual numbers (Supabase numeric)
       ;['bedrooms', 'sqft', 'year_built', 'lot_size_sqft'].forEach(k => {
         if (payload[k] !== null) payload[k] = parseInt(payload[k], 10)
@@ -243,6 +257,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
 
   const memberOptions = [
     { value: '', label: 'Unassigned' },
+    { value: '__all__', label: '🌐 All Members' },
     ...members.map(m => ({ value: m.user_id, label: m.profiles?.full_name || 'User' })),
   ]
 
