@@ -48,6 +48,7 @@ export default function TodayPage() {
   const [myTasks, setMyTasks] = useState([])
   const [taskProjects, setTaskProjects] = useState([])
   const [activityDate, setActivityDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [activityUser, setActivityUser] = useState('')
   const [activityFeed, setActivityFeed] = useState([])
   const [activityLeadMap, setActivityLeadMap] = useState({})
   const [activityLoading, setActivityLoading] = useState(false)
@@ -102,17 +103,19 @@ export default function TodayPage() {
       setActivityLeadMap(leadMap)
       if (leadIds.length === 0) { setActivityFeed([]); setActivityLoading(false); return }
       // Step 2: get activities for those leads on the selected date
-      const { data } = await supabase
+      let q = supabase
         .from('lead_activities')
         .select('id, lead_id, user_id, type, content, created_at')
         .in('lead_id', leadIds)
         .gte('created_at', `${activityDate}T00:00:00`)
         .lte('created_at', `${activityDate}T23:59:59`)
         .order('created_at', { ascending: false })
+      if (activityUser) q = q.eq('user_id', activityUser)
+      const { data } = await q
       setActivityFeed(data || [])
       setActivityLoading(false)
     })
-  }, [workspaceId, user?.id, userRole, activityDate])
+  }, [workspaceId, user?.id, userRole, activityDate, activityUser])
 
   const snoozeLead = async (e, leadId, hours) => {
     e.preventDefault()
@@ -357,12 +360,26 @@ export default function TodayPage() {
               <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">Activity Feed</h3>
               <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Comments and changes on your leads</p>
             </div>
-            <input
-              type="date"
-              value={activityDate}
-              onChange={e => setActivityDate(e.target.value)}
-              className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-            />
+            <div className="flex items-center gap-2">
+              {userRole === 'admin' && (
+                <select
+                  value={activityUser}
+                  onChange={e => setActivityUser(e.target.value)}
+                  className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                >
+                  <option value="">All Users</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+                  ))}
+                </select>
+              )}
+              <input
+                type="date"
+                value={activityDate}
+                onChange={e => setActivityDate(e.target.value)}
+                className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
           </header>
 
           {activityLoading ? (

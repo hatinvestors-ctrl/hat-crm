@@ -47,6 +47,7 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState('30d')
+  const [filterUser, setFilterUser] = useState('')
   const [allLeads, setAllLeads] = useState([])
   const [transitions, setTransitions] = useState([])
 
@@ -83,6 +84,16 @@ export default function DashboardPage() {
 
   // ── Aggregations ────────────────────────────────────────────────────────
   const today = todayISO()
+
+  // Apply user filter to raw data before all aggregations
+  const filteredLeads = useMemo(() =>
+    filterUser ? allLeads.filter(l => l.assigned_to === filterUser) : allLeads
+  , [allLeads, filterUser])
+
+  const filteredTransitions = useMemo(() =>
+    filterUser ? transitions.filter(a => a.user_id === filterUser) : transitions
+  , [transitions, filterUser])
+
   const rangeStartDate = useMemo(() => rangeStart(range), [range])
   const rangeMs = useMemo(() => Date.now() - rangeStartDate.getTime(), [rangeStartDate])
   const prevStart = useMemo(() => new Date(rangeStartDate.getTime() - rangeMs), [rangeStartDate, rangeMs])
@@ -93,47 +104,45 @@ export default function DashboardPage() {
     const empty = Object.fromEntries(METRIC_KEYS.map(k => [k, 0]))
     const cur = { ...empty }
     const prev = { ...empty }
-    for (const a of transitions) {
+    for (const a of filteredTransitions) {
       const ts = new Date(a.created_at)
       const k = TRANSITION_METRICS[a.metadata?.new_value]
       if (!k) continue
       if (ts >= rangeStartDate) cur[k]++
       else if (ts >= prevStart) prev[k]++
     }
-    // Override new_leads from leads.created_at (more reliable than relying on transition logs for first state)
     cur.new_leads = 0; prev.new_leads = 0
-    for (const l of allLeads) {
+    for (const l of filteredLeads) {
       const ts = new Date(l.created_at)
       if (ts >= rangeStartDate) cur.new_leads++
       else if (ts >= prevStart) prev.new_leads++
     }
-    // Compute deltas
     const out = { ...cur }
     for (const k of METRIC_KEYS) out['delta_' + k] = cur[k] - prev[k]
     return out
-  }, [transitions, allLeads, rangeStartDate, prevStart])
+  }, [filteredTransitions, filteredLeads, rangeStartDate, prevStart])
 
   // Leads grouped by current status (for bottlenecks)
   const leadsByStatus = useMemo(() => {
     const m = {}
-    for (const l of allLeads) {
+    for (const l of filteredLeads) {
       ;(m[l.status] ||= []).push(l)
     }
     return m
-  }, [allLeads])
+  }, [filteredLeads])
 
   // Daily activity chart series — last 30 days
   const dailySeries = useMemo(() => {
     const newLeadsByDay = {}
     const offersByDay = {}
     const since = new Date(); since.setDate(since.getDate() - 30); since.setHours(0,0,0,0)
-    for (const l of allLeads) {
+    for (const l of filteredLeads) {
       const d = new Date(l.created_at)
       if (d < since) continue
       const k = d.toISOString().slice(0, 10)
       newLeadsByDay[k] = (newLeadsByDay[k] || 0) + 1
     }
-    for (const a of transitions) {
+    for (const a of filteredTransitions) {
       if (a.metadata?.new_value !== 'offer_sent') continue
       const d = new Date(a.created_at)
       if (d < since) continue
@@ -141,30 +150,30 @@ export default function DashboardPage() {
       offersByDay[k] = (offersByDay[k] || 0) + 1
     }
     return { newLeadsByDay, offersByDay }
-  }, [allLeads, transitions])
+  }, [filteredLeads, filteredTransitions])
 
   // Offers-sent-in-range by assignee — for the teammate table
   const offersByAssignee = useMemo(() => {
     const m = {}
-    for (const a of transitions) {
+    for (const a of filteredTransitions) {
       if (a.metadata?.new_value !== 'offer_sent') continue
       if (new Date(a.created_at) < rangeStartDate) continue
       const uid = a.leads?.assigned_to || '__unassigned__'
       m[uid] = (m[uid] || 0) + 1
     }
     return m
-  }, [transitions, rangeStartDate])
+  }, [filteredTransitions, rangeStartDate])
 
   // Top-level KPIs
   const headlines = useMemo(() => {
-    const total = allLeads.length
-    const hot = allLeads.filter(l => l.is_hot && !['sold','dead_lead'].includes(l.status)).length
-    const followUpsToday = allLeads.filter(l => l.follow_up_date === today)
-    const activePipelineArv = allLeads
+    const total = filteredLeads.length
+    const hot = filteredLeads.filter(l => l.is_hot && !['sold','dead_lead'].includes(l.status)).length
+    const followUpsToday = filteredLeads.filter(l => l.follow_up_date === today)
+    const activePipelineArv = filteredLeads
       .filter(l => !['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed'].includes(l.status))
       .reduce((s, l) => s + Number(l.arv || 0), 0)
     return { total, hot, followUpsToday, activePipelineArv }
-  }, [allLeads, today])
+  }, [filteredLeads, today])
 
   if (loading) return <LoadingSpinner fullPage label="Loading dashboard…" />
 
@@ -179,7 +188,7 @@ export default function DashboardPage() {
 
   // Pipeline + status breakdown reuse existing components
   const ACTIVE = ['new_lead','mao_calculated','offer_pending_hat_signing','offer_signed','offer_sent','negotiating','follow_up','offer_accepted','move_to_sequence','working_project','automated_offers','agent_rel','imported']
-  const activePipeline = allLeads.filter(l => ACTIVE.includes(l.status))
+  const activePipeline = filteredLeads.filter(l => ACTIVE.includes(l.status))
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
     .slice(0, 10)
   const statusCounts = Object.fromEntries(Object.entries(leadsByStatus).map(([k, v]) => [k, v.length]))
@@ -199,7 +208,17 @@ export default function DashboardPage() {
                 : 'No follow-ups today. Stay sharp.'}
             </h2>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
+            <select
+              value={filterUser}
+              onChange={e => setFilterUser(e.target.value)}
+              className="h-8 px-2 text-[12px] bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            >
+              <option value="">All Users</option>
+              {(members || []).map(m => (
+                <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+              ))}
+            </select>
             <TimeRangePicker value={range} onChange={setRange} />
             <Link to={`/w/${workspaceId}/today`}>
               <Button variant="primary">Open Today →</Button>
