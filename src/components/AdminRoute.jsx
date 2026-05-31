@@ -2,7 +2,8 @@
 import { Navigate, Outlet, useOutletContext } from 'react-router-dom'
 
 export default function AdminRoute() {
-  const { userRole, workspaceId } = useOutletContext()
-  if (userRole === 'admin') return <Outlet />
+  const ctx = useOutletContext()
+  const { userRole, workspaceId } = ctx
+  if (userRole === 'admin') return <Outlet context={ctx} />
   return <Navigate to={`/w/${workspaceId}/today`} replace />
 }
