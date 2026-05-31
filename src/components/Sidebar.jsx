@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import Badge from './ui/Badge'
 import { categorizeLeads } from '../lib/staleness'
 import QuickAnalysisModal from './QuickAnalysisModal'
+import { applyLeadVisibility } from '../lib/leadVisibility'
 
 const Icon = ({ d, size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +32,7 @@ const navItemClasses = ({ isActive }) =>
       : 'text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-elev)] hover:text-[color:var(--color-text)]'
   }`
 
-export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
+export default function Sidebar({ workspace, userRole, userId, profile, onSignOut }) {
   const { workspaceId } = useParams()
   const base = `/w/${workspaceId}`
   const [recentLeads, setRecentLeads] = useState([])
@@ -44,13 +45,14 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
   useEffect(() => {
     if (!workspaceId) return
     let cancel = false
-    supabase
+    let leadsQ = supabase
       .from('leads')
       .select('id, address, status, follow_up_date, contract_signed_date, created_at, updated_at, is_hot')
       .eq('workspace_id', workspaceId)
       .not('status', 'in', '("sold","dead_lead","rejected_not_accepted","not_in_buy_box","sequence_completed")')
       .order('updated_at', { ascending: false })
-      .then(({ data }) => {
+    leadsQ = applyLeadVisibility(leadsQ, userId, userRole)
+    leadsQ.then(({ data }) => {
         if (cancel) return
         const rows = data || []
         setRecentLeads(rows.slice(0, 8))
@@ -146,19 +148,21 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
             )}
           </div>
         </NavLink>
-        <NavLink to={`${base}/tasks`} className={navItemClasses}>
-          <span className="text-[color:var(--color-text-dim)]">{ICONS.tasks}</span>
-          <span className="flex-1">Tasks</span>
-          {myOpenTaskCount > 0 && (
-            <span
-              title={`${myOpenTaskCount} open task${myOpenTaskCount === 1 ? '' : 's'} assigned to you`}
-              className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-[color:var(--color-accent)] text-white tabular-nums"
-            >
-              {myOpenTaskCount}
-            </span>
-          )}
-        </NavLink>
-        {userRole !== 'readonly' && (
+        {userRole === 'admin' && (
+          <NavLink to={`${base}/tasks`} className={navItemClasses}>
+            <span className="text-[color:var(--color-text-dim)]">{ICONS.tasks}</span>
+            <span className="flex-1">Tasks</span>
+            {myOpenTaskCount > 0 && (
+              <span
+                title={`${myOpenTaskCount} open task${myOpenTaskCount === 1 ? '' : 's'} assigned to you`}
+                className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-[color:var(--color-accent)] text-white tabular-nums"
+              >
+                {myOpenTaskCount}
+              </span>
+            )}
+          </NavLink>
+        )}
+        {userRole === 'admin' && (
           <NavLink to={`${base}/import`} className={navItemClasses}>
             <span className="text-[color:var(--color-text-dim)]">{ICONS.import}</span>
             Import
@@ -173,15 +177,17 @@ export default function Sidebar({ workspace, userRole, profile, onSignOut }) {
       </nav>
 
       {/* Quick Analysis button */}
-      <div className="px-2 pb-1">
-        <button
-          onClick={() => setQuickAnalysisOpen(true)}
-          className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90 transition-opacity"
-        >
-          <span>⚡</span>
-          Quick Analysis
-        </button>
-      </div>
+      {userRole === 'admin' && (
+        <div className="px-2 pb-1">
+          <button
+            onClick={() => setQuickAnalysisOpen(true)}
+            className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90 transition-opacity"
+          >
+            <span>⚡</span>
+            Quick Analysis
+          </button>
+        </div>
+      )}
 
       {/* Active pipeline (like GitHub "Top repositories") */}
       <div className="px-2 py-2 mt-1 flex-1 min-h-0 overflow-y-auto">

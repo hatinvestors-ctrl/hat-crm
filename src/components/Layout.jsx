@@ -26,7 +26,7 @@ export default function Layout({ user, onSignOut }) {
 
   return (
     <div className="flex min-h-screen bg-[color:var(--color-bg)]">
-      <Sidebar workspace={workspace} userRole={userRole} profile={profile} onSignOut={onSignOut} />
+      <Sidebar workspace={workspace} userRole={userRole} userId={user.id} profile={profile} onSignOut={onSignOut} />
       <main className="flex-1 min-w-0 flex flex-col">
         <Outlet context={{ user, profile, workspace, userRole, members, workspaceId }} />
       </main>
