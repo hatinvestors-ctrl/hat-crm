@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import { SYSTEM_VIEWS, LEAD_STATUSES, STATUS_MAP } from '../lib/constants'
 import { todayISO, endOfWeekISO } from '../lib/calculations'
 import { escapeLike, safeOrIlikeValue } from '../lib/safeQuery'
+import { applyLeadVisibility } from '../lib/leadVisibility'
 
 function resolveFilters(viewFilters, userId) {
   const f = { ...viewFilters }
@@ -121,6 +122,7 @@ export default function LeadsPage() {
   const fetchLeads = async () => {
     setLoading(true)
     let q = supabase.from('leads').select('*').eq('workspace_id', workspaceId)
+    q = applyLeadVisibility(q, user.id, userRole)
 
     if (effectiveFilters.status) q = q.eq('status', effectiveFilters.status)
     if (effectiveFilters.is_hot === true) q = q.eq('is_hot', true)

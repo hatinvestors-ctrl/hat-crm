@@ -7,6 +7,7 @@ import Badge from '../components/ui/Badge'
 import { supabase } from '../lib/supabase'
 import { categorizeLeads } from '../lib/staleness'
 import { formatCurrency, formatDate } from '../lib/calculations'
+import { applyLeadVisibility } from '../lib/leadVisibility'
 
 const TONE_STYLES = {
   danger: {
@@ -40,7 +41,7 @@ const TONE_STYLES = {
 }
 
 export default function TodayPage() {
-  const { workspace, workspaceId, members, user } = useOutletContext()
+  const { workspace, workspaceId, members, user, userRole } = useOutletContext()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
@@ -50,19 +51,20 @@ export default function TodayPage() {
   useEffect(() => {
     if (!workspaceId) return
     let cancelled = false
-    supabase
+    let leadsQ = supabase
       .from('leads')
       .select('id, address, city, status, follow_up_date, contract_signed_date, assigned_to, arv, mao, offer_price, created_at, updated_at, snooze_until')
       .eq('workspace_id', workspaceId)
       .not('status', 'in', '("closed","dead")')
-      .then(({ data }) => {
-        if (!cancelled) {
-          setLeads(data || [])
-          setLoading(false)
-        }
-      })
+    leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
+    leadsQ.then(({ data }) => {
+      if (!cancelled) {
+        setLeads(data || [])
+        setLoading(false)
+      }
+    })
     return () => { cancelled = true }
-  }, [workspaceId])
+  }, [workspaceId, user.id, userRole])
 
   useEffect(() => {
     if (!workspaceId || !user?.id) return
