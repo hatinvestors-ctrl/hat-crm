@@ -1,20 +1,11 @@
-import { supabase } from './supabase'
-
-// Wraps the admin-users Edge Function for create / update / delete.
 async function invoke(action, workspaceId, payload) {
-  const { data, error } = await supabase.functions.invoke('admin-users', {
-    body: { action, workspace_id: workspaceId, ...payload },
+  const res = await fetch('/.netlify/functions/admin-users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, workspace_id: workspaceId, ...payload }),
   })
-  if (error) {
-    // Supabase wraps non-2xx as error; try to extract our JSON error message
-    let detail = error.message
-    try {
-      const ctx = await error.context?.json?.()
-      if (ctx?.error) detail = ctx.error
-    } catch (_) {}
-    throw new Error(detail)
-  }
-  if (data?.error) throw new Error(data.error)
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error || 'Request failed')
   return data
 }
 

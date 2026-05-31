@@ -1,0 +1,139 @@
+// Admin user management via Supabase Auth Admin API.
+// POST /.netlify/functions/admin-users
+// body: { action: 'create'|'update'|'delete', workspace_id, ...fields }
+// Required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+const HEADERS = {
+  'content-type': 'application/json',
+  'access-control-allow-origin': '*',
+  'access-control-allow-headers': 'content-type, authorization',
+  'access-control-allow-methods': 'POST,OPTIONS',
+}
+
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SERVICE_KEY,
+    'Authorization': `Bearer ${SERVICE_KEY}`,
+  }
+}
+
+async function createUser({ email, password, full_name, role, workspace_id }) {
+  // 1. Create auth user
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { full_name } }),
+  })
+  const user = await res.json()
+  if (!res.ok) throw new Error(user.message || user.msg || 'Failed to create auth user')
+
+  const userId = user.id
+
+  // 2. Upsert profile
+  await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+    method: 'POST',
+    headers: { ...authHeaders(), Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({ id: userId, full_name }),
+  })
+
+  // 3. Add workspace member
+  const memRes = await fetch(`${SUPABASE_URL}/rest/v1/workspace_members`, {
+    method: 'POST',
+    headers: { ...authHeaders(), Prefer: 'return=representation' },
+    body: JSON.stringify({ workspace_id, user_id: userId, role }),
+  })
+  if (!memRes.ok) {
+    const err = await memRes.text()
+    throw new Error(`Failed to add workspace member: ${err}`)
+  }
+
+  return { user_id: userId, full_name, email, role }
+}
+
+async function updateUser({ user_id, email, password, full_name, role, workspace_id }) {
+  // Update auth user (email/password)
+  const patch = {}
+  if (email) patch.email = email
+  if (password) patch.password = password
+  if (full_name) patch.user_metadata = { full_name }
+
+  if (Object.keys(patch).length > 0) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user_id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.message || 'Failed to update auth user')
+    }
+  }
+
+  // Update profile name
+  if (full_name) {
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user_id}`, {
+      method: 'PATCH',
+      headers: { ...authHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify({ full_name }),
+    })
+  }
+
+  // Update role
+  if (role && workspace_id) {
+    await fetch(`${SUPABASE_URL}/rest/v1/workspace_members?workspace_id=eq.${workspace_id}&user_id=eq.${user_id}`, {
+      method: 'PATCH',
+      headers: { ...authHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify({ role }),
+    })
+  }
+
+  return { ok: true }
+}
+
+async function deleteUser({ user_id, workspace_id }) {
+  // Remove from workspace
+  await fetch(`${SUPABASE_URL}/rest/v1/workspace_members?workspace_id=eq.${workspace_id}&user_id=eq.${user_id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+
+  // Delete auth user
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user_id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete user')
+  }
+
+  return { ok: true }
+}
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: HEADERS })
+
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    return new Response(JSON.stringify({ error: 'Supabase credentials not configured.' }), { status: 500, headers: HEADERS })
+  }
+
+  try {
+    const body = await req.json().catch(() => ({}))
+    const { action, ...payload } = body
+
+    let result
+    if (action === 'create') result = await createUser(payload)
+    else if (action === 'update') result = await updateUser(payload)
+    else if (action === 'delete') result = await deleteUser(payload)
+    else throw new Error(`Unknown action: ${action}`)
+
+    return new Response(JSON.stringify(result), { status: 200, headers: HEADERS })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: HEADERS })
+  }
+}
