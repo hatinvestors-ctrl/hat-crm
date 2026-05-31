@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, Link } from 'react-router-dom'
 import Topbar from '../components/Topbar'
+import PersonalDashboard from '../components/dashboard/PersonalDashboard'
 import StatsCard from '../components/dashboard/StatsCard'
 import StatusBreakdown from '../components/dashboard/StatusBreakdown'
 import FollowUpWidget from '../components/dashboard/FollowUpWidget'
@@ -30,7 +31,20 @@ const TRANSITION_METRICS = {
 const METRIC_KEYS = Object.values(TRANSITION_METRICS)
 
 export default function DashboardPage() {
-  const { workspace, workspaceId, profile, members } = useOutletContext()
+  const { workspace, workspaceId, profile, members, user, userRole } = useOutletContext()
+
+  if (userRole !== 'admin') {
+    return (
+      <>
+        <Topbar
+          title="Dashboard"
+          breadcrumbs={[{ label: workspace?.name }, { label: 'My Dashboard' }]}
+        />
+        <PersonalDashboard workspaceId={workspaceId} userId={user?.id} userRole={userRole} />
+      </>
+    )
+  }
+
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState('30d')
   const [allLeads, setAllLeads] = useState([])
