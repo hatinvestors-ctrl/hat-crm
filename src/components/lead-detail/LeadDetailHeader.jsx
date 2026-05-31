@@ -9,6 +9,17 @@ export default function LeadDetailHeader({ lead, members, canEdit, onEdit, onUpd
   const assignee = userLookup[lead.assigned_to]
   const zillowUrl = safeUrl(lead.zillow_url) || buildZillowUrl(lead)
 
+  const handleAssigneeChange = async (e) => {
+    const val = e.target.value
+    const patch = val === '__all__'
+      ? { visible_to_all: true, assigned_to: null }
+      : { visible_to_all: false, assigned_to: val || null }
+    const { data } = await supabase.from('leads').update(patch).eq('id', lead.id).select().single()
+    if (data) onUpdated?.(data)
+  }
+
+  const assigneeValue = lead.visible_to_all ? '__all__' : (lead.assigned_to || '')
+
   const toggleHot = async () => {
     if (!canEdit) return
     const next = !lead.is_hot
@@ -36,7 +47,26 @@ export default function LeadDetailHeader({ lead, members, canEdit, onEdit, onUpd
             {[lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')}
           </div>
           <div className="text-[11px] text-[color:var(--color-text-dim)] mt-2 flex gap-3 flex-wrap">
-            <span>Assigned · <span className="text-[color:var(--color-text-muted)]">{assignee?.full_name || 'Unassigned'}</span></span>
+            <span className="flex items-center gap-1">
+              Assigned ·
+              {canEdit ? (
+                <select
+                  value={assigneeValue}
+                  onChange={handleAssigneeChange}
+                  className="bg-transparent border-none text-[color:var(--color-text-muted)] text-[11px] cursor-pointer focus:outline-none hover:text-[color:var(--color-text)] -ml-0.5"
+                >
+                  <option value="">Unassigned</option>
+                  <option value="__all__">🌐 All Members</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-[color:var(--color-text-muted)]">
+                  {lead.visible_to_all ? '🌐 All Members' : assignee?.full_name || 'Unassigned'}
+                </span>
+              )}
+            </span>
             <span>Created · {formatDateTime(lead.created_at)}</span>
             <span>Updated · {formatDateTime(lead.updated_at)}</span>
           </div>
