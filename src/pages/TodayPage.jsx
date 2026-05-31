@@ -47,6 +47,10 @@ export default function TodayPage() {
   const [busyId, setBusyId] = useState(null)
   const [myTasks, setMyTasks] = useState([])
   const [taskProjects, setTaskProjects] = useState([])
+  const [activityDate, setActivityDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [activityFeed, setActivityFeed] = useState([])
+  const [activityLeadMap, setActivityLeadMap] = useState({})
+  const [activityLoading, setActivityLoading] = useState(false)
 
   useEffect(() => {
     if (!workspaceId) return
@@ -85,6 +89,30 @@ export default function TodayPage() {
       .eq('workspace_id', workspaceId)
       .then(({ data }) => setTaskProjects(data || []))
   }, [workspaceId, user?.id])
+
+  useEffect(() => {
+    if (!workspaceId || !user?.id) return
+    setActivityLoading(true)
+    // Step 1: get visible lead IDs
+    let leadsQ = supabase.from('leads').select('id, address').eq('workspace_id', workspaceId)
+    leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
+    leadsQ.then(async ({ data: visibleLeads }) => {
+      const leadIds = (visibleLeads || []).map(l => l.id)
+      const leadMap = Object.fromEntries((visibleLeads || []).map(l => [l.id, l]))
+      setActivityLeadMap(leadMap)
+      if (leadIds.length === 0) { setActivityFeed([]); setActivityLoading(false); return }
+      // Step 2: get activities for those leads on the selected date
+      const { data } = await supabase
+        .from('lead_activities')
+        .select('id, lead_id, user_id, type, content, created_at')
+        .in('lead_id', leadIds)
+        .gte('created_at', `${activityDate}T00:00:00`)
+        .lte('created_at', `${activityDate}T23:59:59`)
+        .order('created_at', { ascending: false })
+      setActivityFeed(data || [])
+      setActivityLoading(false)
+    })
+  }, [workspaceId, user?.id, userRole, activityDate])
 
   const snoozeLead = async (e, leadId, hours) => {
     e.preventDefault()
@@ -321,6 +349,96 @@ export default function TodayPage() {
             )}
           </section>
         )}
+
+        {/* Activity Feed */}
+        <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
+          <header className="px-4 py-3 border-b border-[color:var(--color-line)] flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">Activity Feed</h3>
+              <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Comments and changes on your leads</p>
+            </div>
+            <input
+              type="date"
+              value={activityDate}
+              onChange={e => setActivityDate(e.target.value)}
+              className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            />
+          </header>
+
+          {activityLoading ? (
+            <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">Loading…</div>
+          ) : activityFeed.length === 0 ? (
+            <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">No activity on this date.</div>
+          ) : (() => {
+            // Group by lead
+            const byLead = {}
+            for (const item of activityFeed) {
+              if (!byLead[item.lead_id]) byLead[item.lead_id] = []
+              byLead[item.lead_id].push(item)
+            }
+            return (
+              <div className="divide-y divide-[color:var(--color-line)]">
+                {Object.entries(byLead).map(([leadId, items]) => {
+                  const lead = activityLeadMap[leadId]
+                  const comments = items.filter(i => i.type === 'comment')
+                  const changes  = items.filter(i => i.type !== 'comment')
+                  return (
+                    <div key={leadId} className="px-4 py-3">
+                      <Link
+                        to={`/w/${workspaceId}/leads/${leadId}`}
+                        className="text-[13px] font-medium text-[color:var(--color-accent-text)] hover:underline"
+                      >
+                        🏠 {lead?.address || leadId}
+                      </Link>
+
+                      {comments.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">
+                            💬 Comments ({comments.length})
+                          </div>
+                          <ul className="space-y-1.5">
+                            {comments.map(item => {
+                              const author = memberMap[item.user_id]?.full_name || 'Someone'
+                              const time   = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              return (
+                                <li key={item.id} className="flex gap-2 text-[12.5px]">
+                                  <span className="text-[color:var(--color-text-dim)] shrink-0 tabular-nums">{time}</span>
+                                  <span className="text-[color:var(--color-text-muted)] shrink-0">{author}:</span>
+                                  <span className="text-[color:var(--color-text)] leading-snug">{item.content}</span>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      )}
+
+                      {changes.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">
+                            🔄 Changes ({changes.length})
+                          </div>
+                          <ul className="space-y-1">
+                            {changes.map(item => {
+                              const author = memberMap[item.user_id]?.full_name || 'Someone'
+                              const time   = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                              return (
+                                <li key={item.id} className="flex gap-2 text-[12px] text-[color:var(--color-text-muted)]">
+                                  <span className="shrink-0 tabular-nums">{time}</span>
+                                  <span className="shrink-0">{author}:</span>
+                                  <span className="text-[color:var(--color-text-dim)]">{item.content}</span>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </section>
       </div>
     </>
   )
