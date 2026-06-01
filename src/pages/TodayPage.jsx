@@ -163,6 +163,16 @@ export default function TodayPage() {
 
   if (loading) return <LoadingSpinner fullPage label="Scanning your pipeline…" />
 
+  // Activity feed grouped by lead (computed once for rendering)
+  const activityByLead = (() => {
+    const m = {}
+    for (const item of activityFeed) {
+      if (!m[item.lead_id]) m[item.lead_id] = []
+      m[item.lead_id].push(item)
+    }
+    return m
+  })()
+
   return (
     <>
       <Topbar
@@ -170,8 +180,10 @@ export default function TodayPage() {
         breadcrumbs={[{ label: workspace.name }, { label: 'Today' }]}
       />
 
-      <div className="px-6 py-6 max-w-[1100px] w-full space-y-6 flex-1">
-        <div className="pb-5 border-b border-[color:var(--color-line)]">
+      <div className="px-6 py-6 w-full flex-1">
+
+        {/* Page header */}
+        <div className="pb-5 border-b border-[color:var(--color-line)] mb-6">
           <p className="text-[12px] text-[color:var(--color-text-dim)]">Needs attention</p>
           <h2 className="text-[22px] font-semibold text-[color:var(--color-text)] tracking-tight mt-1">
             {totalCount === 0
@@ -179,285 +191,245 @@ export default function TodayPage() {
               : `${totalCount} lead${totalCount === 1 ? '' : 's'} need${totalCount === 1 ? 's' : ''} action.`}
           </h2>
           <p className="text-[13px] text-[color:var(--color-text-muted)] mt-1 leading-relaxed">
-            Leads that are stuck in a status too long, overdue follow-ups, or missing a next step. Tackle them in priority order — top to bottom.
+            Leads that are stuck in a status too long, overdue follow-ups, or missing a next step.
           </p>
         </div>
 
-        {totalCount === 0 ? (
-          <EmptyState
-            icon="✓"
-            title="Inbox zero."
-            description="Every active lead is moving. No overdue follow-ups, no stalled offers, no leads sitting idle. Nice work."
-          />
-        ) : (
-          <div className="space-y-5">
-            {byBucket.map(({ bucket, leads: bucketLeads }) => {
-              const tone = TONE_STYLES[bucket.tone]
-              return (
-                <section
-                  key={bucket.id}
-                  className={`bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] border-l-4 ${tone.border} rounded-lg overflow-hidden`}
-                >
-                  <header className="px-4 py-3 border-b border-[color:var(--color-line)] flex items-center justify-between gap-3 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${tone.dot}`} />
-                        <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">{bucket.label}</h3>
-                        <span className={`inline-flex items-center px-1.5 h-5 text-[11px] font-semibold rounded-full ${tone.chip} tabular-nums`}>
-                          {bucketLeads.length}
-                        </span>
-                      </div>
-                      <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">{bucket.description}</p>
-                    </div>
-                  </header>
+        {/* Two-column layout */}
+        <div className="flex gap-6 items-start">
 
-                  <ul className="divide-y divide-[color:var(--color-line)]">
-                    {bucketLeads.map(lead => {
-                      const assignee = memberMap[lead.assigned_to]
-                      return (
-                        <li key={lead.id}>
-                          <Link
-                            to={`/w/${workspaceId}/leads/${lead.id}`}
-                            className="block px-4 py-3 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[14px] font-medium text-[color:var(--color-text)] truncate">
-                                    {lead.address}
-                                  </span>
-                                  <Badge status={lead.status} />
-                                </div>
-                                <div className={`text-[12px] font-medium ${tone.text} mt-1`}>
-                                  → {bucket.action(lead)}
-                                </div>
-                                <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                                  {lead.city && <span>{lead.city}</span>}
-                                  {assignee && <span>{assignee.full_name}</span>}
-                                  {lead.mao && <span className="tabular-nums">MAO {formatCurrency(lead.mao)}</span>}
-                                  {lead.offer_price && <span className="tabular-nums">Offer {formatCurrency(lead.offer_price)}</span>}
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0 text-[11px] text-[color:var(--color-text-dim)] flex flex-col items-end gap-1.5">
-                                <div>
-                                  <div>Updated</div>
-                                  <div className="text-[color:var(--color-text-muted)] tabular-nums">{formatDate(lead.updated_at)}</div>
-                                </div>
-                                <div className="flex gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => snoozeLead(e, lead.id, 24)}
-                                    disabled={busyId === lead.id}
-                                    title="Hide from Today for 24 hours"
-                                    className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] border border-[color:var(--color-line)] transition-colors disabled:opacity-50"
-                                  >
-                                    💤 Snooze 24h
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => markHandled(e, lead.id)}
-                                    disabled={busyId === lead.id}
-                                    title="Mark as handled — resets idle counter and hides for 24h"
-                                    className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors disabled:opacity-50"
-                                  >
-                                    ✓ Handled
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </Link>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              )
-            })}
-          </div>
-        )}
-
-        {(overdueTasks.length > 0 || todayTasks.length > 0) && (
-          <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
-            <header className="px-4 py-3 border-b border-[color:var(--color-line)]">
-              <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">My Tasks</h3>
-              <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Tasks assigned to you that are due today or overdue</p>
-            </header>
-
-            {overdueTasks.length > 0 && (
-              <div>
-                <div className="px-4 py-1.5 bg-[color:var(--color-danger-soft)] border-b border-[color:var(--color-line)]">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-danger-text)]">Overdue — {overdueTasks.length}</span>
-                </div>
-                <ul className="divide-y divide-[color:var(--color-line)]">
-                  {overdueTasks.map(task => (
-                    <li key={task.id}>
-                      <a
-                        href={`/w/${workspaceId}/tasks/${task.id}`}
-                        className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
-                          {task.project_id && taskProjectMap[task.project_id] && (
-                            <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[11px] text-[color:var(--color-danger-text)]">{task.due_date}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => markTaskDone(e, task.id)}
-                            className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors"
-                          >
-                            ✓ Done
-                          </button>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {todayTasks.length > 0 && (
-              <div>
-                <div className="px-4 py-1.5 bg-[color:var(--color-warn-soft)] border-b border-[color:var(--color-line)]">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-warn-text)]">Due Today — {todayTasks.length}</span>
-                </div>
-                <ul className="divide-y divide-[color:var(--color-line)]">
-                  {todayTasks.map(task => (
-                    <li key={task.id}>
-                      <a
-                        href={`/w/${workspaceId}/tasks/${task.id}`}
-                        className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
-                          {task.project_id && taskProjectMap[task.project_id] && (
-                            <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[11px] text-[color:var(--color-warn-text)]">Today</span>
-                          <button
-                            type="button"
-                            onClick={(e) => markTaskDone(e, task.id)}
-                            className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors"
-                          >
-                            ✓ Done
-                          </button>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Activity Feed */}
-        <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
-          <header className="px-4 py-3 border-b border-[color:var(--color-line)] flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">Activity Feed</h3>
-              <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Comments and changes on your leads</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {userRole === 'admin' && (
-                <select
-                  value={activityUser}
-                  onChange={e => setActivityUser(e.target.value)}
-                  className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-                >
-                  <option value="">All Users</option>
-                  {members.map(m => (
-                    <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
-                  ))}
-                </select>
-              )}
-              <input
-                type="date"
-                value={activityDate}
-                onChange={e => setActivityDate(e.target.value)}
-                className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+          {/* LEFT — Needs Attention */}
+          <div className="flex-1 min-w-0 space-y-5">
+            {totalCount === 0 ? (
+              <EmptyState
+                icon="✓"
+                title="Inbox zero."
+                description="Every active lead is moving. No overdue follow-ups, no stalled offers, no leads sitting idle. Nice work."
               />
-            </div>
-          </header>
-
-          {activityLoading ? (
-            <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">Loading…</div>
-          ) : activityFeed.length === 0 ? (
-            <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">No activity on this date.</div>
-          ) : (() => {
-            // Group by lead
-            const byLead = {}
-            for (const item of activityFeed) {
-              if (!byLead[item.lead_id]) byLead[item.lead_id] = []
-              byLead[item.lead_id].push(item)
-            }
-            return (
-              <div className="divide-y divide-[color:var(--color-line)]">
-                {Object.entries(byLead).map(([leadId, items]) => {
-                  const lead = activityLeadMap[leadId]
-                  const comments = items.filter(i => i.type === 'comment')
-                  const changes  = items.filter(i => i.type !== 'comment')
-                  return (
-                    <div key={leadId} className="px-4 py-3">
-                      <Link
-                        to={`/w/${workspaceId}/leads/${leadId}`}
-                        className="text-[13px] font-medium text-[color:var(--color-accent-text)] hover:underline"
-                      >
-                        🏠 {lead?.address || leadId}
-                      </Link>
-
-                      {comments.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">
-                            💬 Comments ({comments.length})
-                          </div>
-                          <ul className="space-y-1.5">
-                            {comments.map(item => {
-                              const author = memberMap[item.user_id]?.full_name || 'Someone'
-                              const time   = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-                              return (
-                                <li key={item.id} className="flex gap-2 text-[12.5px]">
-                                  <span className="text-[color:var(--color-text-dim)] shrink-0 tabular-nums">{time}</span>
-                                  <span className="text-[color:var(--color-text-muted)] shrink-0">{author}:</span>
-                                  <span className="text-[color:var(--color-text)] leading-snug">{item.content}</span>
-                                </li>
-                              )
-                            })}
-                          </ul>
+            ) : (
+              byBucket.map(({ bucket, leads: bucketLeads }) => {
+                const tone = TONE_STYLES[bucket.tone]
+                return (
+                  <section
+                    key={bucket.id}
+                    className={`bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] border-l-4 ${tone.border} rounded-lg overflow-hidden`}
+                  >
+                    <header className="px-4 py-3 border-b border-[color:var(--color-line)] flex items-center justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${tone.dot}`} />
+                          <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">{bucket.label}</h3>
+                          <span className={`inline-flex items-center px-1.5 h-5 text-[11px] font-semibold rounded-full ${tone.chip} tabular-nums`}>
+                            {bucketLeads.length}
+                          </span>
                         </div>
-                      )}
+                        <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">{bucket.description}</p>
+                      </div>
+                    </header>
+                    <ul className="divide-y divide-[color:var(--color-line)]">
+                      {bucketLeads.map(lead => {
+                        const assignee = memberMap[lead.assigned_to]
+                        return (
+                          <li key={lead.id}>
+                            <Link
+                              to={`/w/${workspaceId}/leads/${lead.id}`}
+                              className="block px-4 py-3 hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[14px] font-medium text-[color:var(--color-text)] truncate">{lead.address}</span>
+                                    <Badge status={lead.status} />
+                                  </div>
+                                  <div className={`text-[12px] font-medium ${tone.text} mt-1`}>→ {bucket.action(lead)}</div>
+                                  <div className="text-[11.5px] text-[color:var(--color-text-dim)] mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                                    {lead.city && <span>{lead.city}</span>}
+                                    {assignee && <span>{assignee.full_name}</span>}
+                                    {lead.mao && <span className="tabular-nums">MAO {formatCurrency(lead.mao)}</span>}
+                                    {lead.offer_price && <span className="tabular-nums">Offer {formatCurrency(lead.offer_price)}</span>}
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0 text-[11px] text-[color:var(--color-text-dim)] flex flex-col items-end gap-1.5">
+                                  <div>
+                                    <div>Updated</div>
+                                    <div className="text-[color:var(--color-text-muted)] tabular-nums">{formatDate(lead.updated_at)}</div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button type="button" onClick={(e) => snoozeLead(e, lead.id, 24)} disabled={busyId === lead.id}
+                                      className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] border border-[color:var(--color-line)] transition-colors disabled:opacity-50">
+                                      💤 Snooze 24h
+                                    </button>
+                                    <button type="button" onClick={(e) => markHandled(e, lead.id)} disabled={busyId === lead.id}
+                                      className="text-[11px] px-2 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors disabled:opacity-50">
+                                      ✓ Handled
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </section>
+                )
+              })
+            )}
+          </div>
 
-                      {changes.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">
-                            🔄 Changes ({changes.length})
-                          </div>
-                          <ul className="space-y-1">
-                            {changes.map(item => {
-                              const author = memberMap[item.user_id]?.full_name || 'Someone'
-                              const time   = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-                              return (
-                                <li key={item.id} className="flex gap-2 text-[12px] text-[color:var(--color-text-muted)]">
-                                  <span className="shrink-0 tabular-nums">{time}</span>
-                                  <span className="shrink-0">{author}:</span>
-                                  <span className="text-[color:var(--color-text-dim)]">{item.content}</span>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </div>
-                      )}
+          {/* RIGHT — My Tasks + Activity Feed */}
+          <div className="w-[380px] shrink-0 space-y-4">
+
+            {/* My Tasks */}
+            {(overdueTasks.length > 0 || todayTasks.length > 0) && (
+              <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
+                <header className="px-4 py-3 border-b border-[color:var(--color-line)]">
+                  <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">My Tasks</h3>
+                  <p className="text-[12px] text-[color:var(--color-text-muted)] mt-0.5">Due today or overdue</p>
+                </header>
+                {overdueTasks.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 bg-[color:var(--color-danger-soft)] border-b border-[color:var(--color-line)]">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-danger-text)]">Overdue — {overdueTasks.length}</span>
                     </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
-        </section>
+                    <ul className="divide-y divide-[color:var(--color-line)]">
+                      {overdueTasks.map(task => (
+                        <li key={task.id}>
+                          <a href={`/w/${workspaceId}/tasks/${task.id}`}
+                            className="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12.5px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
+                              {task.project_id && taskProjectMap[task.project_id] && (
+                                <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-[color:var(--color-danger-text)]">{task.due_date}</span>
+                              <button type="button" onClick={(e) => markTaskDone(e, task.id)}
+                                className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors">
+                                ✓
+                              </button>
+                            </div>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {todayTasks.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 bg-[color:var(--color-warn-soft)] border-b border-[color:var(--color-line)]">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-warn-text)]">Due Today — {todayTasks.length}</span>
+                    </div>
+                    <ul className="divide-y divide-[color:var(--color-line)]">
+                      {todayTasks.map(task => (
+                        <li key={task.id}>
+                          <a href={`/w/${workspaceId}/tasks/${task.id}`}
+                            className="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12.5px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
+                              {task.project_id && taskProjectMap[task.project_id] && (
+                                <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-[color:var(--color-warn-text)]">Today</span>
+                              <button type="button" onClick={(e) => markTaskDone(e, task.id)}
+                                className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors">
+                                ✓
+                              </button>
+                            </div>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Activity Feed */}
+            <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
+              <header className="px-4 py-3 border-b border-[color:var(--color-line)]">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">Activity Feed</h3>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {userRole === 'admin' && (
+                    <select value={activityUser} onChange={e => setActivityUser(e.target.value)}
+                      className="flex-1 h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]">
+                      <option value="">All Users</option>
+                      {members.map(m => (
+                        <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input type="date" value={activityDate} onChange={e => setActivityDate(e.target.value)}
+                    className="h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+                </div>
+              </header>
+
+              {activityLoading ? (
+                <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">Loading…</div>
+              ) : activityFeed.length === 0 ? (
+                <div className="px-4 py-6 text-[13px] text-[color:var(--color-text-dim)] text-center">No activity on this date.</div>
+              ) : (
+                <div className="divide-y divide-[color:var(--color-line)] max-h-[600px] overflow-y-auto">
+                  {Object.entries(activityByLead).map(([leadId, items]) => {
+                    const lead = activityLeadMap[leadId]
+                    const comments = items.filter(i => i.type === 'comment')
+                    const changes  = items.filter(i => i.type !== 'comment')
+                    return (
+                      <div key={leadId} className="px-4 py-3">
+                        <Link to={`/w/${workspaceId}/leads/${leadId}`}
+                          className="text-[12.5px] font-medium text-[color:var(--color-accent-text)] hover:underline">
+                          🏠 {lead?.address || leadId}
+                        </Link>
+                        {comments.length > 0 && (
+                          <div className="mt-1.5">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">💬 Comments</div>
+                            <ul className="space-y-1">
+                              {comments.map(item => {
+                                const author = memberMap[item.user_id]?.full_name || 'Someone'
+                                const time = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                                return (
+                                  <li key={item.id} className="flex gap-1.5 text-[12px]">
+                                    <span className="text-[color:var(--color-text-dim)] shrink-0 tabular-nums">{time}</span>
+                                    <span className="text-[color:var(--color-text-muted)] shrink-0">{author}:</span>
+                                    <span className="text-[color:var(--color-text)] leading-snug">{item.content}</span>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                        {changes.length > 0 && (
+                          <div className="mt-1.5">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">🔄 Changes</div>
+                            <ul className="space-y-1">
+                              {changes.map(item => {
+                                const author = memberMap[item.user_id]?.full_name || 'Someone'
+                                const time = new Date(item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                                return (
+                                  <li key={item.id} className="flex gap-1.5 text-[11.5px] text-[color:var(--color-text-muted)]">
+                                    <span className="shrink-0 tabular-nums">{time}</span>
+                                    <span className="shrink-0">{author}:</span>
+                                    <span className="text-[color:var(--color-text-dim)]">{item.content}</span>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+
+          </div>
+        </div>
       </div>
     </>
   )
