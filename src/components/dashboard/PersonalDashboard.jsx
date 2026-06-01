@@ -54,7 +54,6 @@ export default function PersonalDashboard({ workspaceId, userId, userRole }) {
           .in('lead_id', leadIds)
           .eq('type', 'activity')
           .gte('created_at', new Date(Date.now() - 365 * 86400000).toISOString())
-          .not('metadata', 'is', null)
         setTransitions((acts || []).filter(a => a.metadata?.field === 'status' && a.metadata?.new_value))
       }
     })
@@ -73,23 +72,21 @@ export default function PersonalDashboard({ workspaceId, userId, userRole }) {
   }, [workspaceId, userId, userRole])
 
   const today = todayISO()
-  const rangeStartDate = useMemo(() => rangeStart(range), [range])
+  const rangeStartMs = useMemo(() => rangeStart(range).getTime(), [range])
 
   // Time-range-filtered metrics
   const throughput = useMemo(() => {
     const counts = Object.fromEntries(THROUGHPUT_METRICS.map(m => [m.key, 0]))
-    // New leads from created_at
     for (const l of leads) {
-      if (new Date(l.created_at) >= rangeStartDate) counts.new_leads++
+      if (new Date(l.created_at).getTime() >= rangeStartMs) counts.new_leads++
     }
-    // Other metrics from status transitions
     for (const a of transitions) {
-      if (new Date(a.created_at) < rangeStartDate) continue
+      if (new Date(a.created_at).getTime() < rangeStartMs) continue
       const k = STATUS_TO_METRIC[a.metadata?.new_value]
       if (k) counts[k]++
     }
     return counts
-  }, [leads, transitions, rangeStartDate])
+  }, [leads, transitions, rangeStartMs])
 
   // Current-state (not range-filtered)
   const activeLeads = leads.filter(l => !['sold'].includes(l.status))
