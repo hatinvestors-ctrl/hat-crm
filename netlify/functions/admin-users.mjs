@@ -21,17 +21,39 @@ function authHeaders() {
   }
 }
 
+async function findUserByEmail(email) {
+  // Search auth users by email via admin API
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}&page=1&per_page=1`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  const users = data.users || []
+  return users.find(u => u.email?.toLowerCase() === email.toLowerCase()) || null
+}
+
 async function createUser({ email, password, full_name, role, workspace_id }) {
-  // 1. Create auth user
+  // 1. Try to create auth user; if already exists, look them up instead
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { full_name } }),
   })
-  const user = await res.json()
-  if (!res.ok) throw new Error(user.message || user.msg || 'Failed to create auth user')
+  const body = await res.json()
 
-  const userId = user.id
+  let userId
+  if (!res.ok) {
+    // If already registered, find existing user and just add to workspace
+    if (body.message?.includes('already been registered') || body.code === 'email_exists') {
+      const existing = await findUserByEmail(email)
+      if (!existing) throw new Error(body.message || 'User already exists but could not be found.')
+      userId = existing.id
+    } else {
+      throw new Error(body.message || body.msg || 'Failed to create auth user')
+    }
+  } else {
+    userId = body.id
+  }
 
   // 2. Upsert profile
   await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
@@ -40,10 +62,10 @@ async function createUser({ email, password, full_name, role, workspace_id }) {
     body: JSON.stringify({ id: userId, full_name }),
   })
 
-  // 3. Add workspace member
-  const memRes = await fetch(`${SUPABASE_URL}/rest/v1/workspace_members`, {
+  // 3. Upsert workspace member (in case they're already a member, update role)
+  const memRes = await fetch(`${SUPABASE_URL}/rest/v1/workspace_members?workspace_id=eq.${workspace_id}&user_id=eq.${userId}`, {
     method: 'POST',
-    headers: { ...authHeaders(), Prefer: 'return=representation' },
+    headers: { ...authHeaders(), Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify({ workspace_id, user_id: userId, role }),
   })
   if (!memRes.ok) {
