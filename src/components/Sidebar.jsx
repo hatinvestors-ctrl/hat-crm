@@ -148,7 +148,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
             )}
           </div>
         </NavLink>
-        {userRole === 'admin' && (
+        {userRole !== 'readonly' && (
           <NavLink to={`${base}/tasks`} className={navItemClasses}>
             <span className="text-[color:var(--color-text-dim)]">{ICONS.tasks}</span>
             <span className="flex-1">Tasks</span>

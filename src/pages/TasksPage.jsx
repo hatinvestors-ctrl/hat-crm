@@ -74,11 +74,16 @@ export default function TasksPage() {
   // Load tasks
   const loadTasks = async () => {
     setLoading(true)
-    const { data } = await supabase
+    let q = supabase
       .from('tasks')
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: true })
+    // Non-admin: only see tasks they created or are assigned to
+    if (userRole !== 'admin') {
+      q = q.or(`created_by.eq.${user.id},assignee_ids.cs.{${user.id}}`)
+    }
+    const { data } = await q
     setTasks(data || [])
     setLoading(false)
     // Counts (best-effort, non-blocking)

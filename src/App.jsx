@@ -51,9 +51,9 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
+        <Route path="tasks" element={<TasksPage />} />
+        <Route path="tasks/:taskId" element={<TasksPage />} />
         <Route element={<AdminRoute />}>
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="tasks/:taskId" element={<TasksPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
