@@ -121,7 +121,7 @@ export const PROPERTY_TYPES = [
 
 export const USER_ROLES = [
   { value: 'admin', label: 'Admin', description: 'Full access — manage users, settings, all leads' },
-  { value: 'member', label: 'Member', description: 'Create, edit, and manage leads' },
+  { value: 'regular', label: 'Regular', description: 'Create, edit, and manage leads' },
   { value: 'readonly', label: 'Read-only', description: 'View leads only — cannot edit or delete' },
 ]
 

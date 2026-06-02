@@ -6,7 +6,7 @@ import Button from '../ui/Button'
 import { USER_ROLES } from '../../lib/constants'
 import { createUser, updateUser } from '../../lib/adminUsers'
 
-const EMPTY = { full_name: '', email: '', password: '', role: 'member', addExisting: false }
+const EMPTY = { full_name: '', email: '', password: '', role: 'regular', addExisting: false }
 
 export default function CreateUserModal({ open, onClose, workspaceId, editUser, onSaved }) {
   const [form, setForm] = useState(EMPTY)
