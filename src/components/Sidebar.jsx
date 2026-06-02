@@ -177,7 +177,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
       </nav>
 
       {/* Quick Analysis button */}
-      {userRole === 'admin' && (
+      {userRole !== 'readonly' && (
         <div className="px-2 pb-1">
           <button
             onClick={() => setQuickAnalysisOpen(true)}
