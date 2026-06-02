@@ -302,6 +302,7 @@ export default function LeadsPage() {
             onChange={setFilters}
             onClear={() => setFilters({})}
             members={members}
+            isAdmin={userRole === 'admin'}
           />
 
           {/* Bulk-action bar (sticky just below the topbar when leads are selected) */}
