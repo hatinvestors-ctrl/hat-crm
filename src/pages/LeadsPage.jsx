@@ -148,8 +148,16 @@ export default function LeadsPage() {
 
     q = q.order(sortBy, { ascending: sortOrder === 'asc' })
 
+    const DEAD = new Set(['dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed'])
     const { data, error } = await q
-    if (!error) setLeads(data || [])
+    if (!error) {
+      const sorted = (data || []).sort((a, b) => {
+        const aD = DEAD.has(a.status) ? 1 : 0
+        const bD = DEAD.has(b.status) ? 1 : 0
+        return aD - bD
+      })
+      setLeads(sorted)
+    }
     setLoading(false)
   }
 
