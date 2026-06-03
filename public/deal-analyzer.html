@@ -467,9 +467,9 @@
             </tr>
             <tr>
               <td style="padding:6px 10px; color:#718096; font-size:12px; font-weight:500;">Offer Price</td>
-              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
-              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
-              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-offer" step="1000" oninput="this._manualOverride=true;calcScenarios()" placeholder="auto from MAO" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-offer" step="1000" oninput="this._manualOverride=true;calcScenarios()" placeholder="auto from MAO" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-offer" step="1000" oninput="this._manualOverride=true;calcScenarios()" placeholder="auto from MAO" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
             </tr>
             <!-- Derived rows -->
             <tr style="border-top:1px solid #2d3748;">
@@ -1212,6 +1212,8 @@ function calc() {
   document.getElementById('sc-con-reno').value = reno;
   document.getElementById('sc-rea-reno').value = reno;
   document.getElementById('sc-agg-reno').value = reno;
+  // Reset offer price manual overrides so MAO auto-fills again
+  ['con','rea','agg'].forEach(k => { document.getElementById(`sc-${k}-offer`)._manualOverride = false; });
   calcScenarios();
 
   // ── Deal Summary ──
@@ -2449,13 +2451,16 @@ function calcScenarios() {
     const sReno  = parseFloat(document.getElementById(`sc-${k}-reno`).value)  || 0;
     const sOffer = parseFloat(document.getElementById(`sc-${k}-offer`).value) || 0;
 
-    const sMao       = sArv * 0.75 - sReno;
-    const sLoan      = sPP  * 0.9 + sReno;
+    const sMao       = Math.round(sArv * 0.75 - sReno);
+    // Auto-fill Offer Price with MAO if not manually set
+    const offerEl = document.getElementById(`sc-${k}-offer`);
+    if (!offerEl._manualOverride && sMao > 0) offerEl.value = sMao;
+    const sOfferFinal = parseFloat(offerEl.value) || sMao;
+    const sLoan      = sOfferFinal * 0.9 + sReno;
     const sPoints    = sLoan * 0.02;
-    const sCashNeeded= sPP  * 0.1 + sPoints + fixedFeesVal;
+    const sCashNeeded= sOfferFinal * 0.1 + sPoints + fixedFeesVal;
     const sSale      = sArv * 0.93;
     const sHoldCost  = (sLoan * 0.01 + 308) * holdFlipVal;
-    const sPurchase  = sOffer > 0 ? sOffer : (sMao > 0 ? sMao : sPP);
     const sProfit    = sSale - sLoan - sHoldCost - sCashNeeded;
     const sRoi       = sCashNeeded > 0 ? (sProfit / sCashNeeded) * (12 / holdFlipVal) * 100 : 0;
 
