@@ -168,7 +168,8 @@ export default function DashboardPage() {
   const headlines = useMemo(() => {
     const total = filteredLeads.length
     const hot = filteredLeads.filter(l => l.is_hot && !['sold','dead_lead'].includes(l.status)).length
-    const followUpsToday = filteredLeads.filter(l => l.follow_up_date === today)
+    const TERMINAL = ['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed']
+    const followUpsToday = filteredLeads.filter(l => l.follow_up_date === today && !TERMINAL.includes(l.status))
     const activePipelineArv = filteredLeads
       .filter(l => !['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed'].includes(l.status))
       .reduce((s, l) => s + Number(l.arv || 0), 0)

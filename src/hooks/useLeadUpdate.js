@@ -15,6 +15,12 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
       if (mao !== null) patch.mao = mao
     }
 
+    // Auto-clear follow_up_date when status moves to a terminal/closed state
+    const TERMINAL = ['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed']
+    if ('status' in patch && TERMINAL.includes(patch.status)) {
+      patch.follow_up_date = null
+    }
+
     const { data: updated, error } = await supabase
       .from('leads')
       .update(patch)

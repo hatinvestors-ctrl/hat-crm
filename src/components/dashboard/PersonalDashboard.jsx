@@ -90,7 +90,8 @@ export default function PersonalDashboard({ workspaceId, userId, userRole }) {
 
   // Current-state (not range-filtered)
   const activeLeads = leads.filter(l => !['sold'].includes(l.status))
-  const followUps   = leads.filter(l => l.follow_up_date && l.follow_up_date <= today)
+  const TERMINAL    = ['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed']
+  const followUps   = leads.filter(l => l.follow_up_date && l.follow_up_date <= today && !TERMINAL.includes(l.status))
   const pipeline    = leads.filter(l => !['dead_lead','rejected_not_accepted','sold'].includes(l.status)).slice(0, 10)
 
   // Tasks
