@@ -9,6 +9,9 @@
 [functions."analyze-deal"]
   timeout = 120
 
+[functions."generate-report"]
+  timeout = 120
+
 # SPA fallback. The Netlify CLI/runtime routes /.netlify/functions/* to functions
 # automatically — no redirect needed for that.
 [[redirects]]
