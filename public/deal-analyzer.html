@@ -434,18 +434,75 @@
 
     <!-- ARV Scenarios -->
     <div>
-      <div class="section-label">ARV Scenarios — Conservative / Realistic / Aggressive</div>
+      <div class="section-label">Scenarios — Conservative / Realistic / Aggressive</div>
       <div style="overflow-x:auto;">
-        <table id="scenario-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
           <thead>
             <tr>
-              <th style="text-align:left; padding:8px 10px; color:#718096; font-size:10px; text-transform:uppercase; letter-spacing:1px; font-weight:600; border-bottom:1px solid #2d3748;"></th>
-              <th style="text-align:center; padding:8px 10px; color:#f6ad55; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Conservative<br><span style="font-size:9px; font-weight:400; color:#718096;">ARV −10%</span></th>
-              <th style="text-align:center; padding:8px 10px; color:#63b3ed; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:2px solid #63b3ed;">Realistic<br><span style="font-size:9px; font-weight:400; color:#718096;">current inputs</span></th>
-              <th style="text-align:center; padding:8px 10px; color:#68d391; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Aggressive<br><span style="font-size:9px; font-weight:400; color:#718096;">ARV +10%</span></th>
+              <th style="text-align:left; padding:8px 10px; color:#718096; font-size:10px; text-transform:uppercase; letter-spacing:1px; font-weight:600; border-bottom:1px solid #2d3748; width:130px;"></th>
+              <th style="text-align:center; padding:8px 10px; color:#f6ad55; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Conservative</th>
+              <th style="text-align:center; padding:8px 10px; color:#63b3ed; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:2px solid #63b3ed;">Realistic</th>
+              <th style="text-align:center; padding:8px 10px; color:#68d391; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Aggressive</th>
             </tr>
           </thead>
-          <tbody id="scenario-body"></tbody>
+          <tbody>
+            <!-- Editable rows -->
+            <tr>
+              <td style="padding:6px 10px; color:#a0aec0; font-size:12px; font-weight:500;">ARV</td>
+              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-arv" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #f6ad55;border-radius:6px;padding:6px 10px;color:#f6ad55;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-arv" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #63b3ed;border-radius:6px;padding:6px 10px;color:#63b3ed;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-arv" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #68d391;border-radius:6px;padding:6px 10px;color:#68d391;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; color:#a0aec0; font-size:12px; font-weight:500;">Purchase Price</td>
+              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-pp" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-pp" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-pp" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; color:#a0aec0; font-size:12px; font-weight:500;">Reno Cost</td>
+              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-reno" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-reno" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-reno" step="1000" oninput="calcScenarios()" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; color:#718096; font-size:12px; font-weight:500;">Offer Price</td>
+              <td style="padding:4px 6px; background:rgba(246,173,85,0.05);"><input type="number" id="sc-con-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;"><input type="number" id="sc-rea-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+              <td style="padding:4px 6px; background:rgba(104,211,145,0.05);"><input type="number" id="sc-agg-offer" step="1000" oninput="calcScenarios()" placeholder="optional" style="width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;font-weight:600;outline:none;text-align:right;"></td>
+            </tr>
+            <!-- Derived rows -->
+            <tr style="border-top:1px solid #2d3748;">
+              <td style="padding:8px 10px; color:#718096; font-size:11px;">MAO (75%×ARV−Reno)</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; color:#a0aec0; background:rgba(246,173,85,0.05);" id="sc-con-mao">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; color:#a0aec0; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;" id="sc-rea-mao">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; color:#a0aec0; background:rgba(104,211,145,0.05);" id="sc-agg-mao">—</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; color:#a0aec0; font-size:12px; font-weight:600;">Est. Flip Profit</td>
+              <td style="padding:8px 10px; text-align:center; font-size:15px; font-weight:800; background:rgba(246,173,85,0.05);" id="sc-con-profit">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:15px; font-weight:800; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;" id="sc-rea-profit">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:15px; font-weight:800; background:rgba(104,211,145,0.05);" id="sc-agg-profit">—</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; color:#718096; font-size:11px;">Ann. ROI</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; background:rgba(246,173,85,0.05);" id="sc-con-roi">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed;" id="sc-rea-roi">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; font-weight:600; background:rgba(104,211,145,0.05);" id="sc-agg-roi">—</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; color:#718096; font-size:11px; border-bottom:2px solid #2d3748;">Cash Needed</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; background:rgba(246,173,85,0.05); border-bottom:2px solid #2d3748;" id="sc-con-cash">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed; border-bottom:2px solid #63b3ed;" id="sc-rea-cash">—</td>
+              <td style="padding:8px 10px; text-align:center; font-size:13px; background:rgba(104,211,145,0.05); border-bottom:2px solid #2d3748;" id="sc-agg-cash">—</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px; text-align:center; background:rgba(246,173,85,0.05);" id="sc-con-badge">—</td>
+              <td style="padding:8px 10px; text-align:center; background:rgba(99,179,237,0.08); border-left:2px solid #63b3ed; border-right:2px solid #63b3ed; border-bottom:2px solid #63b3ed;" id="sc-rea-badge">—</td>
+              <td style="padding:8px 10px; text-align:center; background:rgba(104,211,145,0.05);" id="sc-agg-badge">—</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -1145,65 +1202,25 @@ function calc() {
     stratNote.textContent = 'Flip: ' + fmt(flipProfit) + ' profit (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo. Both are below target — renegotiate purchase price or check BRRRR rent-ready reno sensitivity below before committing.';
   }
 
-  // ── ARV Scenarios ──
-  (function() {
-    const scenarios = [
-      { label: 'Conservative', arv: Math.round(arv * 0.9 / 1000) * 1000, tone: '#f6ad55', bg: 'rgba(246,173,85,0.05)' },
-      { label: 'Realistic',    arv: arv,                                   tone: '#63b3ed', bg: 'rgba(99,179,237,0.08)', isCurrent: true },
-      { label: 'Aggressive',   arv: Math.round(arv * 1.1 / 1000) * 1000,  tone: '#68d391', bg: 'rgba(104,211,145,0.05)' },
-    ];
-    const rows = [
-      { label: 'ARV',             key: 'arv',    fmt: v => fmt(v) },
-      { label: 'MAO (75% − Reno)', key: 'mao',   fmt: v => fmt(v) },
-      { label: 'Purchase Price',   key: 'pp',    fmt: v => fmt(v) },
-      { label: 'Reno Cost',        key: 'reno',  fmt: v => fmt(v) },
-      { label: 'Est. Flip Profit', key: 'profit', fmt: v => {
-          const c = v > 0 ? '#68d391' : '#fc8181';
-          return `<span style="color:${c}; font-weight:700;">${fmt(v)}</span>`;
-        }
-      },
-      { label: 'Annualized ROI',   key: 'roi',   fmt: v => `<span style="font-weight:600;">${fmtPct(v)}</span>` },
-      { label: 'Cash Needed',      key: 'cash',  fmt: v => fmt(v) },
-    ];
-
-    const scData = scenarios.map(s => {
-      const sLoan      = pp * 0.9 + reno;
-      const sPoints    = sLoan * 0.02;
-      const sCashNeeded= pp * 0.1 + sPoints + fixedFees;
-      const sSale      = s.arv * 0.93;
-      const sHoldCost  = (sLoan * 0.01 + 308) * holdFlip;
-      const sProfit    = sSale - sLoan - sHoldCost - sCashNeeded;
-      const sRoi       = sCashNeeded > 0 ? (sProfit / sCashNeeded) * (12 / holdFlip) : 0;
-      const sMao       = s.arv * 0.75 - reno;
-      return { ...s, mao: sMao, pp, reno, profit: sProfit, roi: sRoi, cash: sCashNeeded };
-    });
-
-    let html = '';
-    rows.forEach(row => {
-      html += `<tr>
-        <td style="padding:8px 10px; color:#a0aec0; font-size:12px; font-weight:500; border-bottom:1px solid #1a2030; white-space:nowrap;">${row.label}</td>`;
-      scData.forEach(s => {
-        const border = s.isCurrent ? `border-left:2px solid ${s.tone}; border-right:2px solid ${s.tone};` : '';
-        html += `<td style="padding:8px 10px; text-align:center; font-size:13px; background:${s.bg}; ${border} border-bottom:1px solid #1a2030;">${row.fmt(s[row.key])}</td>`;
-      });
-      html += '</tr>';
-    });
-
-    // Verdict row
-    html += `<tr>
-      <td style="padding:8px 10px; color:#718096; font-size:11px;"></td>`;
-    scData.forEach(s => {
-      const ok = s.profit >= 30000;
-      const badge = ok
-        ? `<span style="background:#276749; color:#68d391; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">✓ WORKS</span>`
-        : `<span style="background:#742a2a; color:#fc8181; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">✗ PASS</span>`;
-      const border = s.isCurrent ? `border-left:2px solid ${s.tone}; border-right:2px solid ${s.tone}; border-bottom:2px solid ${s.tone};` : '';
-      html += `<td style="padding:8px 10px; text-align:center; background:${s.bg}; ${border}">${badge}</td>`;
-    });
-    html += '</tr>';
-
-    document.getElementById('scenario-body').innerHTML = html;
-  })();
+  // ── ARV Scenarios — seed inputs from current sliders (only first time) ──
+  if (!window._scenariosSeeded) {
+    window._scenariosSeeded = true;
+    document.getElementById('sc-con-arv').value  = Math.round(arv * 0.9 / 1000) * 1000;
+    document.getElementById('sc-rea-arv').value  = arv;
+    document.getElementById('sc-agg-arv').value  = Math.round(arv * 1.1 / 1000) * 1000;
+    document.getElementById('sc-con-pp').value   = pp;
+    document.getElementById('sc-rea-pp').value   = pp;
+    document.getElementById('sc-agg-pp').value   = pp;
+    document.getElementById('sc-con-reno').value = reno;
+    document.getElementById('sc-rea-reno').value = reno;
+    document.getElementById('sc-agg-reno').value = reno;
+  } else {
+    // On subsequent calc() calls, only update Realistic ARV/PP/Reno from sliders
+    document.getElementById('sc-rea-arv').value  = arv;
+    document.getElementById('sc-rea-pp').value   = pp;
+    document.getElementById('sc-rea-reno').value = reno;
+  }
+  calcScenarios();
 
   // ── Deal Summary ──
   const summaryData = {
@@ -2430,6 +2447,39 @@ const _dealData = {
   hold_flip:  parseInt(_p.get('hold_flip'))   || DEAL.hold_flip,
   hold_brrrr: parseInt(_p.get('hold_brrrr'))  || DEAL.hold_brrrr,
 };
+function calcScenarios() {
+  const holdFlipVal = parseInt(document.getElementById('hold-flip').value) || 3;
+  const fixedFeesVal = 1600 + 500 + 200 + 150; // title + lender title + doc stamps + intangible
+
+  ['con','rea','agg'].forEach(k => {
+    const sArv   = parseFloat(document.getElementById(`sc-${k}-arv`).value)   || 0;
+    const sPP    = parseFloat(document.getElementById(`sc-${k}-pp`).value)    || 0;
+    const sReno  = parseFloat(document.getElementById(`sc-${k}-reno`).value)  || 0;
+    const sOffer = parseFloat(document.getElementById(`sc-${k}-offer`).value) || 0;
+
+    const sMao       = sArv * 0.75 - sReno;
+    const sLoan      = sPP  * 0.9 + sReno;
+    const sPoints    = sLoan * 0.02;
+    const sCashNeeded= sPP  * 0.1 + sPoints + fixedFeesVal;
+    const sSale      = sArv * 0.93;
+    const sHoldCost  = (sLoan * 0.01 + 308) * holdFlipVal;
+    const sPurchase  = sOffer > 0 ? sOffer : (sMao > 0 ? sMao : sPP);
+    const sProfit    = sSale - sLoan - sHoldCost - sCashNeeded;
+    const sRoi       = sCashNeeded > 0 ? (sProfit / sCashNeeded) * (12 / holdFlipVal) * 100 : 0;
+
+    const profitColor = sProfit >= 30000 ? '#68d391' : sProfit >= 0 ? '#f6ad55' : '#fc8181';
+    const badge = sProfit >= 30000
+      ? '<span style="background:#276749;color:#68d391;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;">✓ WORKS</span>'
+      : '<span style="background:#742a2a;color:#fc8181;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;">✗ PASS</span>';
+
+    document.getElementById(`sc-${k}-mao`).textContent    = sMao > 0 ? '$' + Math.round(sMao).toLocaleString() : '—';
+    document.getElementById(`sc-${k}-profit`).innerHTML   = `<span style="color:${profitColor}">$${Math.round(sProfit).toLocaleString()}</span>`;
+    document.getElementById(`sc-${k}-roi`).textContent    = sRoi.toFixed(1) + '%';
+    document.getElementById(`sc-${k}-cash`).textContent   = '$' + Math.round(sCashNeeded).toLocaleString();
+    document.getElementById(`sc-${k}-badge`).innerHTML    = badge;
+  });
+}
+
 loadDeal(_dealData);
 updateHoldLabel('flip');
 updateHoldLabel('brrrr');
