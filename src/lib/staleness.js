@@ -55,7 +55,7 @@ export const BUCKETS = [
     priority: 3,
     configurable: true,
     defaultDays: 1,
-    matcher: (l, days) => l.status === 'offer_signed' && daysSince(l.updated_at) > days,
+    matcher: (l, days) => l.status === 'offer_signed' && daysSince(l.updated_at) >= days,
     action: (l) => `Signed ${daysSince(l.contract_signed_date || l.updated_at)} day(s) ago — send to seller`,
   },
   {
