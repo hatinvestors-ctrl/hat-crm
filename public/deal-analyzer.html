@@ -432,6 +432,24 @@
       </div>
     </div>
 
+    <!-- ARV Scenarios -->
+    <div>
+      <div class="section-label">ARV Scenarios — Conservative / Realistic / Aggressive</div>
+      <div style="overflow-x:auto;">
+        <table id="scenario-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:8px 10px; color:#718096; font-size:10px; text-transform:uppercase; letter-spacing:1px; font-weight:600; border-bottom:1px solid #2d3748;"></th>
+              <th style="text-align:center; padding:8px 10px; color:#f6ad55; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Conservative<br><span style="font-size:9px; font-weight:400; color:#718096;">ARV −10%</span></th>
+              <th style="text-align:center; padding:8px 10px; color:#63b3ed; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:2px solid #63b3ed;">Realistic<br><span style="font-size:9px; font-weight:400; color:#718096;">current inputs</span></th>
+              <th style="text-align:center; padding:8px 10px; color:#68d391; font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; border-bottom:1px solid #2d3748;">Aggressive<br><span style="font-size:9px; font-weight:400; color:#718096;">ARV +10%</span></th>
+            </tr>
+          </thead>
+          <tbody id="scenario-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Offer Strategy -->
     <div>
       <div class="section-label">Offer Strategy</div>
@@ -1126,6 +1144,66 @@ function calc() {
     winnerBanner.style.background = 'rgba(246,173,85,0.12)'; winnerBanner.style.border = '1px solid rgba(246,173,85,0.3)'; winnerBanner.style.color = '#f6ad55';
     stratNote.textContent = 'Flip: ' + fmt(flipProfit) + ' profit (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo. Both are below target — renegotiate purchase price or check BRRRR rent-ready reno sensitivity below before committing.';
   }
+
+  // ── ARV Scenarios ──
+  (function() {
+    const scenarios = [
+      { label: 'Conservative', arv: Math.round(arv * 0.9 / 1000) * 1000, tone: '#f6ad55', bg: 'rgba(246,173,85,0.05)' },
+      { label: 'Realistic',    arv: arv,                                   tone: '#63b3ed', bg: 'rgba(99,179,237,0.08)', isCurrent: true },
+      { label: 'Aggressive',   arv: Math.round(arv * 1.1 / 1000) * 1000,  tone: '#68d391', bg: 'rgba(104,211,145,0.05)' },
+    ];
+    const rows = [
+      { label: 'ARV',             key: 'arv',    fmt: v => fmt(v) },
+      { label: 'MAO (75% − Reno)', key: 'mao',   fmt: v => fmt(v) },
+      { label: 'Purchase Price',   key: 'pp',    fmt: v => fmt(v) },
+      { label: 'Reno Cost',        key: 'reno',  fmt: v => fmt(v) },
+      { label: 'Est. Flip Profit', key: 'profit', fmt: v => {
+          const c = v > 0 ? '#68d391' : '#fc8181';
+          return `<span style="color:${c}; font-weight:700;">${fmt(v)}</span>`;
+        }
+      },
+      { label: 'Annualized ROI',   key: 'roi',   fmt: v => `<span style="font-weight:600;">${fmtPct(v)}</span>` },
+      { label: 'Cash Needed',      key: 'cash',  fmt: v => fmt(v) },
+    ];
+
+    const scData = scenarios.map(s => {
+      const sLoan      = pp * 0.9 + reno;
+      const sPoints    = sLoan * 0.02;
+      const sCashNeeded= pp * 0.1 + sPoints + fixedFees;
+      const sSale      = s.arv * 0.93;
+      const sHoldCost  = (sLoan * 0.01 + 308) * holdFlip;
+      const sProfit    = sSale - sLoan - sHoldCost - sCashNeeded;
+      const sRoi       = sCashNeeded > 0 ? (sProfit / sCashNeeded) * (12 / holdFlip) : 0;
+      const sMao       = s.arv * 0.75 - reno;
+      return { ...s, mao: sMao, pp, reno, profit: sProfit, roi: sRoi, cash: sCashNeeded };
+    });
+
+    let html = '';
+    rows.forEach(row => {
+      html += `<tr>
+        <td style="padding:8px 10px; color:#a0aec0; font-size:12px; font-weight:500; border-bottom:1px solid #1a2030; white-space:nowrap;">${row.label}</td>`;
+      scData.forEach(s => {
+        const border = s.isCurrent ? `border-left:2px solid ${s.tone}; border-right:2px solid ${s.tone};` : '';
+        html += `<td style="padding:8px 10px; text-align:center; font-size:13px; background:${s.bg}; ${border} border-bottom:1px solid #1a2030;">${row.fmt(s[row.key])}</td>`;
+      });
+      html += '</tr>';
+    });
+
+    // Verdict row
+    html += `<tr>
+      <td style="padding:8px 10px; color:#718096; font-size:11px;"></td>`;
+    scData.forEach(s => {
+      const ok = s.profit >= 30000;
+      const badge = ok
+        ? `<span style="background:#276749; color:#68d391; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">✓ WORKS</span>`
+        : `<span style="background:#742a2a; color:#fc8181; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">✗ PASS</span>`;
+      const border = s.isCurrent ? `border-left:2px solid ${s.tone}; border-right:2px solid ${s.tone}; border-bottom:2px solid ${s.tone};` : '';
+      html += `<td style="padding:8px 10px; text-align:center; background:${s.bg}; ${border}">${badge}</td>`;
+    });
+    html += '</tr>';
+
+    document.getElementById('scenario-body').innerHTML = html;
+  })();
 
   // ── Deal Summary ──
   const summaryData = {
