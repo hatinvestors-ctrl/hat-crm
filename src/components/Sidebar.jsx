@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, useParams, Link } from 'react-router-dom'
+import { NavLink, useParams, useMatch, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Badge from './ui/Badge'
 import { categorizeLeads } from '../lib/staleness'
@@ -35,8 +35,11 @@ const navItemClasses = ({ isActive }) =>
 export default function Sidebar({ workspace, userRole, userId, profile, onSignOut }) {
   const { workspaceId } = useParams()
   const base = `/w/${workspaceId}`
+  const leadMatch = useMatch('/w/:workspaceId/leads/:leadId')
+  const currentLeadId = leadMatch?.params?.leadId || null
   const [recentLeads, setRecentLeads] = useState([])
   const [quickAnalysisOpen, setQuickAnalysisOpen] = useState(false)
+  const [quickAnalysisPrefill, setQuickAnalysisPrefill] = useState(null)
   const [needsActionCount, setNeedsActionCount] = useState(0)
   const [hotCount, setHotCount] = useState(0)
   const [triageCount, setTriageCount] = useState(0)
@@ -180,7 +183,24 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
       {userRole !== 'readonly' && (
         <div className="px-2 pb-1">
           <button
-            onClick={() => setQuickAnalysisOpen(true)}
+            onClick={async () => {
+              if (currentLeadId) {
+                const { data } = await supabase.from('leads')
+                  .select('address, city, state, arv, asking_price, offer_price, renovation_cost')
+                  .eq('id', currentLeadId).single()
+                if (data) {
+                  setQuickAnalysisPrefill({
+                    address: [data.address, data.city, data.state].filter(Boolean).join(', '),
+                    arv: data.arv || '',
+                    purchase_price: data.asking_price || data.offer_price || '',
+                    renovation_cost: data.renovation_cost || '',
+                  })
+                }
+              } else {
+                setQuickAnalysisPrefill(null)
+              }
+              setQuickAnalysisOpen(true)
+            }}
             className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90 transition-opacity"
           >
             <span>⚡</span>
@@ -251,7 +271,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
       </div>
     </aside>
 
-    <QuickAnalysisModal open={quickAnalysisOpen} onClose={() => setQuickAnalysisOpen(false)} />
+    <QuickAnalysisModal open={quickAnalysisOpen} onClose={() => { setQuickAnalysisOpen(false); setQuickAnalysisPrefill(null) }} prefill={quickAnalysisPrefill} />
     </>
   )
 }

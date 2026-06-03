@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatCurrency } from '../lib/calculations'
 
 const VERDICT_STYLES = {
@@ -28,12 +28,24 @@ function ScoreRing({ score }) {
 
 const EMPTY = { address: '', purchase_price: '', arv: '', renovation_cost: '', monthly_rent: '', strategy: 'flip' }
 
-export default function QuickAnalysisModal({ open, onClose }) {
+export default function QuickAnalysisModal({ open, onClose, prefill }) {
   const [form,      setForm]      = useState(EMPTY)
   const [analyzing, setAnalyzing] = useState(false)
   const [error,     setError]     = useState(null)
   const [result,    setResult]    = useState(null)
   const [expanded,  setExpanded]  = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setForm(prefill
+        ? { ...EMPTY, ...prefill }
+        : EMPTY
+      )
+      setResult(null)
+      setError(null)
+      setExpanded(false)
+    }
+  }, [open, prefill])
 
   if (!open) return null
 
