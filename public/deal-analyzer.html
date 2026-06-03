@@ -1202,24 +1202,16 @@ function calc() {
     stratNote.textContent = 'Flip: ' + fmt(flipProfit) + ' profit (' + fmtPct(flipAnnROI) + ' ann. ROI). BRRRR: ' + fmtPct(coc) + ' COC, ' + fmt(monthlyCF) + '/mo. Both are below target — renegotiate purchase price or check BRRRR rent-ready reno sensitivity below before committing.';
   }
 
-  // ── ARV Scenarios — seed inputs from current sliders (only first time) ──
-  if (!window._scenariosSeeded) {
-    window._scenariosSeeded = true;
-    document.getElementById('sc-con-arv').value  = Math.round(arv * 0.9 / 1000) * 1000;
-    document.getElementById('sc-rea-arv').value  = arv;
-    document.getElementById('sc-agg-arv').value  = Math.round(arv * 1.1 / 1000) * 1000;
-    document.getElementById('sc-con-pp').value   = pp;
-    document.getElementById('sc-rea-pp').value   = pp;
-    document.getElementById('sc-agg-pp').value   = pp;
-    document.getElementById('sc-con-reno').value = reno;
-    document.getElementById('sc-rea-reno').value = reno;
-    document.getElementById('sc-agg-reno').value = reno;
-  } else {
-    // On subsequent calc() calls, only update Realistic ARV/PP/Reno from sliders
-    document.getElementById('sc-rea-arv').value  = arv;
-    document.getElementById('sc-rea-pp').value   = pp;
-    document.getElementById('sc-rea-reno').value = reno;
-  }
+  // ── ARV Scenarios — always sync all columns from sliders ──
+  document.getElementById('sc-con-arv').value  = Math.round(arv * 0.9 / 1000) * 1000;
+  document.getElementById('sc-rea-arv').value  = arv;
+  document.getElementById('sc-agg-arv').value  = Math.round(arv * 1.1 / 1000) * 1000;
+  document.getElementById('sc-con-pp').value   = pp;
+  document.getElementById('sc-rea-pp').value   = pp;
+  document.getElementById('sc-agg-pp').value   = pp;
+  document.getElementById('sc-con-reno').value = reno;
+  document.getElementById('sc-rea-reno').value = reno;
+  document.getElementById('sc-agg-reno').value = reno;
   calcScenarios();
 
   // ── Deal Summary ──
