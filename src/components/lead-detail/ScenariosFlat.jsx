@@ -88,7 +88,8 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
   const save = async () => {
     setSaving(true)
     const patch = {}
-    COLUMNS.forEach(col => {
+    // Only save Conservative and Aggressive — Realistic is managed by the Financial section
+    COLUMNS.filter(c => c.key !== 'realistic').forEach(col => {
       ROWS.forEach(row => {
         const dbField = col[row.key]
         if (dbField) patch[dbField] = draft[dbField] === '' ? null : draft[dbField]
@@ -100,13 +101,18 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
     setDirty(false)
   }
 
-  // Derived realistic profit
-  const realisticProfit = (() => {
-    const arv = draft['arv']
-    const purchase = draft['offer_price'] || draft['mao']
-    const reno = draft['renovation_cost'] || 0
-    return calculateFlipProfit(arv, purchase, reno)
-  })()
+  // Realistic column always reads live from lead prop (not draft)
+  const realisticValues = {
+    arv:              lead.arv              ?? null,
+    renovation_cost:  lead.renovation_cost  ?? null,
+    mao:              lead.mao              ?? null,
+    offer_price:      lead.offer_price      ?? lead.asking_price ?? null,
+  }
+  const realisticProfit = calculateFlipProfit(
+    realisticValues.arv,
+    realisticValues.offer_price || realisticValues.mao,
+    realisticValues.renovation_cost || 0
+  )
 
   return (
     <Card title="Scenarios" action={
@@ -122,6 +128,9 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
               {COLUMNS.map(col => (
                 <th key={col.key} className={`text-center text-[11px] uppercase tracking-wider font-semibold py-2 px-2 ${TONE_HEADER[col.tone]} border-b border-[color:var(--color-line)]`}>
                   {col.label}
+                  {col.key === 'realistic' && (
+                    <div className="text-[9px] font-normal text-[color:var(--color-text-dim)] normal-case tracking-normal mt-0.5">from Financials</div>
+                  )}
                 </th>
               ))}
             </tr>
@@ -135,25 +144,38 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
                 </td>
                 {COLUMNS.map(col => {
                   const dbField = col[row.key]
-                  // Derived profit row for realistic uses live calculation
+                  const isRealistic = col.key === 'realistic'
+
+                  // Profit row
                   if (row.type === 'derived') {
-                    if (col.key === 'realistic') {
-                      return (
-                        <td key={col.key} className="py-2 px-2">
-                          <div className="text-[14px] font-bold text-[color:var(--color-success-text)] tabular-nums text-center">
-                            {formatCurrency(realisticProfit)}
-                          </div>
-                        </td>
-                      )
-                    }
+                    const profitVal = isRealistic ? realisticProfit : draft[dbField]
+                    const color = profitVal > 0
+                      ? 'text-[color:var(--color-success-text)]'
+                      : profitVal < 0
+                        ? 'text-[color:var(--color-danger-text)]'
+                        : 'text-[color:var(--color-text-dim)]'
                     return (
                       <td key={col.key} className="py-2 px-2">
-                        <div className="text-[14px] font-bold text-[color:var(--color-success-text)] tabular-nums text-center">
-                          {formatCurrency(draft[dbField])}
+                        <div className={`text-[14px] font-bold tabular-nums text-center ${color}`}>
+                          {formatCurrency(profitVal)}
                         </div>
                       </td>
                     )
                   }
+
+                  // Realistic column — read-only, always from live lead data
+                  if (isRealistic) {
+                    const liveVal = realisticValues[dbField]
+                    return (
+                      <td key={col.key} className="py-1.5 px-1.5">
+                        <div className="h-8 px-2 flex items-center justify-end rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[13px] text-[color:var(--color-text-muted)] tabular-nums">
+                          {liveVal != null ? `$${Number(liveVal).toLocaleString()}` : <span className="text-[color:var(--color-text-dim)] text-[11px]">from Financials</span>}
+                        </div>
+                      </td>
+                    )
+                  }
+
+                  // Conservative / Aggressive — editable
                   return (
                     <td key={col.key} className="py-1.5 px-1.5">
                       <CurrencyInput
