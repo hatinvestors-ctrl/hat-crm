@@ -36,7 +36,9 @@ export default function ReportSection({ lead }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead: { ...lead, recent_notes: [] }, recipient_type: reportType, length }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch { throw new Error('Report timed out. Try "Brief" or "Standard" length instead.') }
       if (!res.ok || !data.ok) throw new Error(data.error || 'Generation failed.')
       setSubject(data.subject)
       setReportText(data.report)
