@@ -106,7 +106,7 @@ function buildUserPrompt(lead, recipientType, length) {
     `Realistic — ARV: ${fmt(lead.arv)}, Reno: ${fmt(lead.renovation_cost)}, Purchase: ${fmt(lead.offer_price || lead.asking_price)}, Est. Profit: ${reaProfit != null ? fmt(reaProfit) : '—'}`,
     `Aggressive — ARV: ${fmt(lead.aggressive_arv)}, Reno: ${fmt(lead.aggressive_renovation_cost || lead.renovation_cost)}, Purchase: ${fmt(lead.aggressive_offer_price || lead.offer_price)}, Est. Profit: ${aggProfit != null ? fmt(aggProfit) : '—'}`,
     '',
-    lead.notes ? `NOTES:\n${lead.notes}` : '',
+    lead.notes ? `NOTES:\n${String(lead.notes).slice(0, 500)}` : '',
     lead.recent_notes?.length ? `RECENT ACTIVITY:\n${lead.recent_notes.slice(0, 5).join('\n')}` : '',
     lead.deal_analysis ? `DEAL ANALYSIS: Verdict: ${lead.deal_analysis.verdict}, Profit: ${fmt(lead.deal_analysis.profit)}, ROI: ${lead.deal_analysis.roi}%, Risks: ${(lead.deal_analysis.key_risks || []).join('; ')}` : '',
     lead.status ? `CRM STATUS: ${lead.status}` : '',
@@ -157,7 +157,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
+        max_tokens: length === 'brief' ? 400 : length === 'standard' ? 800 : 1200,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
