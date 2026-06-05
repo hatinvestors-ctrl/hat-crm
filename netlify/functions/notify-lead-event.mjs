@@ -6,8 +6,8 @@
 import nodemailer from 'nodemailer'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_PAT = process.env.SUPABASE_PAT
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_PAT = process.env.SUPABASE_PAT || SERVICE_KEY
 const APP_URL      = process.env.URL || 'https://hatcrm.netlify.app'
 
 const HEADERS = {

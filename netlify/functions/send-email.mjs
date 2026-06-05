@@ -10,7 +10,7 @@
 import nodemailer from 'nodemailer'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_PAT = process.env.SUPABASE_PAT
+const SUPABASE_PAT = process.env.SUPABASE_PAT || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const HEADERS = {
   'content-type': 'application/json',
