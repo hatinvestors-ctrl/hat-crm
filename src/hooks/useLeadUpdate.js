@@ -37,7 +37,8 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
     if (updated) {
       const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
       await logChanges(lead.id, userId, lead, updated, userLookup).catch(() => {})
-      fireLeadNotifications(lead, updated, lead.workspace_id, userId).catch(() => {})
+      console.log('[useLeadUpdate] firing notifications', { status_before: lead.status, status_after: updated.status, workspace_id: lead.workspace_id })
+      fireLeadNotifications(lead, updated, lead.workspace_id, userId).catch((e) => console.error('[useLeadUpdate] fireLeadNotifications error', e))
       onUpdated?.(updated)
     }
     return updated
