@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -22,6 +22,13 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
   const [error, setError] = useState(null)
   const [dirty, setDirty] = useState(false)
 
+  useEffect(() => {
+    const notif = workspace?.settings?.notifications || {}
+    setEnabled(Object.fromEntries(LEAD_NOTIFICATIONS.map(r => [r.event, notif[r.event] !== false])))
+    setDirty(false)
+    setSaved(false)
+  }, [workspace?.id])
+
   const toggle = (event) => {
     setEnabled(prev => ({ ...prev, [event]: !prev[event] }))
     setDirty(true)
@@ -33,14 +40,16 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
     setError(null)
     try {
       const currentSettings = workspace?.settings || {}
-      const { error: err } = await supabase
+      const { data: updated, error: err } = await supabase
         .from('workspaces')
         .update({ settings: { ...currentSettings, notifications: enabled } })
         .eq('id', workspace.id)
+        .select()
+        .single()
       if (err) throw err
       setSaved(true)
       setDirty(false)
-      onUpdated?.({ ...workspace, settings: { ...currentSettings, notifications: enabled } })
+      onUpdated?.(updated)
     } catch (e) {
       setError(e.message)
     } finally {
