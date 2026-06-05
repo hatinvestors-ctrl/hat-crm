@@ -178,7 +178,7 @@ export default async (req) => {
 
     await transport.sendMail({ from, to: toEmail, subject, text: body })
 
-    return new Response(JSON.stringify({ ok: true, to: toEmail }), { status: 200, headers: HEADERS })
+    return new Response(JSON.stringify({ ok: true, to: toEmail, subject }), { status: 200, headers: HEADERS })
   } catch (err) {
     console.error('[notify-lead-event]', err.message)
     return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: HEADERS })

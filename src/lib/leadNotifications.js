@@ -1,6 +1,8 @@
 // Notification config map. To add a new notification, add one entry to LEAD_NOTIFICATIONS.
 // Each rule fires when `trigger.field` changes to `trigger.value` on a lead.
 
+import { logEmailSent } from './activityLogger.js'
+
 export const LEAD_NOTIFICATIONS = [
   {
     event: 'offer_signed',
@@ -37,10 +39,9 @@ export async function fireLeadNotifications(before, after, workspaceId, userId) 
       const data = await res.json().catch(() => ({}))
       if (data.ok && data.to) {
         // Log to activity timeline
-        const { logEmailSent } = await import('./activityLogger.js')
         await logEmailSent(after.id, userId, {
           to: data.to,
-          subject: rule.subject.replace('{address}', after.address || ''),
+          subject: data.subject || rule.subject.replace('{address}', after.address || ''),
         }).catch(() => {})
       }
     } catch (err) {
