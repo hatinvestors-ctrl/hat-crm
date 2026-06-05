@@ -6,12 +6,14 @@ import UserManagement from '../components/settings/UserManagement'
 import ActionTriggersForm from '../components/settings/ActionTriggersForm'
 import MlsRefreshForm from '../components/settings/MlsRefreshForm'
 import MailServerForm from '../components/settings/MailServerForm'
+import NotificationTriggersForm from '../components/settings/NotificationTriggersForm'
 
 const TABS = [
   { id: 'workspace', label: 'Workspace' },
   { id: 'triggers', label: 'Action Triggers' },
   { id: 'mls', label: 'MLS Auto-Refresh' },
   { id: 'mail', label: 'Mail Server' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'users', label: 'Users' },
 ]
 
@@ -58,6 +60,9 @@ export default function SettingsPage() {
         )}
         {tab === 'mail' && (
           <MailServerForm workspace={workspace} canEdit={userRole === 'admin'} onUpdated={() => window.location.reload()} />
+        )}
+        {tab === 'notifications' && (
+          <NotificationTriggersForm workspace={workspace} canEdit={userRole === 'admin'} onUpdated={() => window.location.reload()} />
         )}
         {tab === 'users' && (
           <UserManagement
