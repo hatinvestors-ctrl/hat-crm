@@ -12,7 +12,7 @@ export async function upsertAgentFromLead(workspaceId, { listing_agent_name, lis
       brokerage:    listing_brokerage  || null,
       updated_at:   new Date().toISOString(),
     },
-    { onConflict: 'workspace_id,email', ignoreDuplicates: false }
+    { onConflict: 'workspace_id,email', ignoreDuplicates: true }
   )
 }
 

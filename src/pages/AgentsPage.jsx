@@ -61,7 +61,7 @@ export default function AgentsPage() {
     if (filter === 'never') list = list.filter(a => !a.last_contacted_at)
     if (filter === 'due') {
       list = list.filter(a => {
-        if (!a.last_contacted_at) return true
+        if (!a.last_contacted_at) return false
         return Math.floor((Date.now() - new Date(a.last_contacted_at)) / 86400000) > 30
       })
     }

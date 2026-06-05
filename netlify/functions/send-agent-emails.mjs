@@ -20,6 +20,16 @@ function sbHeaders() {
   return { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Accept: 'application/json', 'Content-Type': 'application/json' }
 }
 
+async function verifyWorkspaceMember(workspaceId, userId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/workspace_members?workspace_id=eq.${workspaceId}&user_id=eq.${userId}&select=id&limit=1`,
+    { headers: sbHeaders() }
+  )
+  if (!res.ok) return false
+  const rows = await res.json()
+  return rows?.length > 0
+}
+
 async function fetchWorkspaceSettings(workspaceId) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/workspaces?id=eq.${workspaceId}&select=settings`, { headers: sbHeaders() })
   if (!res.ok) throw new Error(`Failed to fetch workspace: HTTP ${res.status}`)
@@ -116,6 +126,11 @@ export default async (req) => {
 
     if (!DEFAULT_TEMPLATES[template]) {
       return new Response(JSON.stringify({ ok: false, error: `Unknown template: ${template}` }), { status: 400, headers: HEADERS })
+    }
+
+    const isMember = await verifyWorkspaceMember(workspace_id, user_id)
+    if (!isMember) {
+      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized.' }), { status: 403, headers: HEADERS })
     }
 
     const settings = await fetchWorkspaceSettings(workspace_id)

@@ -15,9 +15,9 @@ CREATE TABLE IF NOT EXISTS public.agents (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Unique agent per workspace by email (case-insensitive)
+-- Plain unique constraint — required for PostgREST onConflict resolution
 CREATE UNIQUE INDEX agents_workspace_email_idx
-  ON public.agents (workspace_id, LOWER(email))
+  ON public.agents (workspace_id, email)
   WHERE email IS NOT NULL AND email <> '';
 
 -- RLS: workspace members can read/write their workspace agents
