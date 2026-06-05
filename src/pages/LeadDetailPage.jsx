@@ -115,6 +115,7 @@ export default function LeadDetailPage() {
           lead={lead}
           members={members}
           userId={user.id}
+          workspaceId={workspaceId}
           canEdit={canEdit}
           onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
         />

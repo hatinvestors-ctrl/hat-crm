@@ -26,9 +26,7 @@ export function matchNotifications(before, after) {
 // Fires all matching notifications for a lead change. Silent on error.
 // workspaceId is needed to build the lead URL and fetch SMTP settings.
 export async function fireLeadNotifications(before, after, workspaceId, userId) {
-  console.log('[fireLeadNotifications] called', { before_status: before?.status, after_status: after?.status, workspaceId })
   const matches = matchNotifications(before, after)
-  console.log('[fireLeadNotifications] matches', matches.length)
   if (!matches.length) return
 
   for (const rule of matches) {
@@ -39,15 +37,13 @@ export async function fireLeadNotifications(before, after, workspaceId, userId) 
         body: JSON.stringify({ event: rule.event, lead_id: after.id, workspace_id: workspaceId }),
       })
       const data = await res.json().catch(() => ({}))
-      console.log('[fireLeadNotifications] response', rule.event, res.status, data)
       if (data.ok && data.to) {
-        // Log to activity timeline
         await logEmailSent(after.id, userId, {
           to: data.to,
           subject: data.subject || rule.subject.replace('{address}', after.address || ''),
         }).catch(() => {})
-      } else if (!data.ok) {
-        console.error('[fireLeadNotifications] failed', rule.event, data.error || data.skipped || res.status)
+      } else if (!data.ok && !data.skipped) {
+        console.error('[fireLeadNotifications]', rule.event, data.error || res.status)
       }
     } catch (err) {
       console.error('[fireLeadNotifications]', rule.event, err.message)

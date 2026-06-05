@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { logChanges } from '../../lib/activityLogger'
 import { formatDate } from '../../lib/calculations'
 import { STATUS_CATEGORIES, STATUS_MAP } from '../../lib/constants'
+import { fireLeadNotifications } from '../../lib/leadNotifications'
 
 const TONE_ACTIVE = {
   neutral: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text)] ring-[color:var(--color-text-dim)]',
@@ -43,7 +44,7 @@ const DATE_REQUIRED = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-export default function LeadStatusPipeline({ lead, members, userId, canEdit, onUpdated }) {
+export default function LeadStatusPipeline({ lead, members, userId, workspaceId, canEdit, onUpdated }) {
   const [dateModal, setDateModal] = useState(null)
   const [dateValue, setDateValue] = useState('')
   const [saving, setSaving] = useState(false)
@@ -58,6 +59,7 @@ export default function LeadStatusPipeline({ lead, members, userId, canEdit, onU
     const { data: updated } = await supabase.from('leads').update(patch).eq('id', lead.id).select().single()
     if (updated) {
       await logChanges(lead.id, userId, lead, updated, userLookup)
+      fireLeadNotifications(lead, updated, workspaceId, userId).catch(() => {})
       onUpdated?.(updated)
     }
     setSaving(false)
