@@ -247,7 +247,12 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
           .insert(payload)
           .select()
           .single()
-        if (insErr) throw insErr
+        if (insErr) {
+          if (insErr.code === '23505') {
+            throw new Error('A lead with this address already exists in your workspace.')
+          }
+          throw insErr
+        }
         await logLeadCreated(created.id, userId)
         onSaved?.(created)
       }
