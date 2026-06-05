@@ -16,6 +16,7 @@ import { calculateMAO } from '../../lib/calculations'
 import { supabase } from '../../lib/supabase'
 import { logLeadCreated, logChanges } from '../../lib/activityLogger'
 import { lookupAddress } from '../../lib/enrichment'
+import { upsertAgentFromLead } from '../../lib/agentOutreach'
 
 const EMPTY_LEAD = {
   address: '',
@@ -118,6 +119,15 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
 
       const filledCount = Object.keys(patch).length
       setForm(prev => ({ ...prev, ...patch }))
+      // Auto-upsert agent into agents table if email was returned
+      if (r.listing_agent_email) {
+        upsertAgentFromLead(workspaceId, {
+          listing_agent_name:  r.listing_agent_name,
+          listing_agent_email: r.listing_agent_email,
+          listing_agent_phone: r.listing_agent_phone,
+          listing_brokerage:   r.listing_brokerage,
+        }).catch(() => {})
+      }
 
       const bits = []
       if (r.mls_status) bits.push(`status=${r.mls_status}`)
