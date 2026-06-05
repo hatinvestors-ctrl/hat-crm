@@ -14,10 +14,10 @@ export function calculateFlipNetProceeds(arv) {
   return a * 0.93
 }
 
-export function calculateFlipProfit(arv, purchasePrice, renovationCost /*, closingCosts */) {
-  const net = calculateFlipNetProceeds(arv)
-  if (net === null) return null
-  return net - num(purchasePrice) - num(renovationCost)
+export function calculateFlipProfit(arv, purchasePrice, renovationCost) {
+  const a = num(arv)
+  if (!a) return null
+  return a - num(purchasePrice) - num(renovationCost)
 }
 
 export function formatCurrency(value) {

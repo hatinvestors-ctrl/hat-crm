@@ -3,7 +3,7 @@ import Card from '../ui/Card'
 import CurrencyInput from '../ui/CurrencyInput'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
-import { calculateMAO, calculateFlipProfit, formatCurrency } from '../../lib/calculations'
+import { calculateFlipProfit, formatCurrency } from '../../lib/calculations'
 
 // 3 scenario columns. The "realistic" column reads/writes the lead's primary fields.
 // Conservative / Aggressive use prefixed columns.
@@ -31,8 +31,7 @@ const TONE_HEADER = {
 const ROWS = [
   { key: 'arv',    label: 'ARV',              type: 'input' },
   { key: 'reno',   label: 'Renovation Cost',  type: 'input' },
-  { key: 'mao',    label: 'MAO',              type: 'input', hint: '= 75% × ARV − reno' },
-  { key: 'offer',  label: 'Offer Price',      type: 'input' },
+  { key: 'offer',  label: 'Purchase Price',   type: 'input' },
   { key: 'profit', label: 'Est. Flip Profit', type: 'derived' },
 ]
 
@@ -54,32 +53,16 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
     setDirty(false)
   }, [lead])
 
-  // Auto-compute MAO and Profit when inputs change
+  // Recompute profit when inputs change
   const updateField = (dbField, value) => {
     setDraft(prev => {
       const next = { ...prev, [dbField]: value }
-
-      // Recompute MAO for the affected column (MAO = 75% × ARV − Reno)
-      COLUMNS.forEach(col => {
-        if (col.arv === dbField || col.reno === dbField) {
-          const arv  = col.arv  ? next[col.arv]  : null
-          const reno = col.reno ? next[col.reno] : null
-          const mao = calculateMAO(arv, reno)
-          if (mao !== null && col.mao) next[col.mao] = mao.toFixed(2)
-        }
-      })
-
-      // Recompute Expected Profit (uses offer_price if set, else mao)
       COLUMNS.forEach(col => {
         if (col.profit) {
-          const arv = next[col.arv] || null
-          const purchase = next[col.offer] || next[col.mao] || null
-          const reno = next[col.reno] || 0
-          const profit = calculateFlipProfit(arv, purchase, reno)
+          const profit = calculateFlipProfit(next[col.arv], next[col.offer], next[col.reno] || 0)
           if (profit !== null) next[col.profit] = profit.toFixed(2)
         }
       })
-
       return next
     })
     setDirty(true)
@@ -103,14 +86,13 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
 
   // Realistic column always reads live from lead prop (not draft)
   const realisticValues = {
-    arv:              lead.arv              ?? null,
-    renovation_cost:  lead.renovation_cost  ?? null,
-    mao:              lead.mao              ?? null,
-    offer_price:      lead.offer_price      ?? lead.asking_price ?? null,
+    arv:             lead.arv             ?? null,
+    renovation_cost: lead.renovation_cost ?? null,
+    offer_price:     lead.offer_price     ?? null,
   }
   const realisticProfit = calculateFlipProfit(
     realisticValues.arv,
-    realisticValues.offer_price || realisticValues.mao,
+    realisticValues.offer_price,
     realisticValues.renovation_cost || 0
   )
 
@@ -193,7 +175,7 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
       </div>
 
       <p className="text-[11px] text-[color:var(--color-text-dim)] mt-3 leading-relaxed">
-        MAO = 75% × ARV − Renovation. Est. Flip Profit = (ARV × 93%) − (Offer or MAO) − Renovation.
+        Est. Flip Profit = ARV − Purchase Price − Renovation Cost
       </p>
     </Card>
   )
