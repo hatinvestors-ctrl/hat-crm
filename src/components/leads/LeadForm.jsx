@@ -359,9 +359,11 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                     <span className="text-[14px] leading-none mt-0.5">⚠️</span>
                     <div className="flex-1">
                       <div className="font-semibold">
-                        {duplicates.length === 1
-                          ? 'A lead with this address already exists in this workspace.'
-                          : `${duplicates.length} leads with this address already exist in this workspace.`}
+                        {duplicates.every(d => d.fuzzy)
+                          ? `This might be the same property as an existing lead — double-check before saving.`
+                          : duplicates.length === 1
+                            ? 'A lead with this address already exists in this workspace.'
+                            : `${duplicates.length} leads with this address already exist in this workspace.`}
                       </div>
                       <ul className="mt-1 space-y-0.5">
                         {duplicates.map(d => (
@@ -374,6 +376,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                             >
                               {d.address}
                             </Link>
+                            {d.fuzzy && <span className="opacity-70 ml-1.5 italic">· possible match</span>}
                             <span className="opacity-70 ml-1.5">· {d.status?.replace(/_/g, ' ')}</span>
                             {d.follow_up_date && <span className="opacity-70 ml-1.5">· follow-up {d.follow_up_date}</span>}
                           </li>

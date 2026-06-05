@@ -40,8 +40,28 @@ export function normalizeAddressForDB(addr) {
   return addr.replace(/[.,\s#]+/g, ' ').toLowerCase().trim()
 }
 
+const STREET_SUFFIXES = new Set([
+  'street', 'st', 'road', 'rd', 'drive', 'dr', 'avenue', 'ave', 'av',
+  'boulevard', 'blvd', 'lane', 'ln', 'court', 'ct', 'circle', 'cir',
+  'parkway', 'pkwy', 'highway', 'hwy', 'terrace', 'ter', 'place', 'pl',
+  'way', 'trail', 'trl', 'run', 'path', 'loop',
+])
+
+// Extract house number and street name words without suffix for fuzzy matching.
+// "2712 cherrywood road" → { num: "2712", words: ["cherrywood"] }
+function streetCore(norm) {
+  const parts = norm.split(' ')
+  if (parts.length < 2) return null
+  const num = parts[0]
+  if (!/^\d/.test(num)) return null
+  const words = parts.slice(1).filter(w => !STREET_SUFFIXES.has(w))
+  if (!words.length) return null
+  return { num, words: words.join(' ') }
+}
+
 // Returns array of leads with the same (normalized) address in the workspace.
 // Optionally excludes a specific lead id (when editing).
+// Each result has a `fuzzy` boolean — true means suffix-only difference (soft warning).
 export async function findDuplicateLeads(workspaceId, address, excludeLeadId = null) {
   if (!workspaceId || !address?.trim()) return []
   const norm = normalizeAddress(address)
@@ -59,5 +79,23 @@ export async function findDuplicateLeads(workspaceId, address, excludeLeadId = n
 
   const { data, error } = await q
   if (error || !data) return []
-  return data.filter(l => normalizeAddress(l.address) === norm)
+
+  const inputCore = streetCore(norm)
+  const seen = new Set()
+  const results = []
+
+  for (const l of data) {
+    const lNorm = normalizeAddress(l.address)
+    const exact = lNorm === norm
+    let fuzzy = false
+    if (!exact && inputCore) {
+      const lCore = streetCore(lNorm)
+      fuzzy = lCore?.num === inputCore.num && lCore?.words === inputCore.words
+    }
+    if ((exact || fuzzy) && !seen.has(l.id)) {
+      seen.add(l.id)
+      results.push({ ...l, fuzzy: !exact })
+    }
+  }
+  return results
 }
