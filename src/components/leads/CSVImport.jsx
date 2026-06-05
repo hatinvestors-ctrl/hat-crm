@@ -147,12 +147,32 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
         throw new Error(`All ${beforeDedup} rows are duplicates of existing leads. Nothing to import.`)
       }
 
-      const { data, error: insErr } = await supabase.from('leads').insert(deduped).select('id')
-      if (insErr) throw insErr
+      // Try bulk insert first; if any row hits the unique constraint, fall back to row-by-row
+      let imported = 0
+      let dbDuplicatesSkipped = 0
+      const { data: bulkData, error: bulkErr } = await supabase.from('leads').insert(deduped).select('id')
+      if (bulkErr && bulkErr.code === '23505') {
+        // Fall back: insert one by one, skip constraint violations
+        for (const rec of deduped) {
+          const { error: rowErr } = await supabase.from('leads').insert(rec).select('id').single()
+          if (rowErr?.code === '23505') {
+            dbDuplicatesSkipped++
+          } else if (rowErr) {
+            throw rowErr
+          } else {
+            imported++
+          }
+        }
+      } else if (bulkErr) {
+        throw bulkErr
+      } else {
+        imported = bulkData.length
+      }
+
       setResult({
-        imported: data.length,
+        imported,
         skipped: rows.length - records.length,
-        duplicatesSkipped,
+        duplicatesSkipped: duplicatesSkipped + dbDuplicatesSkipped,
       })
       onDone?.()
     } catch (e) {
