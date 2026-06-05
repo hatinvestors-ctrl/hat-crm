@@ -1,5 +1,4 @@
 // src/components/agents/AgentTable.jsx
-import { formatDate } from '../../lib/calculations'
 
 const STATUS_DAYS = 30
 
