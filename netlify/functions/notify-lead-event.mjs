@@ -39,7 +39,8 @@ async function fetchWorkspaceSettings(workspaceId) {
   )
   if (!res.ok) throw new Error(`Failed to fetch workspace: HTTP ${res.status}`)
   const rows = await res.json()
-  return rows?.[0]?.settings || {}
+  if (!rows?.length) throw new Error('Workspace not found.')
+  return rows[0].settings || {}
 }
 
 async function fetchUserEmail(userId) {
@@ -128,6 +129,10 @@ export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), { status: 405, headers: HEADERS })
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_PAT || !SERVICE_KEY) {
+    return new Response(JSON.stringify({ ok: false, error: 'Server misconfigured: missing SUPABASE_URL, SUPABASE_PAT, or SUPABASE_SERVICE_ROLE_KEY.' }), { status: 500, headers: HEADERS })
   }
 
   try {
