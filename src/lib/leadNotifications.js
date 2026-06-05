@@ -26,7 +26,9 @@ export function matchNotifications(before, after) {
 // Fires all matching notifications for a lead change. Silent on error.
 // workspaceId is needed to build the lead URL and fetch SMTP settings.
 export async function fireLeadNotifications(before, after, workspaceId, userId) {
+  console.log('[fireLeadNotifications] called', { before_status: before?.status, after_status: after?.status, workspaceId })
   const matches = matchNotifications(before, after)
+  console.log('[fireLeadNotifications] matches', matches.length)
   if (!matches.length) return
 
   for (const rule of matches) {
