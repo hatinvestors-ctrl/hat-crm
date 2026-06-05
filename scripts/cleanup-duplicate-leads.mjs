@@ -41,6 +41,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 //   LOWER(REGEXP_REPLACE(address, '[.,\s#]+', ' ', 'g'))
 // We replicate it in JS to preview what will be deleted.
 function normalizeAddr(addr) {
+  if (!addr) return ''
   return addr.replace(/[.,\s#]+/g, ' ').toLowerCase().trim()
 }
 
@@ -48,6 +49,7 @@ const { data: leads, error } = await supabase
   .from('leads')
   .select('id, workspace_id, address, created_at')
   .order('created_at', { ascending: true })
+  .limit(100000)
 
 if (error) { console.error('Fetch failed:', error.message); process.exit(1) }
 
@@ -56,7 +58,9 @@ console.log(`Fetched ${leads.length} leads.`)
 // Group by (workspace_id, normalizedAddress)
 const groups = new Map()
 for (const lead of leads) {
-  const key = `${lead.workspace_id}::${normalizeAddr(lead.address)}`
+  const normalized = normalizeAddr(lead.address)
+  if (!normalized) continue  // skip leads with no address
+  const key = `${lead.workspace_id}::${normalized}`
   if (!groups.has(key)) groups.set(key, [])
   groups.get(key).push(lead)
 }
