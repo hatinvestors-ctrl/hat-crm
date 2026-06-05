@@ -14,6 +14,7 @@ export const LEAD_NOTIFICATIONS = [
 // Returns rules whose trigger field changed to the trigger value.
 // before/after are lead objects (full or partial with the changed fields).
 export function matchNotifications(before, after) {
+  if (!before || !after) return []
   return LEAD_NOTIFICATIONS.filter(rule => {
     const { field, value } = rule.trigger
     return after[field] === value && before[field] !== value
