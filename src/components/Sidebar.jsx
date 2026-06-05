@@ -23,6 +23,14 @@ const ICONS = {
   chevron:   <Icon d={<><path d="M6 9l6 6 6-6" /></>} />,
   building:  <Icon d={<><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h4M10 13h4M10 17h4" /></>} />,
   tasks:     <Icon d={<><rect x="3" y="4" width="6" height="16" rx="1" /><rect x="11" y="4" width="6" height="10" rx="1" /><rect x="19" y="4" width="2" height="7" rx="1" /></>} />,
+  agents: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  ),
 }
 
 const navItemClasses = ({ isActive }) =>
@@ -150,6 +158,10 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
               </span>
             )}
           </div>
+        </NavLink>
+        <NavLink to={`${base}/agents`} className={navItemClasses}>
+          <span className="text-[color:var(--color-text-dim)]">{ICONS.agents}</span>
+          <span className="flex-1">Agents</span>
         </NavLink>
         {userRole !== 'readonly' && (
           <NavLink to={`${base}/tasks`} className={navItemClasses}>

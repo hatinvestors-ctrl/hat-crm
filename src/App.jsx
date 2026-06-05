@@ -10,6 +10,7 @@ import TodayPage from './pages/TodayPage'
 import InboxPage from './pages/InboxPage'
 import LeadsPage from './pages/LeadsPage'
 import LeadDetailPage from './pages/LeadDetailPage'
+import AgentsPage from './pages/AgentsPage'
 import TasksPage from './pages/TasksPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
+        <Route path="agents" element={<AgentsPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="tasks/:taskId" element={<TasksPage />} />
         <Route element={<AdminRoute />}>
