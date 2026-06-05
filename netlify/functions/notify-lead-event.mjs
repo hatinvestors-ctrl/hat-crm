@@ -176,7 +176,8 @@ export default async (req) => {
     const fromEmail = settings.mail_from_email?.trim() || settings.mail_smtp_user
     const from      = fromName ? `"${fromName}" <${fromEmail}>` : fromEmail
 
-    await transport.sendMail({ from, to: toEmail, subject, text: body })
+    const cc = settings.notification_cc || undefined
+    await transport.sendMail({ from, to: toEmail, cc, subject, text: body })
 
     return new Response(JSON.stringify({ ok: true, to: toEmail, subject }), { status: 200, headers: HEADERS })
   } catch (err) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
+import Input from '../ui/Input'
 import { supabase } from '../../lib/supabase'
 import { LEAD_NOTIFICATIONS } from '../../lib/leadNotifications'
 
@@ -17,6 +18,7 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
   const [enabled, setEnabled] = useState(
     () => Object.fromEntries(LEAD_NOTIFICATIONS.map(r => [r.event, initial[r.event] !== false]))
   )
+  const [cc, setCc] = useState(() => workspace?.settings?.notification_cc || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
@@ -25,6 +27,7 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
   useEffect(() => {
     const notif = workspace?.settings?.notifications || {}
     setEnabled(Object.fromEntries(LEAD_NOTIFICATIONS.map(r => [r.event, notif[r.event] !== false])))
+    setCc(workspace?.settings?.notification_cc || '')
     setDirty(false)
     setSaved(false)
   }, [workspace?.id])
@@ -42,7 +45,7 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
       const currentSettings = workspace?.settings || {}
       const { data: updated, error: err } = await supabase
         .from('workspaces')
-        .update({ settings: { ...currentSettings, notifications: enabled } })
+        .update({ settings: { ...currentSettings, notifications: enabled, notification_cc: cc.trim() || null } })
         .eq('id', workspace.id)
         .select()
         .single()
@@ -87,6 +90,18 @@ export default function NotificationTriggersForm({ workspace, canEdit, onUpdated
             </div>
           )
         })}
+
+        <div className="border-t border-[color:var(--color-line)] pt-4">
+          <Input
+            label="CC Email (optional)"
+            type="email"
+            value={cc}
+            onChange={e => { setCc(e.target.value); setDirty(true); setSaved(false) }}
+            disabled={!canEdit}
+            placeholder="e.g. tom@hatinvestors.com"
+            hint="This address is CC'd on every notification email, regardless of who the lead is assigned to."
+          />
+        </div>
 
         {error && (
           <div className="text-[12px] text-[color:var(--color-danger-text)] bg-[color:var(--color-danger-soft)] px-3 py-2 rounded">
