@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { calculateMAO } from '../../lib/calculations'
 import { DEFAULT_CLOSING_COSTS, DEFAULT_TARGET_PROFIT } from '../../lib/constants'
 import { buildZillowUrl } from '../../lib/zillow'
-import { normalizeAddress } from '../../lib/leadDedup'
+import { normalizeAddress, normalizeAddressForDB } from '../../lib/leadDedup'
 import { isSafeHttpUrl } from '../../lib/urlSafety'
 
 const LEAD_FIELDS = [
@@ -138,9 +138,9 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
         .from('leads')
         .select('address')
         .eq('workspace_id', workspaceId)
-      const existingSet = new Set((existing || []).map(l => normalizeAddress(l.address)))
+      const existingSet = new Set((existing || []).map(l => normalizeAddressForDB(l.address)))
       const beforeDedup = records.length
-      const deduped = records.filter(r => !existingSet.has(normalizeAddress(r.address)))
+      const deduped = records.filter(r => !existingSet.has(normalizeAddressForDB(r.address)))
       const duplicatesSkipped = beforeDedup - deduped.length
 
       if (!deduped.length) {

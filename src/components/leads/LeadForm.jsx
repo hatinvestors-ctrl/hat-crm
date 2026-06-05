@@ -60,7 +60,6 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [duplicates, setDuplicates] = useState([])
-  const [forceDuplicate, setForceDuplicate] = useState(false)
   const dupTimer = useRef(null)
   const [refreshingMls, setRefreshingMls] = useState(false)
   const [mlsRefreshErr, setMlsRefreshErr] = useState(null)
@@ -145,8 +144,6 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
     dupTimer.current = setTimeout(async () => {
       const dups = await findDuplicateLeads(workspaceId, form.address, lead?.id)
       setDuplicates(dups)
-      // If user changed the address, reset the override
-      setForceDuplicate(false)
     }, 350)
     return () => clearTimeout(dupTimer.current)
   }, [form.address, workspaceId, open, lead?.id])
@@ -190,11 +187,6 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (duplicates.length > 0 && !forceDuplicate) {
-      // Block submit — user must explicitly tick the override checkbox
-      setError(`A lead with this address already exists. Tick "Create anyway" to override.`)
-      return
-    }
     setSaving(true)
     setError(null)
     try {
@@ -382,15 +374,6 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                           </li>
                         ))}
                       </ul>
-                      <label className="inline-flex items-center gap-2 mt-2 cursor-pointer text-[11.5px]">
-                        <input
-                          type="checkbox"
-                          checked={forceDuplicate}
-                          onChange={(e) => setForceDuplicate(e.target.checked)}
-                          className="accent-[color:var(--color-warn)]"
-                        />
-                        Create anyway (I know it's a duplicate)
-                      </label>
                     </div>
                   </div>
                 </div>

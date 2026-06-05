@@ -32,6 +32,14 @@ export function normalizeAddress(s) {
   return n.replace(/\s+/g, ' ').trim()
 }
 
+// Mirrors the SQL index normalization exactly:
+//   TRIM(LOWER(REGEXP_REPLACE(address, '[.,\s#]+', ' ', 'g')))
+// Use this for pre-dedup checks against DB data (e.g. CSV import).
+export function normalizeAddressForDB(addr) {
+  if (!addr) return ''
+  return addr.replace(/[.,\s#]+/g, ' ').toLowerCase().trim()
+}
+
 // Returns array of leads with the same (normalized) address in the workspace.
 // Optionally excludes a specific lead id (when editing).
 export async function findDuplicateLeads(workspaceId, address, excludeLeadId = null) {

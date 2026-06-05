@@ -3,5 +3,5 @@
 CREATE UNIQUE INDEX leads_workspace_address_unique_idx
 ON leads (
   workspace_id,
-  LOWER(REGEXP_REPLACE(address, '[.,\s#]+', ' ', 'g'))
+  TRIM(LOWER(REGEXP_REPLACE(address, '[.,\s#]+', ' ', 'g')))
 );
