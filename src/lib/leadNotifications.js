@@ -37,12 +37,15 @@ export async function fireLeadNotifications(before, after, workspaceId, userId) 
         body: JSON.stringify({ event: rule.event, lead_id: after.id, workspace_id: workspaceId }),
       })
       const data = await res.json().catch(() => ({}))
+      console.log('[fireLeadNotifications] response', rule.event, res.status, data)
       if (data.ok && data.to) {
         // Log to activity timeline
         await logEmailSent(after.id, userId, {
           to: data.to,
           subject: data.subject || rule.subject.replace('{address}', after.address || ''),
         }).catch(() => {})
+      } else if (!data.ok) {
+        console.error('[fireLeadNotifications] failed', rule.event, data.error || data.skipped || res.status)
       }
     } catch (err) {
       console.error('[fireLeadNotifications]', rule.event, err.message)
