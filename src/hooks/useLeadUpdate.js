@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { logChanges } from '../lib/activityLogger'
 import { calculateMAO } from '../lib/calculations'
+import { fireLeadNotifications } from '../lib/leadNotifications'
 
 // Returns a function `update(patch)` that updates the lead in Supabase,
 // auto-recalculates MAO when ARV or renovation_cost change, and logs
@@ -36,6 +37,7 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
     if (updated) {
       const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
       await logChanges(lead.id, userId, lead, updated, userLookup).catch(() => {})
+      fireLeadNotifications(lead, updated, lead.workspace_id, userId).catch(() => {})
       onUpdated?.(updated)
     }
     return updated
