@@ -21,7 +21,8 @@ export default function AddAgentModal({ open, onClose, workspaceId, onAdded, ini
       })
       setError(null)
     }
-  }, [open, initialValues])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const update = patch => setForm(prev => ({ ...prev, ...patch }))
 

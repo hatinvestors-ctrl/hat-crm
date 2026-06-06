@@ -26,20 +26,23 @@ export default function AgentDetailDrawer({
   onSendEmail,
   onAgentUpdated,
 }) {
-  const [agent, setAgent]       = useState(null)
-  const [loading, setLoading]   = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
+  const [agent, setAgent]           = useState(null)
+  const [loading, setLoading]       = useState(false)
+  const [editOpen, setEditOpen]     = useState(false)
+  const [fetchError, setFetchError] = useState(null)
 
   const canEdit = userRole !== 'readonly'
   const drawerWidth = Math.min(900, Math.max(600, Math.round(window.innerWidth * 0.70)))
 
   useEffect(() => {
-    if (!agentId || !open) { setAgent(null); return }
+    if (!agentId || !open) { setAgent(null); setFetchError(null); return }
     let cancelled = false
     setLoading(true)
+    setFetchError(null)
     supabase.from('agents').select('*').eq('id', agentId).single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return
+        if (error) { setFetchError(error.message); setLoading(false); return }
         setAgent(data)
         setLoading(false)
       })
@@ -58,7 +61,7 @@ export default function AgentDetailDrawer({
       <Drawer open={open} onClose={onClose} title="" width={drawerWidth}>
         {loading || !agent ? (
           <div className="flex items-center justify-center h-32 text-[13px] text-[color:var(--color-text-dim)]">
-            {loading ? 'Loading…' : ''}
+            {loading ? 'Loading…' : fetchError ? `Error: ${fetchError}` : 'Agent not found.'}
           </div>
         ) : (
           <div className="flex flex-col h-full">
