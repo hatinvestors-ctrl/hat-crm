@@ -55,7 +55,7 @@ async function logOutreach(workspaceId, agentId, userId, template, subject) {
 
 async function logActivity(workspaceId, agentId, userId, subject) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/agent_activities`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/agent_activities`, {
       method: 'POST',
       headers: { ...sbHeaders(), Prefer: 'return=minimal' },
       body: JSON.stringify({
@@ -66,6 +66,7 @@ async function logActivity(workspaceId, agentId, userId, subject) {
         note:         subject,
       }),
     })
+    if (!res.ok) console.warn('[logActivity] insert failed', res.status)
   } catch (_) {
     // non-blocking — log failure does not affect email delivery
   }
@@ -171,7 +172,7 @@ export default async (req) => {
         const body = renderTemplate(templateDef.body, agent)
         await transport.sendMail({ from, to: agent.email, cc, subject: finalSubject, text: body })
         await logOutreach(workspace_id, agent.id, user_id, template, finalSubject)
-        await logActivity(workspace_id, agent.id, user_id, finalSubject)
+        void logActivity(workspace_id, agent.id, user_id, finalSubject)
         await updateLastContacted(agent.id)
         results.sent++
       } catch (err) {

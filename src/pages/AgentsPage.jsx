@@ -57,6 +57,7 @@ export default function AgentsPage() {
   }
 
   useEffect(() => { load() }, [workspaceId])
+  useEffect(() => { setSelectedAgentId(null) }, [workspaceId])
 
   const filtered = useMemo(() => {
     let list = agents
@@ -194,7 +195,7 @@ export default function AgentsPage() {
         open={addModal}
         onClose={() => setAddModal(false)}
         workspaceId={workspaceId}
-        onAdded={(a) => { setAgents(prev => [...prev, a]); setAddModal(false) }}
+        onAdded={(a) => setAgents(prev => [...prev, a])}
       />
 
       <AgentDetailDrawer
