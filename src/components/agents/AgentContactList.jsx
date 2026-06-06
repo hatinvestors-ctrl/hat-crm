@@ -117,7 +117,7 @@ function ContactRow({ contact, showPrimary, onDelete, onUpdateLabel, onUpdateVal
   )
 }
 
-function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onCancel }) {
+function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onCancel, isFirstEmail, onFirstEmailAdded }) {
   const [label, setLabel]               = useState('')
   const [value, setValue]               = useState('')
   const [saving, setSaving]             = useState(false)
@@ -137,11 +137,12 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
       type,
       value:        value.trim(),
       label:        label.trim(),
-      is_primary:   false,
+      is_primary:   type === 'email' ? isFirstEmail : false,
       sort_order:   nextSortOrder,
     })
     setSaving(false)
     if (error) { setInsertError(error.message); return }
+    if (isFirstEmail) onFirstEmailAdded?.(value.trim())
     onSaved()
   }
 
@@ -268,8 +269,12 @@ export default function AgentContactList({ agentId, workspaceId, type, contacts,
           workspaceId={workspaceId}
           agentId={agentId}
           nextSortOrder={nextSortOrder}
+          isFirstEmail={type === 'email' && contacts.length === 0}
           onSaved={() => { setAdding(false); onChanged() }}
           onCancel={() => setAdding(false)}
+          onFirstEmailAdded={async (emailValue) => {
+            await onPrimaryEmailChanged?.(emailValue)
+          }}
         />
       )}
 

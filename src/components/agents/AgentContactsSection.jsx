@@ -13,20 +13,26 @@ async function seedLegacyContacts(agent, workspaceId) {
   if (agent.email) {
     rows.push({ workspace_id: workspaceId, agent_id: agent.id, type: 'email', value: agent.email, label: 'Work', is_primary: true, sort_order: 0 })
   }
-  if (rows.length) await supabase.from('agent_contacts').insert(rows)
+  if (rows.length) {
+    const { error } = await supabase.from('agent_contacts').insert(rows)
+    if (error) console.warn('[seedLegacyContacts] failed:', error.message)
+  }
 }
 
 export default function AgentContactsSection({ agent, workspaceId, canEdit, onAgentUpdated }) {
   const [contacts, setContacts] = useState([])
   const [loading, setLoading]   = useState(true)
   const [seeded, setSeeded]     = useState(false)
+  const [fetchError, setFetchError] = useState(null)
 
   const fetchContacts = async () => {
-    const { data } = await supabase
+    setFetchError(null)
+    const { data, error } = await supabase
       .from('agent_contacts')
       .select('*')
       .eq('agent_id', agent.id)
       .order('sort_order', { ascending: true })
+    if (error) { setFetchError(error.message); setLoading(false); return [] }
     setContacts(data || [])
     setLoading(false)
     return data || []
@@ -57,28 +63,34 @@ export default function AgentContactsSection({ agent, workspaceId, canEdit, onAg
   }
 
   const handlePrimaryEmailChanged = async (newEmail) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('agents')
       .update({ email: newEmail, updated_at: new Date().toISOString() })
       .eq('id', agent.id)
       .select()
       .single()
+    if (error) { console.warn('[handlePrimaryEmailChanged] failed:', error.message); return }
     if (data) onAgentUpdated?.(data)
   }
 
   const saveScalar = async (field, value) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('agents')
       .update({ [field]: value || null, updated_at: new Date().toISOString() })
       .eq('id', agent.id)
       .select()
       .single()
+    if (error) { console.warn('[saveScalar] failed:', error.message); return }
     if (data) onAgentUpdated?.(data)
   }
 
   return (
     <Card title="Contact Info">
       <div className="flex flex-col gap-4">
+
+        {fetchError && (
+          <div className="text-[11px] text-[color:var(--color-danger-text)] mb-2">{fetchError}</div>
+        )}
 
         {/* Scalar fields */}
         <AgentInlineField
