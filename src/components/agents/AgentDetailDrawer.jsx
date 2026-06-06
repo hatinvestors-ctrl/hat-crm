@@ -2,10 +2,10 @@
 import { useEffect, useState } from 'react'
 import Drawer from '../ui/Drawer'
 import Button from '../ui/Button'
-import Card from '../ui/Card'
 import AgentNotesSection from './AgentNotesSection'
 import AgentActivityFeed from './AgentActivityFeed'
 import AddAgentModal from './AddAgentModal'
+import AgentContactsSection from './AgentContactsSection'
 import { supabase } from '../../lib/supabase'
 
 function lastContactedBadge(lastContactedAt) {
@@ -114,21 +114,13 @@ export default function AgentDetailDrawer({
 
               {/* Left column */}
               <div className="w-1/2 border-r border-[color:var(--color-line)] overflow-y-auto p-4 flex flex-col gap-4">
-                {/* Contact Info */}
-                <Card title="Contact Info">
-                  <dl className="flex flex-col gap-2">
-                    {[
-                      { label: 'Email', value: agent.email },
-                      { label: 'Phone', value: agent.phone },
-                      { label: 'Brokerage', value: agent.brokerage },
-                    ].map(({ label, value }) => value ? (
-                      <div key={label} className="flex gap-3 items-start">
-                        <dt className="text-[11px] text-[color:var(--color-text-dim)] w-16 shrink-0 pt-px">{label}</dt>
-                        <dd className="text-[12px] text-[color:var(--color-text)] break-all">{value}</dd>
-                      </div>
-                    ) : null)}
-                  </dl>
-                </Card>
+                {/* Contact Info — editable */}
+                <AgentContactsSection
+                  agent={agent}
+                  workspaceId={workspaceId}
+                  canEdit={canEdit}
+                  onAgentUpdated={handleAgentUpdated}
+                />
 
                 {/* Notes */}
                 <div className="flex-1">
