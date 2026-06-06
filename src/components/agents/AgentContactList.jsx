@@ -15,6 +15,8 @@ function ContactRow({ contact, showPrimary, onDelete, onUpdateLabel, onUpdateVal
 
   useEffect(() => { if (editingLabel) labelRef.current?.focus() }, [editingLabel])
   useEffect(() => { if (editingValue) valueRef.current?.focus() }, [editingValue])
+  useEffect(() => { if (!editingLabel) setLabelDraft(contact.label) }, [contact.label])
+  useEffect(() => { if (!editingValue) setValueDraft(contact.value) }, [contact.value])
 
   const commitLabel = () => {
     setEditingLabel(false)
@@ -217,9 +219,9 @@ export default function AgentContactList({ agentId, workspaceId, type, contacts,
       if (remaining.length > 0) {
         const next = remaining.sort((a, b) => a.sort_order - b.sort_order)[0]
         await supabase.from('agent_contacts').update({ is_primary: true }).eq('id', next.id)
-        onPrimaryEmailChanged?.(next.value)
+        await onPrimaryEmailChanged?.(next.value)
       } else {
-        onPrimaryEmailChanged?.(null)
+        await onPrimaryEmailChanged?.(null)
       }
     }
     onChanged()
@@ -228,11 +230,14 @@ export default function AgentContactList({ agentId, workspaceId, type, contacts,
   const makePrimary = async (id) => {
     setError(null)
     const current = contacts.find(c => c.is_primary)
-    if (current) await supabase.from('agent_contacts').update({ is_primary: false }).eq('id', current.id)
+    if (current) {
+      const { error: clearErr } = await supabase.from('agent_contacts').update({ is_primary: false }).eq('id', current.id)
+      if (clearErr) { setError(clearErr.message); return }
+    }
     const { error: err } = await supabase.from('agent_contacts').update({ is_primary: true }).eq('id', id)
     if (err) { setError(err.message); return }
     const target = contacts.find(c => c.id === id)
-    onPrimaryEmailChanged?.(target?.value)
+    await onPrimaryEmailChanged?.(target?.value)
     onChanged()
   }
 
