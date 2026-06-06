@@ -6,6 +6,7 @@ import TaskActivity from './TaskActivity'
 import TaskComment from './TaskComment'
 import TaskAttachments from './TaskAttachments'
 import TaskChecklist from './TaskChecklist'
+import TaskCalendarInviteModal from './TaskCalendarInviteModal'
 import { supabase } from '../../lib/supabase'
 import { TASK_STATUSES, TASK_PRIORITIES } from '../../lib/constants'
 import SearchableSelect from '../ui/SearchableSelect'
@@ -18,6 +19,7 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
   const [error, setError] = useState(null)
   const [activityRefresh, setActivityRefresh] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [inviteOpen, setInviteOpen]       = useState(false)
   const initialRef = useRef(null)
   const canEdit = userRole !== 'readonly'
   const canDelete = userRole === 'admin' || task?.created_by === userId
@@ -257,9 +259,18 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
               <TaskActivity taskId={task.id} refreshKey={activityRefresh} />
             </div>
 
+            {/* Calendar Invite */}
+            {canEdit && (
+              <div className="pt-2 border-t border-[color:var(--color-line)]">
+                <Button variant="secondary" size="sm" onClick={() => setInviteOpen(true)}>
+                  📅 Send Calendar Invite
+                </Button>
+              </div>
+            )}
+
             {/* Delete */}
             {canDelete && (
-              <div className="pt-2 border-t border-[color:var(--color-line)]">
+              <div className="pt-1">
                 <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)}>
                   <span className="text-[color:var(--color-danger-text)]">Delete task</span>
                 </Button>
@@ -284,6 +295,17 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
         message="This will permanently delete the task, its comments, and its attachments."
         confirmLabel="Delete"
       />
+
+      {task && (
+        <TaskCalendarInviteModal
+          open={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          task={task}
+          members={members}
+          workspaceId={workspaceId}
+          userId={userId}
+        />
+      )}
     </>
   )
 }
