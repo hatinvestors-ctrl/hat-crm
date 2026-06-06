@@ -53,6 +53,24 @@ async function logOutreach(workspaceId, agentId, userId, template, subject) {
   })
 }
 
+async function logActivity(workspaceId, agentId, userId, subject) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/agent_activities`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        agent_id:     agentId,
+        user_id:      userId,
+        type:         'email_sent',
+        note:         subject,
+      }),
+    })
+  } catch (_) {
+    // non-blocking — log failure does not affect email delivery
+  }
+}
+
 async function updateLastContacted(agentId) {
   await fetch(`${SUPABASE_URL}/rest/v1/agents?id=eq.${agentId}`, {
     method: 'PATCH',
@@ -153,6 +171,7 @@ export default async (req) => {
         const body = renderTemplate(templateDef.body, agent)
         await transport.sendMail({ from, to: agent.email, cc, subject: finalSubject, text: body })
         await logOutreach(workspace_id, agent.id, user_id, template, finalSubject)
+        await logActivity(workspace_id, agent.id, user_id, finalSubject)
         await updateLastContacted(agent.id)
         results.sent++
       } catch (err) {
