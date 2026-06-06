@@ -25,7 +25,7 @@ export default function AgentContactsSection({ agent, workspaceId, canEdit, onAg
   const [seeded, setSeeded]     = useState(false)
   const [fetchError, setFetchError] = useState(null)
 
-  const fetchContacts = async () => {
+  const fetchContacts = async ({ autoSeed = false } = {}) => {
     setFetchError(null)
     const { data, error } = await supabase
       .from('agent_contacts')
@@ -33,6 +33,22 @@ export default function AgentContactsSection({ agent, workspaceId, canEdit, onAg
       .eq('agent_id', agent.id)
       .order('sort_order', { ascending: true })
     if (error) { setFetchError(error.message); setLoading(false); return [] }
+
+    // Auto-seed legacy email/phone on first load if no contacts exist yet
+    if (autoSeed && (data || []).length === 0 && (agent.email || agent.phone)) {
+      await seedLegacyContacts(agent, workspaceId)
+      const { data: seededData } = await supabase
+        .from('agent_contacts')
+        .select('*')
+        .eq('agent_id', agent.id)
+        .order('sort_order', { ascending: true })
+      const result = seededData || []
+      setContacts(result)
+      setSeeded(true)
+      setLoading(false)
+      return result
+    }
+
     setContacts(data || [])
     setLoading(false)
     return data || []
@@ -41,16 +57,12 @@ export default function AgentContactsSection({ agent, workspaceId, canEdit, onAg
   useEffect(() => {
     if (!agent?.id) return
     setLoading(true)
-    fetchContacts()
+    fetchContacts({ autoSeed: true })
     setSeeded(false)
   }, [agent.id])
 
   const phones = contacts.filter(c => c.type === 'phone')
   const emails = contacts.filter(c => c.type === 'email')
-
-  const handleContactsChanged = async () => {
-    await fetchContacts()
-  }
 
   const handleBeforeAdd = async () => {
     if (seeded) return
@@ -60,6 +72,10 @@ export default function AgentContactsSection({ agent, workspaceId, canEdit, onAg
       await fetchContacts()
     }
     setSeeded(true)
+  }
+
+  const handleContactsChanged = async () => {
+    await fetchContacts()
   }
 
   const handlePrimaryEmailChanged = async (newEmail) => {
