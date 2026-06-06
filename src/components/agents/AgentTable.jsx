@@ -9,7 +9,7 @@ function contactStatus(lastContactedAt) {
   return { label: `${days}d ago`, cls: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]' }
 }
 
-export default function AgentTable({ agents, selected, onToggle, onToggleAll, leadCounts }) {
+export default function AgentTable({ agents, selected, onToggle, onToggleAll, leadCounts, onRowClick }) {
   const allSelected = agents.length > 0 && agents.every(a => selected.has(a.id))
 
   return (
@@ -37,9 +37,10 @@ export default function AgentTable({ agents, selected, onToggle, onToggleAll, le
             return (
               <tr
                 key={agent.id}
-                className="border-t border-[color:var(--color-line)] hover:bg-[color:var(--color-bg-elev)] transition-colors"
+                onClick={() => onRowClick?.(agent.id)}
+                className="border-t border-[color:var(--color-line)] hover:bg-[color:var(--color-bg-elev)] transition-colors cursor-pointer"
               >
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selected.has(agent.id)}
