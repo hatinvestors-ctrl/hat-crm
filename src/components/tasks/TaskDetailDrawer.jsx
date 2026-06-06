@@ -5,6 +5,7 @@ import ConfirmDialog from '../ui/ConfirmDialog'
 import TaskActivity from './TaskActivity'
 import TaskComment from './TaskComment'
 import TaskAttachments from './TaskAttachments'
+import TaskChecklist from './TaskChecklist'
 import { supabase } from '../../lib/supabase'
 import { TASK_STATUSES, TASK_PRIORITIES } from '../../lib/constants'
 import SearchableSelect from '../ui/SearchableSelect'
@@ -236,6 +237,11 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Checklist */}
+            <div className="pt-2 border-t border-[color:var(--color-line)]">
+              <TaskChecklist taskId={task.id} canEdit={canEdit} />
             </div>
 
             {/* Attachments */}
