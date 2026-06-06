@@ -16,34 +16,66 @@ export async function upsertAgentFromLead(workspaceId, { listing_agent_name, lis
   )
 }
 
+// Parse "First Last (Brokerage)" format from seller_name field
+function parseBrokerage(sellerName) {
+  if (!sellerName) return { name: null, brokerage: null }
+  const match = sellerName.match(/^(.+?)\s*\((.+)\)$/)
+  if (match) return { name: match[1].trim(), brokerage: match[2].trim() }
+  return { name: sellerName.trim(), brokerage: null }
+}
+
 export async function syncAgentsFromLeads(workspaceId) {
   if (!workspaceId) return { count: 0 }
 
-  const { data: leads } = await supabase
+  // Source 1: dedicated listing_agent_* fields (populated via RentCast lookup)
+  const { data: enrichedLeads } = await supabase
     .from('leads')
     .select('listing_agent_name, listing_agent_email, listing_agent_phone, listing_brokerage')
     .eq('workspace_id', workspaceId)
     .not('listing_agent_email', 'is', null)
     .neq('listing_agent_email', '')
 
-  if (!leads?.length) return { count: 0 }
+  // Source 2: seller contact email field (often contains listing agent email)
+  const { data: sellerLeads } = await supabase
+    .from('leads')
+    .select('seller_name, email, phone')
+    .eq('workspace_id', workspaceId)
+    .not('email', 'is', null)
+    .neq('email', '')
 
   const seen = new Set()
-  const unique = leads.filter(l => {
-    const key = l.listing_agent_email.trim().toLowerCase()
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  const rows = []
 
-  const rows = unique.map(l => ({
-    workspace_id: workspaceId,
-    name:         l.listing_agent_name  || null,
-    email:        l.listing_agent_email.trim().toLowerCase(),
-    phone:        l.listing_agent_phone || null,
-    brokerage:    l.listing_brokerage   || null,
-    updated_at:   new Date().toISOString(),
-  }))
+  for (const l of enrichedLeads || []) {
+    const key = l.listing_agent_email.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    rows.push({
+      workspace_id: workspaceId,
+      name:         l.listing_agent_name  || null,
+      email:        key,
+      phone:        l.listing_agent_phone || null,
+      brokerage:    l.listing_brokerage   || null,
+      updated_at:   new Date().toISOString(),
+    })
+  }
+
+  for (const l of sellerLeads || []) {
+    const key = l.email.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    const { name, brokerage } = parseBrokerage(l.seller_name)
+    rows.push({
+      workspace_id: workspaceId,
+      name,
+      email:        key,
+      phone:        l.phone || null,
+      brokerage,
+      updated_at:   new Date().toISOString(),
+    })
+  }
+
+  if (!rows.length) return { count: 0 }
 
   const { error } = await supabase
     .from('agents')
