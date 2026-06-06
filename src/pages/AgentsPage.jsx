@@ -9,25 +9,27 @@ import LoadingSpinner from '../components/ui/LoadingSpinner'
 import AgentTable from '../components/agents/AgentTable'
 import AgentEmailModal from '../components/agents/AgentEmailModal'
 import AddAgentModal from '../components/agents/AddAgentModal'
+import AgentDetailDrawer from '../components/agents/AgentDetailDrawer'
 
 const FILTER_OPTIONS = [
-  { value: 'all',    label: 'All agents' },
-  { value: 'never',  label: 'Never contacted' },
-  { value: 'due',    label: 'Due for follow-up (30+ days)' },
+  { value: 'all',   label: 'All agents' },
+  { value: 'never', label: 'Never contacted' },
+  { value: 'due',   label: 'Due for follow-up (30+ days)' },
 ]
 
 export default function AgentsPage() {
-  const { workspace, workspaceId, user } = useOutletContext()
-  const [agents, setAgents] = useState([])
-  const [leadCounts, setLeadCounts] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [selected, setSelected] = useState(new Set())
-  const [filter, setFilter] = useState('all')
-  const [brokFilter, setBrokFilter] = useState('')
-  const [emailModal, setEmailModal] = useState(false)
-  const [addModal, setAddModal] = useState(false)
-  const [toast, setToast] = useState(null)
+  const { workspace, workspaceId, user, userRole } = useOutletContext()
+  const [agents, setAgents]               = useState([])
+  const [leadCounts, setLeadCounts]       = useState({})
+  const [loading, setLoading]             = useState(true)
+  const [syncing, setSyncing]             = useState(false)
+  const [selected, setSelected]           = useState(new Set())
+  const [filter, setFilter]               = useState('all')
+  const [brokFilter, setBrokFilter]       = useState('')
+  const [emailModal, setEmailModal]       = useState(false)
+  const [addModal, setAddModal]           = useState(false)
+  const [selectedAgentId, setSelectedAgentId] = useState(null)
+  const [toast, setToast]                 = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -109,6 +111,10 @@ export default function AgentsPage() {
     setTimeout(() => setToast(null), 5000)
   }
 
+  const handleAgentUpdated = (updated) => {
+    setAgents(prev => prev.map(a => a.id === updated.id ? updated : a))
+  }
+
   const selectedCount = [...selected].filter(id => filtered.some(a => a.id === id)).length
 
   return (
@@ -118,55 +124,54 @@ export default function AgentsPage() {
         breadcrumbs={[{ label: workspace.name, to: `/w/${workspaceId}` }, { label: 'Agents' }]}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
-              Sync from leads
-            </Button>
-            <Button size="sm" onClick={() => setAddModal(true)}>
-              + Add Agent
-            </Button>
+            {selectedCount > 0 && (
+              <Button size="sm" onClick={() => setEmailModal(true)}>
+                Send Email ({selectedCount})
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => setAddModal(true)}>+ Add Agent</Button>
+            <Button size="sm" variant="secondary" onClick={handleSync} loading={syncing}>Sync from leads</Button>
           </div>
         }
       />
 
-      <div className="px-6 py-4 space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex gap-1">
-            {FILTER_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setFilter(opt.value)}
-                className={`px-3 h-7 text-[12px] font-medium rounded-md transition-colors ${
-                  filter === opt.value
-                    ? 'bg-[color:var(--color-accent)] text-white'
-                    : 'bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+      <div className="p-4 flex flex-col gap-4">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTER_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setFilter(opt.value)}
+              className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+                filter === opt.value
+                  ? 'bg-[color:var(--color-accent)] text-white'
+                  : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
           <input
             type="text"
-            placeholder="Filter by name or brokerage…"
             value={brokFilter}
             onChange={e => setBrokFilter(e.target.value)}
-            className="h-7 px-3 text-[12.5px] rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-dim)] outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]"
+            placeholder="Filter by name or brokerage"
+            className="px-3 py-1 text-[12px] rounded-full bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] w-44"
           />
-          {selectedCount > 0 && (
-            <Button size="sm" onClick={() => setEmailModal(true)}>
-              Send Email ({selectedCount})
-            </Button>
-          )}
         </div>
 
         {toast && (
-          <div className="p-2.5 bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)] text-[12px] rounded">
+          <div className={`text-[12px] px-3 py-2 rounded-md ${
+            toast.startsWith('Sync failed')
+              ? 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]'
+              : 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
+          }`}>
             {toast}
           </div>
         )}
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner label="Loading agents…" />
         ) : (
           <AgentTable
             agents={filtered}
@@ -174,19 +179,14 @@ export default function AgentsPage() {
             onToggle={toggleAgent}
             onToggleAll={toggleAll}
             leadCounts={leadCounts}
+            onRowClick={id => setSelectedAgentId(id)}
           />
         )}
-
-        <div className="text-[11px] text-[color:var(--color-text-dim)]">
-          {filtered.length} agent{filtered.length === 1 ? '' : 's'}
-          {filter !== 'all' && ` (filtered from ${agents.length} total)`}
-        </div>
       </div>
 
       <AgentEmailModal
         open={emailModal}
         onClose={() => setEmailModal(false)}
-        agentCount={selectedCount}
         onSend={handleSend}
       />
 
@@ -194,7 +194,23 @@ export default function AgentsPage() {
         open={addModal}
         onClose={() => setAddModal(false)}
         workspaceId={workspaceId}
-        onAdded={() => load()}
+        onAdded={(a) => { setAgents(prev => [...prev, a]); setAddModal(false) }}
+      />
+
+      <AgentDetailDrawer
+        open={Boolean(selectedAgentId)}
+        agentId={selectedAgentId}
+        workspaceId={workspaceId}
+        userId={user.id}
+        userRole={userRole}
+        leadCount={selectedAgentId ? (leadCounts[selectedAgentId] ?? 0) : null}
+        onClose={() => setSelectedAgentId(null)}
+        onSendEmail={() => {
+          if (selectedAgentId) setSelected(new Set([selectedAgentId]))
+          setSelectedAgentId(null)
+          setEmailModal(true)
+        }}
+        onAgentUpdated={handleAgentUpdated}
       />
     </>
   )
