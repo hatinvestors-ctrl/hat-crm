@@ -1,10 +1,13 @@
 // src/components/agents/AgentInlineField.jsx
 import { useState, useRef, useEffect } from 'react'
 
+const inputCls = 'w-full px-2 py-0.5 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]'
+
 export default function AgentInlineField({ value, onSave, placeholder, multiline = false, label, canEdit = true }) {
   const [editing, setEditing]   = useState(false)
   const [draft, setDraft]       = useState(value || '')
   const inputRef                = useRef(null)
+  const escapedRef              = useRef(false)
 
   useEffect(() => { setDraft(value || '') }, [value])
 
@@ -15,12 +18,14 @@ export default function AgentInlineField({ value, onSave, placeholder, multiline
   }
 
   const commit = () => {
+    if (escapedRef.current) { escapedRef.current = false; return }
     setEditing(false)
     const trimmed = draft.trim()
-    if (trimmed !== (value || '').trim()) onSave(trimmed)
+    if (trimmed !== (value || '').trim()) onSave?.(trimmed)
   }
 
   const cancel = () => {
+    escapedRef.current = true
     setDraft(value || '')
     setEditing(false)
   }
@@ -33,8 +38,6 @@ export default function AgentInlineField({ value, onSave, placeholder, multiline
   useEffect(() => {
     if (editing) inputRef.current?.focus()
   }, [editing])
-
-  const inputCls = 'w-full px-2 py-0.5 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]'
 
   return (
     <div className="group">
