@@ -37,7 +37,7 @@ export default function AgentActivityFeed({ agentId, workspaceId, userId }) {
         .limit(100),
       supabase
         .from('agent_comments')
-        .select('*, profiles:user_id(full_name)')
+        .select('*')
         .eq('agent_id', agentId)
         .order('created_at', { ascending: false })
         .limit(100),
