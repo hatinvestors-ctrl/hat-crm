@@ -20,6 +20,7 @@ export default function AgentActivityFeed({ agentId, workspaceId, userId }) {
   const [showLogForm, setShowLogForm] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [posting, setPosting]         = useState(false)
+  const [commentError, setCommentError] = useState('')
   const [refreshKey, setRefreshKey]   = useState(0)
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export default function AgentActivityFeed({ agentId, workspaceId, userId }) {
       setActivities(acts || [])
       setComments(cmts || [])
       setLoading(false)
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
     })
 
     return () => { cancelled = true }
@@ -55,14 +58,16 @@ export default function AgentActivityFeed({ agentId, workspaceId, userId }) {
   const postComment = async () => {
     if (!commentText.trim()) return
     setPosting(true)
-    await supabase.from('agent_comments').insert({
+    setCommentError('')
+    const { error: err } = await supabase.from('agent_comments').insert({
       workspace_id: workspaceId,
       agent_id:     agentId,
       user_id:      userId,
       body:         commentText.trim(),
     })
-    setCommentText('')
     setPosting(false)
+    if (err) { setCommentError(err.message); return }
+    setCommentText('')
     refresh()
   }
 
@@ -145,6 +150,9 @@ export default function AgentActivityFeed({ agentId, workspaceId, userId }) {
       {/* Pinned comment input */}
       <div className="shrink-0 px-3 py-2 border-t border-[color:var(--color-line)] bg-[color:var(--color-bg)]">
         <div className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg px-3 py-2 focus-within:border-[color:var(--color-accent)] focus-within:ring-1 focus-within:ring-[color:var(--color-accent)] transition-colors">
+          {commentError && (
+            <div className="text-[11px] text-[color:var(--color-danger-text)] mb-1">{commentError}</div>
+          )}
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}

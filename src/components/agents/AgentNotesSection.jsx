@@ -13,14 +13,15 @@ export default function AgentNotesSection({ agent, canEdit, onUpdated }) {
 
   const save = async () => {
     setSaving(true)
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from('agents')
       .update({ notes: draft.trim() || null, updated_at: new Date().toISOString() })
       .eq('id', agent.id)
       .select()
       .single()
-    if (data) onUpdated?.(data)
     setSaving(false)
+    if (err) return
+    if (data) onUpdated?.(data)
     setEditing(false)
   }
 
