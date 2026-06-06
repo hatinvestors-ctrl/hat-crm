@@ -120,7 +120,9 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
   const [value, setValue]               = useState('')
   const [saving, setSaving]             = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [insertError, setInsertError]   = useState('')
   const labelRef = useRef(null)
+  const valueRef = useRef(null)
 
   useEffect(() => { labelRef.current?.focus() }, [])
 
@@ -137,7 +139,7 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
       sort_order:   nextSortOrder,
     })
     setSaving(false)
-    if (error) { onCancel(); return }
+    if (error) { setInsertError(error.message); return }
     onSaved()
   }
 
@@ -152,7 +154,10 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
           onChange={e => setLabel(e.target.value)}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          onKeyDown={e => { if (e.key === 'Escape') onCancel() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); valueRef.current?.focus() }
+            if (e.key === 'Escape') onCancel()
+          }}
           className={`${inputCls} w-20`}
           placeholder="Label"
           disabled={saving}
@@ -162,7 +167,7 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
             {LABEL_SUGGESTIONS.map(s => (
               <button
                 key={s}
-                onMouseDown={() => { setLabel(s); setShowSuggestions(false) }}
+                onMouseDown={() => { setLabel(s); setShowSuggestions(false); setTimeout(() => valueRef.current?.focus(), 0) }}
                 className="block w-full text-left px-3 py-1 text-[11px] text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev)] transition-colors"
               >
                 {s}
@@ -173,6 +178,7 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
       </div>
       <span className="text-[color:var(--color-text-dim)] text-[10px] shrink-0">·</span>
       <input
+        ref={valueRef}
         value={value}
         onChange={e => setValue(e.target.value)}
         onBlur={save}
@@ -181,6 +187,9 @@ function NewContactRow({ type, workspaceId, agentId, nextSortOrder, onSaved, onC
         placeholder={type === 'email' ? 'email@example.com' : '(555) 000-0000'}
         disabled={saving}
       />
+      {insertError && (
+        <div className="text-[11px] text-[color:var(--color-danger-text)] ml-1">{insertError}</div>
+      )}
       <button onClick={onCancel} className="text-[color:var(--color-text-dim)] text-[12px] opacity-60 hover:opacity-100">×</button>
     </div>
   )
