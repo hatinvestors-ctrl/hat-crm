@@ -74,6 +74,132 @@ function MetricRow({ label, value, highlight, positive, negative }) {
   )
 }
 
+// Live calculation panel — shown sticky on the right
+function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
+  if (!calc) return (
+    <div className="text-[12px] text-[color:var(--color-text-dim)] py-6 text-center">
+      Fill in deal details to see live calculations.
+    </div>
+  )
+
+  const dim   = 'text-[color:var(--color-text-dim)]'
+  const muted = 'text-[color:var(--color-text-muted)]'
+  const bold  = 'font-semibold text-[color:var(--color-text)]'
+
+  const Row = ({ label, value, indent = 0, total = false, positive, negative, divider = false }) => (
+    <>
+      {divider && <div className="my-2 border-t border-[color:var(--color-line)]" />}
+      <div className={`flex justify-between items-baseline py-[3px] text-[11.5px] ${total ? 'font-semibold border-t border-[color:var(--color-line)] mt-1 pt-2' : ''}`}
+        style={{ paddingLeft: indent * 12 }}>
+        <span className={total ? 'text-[color:var(--color-text)]' : dim}>{label}</span>
+        <span className={
+          positive ? 'text-[color:var(--color-success-text)] font-semibold' :
+          negative ? 'text-[color:var(--color-danger-text)] font-semibold' :
+          total ? bold : muted
+        }>{value}</span>
+      </div>
+    </>
+  )
+
+  const holdMo = calc.holdMonths || 0
+  const profitResult = calc.actual || calc.expected
+
+  return (
+    <div className="space-y-5 text-[11.5px]">
+
+      {/* ── All-In Cost ── */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">All-In Cost</div>
+
+        <Row label="Purchase Price" value={fmtUSD(financials?.purchase_price_actual)} />
+
+        <Row label="Purchase Closing Costs" value="" divider />
+        <Row label="Title & Closing" value={fmtUSD(calc.purchaseClosing)} indent={1} />
+        <Row label="  Subtotal" value={fmtUSD(calc.purchaseClosing)} indent={1} total />
+
+        <Row label="Lender Fees at Closing" value="" divider />
+        <Row label="Points" value={fmtUSD(calc.pointsCost)} indent={1} />
+        <Row label="Title Insurance" value={fmtUSD(financials?.title_lender_insurance)} indent={1} />
+        <Row label="Doc Stamps" value={fmtUSD(financials?.doc_stamps_mortgage)} indent={1} />
+        <Row label="Intangible Tax" value={fmtUSD(financials?.intangible_tax)} indent={1} />
+        <Row label="Interest Portion" value={fmtUSD(financials?.interest_portion)} indent={1} />
+        {(financials?.extension_fee > 0) && <Row label="Extension Fee" value={fmtUSD(financials?.extension_fee)} indent={1} />}
+        <Row label="  Subtotal" value={fmtUSD(calc.hmlClosingCosts)} indent={1} total />
+
+        <Row label={`Lender Monthly Payments (×${holdMo}mo)`} value="" divider />
+        <Row label="Monthly Interest" value={fmtUSD(calc.monthlyInterest)} indent={1} />
+        <Row label={`  × ${holdMo} months`} value={fmtUSD(calc.totalInterest)} indent={1} total />
+
+        <Row label="Renovation" value="" divider />
+        <Row label="Total Renovation Cost" value={fmtUSD(calc.totalRenovationCost)} indent={1} />
+
+        <Row label={`Other Holding Costs (×${holdMo}mo)`} value="" divider />
+        <Row label="Insurance + Utilities + Taxes + HOA + Misc" value={fmtUSD(calc.monthlyHoldCosts)} indent={1} />
+        <Row label={`  × ${holdMo} months`} value={fmtUSD(calc.monthlyHoldCosts * holdMo)} indent={1} total />
+
+        <div className="mt-3 pt-2 border-t-2 border-[color:var(--color-text)] flex justify-between font-bold text-[13px]">
+          <span className="text-[color:var(--color-text)]">= Total All-In Cost</span>
+          <span className="text-[color:var(--color-text)]">{fmtUSD(calc.totalAllInCost)}</span>
+        </div>
+      </div>
+
+      {/* ── Cash at Closing ── */}
+      <div className="border-t border-[color:var(--color-line)] pt-4">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Cash You Bring</div>
+        <Row label={`Down Payment (${fmtPct(1 - (financials?.loan_to_purchase_pct ?? 0.9))})`} value={fmtUSD(calc.downPayment)} />
+        <Row label="+ Lender Fees" value={fmtUSD(calc.hmlClosingCosts)} />
+        <Row label="+ Purchase Closing" value={fmtUSD(calc.purchaseClosing)} />
+        {calc.renovationGap > 0 && <Row label="+ Renovation Gap" value={fmtUSD(calc.renovationGap)} />}
+        <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-semibold text-[12px]">
+          <span className="text-[color:var(--color-text)]">= Cash Invested</span>
+          <span className="text-[color:var(--color-text)]">{fmtUSD(calc.totalCashInvested)}</span>
+        </div>
+        <div className="mt-1 flex justify-between text-[11px]">
+          <span className={dim}>Break-Even Sale Price</span>
+          <span className={muted}>{fmtUSD(calc.breakEvenPrice)}</span>
+        </div>
+      </div>
+
+      {/* ── Profit & ROI ── */}
+      {profitResult && (
+        <div className="border-t border-[color:var(--color-line)] pt-4">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">
+            {calc.actual ? '✓ Actual Profit' : 'Expected Profit'}
+          </div>
+          <Row label="Sale Price" value={fmtUSD(profitResult.sellPrice)} />
+          <Row label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(profitResult.sellingCosts)}`} />
+          <Row label="− Total All-In Cost" value={`− ${fmtUSD(calc.totalAllInCost)}`} />
+          <div className={`mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-bold text-[13px]`}>
+            <span className="text-[color:var(--color-text)]">= Net Profit</span>
+            <span className={profitResult.netProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
+              {fmtUSD(profitResult.netProfit)}
+            </span>
+          </div>
+          <div className="mt-1 flex justify-between text-[12px] font-semibold">
+            <span className={dim}>ROI on Cash</span>
+            <span className={profitResult.roi >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
+              {fmtPct(profitResult.roi)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Deal Rating ── */}
+      {ratingKey && (
+        <div className="border-t border-[color:var(--color-line)] pt-4">
+          <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg w-full ${dealRatingColor(calc.dealRating)}`}>
+            <span className="text-[20px] font-bold">{ratingKey}</span>
+            <div>
+              <div className="text-[12px] font-semibold">{ratingInfo?.label}</div>
+              <div className="text-[10px] opacity-80">{ratingInfo?.description}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Hero stat box
 function StatBox({ label, value, sub, color }) {
   return (
@@ -196,10 +322,10 @@ export default function ProjectDetailPage() {
         }
       />
 
-      <div className="px-6 py-4 space-y-4 max-w-[1200px] w-full">
+      <div className="px-6 py-4 max-w-[1400px] w-full">
 
         {/* Status + Mark as Sold dialog */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="mb-4 flex items-center gap-3 flex-wrap">
           <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${
             isSold
               ? 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
@@ -250,6 +376,11 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Two-column layout: forms left, live calc panel right */}
+        <div className="flex gap-5 items-start">
+        {/* ── Left column: forms ── */}
+        <div className="flex-1 min-w-0 space-y-4">
 
         {/* ── Hero summary strip ── */}
         {calc && (
@@ -550,62 +681,22 @@ export default function ProjectDetailPage() {
               </div>
             </Card>
 
-            {/* Deal Summary */}
-            <Card title="Deal Summary">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <div className={labelCls + ' mb-2'}>All-In Cost Breakdown</div>
-                  <MetricRow label="Purchase Price"                                        value={fmtUSD(financials.purchase_price_actual)} />
-                  <MetricRow label="Renovation"                                            value={fmtUSD(calc.totalRenovationCost)} />
-                  <MetricRow label="HML Closing Fees"                                      value={fmtUSD(calc.hmlClosingCosts)} />
-                  <MetricRow label="Purchase Closing Costs"                                value={fmtUSD(calc.purchaseClosing)} />
-                  <MetricRow label={`Holding Costs (${calc.holdMonths}mo)`}                value={fmtUSD(calc.totalHoldingCosts)} />
-                  <MetricRow label="Total All-In Cost"                                     value={fmtUSD(calc.totalAllInCost)} highlight />
-                  <MetricRow label="Break-Even Sale Price"                                 value={fmtUSD(calc.breakEvenPrice)} />
-
-                  <div className={labelCls + ' mt-4 mb-2'}>Cash You Bring to the Table</div>
-                  <MetricRow label={`Down Payment (${fmtPct(1 - (financials.loan_to_purchase_pct ?? 0.9))})`} value={fmtUSD(calc.downPayment)} />
-                  <MetricRow label="HML Fees at Closing"                                   value={fmtUSD(calc.hmlClosingCosts)} />
-                  <MetricRow label="Title & Closing Fees"                                  value={fmtUSD(calc.purchaseClosing)} />
-                  {calc.renovationGap > 0 && (
-                    <MetricRow label="Renovation Gap (your cash)"                          value={fmtUSD(calc.renovationGap)} />
-                  )}
-                  <MetricRow label="Total Cash Invested"                                   value={fmtUSD(calc.totalCashInvested)} highlight />
-                </div>
-
-                <div>
-                  {/* Deal Rating */}
-                  <div className={labelCls + ' mb-2'}>Deal Rating</div>
-                  <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-3 mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`text-[22px] font-bold px-2.5 py-0.5 rounded ${dealRatingColor(calc.dealRating)}`}>
-                        {ratingKey || '—'}
-                      </span>
-                      <div>
-                        <div className="text-[13px] font-semibold text-[color:var(--color-text)]">{ratingInfo?.label}</div>
-                        <div className="text-[11px] text-[color:var(--color-text-muted)]">{ratingInfo?.description}</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] text-[color:var(--color-text-dim)] border-t border-[color:var(--color-line)] pt-2">
-                      <div><span className="font-semibold">A:</span> ROI ≥ 70% &amp; profit ≥ $30K</div>
-                      <div><span className="font-semibold">B:</span> ROI ≥ 45% &amp; profit ≥ $20K</div>
-                      <div><span className="font-semibold">C:</span> ROI ≥ 25%</div>
-                      <div><span className="font-semibold">D:</span> ROI below 25%</div>
-                    </div>
-                  </div>
-
-                  {/* Loan summary */}
-                  <div className={labelCls + ' mb-2'}>Loan Summary</div>
-                  <MetricRow label="Purchase Loan"       value={fmtUSD(calc.purchaseLoan)} />
-                  <MetricRow label="Renovation Loan"     value={fmtUSD(calc.renovationLoan)} />
-                  <MetricRow label="Total Loan"          value={fmtUSD(calc.totalLoan)} highlight />
-                  <MetricRow label="Monthly Interest"    value={fmtUSD(calc.monthlyInterest)} />
-                  <MetricRow label="Total Interest Paid" value={fmtUSD(calc.totalInterest)} />
-                </div>
-              </div>
-            </Card>
           </>
         )}
+
+        </div>{/* end left column */}
+
+        {/* ── Right column: sticky live calc panel ── */}
+        <div className="w-[300px] shrink-0 sticky top-4 self-start">
+          <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
+            <div className="text-[11px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-3 flex items-center gap-1.5">
+              <span>📊</span> Live Calculation
+            </div>
+            <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
+          </div>
+        </div>
+
+        </div>{/* end two-column flex */}
       </div>
 
       {financials && (
