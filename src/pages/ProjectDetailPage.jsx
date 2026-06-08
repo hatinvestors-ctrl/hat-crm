@@ -71,6 +71,16 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Lightweight item reload — doesn't show full-page spinner, so calc updates live
+  const reloadItems = useCallback(async () => {
+    const { data: reno } = await supabase
+      .from('deal_renovation_items')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('sort_order')
+    setItems(reno || [])
+  }, [leadId])
+
   const save = useCallback(async (changes) => {
     if (!financials) return
     const next = { ...financials, ...changes, updated_at: new Date().toISOString() }
@@ -191,15 +201,6 @@ export default function ProjectDetailPage() {
                 <Field label="Hold Months">
                   <NumInput value={financials.hold_months} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="5" />
                 </Field>
-                <Field label="Expected Sale Price">
-                  <NumInput value={financials.expected_sell_price} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
-                </Field>
-                <Field label="Actual Sale Price">
-                  <NumInput value={financials.actual_sale_price} onBlur={handleBlur('actual_sale_price')} disabled={!canEdit} />
-                </Field>
-                <Field label="Sold Date">
-                  <input type="date" defaultValue={financials.sold_date || ''} onBlur={e => save({ sold_date: e.target.value || null })} disabled={!canEdit} className={inputCls} />
-                </Field>
               </div>
             </Card>
 
@@ -292,9 +293,59 @@ export default function ProjectDetailPage() {
               workspaceId={workspaceId}
               canEdit={canEdit}
               items={items}
-              onChanged={load}
+              onChanged={reloadItems}
               onOpenImport={() => setImportOpen(true)}
             />
+
+            {/* Selling Price & Profit */}
+            <Card title="Selling Price & Profit">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Field label={`Expected Sale Price`}>
+                    <NumInput value={financials.expected_sell_price} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Actual Sale Price (fill when sold)">
+                    <NumInput value={financials.actual_sale_price} onBlur={handleBlur('actual_sale_price')} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Sold Date">
+                    <input type="date" defaultValue={financials.sold_date || ''} onBlur={e => save({ sold_date: e.target.value || null })} disabled={!canEdit} className={inputCls} />
+                  </Field>
+                  <Field label={`Selling Cost % (default 7%)`}>
+                    <NumInput
+                      value={financials.selling_cost_pct != null ? financials.selling_cost_pct * 100 : 7}
+                      onBlur={v => save({ selling_cost_pct: v === '' ? 0.07 : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="7"
+                    />
+                  </Field>
+                </div>
+                <div>
+                  {calc?.expected ? (
+                    <div className="space-y-0">
+                      <div className={labelCls + ' mb-2'}>Expected Profit Breakdown</div>
+                      <MetricRow label="Sale Price"                                         value={fmtUSD(calc.expected.sellPrice)} />
+                      <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.expected.sellingCosts)}`} />
+                      <MetricRow label="− Total All-In Cost"                                value={`− ${fmtUSD(calc.totalAllInCost)}`} />
+                      <MetricRow label="Net Profit"                                         value={fmtUSD(calc.expected.netProfit)} highlight />
+                      <MetricRow label="ROI on Cash Invested"                               value={fmtPct(calc.expected.roi)} highlight />
+                    </div>
+                  ) : (
+                    <div className="text-[12px] text-[color:var(--color-text-dim)] py-4">
+                      Enter an expected sale price to see the profit breakdown.
+                    </div>
+                  )}
+                  {calc?.actual && (
+                    <div className="mt-4 space-y-0">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-success-text)] mb-2">✓ Actual (Sold)</div>
+                      <MetricRow label="Actual Sale Price"                                    value={fmtUSD(calc.actual.sellPrice)} />
+                      <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`}  value={`− ${fmtUSD(calc.actual.sellingCosts)}`} />
+                      <MetricRow label="− Total All-In Cost"                                  value={`− ${fmtUSD(calc.totalAllInCost)}`} />
+                      <MetricRow label="Net Profit"                                           value={fmtUSD(calc.actual.netProfit)} highlight />
+                      <MetricRow label="ROI on Cash Invested"                                 value={fmtPct(calc.actual.roi)} highlight />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
 
             {calc && (
               <Card title="Deal Summary">
