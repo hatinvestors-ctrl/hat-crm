@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useOutletContext, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { calcDeal, fmtUSD, fmtPct, dealRatingColor } from '../lib/dealCalculations'
+import { calcDeal, fmtUSD, fmtPct, dealRatingColor, DEAL_RATING_INFO } from '../lib/dealCalculations'
 import Topbar from '../components/Topbar'
 import Card from '../components/ui/Card'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -205,14 +205,38 @@ export default function ProjectDetailPage() {
 
             <Card title="Hard Money Loan">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Field label="Lender Amount">
-                  <NumInput value={financials.renovation_lender_amount} onBlur={handleBlur('renovation_lender_amount')} disabled={!canEdit} />
+                <Field label="Purchase Loan (90% of price)">
+                  <div className="h-8 px-2 flex items-center text-[12px] rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">
+                    {calc ? fmtUSD(calc.purchaseLoan) : '—'}
+                  </div>
+                </Field>
+                <Field label="Renovation Financed % (default 100%)">
+                  <NumInput
+                    value={financials.renovation_lender_pct != null ? financials.renovation_lender_pct * 100 : 100}
+                    onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
+                    disabled={!canEdit} placeholder="100"
+                  />
+                </Field>
+                <Field label="Renovation Loan (calculated)">
+                  <div className="h-8 px-2 flex items-center text-[12px] rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">
+                    {calc ? fmtUSD(calc.renovationLoan) : '—'}
+                  </div>
+                </Field>
+                <Field label="Total Loan">
+                  <div className="h-8 px-2 flex items-center text-[12px] font-semibold rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-text)]">
+                    {calc ? fmtUSD(calc.totalLoan) : '—'}
+                  </div>
                 </Field>
                 <Field label="Interest Rate (Annual %)">
                   <NumInput value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''} onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="12" />
                 </Field>
                 <Field label="Points %">
                   <NumInput value={financials.points_pct != null ? financials.points_pct * 100 : ''} onBlur={v => save({ points_pct: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="2" />
+                </Field>
+                <Field label="Monthly Interest Payment">
+                  <div className="h-8 px-2 flex items-center text-[12px] font-semibold rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-accent-text)]">
+                    {calc ? fmtUSD(calc.monthlyInterest) : '—'}
+                  </div>
                 </Field>
                 <Field label="Title Lender Insurance">
                   <NumInput value={financials.title_lender_insurance} onBlur={handleBlur('title_lender_insurance')} disabled={!canEdit} />
@@ -275,43 +299,94 @@ export default function ProjectDetailPage() {
             {calc && (
               <Card title="Deal Summary">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                  {/* Left: Cost breakdown */}
                   <div>
-                    <div className={labelCls + ' mb-2'}>Costs</div>
-                    <MetricRow label="Purchase Price"       value={fmtUSD(financials.purchase_price_actual)} />
-                    <MetricRow label="HML Closing Costs"   value={fmtUSD(calc.hmlClosingCosts)} />
-                    <MetricRow label="Purchase Closing"    value={fmtUSD(calc.purchaseClosing)} />
-                    <MetricRow label="Renovation"          value={fmtUSD(calc.totalRenovationCost)} />
-                    <MetricRow label="Holding Costs"       value={fmtUSD(calc.totalHoldingCosts)} />
-                    <MetricRow label="Total All-In Cost"   value={fmtUSD(calc.totalAllInCost)} highlight />
-                    <MetricRow label="Total Cash Invested" value={fmtUSD(calc.totalCashInvested)} highlight />
-                    <MetricRow label="Break-Even Price"    value={fmtUSD(calc.breakEvenPrice)} />
+                    <div className={labelCls + ' mb-2'}>All-In Costs</div>
+                    <MetricRow label="Purchase Price"            value={fmtUSD(financials.purchase_price_actual)} />
+                    <MetricRow label="Renovation"                value={fmtUSD(calc.totalRenovationCost)} />
+                    <MetricRow label="HML Closing Costs"         value={fmtUSD(calc.hmlClosingCosts)} />
+                    <MetricRow label="Purchase Closing Costs"    value={fmtUSD(calc.purchaseClosing)} />
+                    <MetricRow label={`Holding (${calc.holdMonths}mo interest + expenses)`} value={fmtUSD(calc.totalHoldingCosts)} />
+                    <MetricRow label="Total All-In Cost"         value={fmtUSD(calc.totalAllInCost)} highlight />
+
+                    <div className={labelCls + ' mt-4 mb-2'}>Cash You Bring to the Deal</div>
+                    <MetricRow label={`Down Payment (${fmtPct(1 - (financials.loan_to_purchase_pct ?? 0.9))})`} value={fmtUSD(calc.downPayment)} />
+                    <MetricRow label="Lender Fees at Closing"   value={fmtUSD(calc.hmlClosingCosts)} />
+                    <MetricRow label="Title & Closing Fees"     value={fmtUSD(calc.purchaseClosing)} />
+                    {calc.renovationGap > 0 && (
+                      <MetricRow label="Renovation Gap (lender shortage)" value={fmtUSD(calc.renovationGap)} />
+                    )}
+                    <MetricRow label="Total Cash Invested"      value={fmtUSD(calc.totalCashInvested)} highlight />
+                    <MetricRow label="Break-Even Sale Price"    value={fmtUSD(calc.breakEvenPrice)} />
                   </div>
+
+                  {/* Right: Profit & ROI */}
                   <div>
-                    <div className={labelCls + ' mb-2'}>Profit</div>
                     {calc.expected && (
                       <>
-                        <MetricRow label="Expected Sale Price" value={fmtUSD(calc.expected.sellPrice)} />
-                        <MetricRow label="Selling Costs"       value={fmtUSD(calc.expected.sellingCosts)} />
-                        <MetricRow label="Expected Net Profit" value={fmtUSD(calc.expected.netProfit)} highlight />
-                        <MetricRow label="Expected ROI"        value={fmtPct(calc.expected.roi)} highlight />
+                        <div className={labelCls + ' mb-2'}>Expected Profit</div>
+                        <MetricRow label="Expected Sale Price"              value={fmtUSD(calc.expected.sellPrice)} />
+                        <MetricRow label={`Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.expected.sellingCosts)}`} />
+                        <MetricRow label="Total All-In Cost"               value={`− ${fmtUSD(calc.totalAllInCost)}`} />
+                        <MetricRow
+                          label="Net Profit"
+                          value={fmtUSD(calc.expected.netProfit)}
+                          highlight
+                        />
+                        <MetricRow
+                          label="ROI on Cash Invested"
+                          value={fmtPct(calc.expected.roi)}
+                          highlight
+                        />
                       </>
                     )}
+
                     {calc.actual && (
                       <>
-                        <div className="mt-3 mb-1 text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-success-text)]">Actual (Sold)</div>
-                        <MetricRow label="Actual Sale Price" value={fmtUSD(calc.actual.sellPrice)} />
-                        <MetricRow label="Actual Net Profit" value={fmtUSD(calc.actual.netProfit)} highlight />
-                        <MetricRow label="Actual ROI"        value={fmtPct(calc.actual.roi)} highlight />
+                        <div className="mt-5 mb-1 text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-success-text)]">
+                          ✓ Actual (Sold)
+                        </div>
+                        <MetricRow label="Actual Sale Price"               value={fmtUSD(calc.actual.sellPrice)} />
+                        <MetricRow label={`Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.actual.sellingCosts)}`} />
+                        <MetricRow label="Net Profit"                      value={fmtUSD(calc.actual.netProfit)} highlight />
+                        <MetricRow label="ROI on Cash Invested"            value={fmtPct(calc.actual.roi)} highlight />
                       </>
                     )}
-                    <div className="mt-4 flex items-center gap-2">
-                      <span className="text-[11px] text-[color:var(--color-text-dim)]">Deal Rating</span>
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold ${dealRatingColor(calc.dealRating)}`}>
-                        {calc.dealRating?.split(' - ')[0] || '—'}
-                      </span>
-                    </div>
+
+                    {/* Deal Rating */}
+                    {(() => {
+                      const ratingKey = calc.dealRating?.charAt(0)
+                      const info = DEAL_RATING_INFO[ratingKey]
+                      return (
+                        <div className="mt-5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[11px] text-[color:var(--color-text-dim)]">Deal Rating</span>
+                            <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${dealRatingColor(calc.dealRating)}`}>
+                              {ratingKey || '—'}
+                            </span>
+                            <span className="text-[12px] font-semibold text-[color:var(--color-text)]">
+                              {info?.label}
+                            </span>
+                          </div>
+                          {info && (
+                            <div className="text-[11px] text-[color:var(--color-text-muted)] leading-relaxed">
+                              {info.description}
+                            </div>
+                          )}
+                          <div className="mt-2 text-[10px] text-[color:var(--color-text-dim)] space-y-0.5">
+                            <div>A: ROI ≥ 70% &amp; profit ≥ $30K</div>
+                            <div>B: ROI ≥ 45% &amp; profit ≥ $20K</div>
+                            <div>C: ROI ≥ 25%</div>
+                            <div>D: ROI below 25%</div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Warnings */}
                     {calc.warnings?.map((w, i) => (
-                      <div key={i} className="mt-2 text-[11px] text-[color:var(--color-warn)] flex items-center gap-1">
+                      <div key={i} className="mt-2 text-[11px] text-[color:var(--color-warn,oklch(0.55_0.15_80))] flex items-center gap-1">
                         ⚠ {w}
                       </div>
                     ))}

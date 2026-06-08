@@ -16,6 +16,13 @@ export const ITEM_STATUSES = [
   { value: 'complete',    label: 'Complete',    cls: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]' },
 ]
 
+export const DEAL_RATING_INFO = {
+  A: { label: 'A - Excellent', description: 'ROI ≥ 70% and profit ≥ $30K. Strong deal — move fast.' },
+  B: { label: 'B - Good',      description: 'ROI ≥ 45% and profit ≥ $20K. Solid deal with good upside.' },
+  C: { label: 'C - Fair',      description: 'ROI ≥ 25%. Acceptable — watch costs closely.' },
+  D: { label: 'D - Poor',      description: 'ROI below 25%. Risky — renegotiate price or pass.' },
+}
+
 /**
  * Core deal financial calculations.
  * @param {object} f   - deal_financials row
@@ -25,21 +32,33 @@ export const ITEM_STATUSES = [
 export function calcDeal(f, items = []) {
   if (!f) return null
 
-  // --- Loan ---
-  const purchasePrice     = n(f.purchase_price_actual)
-  const ltvPct            = n(f.loan_to_purchase_pct)
-  const purchaseLoan      = f.purchase_loan_amount != null
+  // --- Basic ---
+  const purchasePrice  = n(f.purchase_price_actual)
+  const ltvPct         = n(f.loan_to_purchase_pct) || 0.90
+  const sellingCostPct = n(f.selling_cost_pct) || 0.07
+
+  // --- Renovation (must come before loan so renovationLoan can use totalRenovationCost) ---
+  const totalRenovationEst    = items.reduce((s, i) => s + n(i.estimated_cost), 0)
+  const totalRenovationActual = items.reduce((s, i) => s + (i.actual_cost != null ? n(i.actual_cost) : n(i.estimated_cost)), 0)
+  const totalRenovationCost   = totalRenovationActual
+
+  // --- Loans ---
+  const purchaseLoan     = f.purchase_loan_amount != null
     ? n(f.purchase_loan_amount)
     : purchasePrice * ltvPct
-  const renovationLoan    = f.renovation_financing === 'Cash' ? 0 : n(f.renovation_lender_amount)
-  const totalLoan         = purchaseLoan + renovationLoan
-  const pointsBase        = f.points_charged_on === 'Purchase Only' ? purchaseLoan : totalLoan
-  const pointsCost        = pointsBase * n(f.points_pct)
-  const monthlyInterest   = totalLoan * (n(f.interest_rate_annual) / 12)
-  const totalInterest     = monthlyInterest * n(f.hold_months)
 
-  // --- HML Closing Costs ---
-  const hmlClosingCosts   = pointsCost
+  const renovLenderPct   = f.renovation_lender_pct != null ? n(f.renovation_lender_pct) : 1.0
+  const renovationLoan   = f.renovation_financing === 'Cash' ? 0 : totalRenovationCost * renovLenderPct
+  const renovationGap    = Math.max(0, totalRenovationCost - renovationLoan)
+
+  const totalLoan        = purchaseLoan + renovationLoan
+  const pointsBase       = f.points_charged_on === 'Purchase Only' ? purchaseLoan : totalLoan
+  const pointsCost       = pointsBase * n(f.points_pct)
+  const monthlyInterest  = totalLoan * (n(f.interest_rate_annual) / 12)
+  const totalInterest    = monthlyInterest * n(f.hold_months)
+
+  // --- HML Closing Costs (paid at closing) ---
+  const hmlClosingCosts  = pointsCost
     + n(f.title_lender_insurance)
     + n(f.interest_portion)
     + n(f.doc_stamps_mortgage)
@@ -47,41 +66,33 @@ export function calcDeal(f, items = []) {
     + n(f.extension_fee)
 
   // --- Down Payment ---
-  const downPayment       = purchasePrice * (1 - ltvPct)
+  const downPayment      = purchasePrice * (1 - ltvPct)
 
-  // --- Renovation ---
-  const totalRenovationEst    = items.reduce((s, i) => s + n(i.estimated_cost), 0)
-  const totalRenovationActual = items.reduce((s, i) => s + (i.actual_cost != null ? n(i.actual_cost) : n(i.estimated_cost)), 0)
-  const totalRenovationCost   = totalRenovationActual // use actual (or est if no actual)
+  // --- Purchase Closing ---
+  const purchaseClosing  = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
 
-  // --- Holding ---
+  // --- Holding Costs (ongoing, not upfront cash) ---
   const monthlyHoldCosts  = n(f.insurance_monthly) + n(f.utilities_monthly) + n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
   const totalHoldingCosts = monthlyHoldCosts * n(f.hold_months) + totalInterest
 
-  // --- Purchase Closing ---
-  const purchaseClosing   = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
+  // --- All-In Cost (total money spent on the deal) ---
+  const totalAllInCost   = purchasePrice + totalRenovationCost + hmlClosingCosts + purchaseClosing + totalHoldingCosts
 
-  // --- All-In Cost ---
-  const totalAllInCost    = purchasePrice + totalRenovationCost + hmlClosingCosts + purchaseClosing + totalHoldingCosts
-
-  // --- Cash Invested ---
-  const renovationCash    = f.renovation_financing === 'Cash'
-    ? totalRenovationCost
-    : Math.max(0, totalRenovationCost - n(f.renovation_lender_amount))
-  const totalCashInvested = downPayment + hmlClosingCosts + purchaseClosing + renovationCash + monthlyHoldCosts * n(f.hold_months)
+  // --- Total Cash Invested (cash you bring to the table at closing + renovation gap) ---
+  // This is the basis for ROI — what you actually invest out of pocket.
+  const totalCashInvested = downPayment + hmlClosingCosts + purchaseClosing + renovationGap
 
   // --- Break-Even ---
-  const sellingCostPct    = n(f.selling_cost_pct)
-  const breakEvenPrice    = sellingCostPct < 1 ? totalAllInCost / (1 - sellingCostPct) : 0
-  const allInVsARV        = n(f.expected_sell_price) > 0 ? totalAllInCost / n(f.expected_sell_price) : 0
+  const breakEvenPrice   = sellingCostPct < 1 ? totalAllInCost / (1 - sellingCostPct) : 0
+  const allInVsARV       = n(f.expected_sell_price) > 0 ? totalAllInCost / n(f.expected_sell_price) : 0
 
   // --- Scenario helper ---
   const scenario = (sellPrice) => {
     if (!sellPrice) return null
-    const sp          = n(sellPrice)
+    const sp           = n(sellPrice)
     const sellingCosts = sp * sellingCostPct
-    const netProfit   = sp - sellingCosts - totalAllInCost
-    const roi         = totalCashInvested > 0 ? netProfit / totalCashInvested : 0
+    const netProfit    = sp - sellingCosts - totalAllInCost
+    const roi          = totalCashInvested > 0 ? netProfit / totalCashInvested : 0
     return { sellPrice: sp, sellingCosts, netProfit, roi }
   }
 
@@ -102,20 +113,26 @@ export function calcDeal(f, items = []) {
   // --- Warning flags ---
   const warnings = []
   if (allInVsARV > 0.75) warnings.push(`All-In vs ARV: ${(allInVsARV * 100).toFixed(1)}% (above 75%)`)
-  if (expected && expected.netProfit < 30000 && expected.netProfit > -999999) warnings.push(`Expected profit below $30K`)
+  if (expected && expected.netProfit < 30000 && expected.netProfit > -999999) warnings.push('Expected profit below $30K')
 
   return {
-    purchaseLoan, renovationLoan, totalLoan,
+    // Loans
+    purchaseLoan, renovationLoan, renovLenderPct, renovationGap, totalLoan,
     pointsCost, monthlyInterest, totalInterest,
-    hmlClosingCosts, downPayment,
+    // Costs
+    hmlClosingCosts, downPayment, purchaseClosing,
     totalRenovationEst, totalRenovationActual, totalRenovationCost,
     monthlyHoldCosts, totalHoldingCosts,
-    purchaseClosing, totalAllInCost,
-    renovationCash, totalCashInvested,
+    totalAllInCost,
+    // Cash invested & break-even
+    totalCashInvested,
     breakEvenPrice, allInVsARV,
+    // Scenarios
     conservative, expected, optimistic, actual,
+    // Rating
     dealRating, warnings,
     holdMonths: n(f.hold_months),
+    sellingCostPct,
   }
 }
 
@@ -132,6 +149,6 @@ export function fmtPct(v) {
 export function dealRatingColor(rating) {
   if (rating?.startsWith('A')) return 'text-[color:var(--color-success-text)] bg-[color:var(--color-success-soft)]'
   if (rating?.startsWith('B')) return 'text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)]'
-  if (rating?.startsWith('C')) return 'text-[color:var(--color-warn-text)] bg-[color:var(--color-warn-soft)]'
+  if (rating?.startsWith('C')) return 'text-[color:var(--color-warn-text,oklch(0.5_0.15_80))] bg-[color:var(--color-warn-soft,oklch(0.97_0.04_80))]'
   return 'text-[color:var(--color-danger-text)] bg-[color:var(--color-danger-soft)]'
 }
