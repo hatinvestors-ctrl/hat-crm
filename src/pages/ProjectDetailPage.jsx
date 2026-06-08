@@ -12,6 +12,44 @@ const labelCls = 'text-[10px] uppercase tracking-wider font-medium text-[color:v
 const inputCls = 'w-full h-8 px-2 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] disabled:opacity-50'
 const calcDisplayCls = 'h-8 px-2 flex items-center text-[12px] rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]'
 
+// Calculated display with an expandable breakdown popover
+function CalcDisplay({ value, lines = [], className = '' }) {
+  const [open, setOpen] = useState(false)
+  const hasLines = lines.length > 0
+  return (
+    <div className="relative">
+      <div className={`${calcDisplayCls} ${className} pr-1 gap-1`}>
+        <span className="flex-1">{value}</span>
+        {hasLines && (
+          <button
+            onClick={() => setOpen(p => !p)}
+            className={`shrink-0 w-5 h-5 rounded text-[10px] flex items-center justify-center transition-colors ${
+              open
+                ? 'bg-[color:var(--color-accent)] text-white'
+                : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-bg-elev)] hover:text-[color:var(--color-text)]'
+            }`}
+            title="Show breakdown"
+          >
+            {open ? '−' : '+'}
+          </button>
+        )}
+      </div>
+      {open && hasLines && (
+        <div className="absolute z-20 left-0 top-full mt-1 w-64 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] shadow-lg p-3 space-y-1">
+          {lines.map((line, i) => (
+            line === '---'
+              ? <div key={i} className="border-t border-[color:var(--color-line)] my-1" />
+              : <div key={i} className={`flex justify-between text-[11px] ${line.bold ? 'font-semibold text-[color:var(--color-text)]' : 'text-[color:var(--color-text-muted)]'}`}>
+                  <span className="truncate pr-2">{line.label}</span>
+                  <span className="shrink-0 tabular-nums">{line.value}</span>
+                </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Field({ label, children, tip }) {
   return (
     <div>
@@ -537,19 +575,54 @@ export default function ProjectDetailPage() {
                     />
                   </Field>
                   <Field label="Renovation Loan (auto)" tip="Renovation Budget × Financed %">
-                    <div className={calcDisplayCls}>{calc ? fmtUSD(calc.renovationLoan) : '—'}</div>
+                    <CalcDisplay
+                      value={calc ? fmtUSD(calc.renovationLoan) : '—'}
+                      lines={calc ? [
+                        { label: `Budget (${fmtUSD(calc.totalRenovationCost)})`, value: '' },
+                        { label: `× Financed (${fmtPct(calc.renovLenderPct)})`, value: '' },
+                        '---',
+                        { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan), bold: true },
+                      ] : []}
+                    />
                   </Field>
                   <Field label="Purchase Portion (auto)" tip="Purchase price × LTV%">
-                    <div className={calcDisplayCls}>{calc ? fmtUSD(calc.purchaseLoan) : '—'}</div>
+                    <CalcDisplay
+                      value={calc ? fmtUSD(calc.purchaseLoan) : '—'}
+                      lines={calc ? [
+                        { label: `Price (${fmtUSD(financials?.purchase_price_actual)})`, value: '' },
+                        { label: `× LTV (${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)})`, value: '' },
+                        '---',
+                        { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan), bold: true },
+                      ] : []}
+                    />
                   </Field>
                   <Field label="Total Loan (auto)" tip="Purchase portion + Renovation loan">
-                    <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-text)]`}>{calc ? fmtUSD(calc.totalLoan) : '—'}</div>
+                    <CalcDisplay
+                      value={calc ? fmtUSD(calc.totalLoan) : '—'}
+                      className="font-semibold text-[color:var(--color-text)]"
+                      lines={calc ? [
+                        { label: 'Purchase Portion', value: fmtUSD(calc.purchaseLoan) },
+                        { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan) },
+                        '---',
+                        { label: 'Total Loan', value: fmtUSD(calc.totalLoan), bold: true },
+                      ] : []}
+                    />
                   </Field>
                   <Field label="Interest Rate (Annual %)">
                     <NumInput value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''} onChange={n => setFinancials(prev => prev ? {...prev, interest_rate_annual: n / 100} : prev)} onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="12" />
                   </Field>
                   <Field label="Monthly Interest Payment (auto)">
-                    <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-accent-text)]`}>{calc ? fmtUSD(calc.monthlyInterest) : '—'}</div>
+                    <CalcDisplay
+                      value={calc ? fmtUSD(calc.monthlyInterest) : '—'}
+                      className="font-semibold text-[color:var(--color-accent-text)]"
+                      lines={calc ? [
+                        { label: `Total Loan (${fmtUSD(calc.totalLoan)})`, value: '' },
+                        { label: `× Rate (${fmtPct(financials?.interest_rate_annual)}/12)`, value: '' },
+                        '---',
+                        { label: 'Monthly Payment', value: fmtUSD(calc.monthlyInterest), bold: true },
+                        { label: `× ${calc.holdMonths}mo = Total Interest`, value: fmtUSD(calc.totalInterest) },
+                      ] : []}
+                    />
                   </Field>
                 </div>
               </div>
@@ -612,7 +685,22 @@ export default function ProjectDetailPage() {
                 </Field>
                 {calc && (
                   <Field label="Total Holding (auto)">
-                    <div className={calcDisplayCls}>{fmtUSD(calc.totalHoldingCosts)} <span className="ml-1 text-[10px]">({calc.holdMonths}mo)</span></div>
+                    <CalcDisplay
+                      value={`${fmtUSD(calc.totalHoldingCosts)} (${calc.holdMonths}mo)`}
+                      lines={[
+                        { label: `Monthly Interest`, value: fmtUSD(calc.monthlyInterest) },
+                        { label: `Insurance`, value: fmtUSD(financials?.insurance_monthly) },
+                        { label: `Utilities`, value: fmtUSD(financials?.utilities_monthly) },
+                        { label: `Taxes`, value: fmtUSD(financials?.taxes_monthly) },
+                        { label: `HOA`, value: fmtUSD(financials?.hoa_monthly) },
+                        { label: `Misc`, value: fmtUSD(financials?.misc_holding_monthly) },
+                        '---',
+                        { label: `Monthly Total`, value: fmtUSD(calc.monthlyInterest + calc.monthlyHoldCosts) },
+                        { label: `× ${calc.holdMonths} months`, value: '' },
+                        '---',
+                        { label: `Total Holding`, value: fmtUSD(calc.totalHoldingCosts), bold: true },
+                      ]}
+                    />
                   </Field>
                 )}
               </div>
