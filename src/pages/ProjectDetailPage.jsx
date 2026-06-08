@@ -167,9 +167,22 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
             {calc.actual ? '✓ Actual Profit' : 'Expected Profit'}
           </div>
           <Row label="Sale Price" value={fmtUSD(profitResult.sellPrice)} />
-          <Row label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(profitResult.sellingCosts)}`} />
+          <Row label="Selling Costs" value="" divider />
+          {calc.agentCommissionPct > 0 && (
+            <Row label={`Listing Agent (${fmtPct(calc.agentCommissionPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.agentCommissionPct)}`} indent={1} />
+          )}
+          {calc.buyerAgentPct > 0 && (
+            <Row label={`Buyer's Agent (${fmtPct(calc.buyerAgentPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.buyerAgentPct)}`} indent={1} />
+          )}
+          {calc.sellingClosingPct > 0 && (
+            <Row label={`Title & Closing (${fmtPct(calc.sellingClosingPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.sellingClosingPct)}`} indent={1} />
+          )}
+          {calc.sellingOtherPct > 0 && (
+            <Row label={`Other (${fmtPct(calc.sellingOtherPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.sellingOtherPct)}`} indent={1} />
+          )}
+          <Row label={`  Total (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(profitResult.sellingCosts)}`} indent={1} total />
           <Row label="− Total All-In Cost" value={`− ${fmtUSD(calc.totalAllInCost)}`} />
-          <div className={`mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-bold text-[13px]`}>
+          <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-bold text-[13px]">
             <span className="text-[color:var(--color-text)]">= Net Profit</span>
             <span className={profitResult.netProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
               {fmtUSD(profitResult.netProfit)}
@@ -498,13 +511,6 @@ export default function ProjectDetailPage() {
                     <option value="Purchase Only">Purchase Only</option>
                   </select>
                 </Field>
-                <Field label="Selling Cost % (agent + fees)">
-                  <NumInput
-                    value={financials.selling_cost_pct != null ? financials.selling_cost_pct * 100 : 7}
-                    onChange={n => setFinancials(prev => prev ? {...prev, selling_cost_pct: n / 100} : prev)} onBlur={v => save({ selling_cost_pct: v === '' ? 0.07 : Number(v) / 100 })}
-                    disabled={!canEdit} placeholder="7"
-                  />
-                </Field>
               </div>
             </Card>
 
@@ -637,10 +643,63 @@ export default function ProjectDetailPage() {
             {/* Selling Price & Profit */}
             <Card title="Selling Price & Profit">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
+
+                {/* Left: inputs */}
+                <div className="space-y-4">
                   <Field label="Expected Sale Price">
                     <NumInput value={financials.expected_sell_price} onChange={handleLive('expected_sell_price')} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
                   </Field>
+
+                  {/* Selling cost breakdown */}
+                  <div>
+                    <div className={labelCls + ' mb-2'}>Selling Costs Breakdown</div>
+                    <div className="space-y-1.5">
+                      {[
+                        { label: 'Listing Agent %',   field: 'agent_commission_pct', calcKey: 'agentCommissionPct', defaultPct: 0.03, tip: "Commission paid to the seller's agent" },
+                        { label: "Buyer's Agent %",   field: 'buyer_agent_pct',      calcKey: 'buyerAgentPct',      defaultPct: 0.03, tip: "Commission paid to the buyer's agent" },
+                        { label: 'Title & Closing %', field: 'selling_closing_pct',  calcKey: 'sellingClosingPct',  defaultPct: 0.01, tip: 'Title insurance, attorney, doc stamps on deed' },
+                        { label: 'Other %',           field: 'selling_other_pct',    calcKey: 'sellingOtherPct',    defaultPct: 0.00, tip: 'Any other selling costs' },
+                      ].map(({ label, field, calcKey, defaultPct, tip }) => {
+                        const pctVal = financials[field] != null ? financials[field] * 100 : defaultPct * 100
+                        const sellRef = financials.expected_sell_price || 0
+                        const dollarAmt = sellRef * (calc?.[calcKey] ?? defaultPct)
+                        return (
+                          <div key={field} className="flex items-center gap-2">
+                            <div className="w-36 shrink-0">
+                              <label className={labelCls}>
+                                {label}
+                                {tip && <span title={tip} className="ml-1 cursor-help opacity-50 hover:opacity-100">ⓘ</span>}
+                              </label>
+                            </div>
+                            <div className="w-20 shrink-0">
+                              <NumInput
+                                value={pctVal}
+                                onChange={n => setFinancials(prev => prev ? { ...prev, [field]: n / 100 } : prev)}
+                                onBlur={v => save({ [field]: v === '' ? 0 : Number(v) / 100 })}
+                                disabled={!canEdit}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="text-[11.5px] text-[color:var(--color-text-muted)] tabular-nums">
+                              {sellRef > 0 ? fmtUSD(dollarAmt) : '—'}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* Total row */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-[color:var(--color-line)]">
+                        <div className="w-36 shrink-0 text-[11px] font-semibold text-[color:var(--color-text)]">Total Selling Costs</div>
+                        <div className="w-20 shrink-0 text-[12px] font-semibold text-[color:var(--color-text)] px-2">
+                          {calc ? fmtPct(calc.sellingCostPct) : '—'}
+                        </div>
+                        <div className="text-[11.5px] font-semibold text-[color:var(--color-danger-text)] tabular-nums">
+                          {calc?.expected ? `− ${fmtUSD(calc.expected.sellingCosts)}` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {isSold && (
                     <>
                       <Field label="Actual Sale Price">
@@ -652,6 +711,8 @@ export default function ProjectDetailPage() {
                     </>
                   )}
                 </div>
+
+                {/* Right: live profit result */}
                 <div>
                   {calc?.expected ? (
                     <>
@@ -659,8 +720,8 @@ export default function ProjectDetailPage() {
                       <MetricRow label="Sale Price"                                          value={fmtUSD(calc.expected.sellPrice)} />
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.expected.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
-                      <MetricRow label="Net Profit"     value={fmtUSD(calc.expected.netProfit)}  highlight positive={calc.expected.netProfit >= 0} negative={calc.expected.netProfit < 0} />
-                      <MetricRow label="ROI on Cash"    value={fmtPct(calc.expected.roi)}        highlight positive={calc.expected.roi >= 0} negative={calc.expected.roi < 0} />
+                      <MetricRow label="Net Profit"  value={fmtUSD(calc.expected.netProfit)} highlight positive={calc.expected.netProfit >= 0} negative={calc.expected.netProfit < 0} />
+                      <MetricRow label="ROI on Cash" value={fmtPct(calc.expected.roi)}       highlight positive={calc.expected.roi >= 0}    negative={calc.expected.roi < 0} />
                     </>
                   ) : (
                     <div className="text-[12px] text-[color:var(--color-text-dim)] py-6 text-center">
@@ -674,7 +735,7 @@ export default function ProjectDetailPage() {
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.actual.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
                       <MetricRow label="Net Profit"  value={fmtUSD(calc.actual.netProfit)}  highlight positive={calc.actual.netProfit >= 0} negative={calc.actual.netProfit < 0} />
-                      <MetricRow label="ROI on Cash" value={fmtPct(calc.actual.roi)}        highlight positive={calc.actual.roi >= 0} negative={calc.actual.roi < 0} />
+                      <MetricRow label="ROI on Cash" value={fmtPct(calc.actual.roi)}        highlight positive={calc.actual.roi >= 0}    negative={calc.actual.roi < 0} />
                     </div>
                   )}
                 </div>

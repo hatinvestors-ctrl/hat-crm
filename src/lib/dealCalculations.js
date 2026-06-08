@@ -35,7 +35,17 @@ export function calcDeal(f, items = []) {
   // --- Basic ---
   const purchasePrice  = n(f.purchase_price_actual)
   const ltvPct         = n(f.loan_to_purchase_pct) || 0.90
-  const sellingCostPct = n(f.selling_cost_pct) || 0.07
+
+  // --- Selling Costs (detailed breakdown or legacy single %) ---
+  const agentCommissionPct = f.agent_commission_pct != null ? n(f.agent_commission_pct) : 0.03
+  const buyerAgentPct      = f.buyer_agent_pct      != null ? n(f.buyer_agent_pct)      : 0.03
+  const sellingClosingPct  = f.selling_closing_pct  != null ? n(f.selling_closing_pct)  : 0.01
+  const sellingOtherPct    = f.selling_other_pct    != null ? n(f.selling_other_pct)    : 0.00
+  // If any detailed field has been explicitly saved, use sum; otherwise fall back to legacy field
+  const hasDetailedSelling = f.agent_commission_pct != null || f.buyer_agent_pct != null || f.selling_closing_pct != null
+  const sellingCostPct     = hasDetailedSelling
+    ? agentCommissionPct + buyerAgentPct + sellingClosingPct + sellingOtherPct
+    : (n(f.selling_cost_pct) || 0.07)
 
   // --- Renovation (must come before loan so renovationLoan can use totalRenovationCost) ---
   // renovation_lender_amount doubles as a "renovation budget" fallback when no line items exist yet
@@ -118,6 +128,8 @@ export function calcDeal(f, items = []) {
   if (expected && expected.netProfit < 30000 && expected.netProfit > -999999) warnings.push('Expected profit below $30K')
 
   return {
+    // Selling cost breakdown
+    agentCommissionPct, buyerAgentPct, sellingClosingPct, sellingOtherPct,
     // Loans
     purchaseLoan, renovationLoan, renovLenderPct, renovationGap, totalLoan,
     pointsCost, monthlyInterest, totalInterest,
