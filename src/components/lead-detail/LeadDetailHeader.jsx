@@ -1,10 +1,13 @@
+import { useNavigate } from 'react-router-dom'
 import Button from '../ui/Button'
 import { formatDateTime } from '../../lib/calculations'
 import { buildZillowUrl } from '../../lib/zillow'
 import { safeUrl } from '../../lib/urlSafety'
 import { supabase } from '../../lib/supabase'
 
-export default function LeadDetailHeader({ lead, members, canEdit, canAssign, onEdit, onUpdated }) {
+export default function LeadDetailHeader({ lead, members, canEdit, canAssign, onEdit, onUpdated, onCreateProject, creatingProject, workspaceId }) {
+  const navigate = useNavigate()
+  const isProject = ['working_project', 'sold'].includes(lead.status)
   const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
   const assignee = userLookup[lead.assigned_to]
   const zillowUrl = safeUrl(lead.zillow_url) || buildZillowUrl(lead)
@@ -74,6 +77,24 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {canEdit && (
+          isProject ? (
+            <button
+              onClick={() => navigate(`/w/${workspaceId}/projects/${lead.id}`)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)] hover:brightness-110 transition"
+            >
+              View Project →
+            </button>
+          ) : (
+            <button
+              onClick={onCreateProject}
+              disabled={creatingProject}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-accent)] text-white hover:brightness-110 transition disabled:opacity-60"
+            >
+              {creatingProject ? 'Creating…' : '+ Create Project'}
+            </button>
+          )
+        )}
         {canEdit && (
           <button
             onClick={toggleHot}

@@ -11,7 +11,6 @@ import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
 import ScenariosFlat from '../components/lead-detail/ScenariosFlat'
-import DealFinancialsSection from '../components/lead-detail/DealFinancialsSection'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -34,6 +33,28 @@ export default function LeadDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [activityRefresh, setActivityRefresh] = useState(0)
+  const [creatingProject, setCreatingProject] = useState(false)
+
+  const handleCreateProject = async () => {
+    setCreatingProject(true)
+    const { data: updatedLead } = await supabase
+      .from('leads')
+      .update({ status: 'working_project' })
+      .eq('id', leadId)
+      .select()
+      .single()
+
+    await supabase.from('deal_financials').upsert({
+      lead_id:               lead.id,
+      workspace_id:          lead.workspace_id,
+      purchase_price_actual: lead.offer_price || lead.asking_price || null,
+      expected_sell_price:   lead.arv || null,
+    }, { onConflict: 'lead_id' })
+
+    setCreatingProject(false)
+    if (updatedLead) setLead(updatedLead)
+    navigate(`/w/${workspaceId}/projects/${leadId}`)
+  }
 
   const canEdit   = userRole !== 'readonly'
   const canAssign = userRole === 'admin'
@@ -100,6 +121,9 @@ export default function LeadDetailPage() {
           canAssign={canAssign}
           onEdit={() => setEditOpen(true)}
           onUpdated={(updated) => setLead(updated)}
+          onCreateProject={handleCreateProject}
+          creatingProject={creatingProject}
+          workspaceId={workspaceId}
         />
 
         <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(updated)} paused={!!workspace?.settings?.mls_paused} />
@@ -151,11 +175,6 @@ export default function LeadDetailPage() {
               onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
             />
             <ScenariosFlat
-              lead={lead}
-              canEdit={canEdit}
-              onUpdated={(updated) => setLead(updated)}
-            />
-            <DealFinancialsSection
               lead={lead}
               canEdit={canEdit}
               onUpdated={(updated) => setLead(updated)}
