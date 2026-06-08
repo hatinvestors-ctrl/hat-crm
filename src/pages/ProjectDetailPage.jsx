@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useOutletContext, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { calcDeal, fmtUSD, fmtPct, dealRatingColor, DEAL_RATING_INFO } from '../lib/dealCalculations'
@@ -26,10 +26,15 @@ function Field({ label, children, tip }) {
   )
 }
 
-function NumInput({ value, onBlur, disabled, placeholder, onSaved }) {
+function NumInput({ value, onChange, onBlur, disabled, placeholder }) {
   const [local, setLocal] = useState(value ?? '')
   const [saved, setSaved] = useState(false)
   useEffect(() => { setLocal(value ?? '') }, [value])
+  const handleChange = (e) => {
+    setLocal(e.target.value)
+    const num = Number(e.target.value)
+    if (e.target.value !== '' && !isNaN(num)) onChange?.(num)
+  }
   const handleBlur = async (e) => {
     await onBlur?.(e.target.value)
     setSaved(true)
@@ -40,7 +45,7 @@ function NumInput({ value, onBlur, disabled, placeholder, onSaved }) {
       <input
         type="number"
         value={local}
-        onChange={e => setLocal(e.target.value)}
+        onChange={handleChange}
         onBlur={handleBlur}
         disabled={disabled}
         placeholder={placeholder || '0'}
@@ -116,11 +121,18 @@ export default function ProjectDetailPage() {
     setItems(reno || [])
   }, [leadId])
 
+  // Keep a ref to financials.id so save() never goes stale
+  const financialsIdRef = useRef(null)
+  useEffect(() => { financialsIdRef.current = financials?.id }, [financials?.id])
+
   const save = useCallback(async (changes) => {
-    if (!financials) return
+    if (!financialsIdRef.current) return
     setFinancials(prev => ({ ...prev, ...changes, updated_at: new Date().toISOString() }))
-    await supabase.from('deal_financials').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', financials.id)
-  }, [financials])
+    await supabase.from('deal_financials').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', financialsIdRef.current)
+  }, [])
+
+  // Live update — updates calc immediately as the user types, without saving to DB
+  const handleLive = (field) => (num) => setFinancials(prev => prev ? { ...prev, [field]: num } : prev)
 
   const handleBlur = (field) => (value) => save({ [field]: value === '' ? null : Number(value) })
   const handleSelect = (field) => (e) => save({ [field]: e.target.value })
@@ -331,15 +343,15 @@ export default function ProjectDetailPage() {
             <Card title="Deal Parameters">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Field label="Purchase Price (Actual)">
-                  <NumInput value={financials.purchase_price_actual} onBlur={handleBlur('purchase_price_actual')} disabled={!canEdit} />
+                  <NumInput value={financials.purchase_price_actual} onChange={handleLive('purchase_price_actual')} onBlur={handleBlur('purchase_price_actual')} disabled={!canEdit} />
                 </Field>
                 <Field label="Hold Months">
-                  <NumInput value={financials.hold_months} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="5" />
+                  <NumInput value={financials.hold_months} onChange={handleLive('hold_months')} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="5" />
                 </Field>
                 <Field label="Loan-to-Purchase % (LTV)">
                   <NumInput
                     value={financials.loan_to_purchase_pct != null ? financials.loan_to_purchase_pct * 100 : ''}
-                    onBlur={v => save({ loan_to_purchase_pct: v === '' ? null : Number(v) / 100 })}
+                    onChange={n => setFinancials(prev => prev ? {...prev, loan_to_purchase_pct: n / 100} : prev)} onBlur={v => save({ loan_to_purchase_pct: v === '' ? null : Number(v) / 100 })}
                     disabled={!canEdit} placeholder="90"
                   />
                 </Field>
@@ -358,7 +370,7 @@ export default function ProjectDetailPage() {
                 <Field label="Selling Cost % (agent + fees)">
                   <NumInput
                     value={financials.selling_cost_pct != null ? financials.selling_cost_pct * 100 : 7}
-                    onBlur={v => save({ selling_cost_pct: v === '' ? 0.07 : Number(v) / 100 })}
+                    onChange={n => setFinancials(prev => prev ? {...prev, selling_cost_pct: n / 100} : prev)} onBlur={v => save({ selling_cost_pct: v === '' ? 0.07 : Number(v) / 100 })}
                     disabled={!canEdit} placeholder="7"
                   />
                 </Field>
@@ -377,7 +389,7 @@ export default function ProjectDetailPage() {
                   <Field label="Renovation Financed %">
                     <NumInput
                       value={financials.renovation_lender_pct != null ? financials.renovation_lender_pct * 100 : 100}
-                      onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
+                      onChange={n => setFinancials(prev => prev ? {...prev, renovation_lender_pct: n / 100} : prev)} onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
                       disabled={!canEdit} placeholder="100"
                     />
                   </Field>
@@ -388,7 +400,7 @@ export default function ProjectDetailPage() {
                     <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-text)]`}>{calc ? fmtUSD(calc.totalLoan) : '—'}</div>
                   </Field>
                   <Field label="Interest Rate (Annual %)">
-                    <NumInput value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''} onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="12" />
+                    <NumInput value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''} onChange={n => setFinancials(prev => prev ? {...prev, interest_rate_annual: n / 100} : prev)} onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="12" />
                   </Field>
                   <Field label="Monthly Interest Payment (auto)">
                     <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-accent-text)]`}>{calc ? fmtUSD(calc.monthlyInterest) : '—'}</div>
@@ -401,22 +413,22 @@ export default function ProjectDetailPage() {
                 <div className={labelCls + ' mb-2'}>Loan Fees at Closing</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <Field label="Points %" tip="Lender origination fee as % of loan amount">
-                    <NumInput value={financials.points_pct != null ? financials.points_pct * 100 : ''} onBlur={v => save({ points_pct: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="2" />
+                    <NumInput value={financials.points_pct != null ? financials.points_pct * 100 : ''} onChange={n => setFinancials(prev => prev ? {...prev, points_pct: n / 100} : prev)} onBlur={v => save({ points_pct: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="2" />
                   </Field>
                   <Field label="Title Lender Insurance" tip="Title insurance paid to protect the lender's interest">
-                    <NumInput value={financials.title_lender_insurance} onBlur={handleBlur('title_lender_insurance')} disabled={!canEdit} />
+                    <NumInput value={financials.title_lender_insurance} onChange={handleLive('title_lender_insurance')} onBlur={handleBlur('title_lender_insurance')} disabled={!canEdit} />
                   </Field>
                   <Field label="Interest Portion" tip="Pre-paid interest for the partial first month of the loan">
-                    <NumInput value={financials.interest_portion} onBlur={handleBlur('interest_portion')} disabled={!canEdit} />
+                    <NumInput value={financials.interest_portion} onChange={handleLive('interest_portion')} onBlur={handleBlur('interest_portion')} disabled={!canEdit} />
                   </Field>
                   <Field label="Doc Stamps (Mortgage)" tip="Florida tax on the mortgage note — calculated as 0.35% of loan amount">
-                    <NumInput value={financials.doc_stamps_mortgage} onBlur={handleBlur('doc_stamps_mortgage')} disabled={!canEdit} />
+                    <NumInput value={financials.doc_stamps_mortgage} onChange={handleLive('doc_stamps_mortgage')} onBlur={handleBlur('doc_stamps_mortgage')} disabled={!canEdit} />
                   </Field>
                   <Field label="Intangible Tax" tip="Florida tax on new mortgages — 0.2% of loan amount">
-                    <NumInput value={financials.intangible_tax} onBlur={handleBlur('intangible_tax')} disabled={!canEdit} />
+                    <NumInput value={financials.intangible_tax} onChange={handleLive('intangible_tax')} onBlur={handleBlur('intangible_tax')} disabled={!canEdit} />
                   </Field>
                   <Field label="Extension Fee" tip="Fee charged by lender if you need to extend the loan term">
-                    <NumInput value={financials.extension_fee} onBlur={handleBlur('extension_fee')} disabled={!canEdit} />
+                    <NumInput value={financials.extension_fee} onChange={handleLive('extension_fee')} onBlur={handleBlur('extension_fee')} disabled={!canEdit} />
                   </Field>
                 </div>
               </div>
@@ -426,10 +438,10 @@ export default function ProjectDetailPage() {
             <Card title="Purchase Closing Costs">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Title & Closing Costs" tip="Title search, title insurance (owner's), attorney, recording fees">
-                  <NumInput value={financials.title_closing_costs} onBlur={handleBlur('title_closing_costs')} disabled={!canEdit} />
+                  <NumInput value={financials.title_closing_costs} onChange={handleLive('title_closing_costs')} onBlur={handleBlur('title_closing_costs')} disabled={!canEdit} />
                 </Field>
                 <Field label="Other">
-                  <NumInput value={financials.purchase_closing_costs_other} onBlur={handleBlur('purchase_closing_costs_other')} disabled={!canEdit} />
+                  <NumInput value={financials.purchase_closing_costs_other} onChange={handleLive('purchase_closing_costs_other')} onBlur={handleBlur('purchase_closing_costs_other')} disabled={!canEdit} />
                 </Field>
               </div>
             </Card>
@@ -438,19 +450,19 @@ export default function ProjectDetailPage() {
             <Card title="Holding Costs (Monthly)">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Field label="Insurance">
-                  <NumInput value={financials.insurance_monthly} onBlur={handleBlur('insurance_monthly')} disabled={!canEdit} />
+                  <NumInput value={financials.insurance_monthly} onChange={handleLive('insurance_monthly')} onBlur={handleBlur('insurance_monthly')} disabled={!canEdit} />
                 </Field>
                 <Field label="Utilities">
-                  <NumInput value={financials.utilities_monthly} onBlur={handleBlur('utilities_monthly')} disabled={!canEdit} />
+                  <NumInput value={financials.utilities_monthly} onChange={handleLive('utilities_monthly')} onBlur={handleBlur('utilities_monthly')} disabled={!canEdit} />
                 </Field>
                 <Field label="Property Taxes">
-                  <NumInput value={financials.taxes_monthly} onBlur={handleBlur('taxes_monthly')} disabled={!canEdit} />
+                  <NumInput value={financials.taxes_monthly} onChange={handleLive('taxes_monthly')} onBlur={handleBlur('taxes_monthly')} disabled={!canEdit} />
                 </Field>
                 <Field label="HOA">
-                  <NumInput value={financials.hoa_monthly} onBlur={handleBlur('hoa_monthly')} disabled={!canEdit} />
+                  <NumInput value={financials.hoa_monthly} onChange={handleLive('hoa_monthly')} onBlur={handleBlur('hoa_monthly')} disabled={!canEdit} />
                 </Field>
                 <Field label="Misc">
-                  <NumInput value={financials.misc_holding_monthly} onBlur={handleBlur('misc_holding_monthly')} disabled={!canEdit} />
+                  <NumInput value={financials.misc_holding_monthly} onChange={handleLive('misc_holding_monthly')} onBlur={handleBlur('misc_holding_monthly')} disabled={!canEdit} />
                 </Field>
                 {calc && (
                   <Field label="Total Holding (auto)">
@@ -487,12 +499,12 @@ export default function ProjectDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <Field label="Expected Sale Price">
-                    <NumInput value={financials.expected_sell_price} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
+                    <NumInput value={financials.expected_sell_price} onChange={handleLive('expected_sell_price')} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
                   </Field>
                   {isSold && (
                     <>
                       <Field label="Actual Sale Price">
-                        <NumInput value={financials.actual_sale_price} onBlur={handleBlur('actual_sale_price')} disabled={!canEdit} />
+                        <NumInput value={financials.actual_sale_price} onChange={handleLive('actual_sale_price')} onBlur={handleBlur('actual_sale_price')} disabled={!canEdit} />
                       </Field>
                       <Field label="Sold Date">
                         <input type="date" defaultValue={financials.sold_date || ''} onBlur={e => save({ sold_date: e.target.value || null })} disabled={!canEdit} className={inputCls} />
