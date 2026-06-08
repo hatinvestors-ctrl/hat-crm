@@ -383,8 +383,14 @@ export default function ProjectDetailPage() {
               <div className="mb-4">
                 <div className={labelCls + ' mb-2'}>Loan Structure</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Field label="Purchase Loan (auto)">
-                    <div className={calcDisplayCls}>{calc ? fmtUSD(calc.purchaseLoan) : '—'}</div>
+                  <Field label="Renovation Budget" tip={items.length > 0 ? "Overridden by your renovation line items total" : "Enter total renovation cost — overridden once you add line items below"}>
+                    <NumInput
+                      value={financials.renovation_lender_amount}
+                      onChange={handleLive('renovation_lender_amount')}
+                      onBlur={handleBlur('renovation_lender_amount')}
+                      disabled={!canEdit || items.length > 0}
+                      placeholder="e.g. 40000"
+                    />
                   </Field>
                   <Field label="Renovation Financed %">
                     <NumInput
@@ -393,10 +399,13 @@ export default function ProjectDetailPage() {
                       disabled={!canEdit} placeholder="100"
                     />
                   </Field>
-                  <Field label="Renovation Loan (auto)">
+                  <Field label="Renovation Loan (auto)" tip="Renovation Budget × Financed %">
                     <div className={calcDisplayCls}>{calc ? fmtUSD(calc.renovationLoan) : '—'}</div>
                   </Field>
-                  <Field label="Total Loan (auto)">
+                  <Field label="Purchase Portion (auto)" tip="Purchase price × LTV%">
+                    <div className={calcDisplayCls}>{calc ? fmtUSD(calc.purchaseLoan) : '—'}</div>
+                  </Field>
+                  <Field label="Total Loan (auto)" tip="Purchase portion + Renovation loan">
                     <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-text)]`}>{calc ? fmtUSD(calc.totalLoan) : '—'}</div>
                   </Field>
                   <Field label="Interest Rate (Annual %)">

@@ -38,8 +38,10 @@ export function calcDeal(f, items = []) {
   const sellingCostPct = n(f.selling_cost_pct) || 0.07
 
   // --- Renovation (must come before loan so renovationLoan can use totalRenovationCost) ---
-  const totalRenovationEst    = items.reduce((s, i) => s + n(i.estimated_cost), 0)
-  const totalRenovationActual = items.reduce((s, i) => s + (i.actual_cost != null ? n(i.actual_cost) : n(i.estimated_cost)), 0)
+  // renovation_lender_amount doubles as a "renovation budget" fallback when no line items exist yet
+  const renovationBudget      = n(f.renovation_lender_amount)
+  const totalRenovationEst    = items.length > 0 ? items.reduce((s, i) => s + n(i.estimated_cost), 0) : renovationBudget
+  const totalRenovationActual = items.length > 0 ? items.reduce((s, i) => s + (i.actual_cost != null ? n(i.actual_cost) : n(i.estimated_cost)), 0) : renovationBudget
   const totalRenovationCost   = totalRenovationActual
 
   // --- Loans ---

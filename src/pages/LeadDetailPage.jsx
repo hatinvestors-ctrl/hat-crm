@@ -50,10 +50,11 @@ export default function LeadDetailPage() {
     }
 
     const { error: finError } = await supabase.from('deal_financials').upsert({
-      lead_id:               lead.id,
-      workspace_id:          lead.workspace_id || workspaceId,
-      purchase_price_actual: lead.offer_price || lead.asking_price || null,
-      expected_sell_price:   lead.arv || null,
+      lead_id:                  lead.id,
+      workspace_id:             lead.workspace_id || workspaceId,
+      purchase_price_actual:    lead.offer_price || lead.asking_price || null,
+      expected_sell_price:      lead.arv || null,
+      renovation_lender_amount: lead.renovation_cost || null,
     }, { onConflict: 'lead_id' })
 
     if (finError) {
