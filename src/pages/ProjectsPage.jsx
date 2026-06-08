@@ -32,17 +32,18 @@ export default function ProjectsPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      // Fetch all deal_financials with their lead data
       const { data: fins } = await supabase
         .from('deal_financials')
-        .select('*, leads!inner(id, address, status, workspace_id)')
+        .select('*, leads!inner(id, address, city, state, status, workspace_id)')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
 
       if (!fins?.length) { setRows([]); setLoading(false); return }
 
-      // Fetch renovation items for all leads
-      const leadIds = fins.map(f => f.lead_id)
+      const projectFins = fins.filter(f => ['working_project', 'sold'].includes(f.leads?.status))
+      if (!projectFins.length) { setRows([]); setLoading(false); return }
+
+      const leadIds = projectFins.map(f => f.lead_id)
       const { data: allItems } = await supabase
         .from('deal_renovation_items')
         .select('*')
@@ -54,7 +55,7 @@ export default function ProjectsPage() {
         itemsByLead[item.lead_id].push(item)
       }
 
-      setRows(fins.map(f => ({
+      setRows(projectFins.map(f => ({
         financials: f,
         lead: f.leads,
         items: itemsByLead[f.lead_id] || [],
@@ -147,7 +148,7 @@ export default function ProjectsPage() {
             {/* Deals table */}
             {filtered.length === 0 ? (
               <div className="text-center py-12 text-[13px] text-[color:var(--color-text-dim)]">
-                No projects yet. Start deal tracking on a lead to see it here.
+                No projects yet. Open any lead and click "Create Project" to start tracking a deal here.
               </div>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-[color:var(--color-line)]">
@@ -168,7 +169,7 @@ export default function ProjectsPage() {
                       return (
                         <tr
                           key={f.id}
-                          onClick={() => navigate(`/w/${workspaceId}/leads/${lead.id}`)}
+                          onClick={() => navigate(`/w/${workspaceId}/projects/${lead.id}`)}
                           className="border-t border-[color:var(--color-line)] hover:bg-[color:var(--color-bg-elev)] cursor-pointer transition-colors"
                         >
                           <td className="px-3 py-2.5 font-medium text-[color:var(--color-text)] max-w-[160px] truncate">{lead?.address || '—'}</td>
