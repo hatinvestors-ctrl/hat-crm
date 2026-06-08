@@ -37,21 +37,28 @@ export default function LeadDetailPage() {
 
   const handleCreateProject = async () => {
     setCreatingProject(true)
-    const { data: updatedLead } = await supabase
+    const { data: updatedLead, error: leadError } = await supabase
       .from('leads')
       .update({ status: 'working_project' })
       .eq('id', leadId)
       .select()
       .single()
 
-    await supabase.from('deal_financials').upsert({
+    if (leadError) {
+      setCreatingProject(false)
+      return
+    }
+
+    const { error: finError } = await supabase.from('deal_financials').upsert({
       lead_id:               lead.id,
-      workspace_id:          lead.workspace_id,
+      workspace_id:          lead.workspace_id || workspaceId,
       purchase_price_actual: lead.offer_price || lead.asking_price || null,
       expected_sell_price:   lead.arv || null,
     }, { onConflict: 'lead_id' })
 
     setCreatingProject(false)
+    if (finError) return
+
     if (updatedLead) setLead(updatedLead)
     navigate(`/w/${workspaceId}/projects/${leadId}`)
   }
