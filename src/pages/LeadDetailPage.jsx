@@ -56,9 +56,12 @@ export default function LeadDetailPage() {
       expected_sell_price:   lead.arv || null,
     }, { onConflict: 'lead_id' })
 
-    setCreatingProject(false)
-    if (finError) return
+    if (finError) {
+      setCreatingProject(false)
+      return
+    }
 
+    setCreatingProject(false)
     if (updatedLead) setLead(updatedLead)
     navigate(`/w/${workspaceId}/projects/${leadId}`)
   }
