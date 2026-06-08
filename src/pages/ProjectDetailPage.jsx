@@ -12,33 +12,54 @@ const labelCls = 'text-[10px] uppercase tracking-wider font-medium text-[color:v
 const inputCls = 'w-full h-8 px-2 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] disabled:opacity-50'
 const calcDisplayCls = 'h-8 px-2 flex items-center text-[12px] rounded bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]'
 
-// Calculated display with an expandable breakdown popover
+// Calculated display with an expandable breakdown popover (fixed-position to avoid clip)
 function CalcDisplay({ value, lines = [], className = '' }) {
-  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState(null)
+  const btnRef = useRef(null)
   const hasLines = lines.length > 0
+
+  const toggle = () => {
+    if (pos) { setPos(null); return }
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 6, left: r.left })
+  }
+
+  useEffect(() => {
+    if (!pos) return
+    const close = () => setPos(null)
+    window.addEventListener('click', close, true)
+    window.addEventListener('scroll', close, true)
+    return () => { window.removeEventListener('click', close, true); window.removeEventListener('scroll', close, true) }
+  }, [pos])
+
   return (
     <div className="relative">
       <div className={`${calcDisplayCls} ${className} pr-1 gap-1`}>
         <span className="flex-1">{value}</span>
         {hasLines && (
           <button
-            onClick={() => setOpen(p => !p)}
+            ref={btnRef}
+            onClick={e => { e.stopPropagation(); toggle() }}
             className={`shrink-0 w-5 h-5 rounded text-[10px] flex items-center justify-center transition-colors ${
-              open
+              pos
                 ? 'bg-[color:var(--color-accent)] text-white'
                 : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-bg-elev)] hover:text-[color:var(--color-text)]'
             }`}
             title="Show breakdown"
           >
-            {open ? '−' : '+'}
+            {pos ? '−' : '+'}
           </button>
         )}
       </div>
-      {open && hasLines && (
-        <div className="absolute z-20 left-0 top-full mt-1 w-64 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] shadow-lg p-3 space-y-1">
+      {pos && hasLines && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-64 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] shadow-xl p-3 space-y-1"
+        >
           {lines.map((line, i) => (
             line === '---'
-              ? <div key={i} className="border-t border-[color:var(--color-line)] my-1" />
+              ? <div key={i} className="border-t border-[color:var(--color-line)] my-1.5" />
               : <div key={i} className={`flex justify-between text-[11px] ${line.bold ? 'font-semibold text-[color:var(--color-text)]' : 'text-[color:var(--color-text-muted)]'}`}>
                   <span className="truncate pr-2">{line.label}</span>
                   <span className="shrink-0 tabular-nums">{line.value}</span>
