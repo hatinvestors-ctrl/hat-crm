@@ -11,6 +11,7 @@ import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
 import ScenariosFlat from '../components/lead-detail/ScenariosFlat'
+import DealFinancialsSection from '../components/lead-detail/DealFinancialsSection'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -150,6 +151,11 @@ export default function LeadDetailPage() {
               onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
             />
             <ScenariosFlat
+              lead={lead}
+              canEdit={canEdit}
+              onUpdated={(updated) => setLead(updated)}
+            />
+            <DealFinancialsSection
               lead={lead}
               canEdit={canEdit}
               onUpdated={(updated) => setLead(updated)}

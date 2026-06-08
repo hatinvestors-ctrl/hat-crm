@@ -31,6 +31,7 @@ const ICONS = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
   ),
+  projects: <Icon d={<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>} />,
 }
 
 const navItemClasses = ({ isActive }) =>
@@ -163,6 +164,12 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
           <span className="text-[color:var(--color-text-dim)]">{ICONS.agents}</span>
           <span className="flex-1">Agents</span>
         </NavLink>
+        {userRole !== 'readonly' && (
+          <NavLink to={`${base}/projects`} className={navItemClasses}>
+            <span className="text-[color:var(--color-text-dim)]">{ICONS.projects}</span>
+            <span className="flex-1">Projects</span>
+          </NavLink>
+        )}
         {userRole !== 'readonly' && (
           <NavLink to={`${base}/tasks`} className={navItemClasses}>
             <span className="text-[color:var(--color-text-dim)]">{ICONS.tasks}</span>

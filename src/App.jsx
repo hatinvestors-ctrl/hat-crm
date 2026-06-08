@@ -12,6 +12,7 @@ import LeadsPage from './pages/LeadsPage'
 import LeadDetailPage from './pages/LeadDetailPage'
 import AgentsPage from './pages/AgentsPage'
 import TasksPage from './pages/TasksPage'
+import ProjectsPage from './pages/ProjectsPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="agents" element={<AgentsPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="tasks/:taskId" element={<TasksPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
         <Route element={<AdminRoute />}>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
