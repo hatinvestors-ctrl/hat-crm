@@ -263,6 +263,12 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
               {fmtPct(profitResult.roi)}
             </span>
           </div>
+          <div className="mt-0.5 flex justify-between text-[11px]">
+            <span className={dim}>Annualized ROI ({calc.holdMonths}mo)</span>
+            <span className={profitResult.annualizedRoi >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
+              {fmtPct(profitResult.annualizedRoi)}
+            </span>
+          </div>
         </div>
       )}
 
@@ -498,7 +504,7 @@ export default function ProjectDetailPage() {
               <StatBox
                 label={calc.actual ? 'Actual ROI' : 'Expected ROI'}
                 value={fmtPct(calc.actual?.roi ?? calc.expected?.roi)}
-                sub="on cash invested"
+                sub={`${fmtPct(calc.actual?.annualizedRoi ?? calc.expected?.annualizedRoi)} annualized`}
                 color={(calc.actual?.roi ?? calc.expected?.roi) >= 0
                   ? 'text-[color:var(--color-success-text)]'
                   : 'text-[color:var(--color-danger-text)]'}
@@ -836,7 +842,8 @@ export default function ProjectDetailPage() {
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.expected.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
                       <MetricRow label="Net Profit"  value={fmtUSD(calc.expected.netProfit)} highlight positive={calc.expected.netProfit >= 0} negative={calc.expected.netProfit < 0} />
-                      <MetricRow label="ROI on Cash" value={fmtPct(calc.expected.roi)}       highlight positive={calc.expected.roi >= 0}    negative={calc.expected.roi < 0} />
+                      <MetricRow label="ROI on Cash Invested"    value={fmtPct(calc.expected.roi)}            highlight positive={calc.expected.roi >= 0}            negative={calc.expected.roi < 0} />
+                      <MetricRow label={`Annualized ROI (${calc.holdMonths}mo)`} value={fmtPct(calc.expected.annualizedRoi)} positive={calc.expected.annualizedRoi >= 0} negative={calc.expected.annualizedRoi < 0} />
                     </>
                   ) : (
                     <div className="text-[12px] text-[color:var(--color-text-dim)] py-6 text-center">
@@ -850,7 +857,8 @@ export default function ProjectDetailPage() {
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.actual.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
                       <MetricRow label="Net Profit"  value={fmtUSD(calc.actual.netProfit)}  highlight positive={calc.actual.netProfit >= 0} negative={calc.actual.netProfit < 0} />
-                      <MetricRow label="ROI on Cash" value={fmtPct(calc.actual.roi)}        highlight positive={calc.actual.roi >= 0}    negative={calc.actual.roi < 0} />
+                      <MetricRow label="ROI on Cash Invested"    value={fmtPct(calc.actual.roi)}            highlight positive={calc.actual.roi >= 0}            negative={calc.actual.roi < 0} />
+                      <MetricRow label={`Annualized ROI (${calc.holdMonths}mo)`} value={fmtPct(calc.actual.annualizedRoi)} positive={calc.actual.annualizedRoi >= 0} negative={calc.actual.annualizedRoi < 0} />
                     </div>
                   )}
                 </div>

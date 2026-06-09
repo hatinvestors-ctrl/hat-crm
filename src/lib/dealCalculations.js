@@ -100,13 +100,15 @@ export function calcDeal(f, items = []) {
   const allInVsARV       = n(f.expected_sell_price) > 0 ? totalAllInCost / n(f.expected_sell_price) : 0
 
   // --- Scenario helper ---
+  const holdMonthsN = n(f.hold_months) || 1
   const scenario = (sellPrice) => {
     if (!sellPrice) return null
-    const sp           = n(sellPrice)
-    const sellingCosts = sp * sellingCostPct
-    const netProfit    = sp - sellingCosts - totalAllInCost
-    const roi          = totalCashInvested > 0 ? netProfit / totalCashInvested : 0
-    return { sellPrice: sp, sellingCosts, netProfit, roi }
+    const sp            = n(sellPrice)
+    const sellingCosts  = sp * sellingCostPct
+    const netProfit     = sp - sellingCosts - totalAllInCost
+    const roi           = totalCashInvested > 0 ? netProfit / totalCashInvested : 0
+    const annualizedRoi = roi * (12 / holdMonthsN)
+    return { sellPrice: sp, sellingCosts, netProfit, roi, annualizedRoi }
   }
 
   const conservative = scenario(f.conservative_sell_price)

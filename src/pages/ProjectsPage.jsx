@@ -155,7 +155,7 @@ export default function ProjectsPage() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)]">
-                      {['Property', 'Status', 'Purchase', 'All-In Cost', 'Expected Profit', 'Actual Profit', 'ROI', 'Hold', 'Rating'].map(h => (
+                      {['Property', 'Status', 'Purchase', 'All-In Cost', 'Expected Profit', 'Actual Profit', 'ROI', 'Ann. ROI', 'Hold', 'Rating'].map(h => (
                         <th key={h} className="text-left px-3 py-2.5 text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">{h}</th>
                       ))}
                     </tr>
@@ -165,6 +165,7 @@ export default function ProjectsPage() {
                       const expectedProfit = calc?.expected?.netProfit
                       const actualProfit   = calc?.actual?.netProfit
                       const roi = actualProfit != null ? calc.actual.roi : calc?.expected?.roi
+                      const annRoi = actualProfit != null ? calc.actual.annualizedRoi : calc?.expected?.annualizedRoi
                       const statusCls = STATUS_CLS[lead?.status] || 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]'
                       return (
                         <tr
@@ -195,6 +196,7 @@ export default function ProjectsPage() {
                             ) : '—'}
                           </td>
                           <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{roi != null ? fmtPct(roi) : '—'}</td>
+                          <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{annRoi != null ? fmtPct(annRoi) : '—'}</td>
                           <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{f.hold_months ? `${f.hold_months}mo` : '—'}</td>
                           <td className="px-3 py-2.5">
                             {calc?.dealRating && (
