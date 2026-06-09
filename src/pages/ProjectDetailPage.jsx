@@ -318,6 +318,8 @@ export default function ProjectDetailPage() {
   const [markingSOld, setMarkingSold] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editingAddress, setEditingAddress] = useState(false)
+  const [addressDraft, setAddressDraft] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -380,6 +382,14 @@ export default function ProjectDetailPage() {
 
   if (loading) return <LoadingSpinner fullPage label="Loading project…" />
   if (!lead) return <div className="p-6 text-[color:var(--color-text-muted)]">Project not found.</div>
+
+  const handleSaveAddress = async () => {
+    const trimmed = addressDraft.trim()
+    if (!trimmed || trimmed === lead.address) { setEditingAddress(false); return }
+    await supabase.from('leads').update({ address: trimmed }).eq('id', leadId)
+    setLead(prev => ({ ...prev, address: trimmed }))
+    setEditingAddress(false)
+  }
 
   const handleDeleteProject = async () => {
     setDeleting(true)
@@ -464,7 +474,7 @@ export default function ProjectDetailPage() {
 
       <div className="px-6 py-4 max-w-[1400px] w-full">
 
-        {/* Status + Mark as Sold dialog */}
+        {/* Status + editable address */}
         <div className="mb-4 flex items-center gap-3 flex-wrap">
           <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${
             isSold
@@ -473,6 +483,29 @@ export default function ProjectDetailPage() {
           }`}>
             {isSold ? '✓ Sold' : 'Active Project'}
           </span>
+          {canEdit && (
+            editingAddress ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={addressDraft}
+                  onChange={e => setAddressDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveAddress(); if (e.key === 'Escape') setEditingAddress(false) }}
+                  className="h-8 px-2 text-[13px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-accent)] focus:outline-none w-80"
+                />
+                <button onClick={handleSaveAddress} className="h-8 px-3 text-[12px] rounded bg-[color:var(--color-accent)] text-white font-medium">Save</button>
+                <button onClick={() => setEditingAddress(false)} className="h-8 px-3 text-[12px] rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">Cancel</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setAddressDraft(lead.address || ''); setEditingAddress(true) }}
+                className="text-[12px] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] underline decoration-dotted transition"
+                title="Edit address"
+              >
+                {lead.address} ✎
+              </button>
+            )
+          )}
         </div>
 
         {/* Mark as Sold inline dialog */}
