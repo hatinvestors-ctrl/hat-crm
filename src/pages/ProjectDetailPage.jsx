@@ -309,7 +309,8 @@ export default function ProjectDetailPage() {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [importOpen, setImportOpen] = useState(false)
-  const [pendingRenovCost, setPendingRenovCost] = useState(null) // live update while typing new reno item
+  const [pendingRenovCost, setPendingRenovCost] = useState(null)
+  const [hmlFeesOpen, setHmlFeesOpen] = useState(false) // live update while typing new reno item
   const [markSoldOpen, setMarkSoldOpen] = useState(false)
   const [soldPrice, setSoldPrice]   = useState('')
   const [soldDate, setSoldDate]     = useState('')
@@ -537,15 +538,42 @@ export default function ProjectDetailPage() {
         {/* Property Summary */}
         <Card title="Property Summary">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Static lead info */}
             {[
-              { label: 'Address',        value: [lead.address, lead.city, lead.state].filter(Boolean).join(', ') || '—' },
-              { label: 'Beds / Baths',   value: [lead.bedrooms && `${lead.bedrooms} bd`, lead.bathrooms && `${lead.bathrooms} ba`].filter(Boolean).join(' / ') || '—' },
-              { label: 'Sqft',           value: lead.square_feet ? Number(lead.square_feet).toLocaleString() : '—' },
-              { label: 'Year Built',     value: lead.year_built || '—' },
-              { label: 'Purchase Price', value: fmtUSD(lead.offer_price || lead.asking_price) },
-              { label: 'ARV',            value: fmtUSD(lead.arv) },
-              { label: 'Listing Agent',  value: lead.listing_agent_name || '—' },
-              { label: 'Agent Phone',    value: lead.listing_agent_phone || '—' },
+              { label: 'Address',      value: [lead.address, lead.city, lead.state].filter(Boolean).join(', ') || '—' },
+              { label: 'Beds / Baths', value: [lead.bedrooms && `${lead.bedrooms} bd`, lead.bathrooms && `${lead.bathrooms} ba`].filter(Boolean).join(' / ') || '—' },
+              { label: 'Sqft',         value: lead.square_feet ? Number(lead.square_feet).toLocaleString() : '—' },
+              { label: 'Year Built',   value: lead.year_built || '—' },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <div className={labelCls}>{label}</div>
+                <div className="text-[12px] text-[color:var(--color-text)]">{value}</div>
+              </div>
+            ))}
+            {/* Editable financial fields — from deal_financials, not the stale lead record */}
+            {financials && (
+              <>
+                <Field label="Purchase Price" tip="Actual purchase price — updates deal calculations">
+                  <NumInput
+                    value={financials.purchase_price_actual}
+                    onChange={handleLive('purchase_price_actual')}
+                    onBlur={handleBlur('purchase_price_actual')}
+                    disabled={!canEdit}
+                  />
+                </Field>
+                <Field label="ARV (Expected Sale Price)" tip="After Repair Value — your expected sale price, used for all profit calculations">
+                  <NumInput
+                    value={financials.expected_sell_price}
+                    onChange={handleLive('expected_sell_price')}
+                    onBlur={handleBlur('expected_sell_price')}
+                    disabled={!canEdit}
+                  />
+                </Field>
+              </>
+            )}
+            {[
+              { label: 'Listing Agent', value: lead.listing_agent_name || '—' },
+              { label: 'Agent Phone',   value: lead.listing_agent_phone || '—' },
             ].map(({ label, value }) => (
               <div key={label}>
                 <div className={labelCls}>{label}</div>
@@ -566,9 +594,6 @@ export default function ProjectDetailPage() {
             {/* Deal Parameters (formerly Assumptions) */}
             <Card title="Deal Parameters">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Field label="Purchase Price (Actual)">
-                  <NumInput value={financials.purchase_price_actual} onChange={handleLive('purchase_price_actual')} onBlur={handleBlur('purchase_price_actual')} disabled={!canEdit} />
-                </Field>
                 <Field label="Hold Months">
                   <NumInput value={financials.hold_months} onChange={handleLive('hold_months')} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="5" />
                 </Field>
@@ -596,102 +621,116 @@ export default function ProjectDetailPage() {
 
             {/* Hard Money Loan */}
             <Card title="Hard Money Loan">
-              {/* Loan structure — calculated display */}
-              <div className="mb-4">
-                <div className={labelCls + ' mb-2'}>Loan Structure</div>
+
+              {/* ── Section 1: Your Deal Terms (highlighted — fill these in) ── */}
+              <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3 mb-4">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)] mb-3 flex items-center gap-1.5">
+                  <span>✏</span> Fill In Your Deal Terms
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Field label="Renovation Budget" tip={items.length > 0 ? "Overridden by your renovation line items total" : "Enter total renovation cost — overridden once you add line items below"}>
+                  <Field label="Renovation Budget" tip={items.length > 0 ? "Locked — using your renovation line items total" : "Total renovation cost. Enter here until you add line items below"}>
                     <NumInput
                       value={financials.renovation_lender_amount}
                       onChange={handleLive('renovation_lender_amount')}
                       onBlur={handleBlur('renovation_lender_amount')}
                       disabled={!canEdit || items.length > 0}
-                      placeholder="e.g. 40000"
+                      placeholder="e.g. 47000"
                     />
                   </Field>
-                  <Field label="Renovation Financed %">
+                  <Field label="Lender Covers %" tip="What % of the renovation does the lender finance? (typically 85–100%)">
                     <NumInput
                       value={financials.renovation_lender_pct != null ? financials.renovation_lender_pct * 100 : 100}
-                      onChange={n => setFinancials(prev => prev ? {...prev, renovation_lender_pct: n / 100} : prev)} onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
+                      onChange={n => setFinancials(prev => prev ? {...prev, renovation_lender_pct: n / 100} : prev)}
+                      onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
                       disabled={!canEdit} placeholder="100"
                     />
                   </Field>
-                  <Field label="Renovation Loan (auto)" tip="Renovation Budget × Financed %">
-                    <CalcDisplay
-                      value={calc ? fmtUSD(calc.renovationLoan) : '—'}
-                      lines={calc ? [
-                        { label: `Budget (${fmtUSD(calc.totalRenovationCost)})`, value: '' },
-                        { label: `× Financed (${fmtPct(calc.renovLenderPct)})`, value: '' },
-                        '---',
-                        { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan), bold: true },
-                      ] : []}
+                  <Field label="Interest Rate (Annual %)" tip="Hard money lender's annual rate. Typical: 10–14%">
+                    <NumInput
+                      value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''}
+                      onChange={n => setFinancials(prev => prev ? {...prev, interest_rate_annual: n / 100} : prev)}
+                      onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="12"
                     />
                   </Field>
-                  <Field label="Purchase Portion (auto)" tip="Purchase price × LTV%">
-                    <CalcDisplay
-                      value={calc ? fmtUSD(calc.purchaseLoan) : '—'}
-                      lines={calc ? [
-                        { label: `Price (${fmtUSD(financials?.purchase_price_actual)})`, value: '' },
-                        { label: `× LTV (${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)})`, value: '' },
-                        '---',
-                        { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan), bold: true },
-                      ] : []}
-                    />
-                  </Field>
-                  <Field label="Total Loan (auto)" tip="Purchase portion + Renovation loan">
-                    <CalcDisplay
-                      value={calc ? fmtUSD(calc.totalLoan) : '—'}
-                      className="font-semibold text-[color:var(--color-text)]"
-                      lines={calc ? [
-                        { label: 'Purchase Portion', value: fmtUSD(calc.purchaseLoan) },
-                        { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan) },
-                        '---',
-                        { label: 'Total Loan', value: fmtUSD(calc.totalLoan), bold: true },
-                      ] : []}
-                    />
-                  </Field>
-                  <Field label="Interest Rate (Annual %)">
-                    <NumInput value={financials.interest_rate_annual != null ? financials.interest_rate_annual * 100 : ''} onChange={n => setFinancials(prev => prev ? {...prev, interest_rate_annual: n / 100} : prev)} onBlur={v => save({ interest_rate_annual: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="12" />
-                  </Field>
-                  <Field label="Monthly Interest Payment (auto)">
-                    <CalcDisplay
-                      value={calc ? fmtUSD(calc.monthlyInterest) : '—'}
-                      className="font-semibold text-[color:var(--color-accent-text)]"
-                      lines={calc ? [
-                        { label: `Total Loan (${fmtUSD(calc.totalLoan)})`, value: '' },
-                        { label: `× Rate (${fmtPct(financials?.interest_rate_annual)}/12)`, value: '' },
-                        '---',
-                        { label: 'Monthly Payment', value: fmtUSD(calc.monthlyInterest), bold: true },
-                        { label: `× ${calc.holdMonths}mo = Total Interest`, value: fmtUSD(calc.totalInterest) },
-                      ] : []}
+                  <Field label="Points %" tip="Lender origination fee as % of total loan. Typical: 1–3%">
+                    <NumInput
+                      value={financials.points_pct != null ? financials.points_pct * 100 : ''}
+                      onChange={n => setFinancials(prev => prev ? {...prev, points_pct: n / 100} : prev)}
+                      onBlur={v => save({ points_pct: v === '' ? null : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="2"
                     />
                   </Field>
                 </div>
               </div>
 
-              {/* Loan fees at closing */}
-              <div className="border-t border-[color:var(--color-line)] pt-4">
-                <div className={labelCls + ' mb-2'}>Loan Fees at Closing</div>
+              {/* ── Section 2: Auto-Calculated ── */}
+              <div className="mb-4">
+                <div className={labelCls + ' mb-2'}>Calculated Automatically</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Field label="Points %" tip="Lender origination fee as % of loan amount">
-                    <NumInput value={financials.points_pct != null ? financials.points_pct * 100 : ''} onChange={n => setFinancials(prev => prev ? {...prev, points_pct: n / 100} : prev)} onBlur={v => save({ points_pct: v === '' ? null : Number(v) / 100 })} disabled={!canEdit} placeholder="2" />
+                  <Field label="Purchase Loan" tip="Purchase price × LTV%">
+                    <CalcDisplay value={calc ? fmtUSD(calc.purchaseLoan) : '—'} lines={calc ? [
+                      { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
+                      '---', { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan), bold: true },
+                    ] : []} />
                   </Field>
-                  <Field label="Title Lender Insurance" tip="Title insurance paid to protect the lender's interest">
-                    <NumInput value={financials.title_lender_insurance} onChange={handleLive('title_lender_insurance')} onBlur={handleBlur('title_lender_insurance')} disabled={!canEdit} />
+                  <Field label="Renovation Loan" tip="Renovation Budget × Lender Covers %">
+                    <CalcDisplay value={calc ? fmtUSD(calc.renovationLoan) : '—'} lines={calc ? [
+                      { label: `${fmtUSD(calc.totalRenovationCost)} × ${fmtPct(calc.renovLenderPct)}`, value: '' },
+                      '---', { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan), bold: true },
+                      { label: 'Your cash portion', value: fmtUSD(calc.renovationGap) },
+                    ] : []} />
                   </Field>
-                  <Field label="Interest Portion" tip="Pre-paid interest for the partial first month of the loan">
-                    <NumInput value={financials.interest_portion} onChange={handleLive('interest_portion')} onBlur={handleBlur('interest_portion')} disabled={!canEdit} />
+                  <Field label="Total Loan" tip="Purchase Loan + Renovation Loan">
+                    <CalcDisplay value={calc ? fmtUSD(calc.totalLoan) : '—'} className="font-semibold text-[color:var(--color-text)]" lines={calc ? [
+                      { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan) },
+                      { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan) },
+                      '---', { label: 'Total Loan', value: fmtUSD(calc.totalLoan), bold: true },
+                    ] : []} />
                   </Field>
-                  <Field label="Doc Stamps (Mortgage)" tip="Florida tax on the mortgage note — calculated as 0.35% of loan amount">
-                    <NumInput value={financials.doc_stamps_mortgage} onChange={handleLive('doc_stamps_mortgage')} onBlur={handleBlur('doc_stamps_mortgage')} disabled={!canEdit} />
-                  </Field>
-                  <Field label="Intangible Tax" tip="Florida tax on new mortgages — 0.2% of loan amount">
-                    <NumInput value={financials.intangible_tax} onChange={handleLive('intangible_tax')} onBlur={handleBlur('intangible_tax')} disabled={!canEdit} />
-                  </Field>
-                  <Field label="Extension Fee" tip="Fee charged by lender if you need to extend the loan term">
-                    <NumInput value={financials.extension_fee} onChange={handleLive('extension_fee')} onBlur={handleBlur('extension_fee')} disabled={!canEdit} />
+                  <Field label="Monthly Interest" tip="Total Loan × (Rate ÷ 12)">
+                    <CalcDisplay value={calc ? fmtUSD(calc.monthlyInterest) : '—'} className="font-semibold text-[color:var(--color-accent-text)]" lines={calc ? [
+                      { label: `${fmtUSD(calc.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
+                      '---', { label: 'Monthly', value: fmtUSD(calc.monthlyInterest), bold: true },
+                      { label: `× ${calc.holdMonths}mo total`, value: fmtUSD(calc.totalInterest) },
+                    ] : []} />
                   </Field>
                 </div>
+              </div>
+
+              {/* ── Section 3: Florida Closing Fees (collapsible defaults) ── */}
+              <div className="border-t border-[color:var(--color-line)] pt-3">
+                <button
+                  onClick={() => setHmlFeesOpen(p => !p)}
+                  className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors w-full"
+                >
+                  <span className="text-[color:var(--color-text-dim)]">{hmlFeesOpen ? '▾' : '▸'}</span>
+                  <span className="font-medium uppercase tracking-wider">Florida Closing Fees</span>
+                  <span className="text-[color:var(--color-text-dim)]">— usually set once, rarely changes</span>
+                  {calc && <span className="ml-auto font-semibold text-[color:var(--color-text-muted)]">{fmtUSD(calc.hmlClosingCosts)} total</span>}
+                </button>
+                {hmlFeesOpen && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                    <Field label="Points Cost (auto)" tip="Points % × Total Loan">
+                      <div className={calcDisplayCls}>{calc ? fmtUSD(calc.pointsCost) : '—'}</div>
+                    </Field>
+                    <Field label="Title Lender Insurance" tip="Protects the lender's interest">
+                      <NumInput value={financials.title_lender_insurance} onChange={handleLive('title_lender_insurance')} onBlur={handleBlur('title_lender_insurance')} disabled={!canEdit} />
+                    </Field>
+                    <Field label="Interest Portion" tip="Pre-paid interest for partial first month">
+                      <NumInput value={financials.interest_portion} onChange={handleLive('interest_portion')} onBlur={handleBlur('interest_portion')} disabled={!canEdit} />
+                    </Field>
+                    <Field label="Doc Stamps (Mortgage)" tip="FL tax: 0.35% of loan. On $148K = ~$518">
+                      <NumInput value={financials.doc_stamps_mortgage} onChange={handleLive('doc_stamps_mortgage')} onBlur={handleBlur('doc_stamps_mortgage')} disabled={!canEdit} />
+                    </Field>
+                    <Field label="Intangible Tax" tip="FL tax: 0.2% of loan. On $148K = ~$296">
+                      <NumInput value={financials.intangible_tax} onChange={handleLive('intangible_tax')} onBlur={handleBlur('intangible_tax')} disabled={!canEdit} />
+                    </Field>
+                    <Field label="Extension Fee" tip="If you need to extend the loan term">
+                      <NumInput value={financials.extension_fee} onChange={handleLive('extension_fee')} onBlur={handleBlur('extension_fee')} disabled={!canEdit} />
+                    </Field>
+                  </div>
+                )}
               </div>
             </Card>
 
