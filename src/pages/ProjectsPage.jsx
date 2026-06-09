@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { calcDeal, fmtUSD, fmtPct, dealRatingColor } from '../lib/dealCalculations'
 import Topbar from '../components/Topbar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
+import ProjectsIntelligencePage from './ProjectsIntelligencePage'
 
 // ─── tiny helpers ───────────────────────────────────────────────────────────
 const dim   = 'text-[color:var(--color-text-dim)]'
@@ -217,7 +218,8 @@ export default function ProjectsPage() {
   const [ratingFilter, setRatingFilter] = useState('All')       // All | A | B | C | D
   const [sortBy, setSortBy]             = useState('annRoi')
   const [sortDir, setSortDir]           = useState('desc')
-  const [activePanel, setActivePanel]   = useState(null) // which stat card is expanded
+  const [activePanel, setActivePanel]   = useState(null)
+  const [view, setView]                 = useState('deals') // 'deals' | 'intelligence'
 
   const togglePanel = (id) => setActivePanel(p => p === id ? null : id)
 
@@ -400,6 +402,30 @@ export default function ProjectsPage() {
 
       <div className="p-4 space-y-6 max-w-[1400px]">
 
+        {/* ── VIEW TABS ── */}
+        <div className="flex gap-1 border-b border-[color:var(--color-line)] pb-0">
+          {[
+            { id: 'deals',        label: 'Deals' },
+            { id: 'intelligence', label: '📊 Intelligence' },
+          ].map(t => (
+            <button key={t.id} onClick={() => setView(t.id)}
+              className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+                view === t.id
+                  ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent-text)]'
+                  : 'border-transparent text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── INTELLIGENCE VIEW ── */}
+        {view === 'intelligence' && !loading && (
+          <ProjectsIntelligencePage rows={rows} />
+        )}
+
+        {view === 'deals' && <>
+
         {/* ── TOP STATS BAR ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <StatCard id="locked"   label="Cash Locked (Active)" value={fmtUSD(portfolio.totalLocked)}    sub={`${portfolio.active} active deals · click to see breakdown`} color="text-[color:var(--color-text)]" activeId={activePanel} onToggle={togglePanel} />
@@ -549,6 +575,9 @@ export default function ProjectsPage() {
             )}
           </>
         )}
+
+        </> /* end deals view */}
+
       </div>
     </>
   )
