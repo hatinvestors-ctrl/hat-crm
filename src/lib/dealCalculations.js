@@ -32,8 +32,15 @@ export const DEAL_RATING_INFO = {
 export function calcDeal(f, items = []) {
   if (!f) return null
 
+  // --- JV (Joint Venture) deal ---
+  const isJV            = !!f.is_jv
+  const jvSplitPct      = isJV ? (f.jv_profit_split_pct != null ? n(f.jv_profit_split_pct) : 0.5) : 1
+  const jvPartnerPurch  = isJV ? n(f.jv_partner_purchase) : 0   // partner's purchase + their closing
+  const jvPartnerLoan   = isJV ? n(f.jv_partner_loan) : 0       // partner lent us for reno
+  const jvPartnerRate   = isJV ? n(f.jv_partner_loan_rate) : 0  // annual rate on partner loan
+
   // --- Basic ---
-  const purchasePrice  = n(f.purchase_price_actual)
+  const purchasePrice  = isJV ? 0 : n(f.purchase_price_actual)  // JV: we didn't buy
   const ltvPct         = f.loan_to_purchase_pct != null ? n(f.loan_to_purchase_pct) : 0.90
 
   // --- Selling Costs (detailed breakdown or legacy single %) ---
@@ -83,17 +90,25 @@ export function calcDeal(f, items = []) {
   // --- Purchase Closing ---
   const purchaseClosing  = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
 
-  // --- Holding Costs (ongoing, not upfront cash) ---
+  // --- Holding Costs ---
   const monthlyHoldCosts  = n(f.insurance_monthly) + n(f.utilities_monthly) + n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
-  const totalHoldingCosts = monthlyHoldCosts * n(f.hold_months) + totalInterest
 
-  // --- All-In Cost (total money spent on the deal) ---
-  const totalAllInCost   = purchasePrice + totalRenovationCost + hmlClosingCosts + purchaseClosing + totalHoldingCosts
+  // --- JV: interest on partner loan (we pay this, it's our cost) ---
+  const jvPartnerInterest = isJV ? jvPartnerLoan * jvPartnerRate * (n(f.hold_months) / 12) : 0
 
-  // --- Total Cash Invested (cash you bring to the table at closing + renovation gap) ---
-  // This is the basis for ROI — what you actually invest out of pocket.
-  // All cash out of pocket: upfront closing cash + ongoing payments (interest + holding) over the hold period
-  const totalCashInvested = downPayment + hmlClosingCosts + purchaseClosing + renovationGap + totalHoldingCosts
+  const totalHoldingCosts = monthlyHoldCosts * n(f.hold_months) + totalInterest + jvPartnerInterest
+
+  // --- All-In Cost (total deal spend, including partner's purchase for JV) ---
+  const totalAllInCost   = (isJV ? jvPartnerPurch : purchasePrice)
+    + totalRenovationCost + hmlClosingCosts + purchaseClosing + totalHoldingCosts
+
+  // --- Our Cash Invested ---
+  // JV: we invest only our reno gap + interest we owe partner (partner funds the purchase + their loan portion)
+  // Standard: down payment + closing fees + reno gap + carrying costs
+  const ourCashInvested  = isJV
+    ? renovationGap + jvPartnerInterest + (monthlyHoldCosts * n(f.hold_months))
+    : downPayment + hmlClosingCosts + purchaseClosing + renovationGap + totalHoldingCosts
+  const totalCashInvested = ourCashInvested
 
   // --- Break-Even ---
   const breakEvenPrice   = sellingCostPct < 1 ? totalAllInCost / (1 - sellingCostPct) : 0
@@ -103,12 +118,14 @@ export function calcDeal(f, items = []) {
   const holdMonthsN = n(f.hold_months) || 1
   const scenario = (sellPrice) => {
     if (!sellPrice) return null
-    const sp            = n(sellPrice)
-    const sellingCosts  = sp * sellingCostPct
-    const netProfit     = sp - sellingCosts - totalAllInCost
-    const roi           = totalCashInvested > 0 ? netProfit / totalCashInvested : 0
-    const annualizedRoi = roi * (12 / holdMonthsN)
-    return { sellPrice: sp, sellingCosts, netProfit, roi, annualizedRoi }
+    const sp              = n(sellPrice)
+    const sellingCosts    = sp * sellingCostPct
+    const totalDealProfit = sp - sellingCosts - totalAllInCost
+    // JV: we only get our split of the profit
+    const netProfit       = isJV ? totalDealProfit * jvSplitPct : totalDealProfit
+    const roi             = ourCashInvested > 0 ? netProfit / ourCashInvested : 0
+    const annualizedRoi   = roi * (12 / holdMonthsN)
+    return { sellPrice: sp, sellingCosts, netProfit, totalDealProfit, roi, annualizedRoi }
   }
 
   const conservative = scenario(f.conservative_sell_price)
@@ -131,6 +148,8 @@ export function calcDeal(f, items = []) {
   if (expected && expected.netProfit < 30000 && expected.netProfit > -999999) warnings.push('Expected profit below $30K')
 
   return {
+    // JV
+    isJV, jvSplitPct, jvPartnerPurch, jvPartnerLoan, jvPartnerInterest,
     // Selling cost breakdown
     agentCommissionPct, buyerAgentPct, sellingClosingPct, sellingOtherPct,
     // Loans

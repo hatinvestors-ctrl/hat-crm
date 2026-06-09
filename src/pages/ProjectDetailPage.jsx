@@ -698,6 +698,35 @@ export default function ProjectDetailPage() {
               </div>
             </Card>
 
+            {/* Joint Venture — only shown when is_jv = true */}
+            {financials?.is_jv && (
+              <Card title="Joint Venture Structure">
+                <div className="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 mb-4 text-[11.5px] text-amber-800 dark:text-amber-300 font-medium">
+                  JV Deal — profit is split {Math.round((financials.jv_profit_split_pct || 0.5) * 100)}% / {100 - Math.round((financials.jv_profit_split_pct || 0.5) * 100)}%. ROI and cash invested reflect <strong>your share only</strong>.
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <Field label="Partner's Purchase + Closing" tip="What your partner paid for the property including their closing costs">
+                    <NumInput value={financials.jv_partner_purchase} onBlur={v => saveField('jv_partner_purchase', parseFloat(v) || 0)} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Partner Loan to Us" tip="Amount your partner lent us for renovation">
+                    <NumInput value={financials.jv_partner_loan} onBlur={v => saveField('jv_partner_loan', parseFloat(v) || 0)} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Partner Loan Rate (Annual)" tip="Interest rate on the partner's loan to us, e.g. 0.12 for 12%">
+                    <NumInput value={financials.jv_partner_loan_rate} onBlur={v => saveField('jv_partner_loan_rate', parseFloat(v) || 0)} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Our Profit Split" tip="Our share of the deal profit, e.g. 0.5 for 50%">
+                    <NumInput value={financials.jv_profit_split_pct} onBlur={v => saveField('jv_profit_split_pct', parseFloat(v) || 0.5)} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Partner Interest (auto)">
+                    <div className={calcDisplayCls}>{calc ? fmtUSD(calc.jvPartnerInterest) : '—'}</div>
+                  </Field>
+                  <Field label="Our Cash In (auto)" tip="Reno gap + interest we owe partner">
+                    <div className={`${calcDisplayCls} font-semibold text-[color:var(--color-success-text)]`}>{calc ? fmtUSD(calc.totalCashInvested) : '—'}</div>
+                  </Field>
+                </div>
+              </Card>
+            )}
+
             {/* Hard Money Loan */}
             <Card title="Hard Money Loan">
 

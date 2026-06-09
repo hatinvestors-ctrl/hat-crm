@@ -63,6 +63,7 @@ function InsightCard({ icon, title, body, tone = 'neutral' }) {
 const TYPE_BADGE = {
   Cash:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   Financed: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  JV:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 }
 
 const STATUS_LABELS = { working_project: 'Active', sold: 'Sold' }
@@ -220,8 +221,9 @@ export default function ProjectsPage() {
     let r = [...rows]
     if (statusFilter === 'Active') r = r.filter(x => x.lead?.status !== 'sold')
     if (statusFilter === 'Sold')   r = r.filter(x => x.lead?.status === 'sold')
-    if (typeFilter === 'Cash') r = r.filter(x => x.financials.renovation_financing === 'Cash')
-    if (typeFilter === 'HML')  r = r.filter(x => x.financials.renovation_financing !== 'Cash')
+    if (typeFilter === 'Cash') r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing === 'Cash')
+    if (typeFilter === 'HML')  r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing !== 'Cash')
+    if (typeFilter === 'JV')   r = r.filter(x => !!x.financials.is_jv)
     if (ratingFilter !== 'All') r = r.filter(x => x.calc?.dealRating?.startsWith(ratingFilter))
 
     const key = (x) => {
@@ -319,14 +321,15 @@ export default function ProjectsPage() {
                 const annRoi  = calc?.actual?.annualizedRoi ?? calc?.expected?.annualizedRoi ?? 0
                 const profit  = calc?.actual?.netProfit ?? calc?.expected?.netProfit ?? 0
                 const barPct  = maxAnnRoi > 0 ? Math.min(Math.abs(annRoi) / maxAnnRoi * 100, 100) : 0
-                const isCash  = f.renovation_financing === 'Cash'
+                const isJV    = !!f.is_jv
+                const isCash  = !isJV && f.renovation_financing === 'Cash'
                 const isSold  = lead?.status === 'sold'
                 const isActual = calc?.actual?.netProfit != null
                 const shortAddr = (lead?.address || '—').split(',')[0]
                 return (
                   <div key={f.id} className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate(`/w/${workspaceId}/projects/${lead.id}`)}>
                     <div className="flex items-center gap-1.5 w-44 shrink-0">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>{isCash ? 'CASH' : 'HML'}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>{isJV ? 'JV' : isCash ? 'CASH' : 'HML'}</span>
                       <span className={`text-[11px] truncate group-hover:text-[color:var(--color-accent)] transition-colors ${muted}`}>{shortAddr}</span>
                     </div>
                     <div className="flex-1 h-5 bg-[color:var(--color-bg-elev-2)] rounded overflow-hidden">
@@ -358,6 +361,7 @@ export default function ProjectsPage() {
             { value: 'All',  label: 'All Types' },
             { value: 'Cash', label: 'Cash' },
             { value: 'HML',  label: 'HML / Financed' },
+            { value: 'JV',   label: 'Joint Venture' },
           ]} value={typeFilter} onChange={setTypeFilter} />
 
           <FilterGroup label="Deal Rating" options={[
@@ -457,7 +461,8 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
               const annRoi = showActual && actualProfit != null ? calc?.actual?.annualizedRoi : calc?.expected?.annualizedRoi
               const allInVsARV = calc?.allInVsARV || 0
               const cashIn = calc?.totalCashInvested || 0
-              const isCash = f.renovation_financing === 'Cash'
+              const isJV   = !!f.is_jv
+              const isCash = !isJV && f.renovation_financing === 'Cash'
               const shortAddr = (lead?.address || '—').split(',')[0]
 
               // variance: actual vs expected
