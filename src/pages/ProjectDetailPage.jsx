@@ -204,13 +204,23 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
 
       {/* ── Cash at Closing ── */}
       <div className="border-t border-[color:var(--color-line)] pt-4">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Cash You Bring</div>
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Total Cash Invested</div>
         <Row label={`Down Payment (${fmtPct(1 - (financials?.loan_to_purchase_pct ?? 0.9))})`} value={fmtUSD(calc.downPayment)} />
-        <Row label="+ Lender Fees" value={fmtUSD(calc.hmlClosingCosts)} />
-        <Row label="+ Purchase Closing" value={fmtUSD(calc.purchaseClosing)} />
-        {calc.renovationGap > 0 && <Row label="+ Renovation Gap" value={fmtUSD(calc.renovationGap)} />}
-        <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-semibold text-[12px]">
-          <span className="text-[color:var(--color-text)]">= Cash Invested</span>
+        <Row label="+ Lender Fees at Closing" value={fmtUSD(calc.hmlClosingCosts)} />
+        <Row label="+ Purchase Closing Costs" value={fmtUSD(calc.purchaseClosing)} />
+        {calc.renovationGap > 0 && <Row label="+ Renovation Gap (cash portion)" value={fmtUSD(calc.renovationGap)} />}
+        <Row
+          label={`+ Interest Paid (${calc.holdMonths}mo × ${fmtUSD(calc.monthlyInterest)})`}
+          value={fmtUSD(calc.totalInterest)}
+        />
+        {calc.monthlyHoldCosts > 0 && (
+          <Row
+            label={`+ Other Holding (${calc.holdMonths}mo × ${fmtUSD(calc.monthlyHoldCosts)})`}
+            value={fmtUSD(calc.monthlyHoldCosts * calc.holdMonths)}
+          />
+        )}
+        <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-bold text-[12px]">
+          <span className="text-[color:var(--color-text)]">= Total Cash Invested</span>
           <span className="text-[color:var(--color-text)]">{fmtUSD(calc.totalCashInvested)}</span>
         </div>
         <div className="mt-1 flex justify-between text-[11px]">

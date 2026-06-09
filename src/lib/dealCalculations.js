@@ -92,7 +92,8 @@ export function calcDeal(f, items = []) {
 
   // --- Total Cash Invested (cash you bring to the table at closing + renovation gap) ---
   // This is the basis for ROI — what you actually invest out of pocket.
-  const totalCashInvested = downPayment + hmlClosingCosts + purchaseClosing + renovationGap
+  // All cash out of pocket: upfront closing cash + ongoing payments (interest + holding) over the hold period
+  const totalCashInvested = downPayment + hmlClosingCosts + purchaseClosing + renovationGap + totalHoldingCosts
 
   // --- Break-Even ---
   const breakEvenPrice   = sellingCostPct < 1 ? totalAllInCost / (1 - sellingCostPct) : 0
