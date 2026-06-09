@@ -251,8 +251,18 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
           )}
           <Row label={`  Total (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(profitResult.sellingCosts)}`} indent={1} total />
           <Row label="− Total All-In Cost" value={`− ${fmtUSD(calc.totalAllInCost)}`} />
-          <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between font-bold text-[13px]">
-            <span className="text-[color:var(--color-text)]">= Net Profit</span>
+          {calc.isJV && profitResult.totalDealProfit != null && (
+            <div className="mt-2 pt-2 border-t border-[color:var(--color-line)] flex justify-between text-[12px]">
+              <span className={dim}>= Total Deal Profit</span>
+              <span className={profitResult.totalDealProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
+                {fmtUSD(profitResult.totalDealProfit)}
+              </span>
+            </div>
+          )}
+          <div className={`${calc.isJV ? 'mt-1' : 'mt-2 pt-2 border-t border-[color:var(--color-line)]'} flex justify-between font-bold text-[13px]`}>
+            <span className="text-[color:var(--color-text)]">
+              {calc.isJV ? `= Your Share (${Math.round(calc.jvSplitPct * 100)}%)` : '= Net Profit'}
+            </span>
             <span className={profitResult.netProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}>
               {fmtUSD(profitResult.netProfit)}
             </span>
@@ -571,9 +581,19 @@ export default function ProjectDetailPage() {
               value={fmtUSD(calc.totalCashInvested)}
               sub="at closing"
             />
+            {(calc.actual || calc.expected) && calc.isJV && (
+              <StatBox
+                label={calc.actual ? 'Total Deal Profit' : 'Total Deal Profit (exp.)'}
+                value={fmtUSD(calc.actual?.totalDealProfit ?? calc.expected?.totalDealProfit)}
+                sub="full deal before split"
+                color="text-[color:var(--color-text-muted)]"
+              />
+            )}
             {(calc.actual || calc.expected) && (
               <StatBox
-                label={calc.actual ? 'Actual Profit' : 'Expected Profit'}
+                label={calc.isJV
+                  ? (calc.actual ? `Your Share (${Math.round(calc.jvSplitPct*100)}%)` : `Your Share (${Math.round(calc.jvSplitPct*100)}%) exp.`)
+                  : (calc.actual ? 'Actual Profit' : 'Expected Profit')}
                 value={fmtUSD(calc.actual?.netProfit ?? calc.expected?.netProfit)}
                 color={(calc.actual?.netProfit ?? calc.expected?.netProfit) >= 0
                   ? 'text-[color:var(--color-success-text)]'
@@ -988,7 +1008,8 @@ export default function ProjectDetailPage() {
                       <MetricRow label="Sale Price"                                          value={fmtUSD(calc.expected.sellPrice)} />
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.expected.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
-                      <MetricRow label="Net Profit"  value={fmtUSD(calc.expected.netProfit)} highlight positive={calc.expected.netProfit >= 0} negative={calc.expected.netProfit < 0} />
+                      {calc.isJV && <MetricRow label="Total Deal Profit" value={fmtUSD(calc.expected.totalDealProfit)} />}
+                      <MetricRow label={calc.isJV ? `Your Share (${Math.round(calc.jvSplitPct*100)}%)` : 'Net Profit'} value={fmtUSD(calc.expected.netProfit)} highlight positive={calc.expected.netProfit >= 0} negative={calc.expected.netProfit < 0} />
                       <MetricRow label="ROI on Cash Invested"    value={fmtPct(calc.expected.roi)}            highlight positive={calc.expected.roi >= 0}            negative={calc.expected.roi < 0} />
                       <MetricRow label={`Annualized ROI (${calc.holdMonths}mo)`} value={fmtPct(calc.expected.annualizedRoi)} positive={calc.expected.annualizedRoi >= 0} negative={calc.expected.annualizedRoi < 0} />
                     </>
@@ -1003,7 +1024,8 @@ export default function ProjectDetailPage() {
                       <MetricRow label="Sale Price"                                          value={fmtUSD(calc.actual.sellPrice)} />
                       <MetricRow label={`− Selling Costs (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(calc.actual.sellingCosts)}`} />
                       <MetricRow label="− Total All-In Cost"                                 value={`− ${fmtUSD(calc.totalAllInCost)}`} />
-                      <MetricRow label="Net Profit"  value={fmtUSD(calc.actual.netProfit)}  highlight positive={calc.actual.netProfit >= 0} negative={calc.actual.netProfit < 0} />
+                      {calc.isJV && <MetricRow label="Total Deal Profit" value={fmtUSD(calc.actual.totalDealProfit)} />}
+                      <MetricRow label={calc.isJV ? `Your Share (${Math.round(calc.jvSplitPct*100)}%)` : 'Net Profit'} value={fmtUSD(calc.actual.netProfit)}  highlight positive={calc.actual.netProfit >= 0} negative={calc.actual.netProfit < 0} />
                       <MetricRow label="ROI on Cash Invested"    value={fmtPct(calc.actual.roi)}            highlight positive={calc.actual.roi >= 0}            negative={calc.actual.roi < 0} />
                       <MetricRow label={`Annualized ROI (${calc.holdMonths}mo)`} value={fmtPct(calc.actual.annualizedRoi)} positive={calc.actual.annualizedRoi >= 0} negative={calc.actual.annualizedRoi < 0} />
                     </div>
