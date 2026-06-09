@@ -74,8 +74,8 @@ function InsightCard({ icon, title, body, tone = 'neutral' }) {
 }
 
 function StatBreakdownPanel({ id, rows, navigate, workspaceId }) {
-  const active = rows.filter(r => r.lead?.status !== 'sold')
-  const sold   = rows.filter(r => r.lead?.status === 'sold')
+  const active = rows.filter(r => !isSoldStatus(r.lead?.status))
+  const sold   = rows.filter(r => isSoldStatus(r.lead?.status))
 
   const configs = {
     locked: {
@@ -109,10 +109,10 @@ function StatBreakdownPanel({ id, rows, navigate, workspaceId }) {
       title: 'Total P&L Breakdown',
       subtitle: 'Realized (sold) + expected (active) — full portfolio picture',
       source: rows,
-      getValue:   r => r.lead?.status === 'sold'
+      getValue:   r => isSoldStatus(r.lead?.status)
         ? (r.calc?.actual?.netProfit ?? r.calc?.expected?.netProfit ?? 0)
         : (r.calc?.expected?.netProfit || 0),
-      getSecond:  r => ({ label: r.lead?.status === 'sold' ? 'Sold ✓' : 'Active', val: null, formatted: r.lead?.status === 'sold' ? 'Sold' : 'Active', color: r.lead?.status === 'sold' ? 'success' : 'accent' }),
+      getSecond:  r => ({ label: isSoldStatus(r.lead?.status) ? 'Flip Sold ✓' : 'Active', val: null, formatted: isSoldStatus(r.lead?.status) ? 'Flip Sold' : 'Active', color: isSoldStatus(r.lead?.status) ? 'success' : 'accent' }),
       valueLabel: 'Profit',
       valueColor: success,
     },
@@ -194,9 +194,11 @@ const TYPE_BADGE = {
   JV:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 }
 
-const STATUS_LABELS = { working_project: 'Active', sold: 'Sold' }
+const isSoldStatus = s => s === 'flip_sold' || s === 'sold'
+const STATUS_LABELS = { working_project: 'Active', flip_sold: 'Flip Sold ✓', sold: 'Sold' }
 const STATUS_CLS    = {
   working_project: 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]',
+  flip_sold:       'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
   sold:            'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
 }
 
@@ -234,7 +236,7 @@ export default function ProjectsPage() {
 
       if (!fins?.length) { setRows([]); setLoading(false); return }
 
-      const projectFins = fins.filter(f => ['working_project', 'sold'].includes(f.leads?.status))
+      const projectFins = fins.filter(f => ['working_project', 'sold', 'flip_sold'].includes(f.leads?.status))
       if (!projectFins.length) { setRows([]); setLoading(false); return }
 
       const leadIds = projectFins.map(f => f.lead_id)
@@ -262,8 +264,8 @@ export default function ProjectsPage() {
 
   // ── Portfolio-level aggregates ──────────────────────────────────────────
   const portfolio = useMemo(() => {
-    const active = rows.filter(r => r.lead?.status !== 'sold')
-    const sold   = rows.filter(r => r.lead?.status === 'sold')
+    const active = rows.filter(r => !isSoldStatus(r.lead?.status))
+    const sold   = rows.filter(r => isSoldStatus(r.lead?.status))
     const cash   = active.filter(r => r.financials.renovation_financing === 'Cash')
     const hml    = active.filter(r => r.financials.renovation_financing !== 'Cash')
 
@@ -351,8 +353,8 @@ export default function ProjectsPage() {
   // ── Filtered + sorted rows ────────────────────────────────────────────────
   const displayRows = useMemo(() => {
     let r = [...rows]
-    if (statusFilter === 'Active') r = r.filter(x => x.lead?.status !== 'sold')
-    if (statusFilter === 'Sold')   r = r.filter(x => x.lead?.status === 'sold')
+    if (statusFilter === 'Active') r = r.filter(x => !isSoldStatus(x.lead?.status))
+    if (statusFilter === 'Sold')   r = r.filter(x => isSoldStatus(x.lead?.status))
     if (typeFilter === 'Cash') r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing === 'Cash')
     if (typeFilter === 'HML')  r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing !== 'Cash')
     if (typeFilter === 'JV')   r = r.filter(x => !!x.financials.is_jv)
@@ -371,8 +373,8 @@ export default function ProjectsPage() {
     return r
   }, [rows, statusFilter, typeFilter, ratingFilter, sortBy, sortDir])
 
-  const activeRows = displayRows.filter(r => r.lead?.status !== 'sold')
-  const soldRows   = displayRows.filter(r => r.lead?.status === 'sold')
+  const activeRows = displayRows.filter(r => !isSoldStatus(r.lead?.status))
+  const soldRows   = displayRows.filter(r => isSoldStatus(r.lead?.status))
 
   const toggleSort = (col) => {
     if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
@@ -482,7 +484,7 @@ export default function ProjectsPage() {
                 const barPct  = maxAnnRoi > 0 ? Math.min(Math.abs(annRoi) / maxAnnRoi * 100, 100) : 0
                 const isJV    = !!f.is_jv
                 const isCash  = !isJV && f.renovation_financing === 'Cash'
-                const isSold  = lead?.status === 'sold'
+                const isSold  = isSoldStatus(lead?.status)
                 const isActual = calc?.actual?.netProfit != null
                 const shortAddr = (lead?.address || '—').split(',')[0]
                 return (

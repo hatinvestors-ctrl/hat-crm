@@ -71,8 +71,9 @@ function dealType(f) {
 
 // ─── main component ───────────────────────────────────────────────────────────
 export default function ProjectsIntelligencePage({ rows }) {
-  const active = useMemo(() => rows.filter(r => r.lead?.status !== 'sold'), [rows])
-  const sold   = useMemo(() => rows.filter(r => r.lead?.status === 'sold'),  [rows])
+  const isSoldStatus = s => s === 'flip_sold' || s === 'sold'
+  const active = useMemo(() => rows.filter(r => !isSoldStatus(r.lead?.status)), [rows])
+  const sold   = useMemo(() => rows.filter(r => isSoldStatus(r.lead?.status)),  [rows])
   const all    = rows
 
   // ── derive sweet-spot formula from A/B rated deals ────────────────────────
@@ -212,7 +213,7 @@ export default function ProjectsIntelligencePage({ rows }) {
             {dealScores.map(({ r, criteria, score, total }) => {
               const addr    = (r.lead?.address || '—').split(',')[0]
               const type    = dealType(r.financials)
-              const isSold  = r.lead?.status === 'sold'
+              const isSold  = isSoldStatus(r.lead?.status)
               const annRoi  = r.calc?.actual?.annualizedRoi ?? r.calc?.expected?.annualizedRoi ?? 0
               const profit  = r.calc?.actual?.netProfit ?? r.calc?.expected?.netProfit ?? 0
               const pct     = Math.round(score / total * 100)

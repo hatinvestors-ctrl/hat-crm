@@ -7,8 +7,8 @@ import Card from '../ui/Card'
 export default function TeammatePerformance({ leads, members, offersByAssignee = {} }) {
   const memberMap = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles?.full_name || 'User']))
 
-  const TERMINAL = ['sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed']
-  const WON = ['offer_accepted','sold','working_project']
+  const TERMINAL = ['sold','flip_sold','dead_lead','rejected_not_accepted','not_in_buy_box','sequence_completed']
+  const WON = ['offer_accepted','sold','flip_sold','working_project']
   const buckets = {}
   for (const l of leads) {
     const k = l.assigned_to || '__unassigned__'

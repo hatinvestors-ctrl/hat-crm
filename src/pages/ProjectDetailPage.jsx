@@ -378,7 +378,7 @@ export default function ProjectDetailPage() {
     if (!soldPrice) return
     setMarkingSold(true)
     const { data: updatedLead } = await supabase
-      .from('leads').update({ status: 'sold' }).eq('id', leadId).select().single()
+      .from('leads').update({ status: 'flip_sold' }).eq('id', leadId).select().single()
 
     // Auto-calculate hold months if we have both purchase_date and sold_date
     let autoHoldMonths = financials.hold_months
@@ -427,7 +427,7 @@ export default function ProjectDetailPage() {
     ? [...items, { estimated_cost: pendingRenovCost, actual_cost: null }]
     : items
   const calc = financials ? calcDeal(financials, calcItems) : null
-  const isSold = lead.status === 'sold'
+  const isSold = lead.status === 'flip_sold' || lead.status === 'sold'
   const ratingKey = calc?.dealRating?.charAt(0)
   const ratingInfo = DEAL_RATING_INFO[ratingKey]
 
@@ -504,7 +504,7 @@ export default function ProjectDetailPage() {
               ? 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
               : 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]'
           }`}>
-            {isSold ? '✓ Sold' : 'Active Project'}
+            {lead.status === 'flip_sold' ? '✓ Flip Sold' : lead.status === 'sold' ? '✓ Sold' : 'Active Project'}
           </span>
           {financials?.purchase_date && (
             <span className="text-[11.5px] text-[color:var(--color-text-dim)]">

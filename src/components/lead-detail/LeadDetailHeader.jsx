@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 
 export default function LeadDetailHeader({ lead, members, canEdit, canAssign, onEdit, onUpdated, onCreateProject, creatingProject, workspaceId }) {
   const navigate = useNavigate()
-  const isProject = ['working_project', 'sold'].includes(lead.status)
+  const isProject = ['working_project', 'sold', 'flip_sold'].includes(lead.status)
   const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
   const assignee = userLookup[lead.assigned_to]
   const zillowUrl = safeUrl(lead.zillow_url) || buildZillowUrl(lead)

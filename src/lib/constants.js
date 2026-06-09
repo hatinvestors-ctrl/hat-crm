@@ -23,7 +23,8 @@ export const LEAD_STATUSES = [
   // ── Outcomes ────────────────────────────────────────────────────
   { value: 'offer_accepted',             label: 'Offer Accepted',        category: 'Outcome',   tone: 'success' },
   { value: 'rejected_not_accepted',      label: 'Rejected / Not Accepted', category: 'Outcome', tone: 'danger'  },
-  { value: 'sold',                       label: 'Sold',                  category: 'Outcome',   tone: 'success' },
+  { value: 'sold',                       label: 'Sold (Wholesale)',       category: 'Outcome',   tone: 'success' },
+  { value: 'flip_sold',                  label: 'Flip Sold ✓',           category: 'Outcome',   tone: 'success' },
   { value: 'dead_lead',                  label: 'Dead Lead',             category: 'Outcome',   tone: 'danger'  },
 
   // ── Process / automation ────────────────────────────────────────
@@ -70,12 +71,12 @@ export function normalizeMlsStatus(raw) {
 // Statuses that mean the deal is fully closed (won or lost or filed-away).
 // Used by Sidebar/Dashboard/Today to filter out non-active leads.
 export const TERMINAL_STATUSES = [
-  'sold', 'dead_lead', 'rejected_not_accepted', 'not_in_buy_box', 'sequence_completed',
+  'sold', 'flip_sold', 'dead_lead', 'rejected_not_accepted', 'not_in_buy_box', 'sequence_completed',
 ]
 
 // Statuses that imply HAT has signed the contract (so the date field should show).
 export const SIGNED_STATUSES = [
-  'offer_signed','offer_sent','negotiating','follow_up','offer_accepted','sold','rejected_not_accepted',
+  'offer_signed','offer_sent','negotiating','follow_up','offer_accepted','sold','flip_sold','rejected_not_accepted',
 ]
 
 // Group statuses by category for the picker grid.
@@ -177,7 +178,7 @@ export const TASK_PRIORITIES = [
 export const TASK_PRIORITY_MAP = Object.fromEntries(TASK_PRIORITIES.map(p => [p.value, p]))
 
 // Statuses that mean a lead is a real "project" — used as project options for tasks.
-export const PROJECT_STATUSES = ['sold', 'working_project', 'offer_accepted']
+export const PROJECT_STATUSES = ['sold', 'flip_sold', 'working_project', 'offer_accepted']
 
 export const ACTIVITY_TRACKED_FIELDS = [
   'status',

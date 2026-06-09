@@ -13,7 +13,7 @@ export default function SourcePerformance({ leads }) {
     if (!buckets[k]) buckets[k] = { count: 0, accepted: 0, sold: 0, dead: 0 }
     buckets[k].count++
     if (l.status === 'offer_accepted') buckets[k].accepted++
-    if (l.status === 'sold' || l.status === 'working_project') buckets[k].sold++
+    if (l.status === 'sold' || l.status === 'flip_sold' || l.status === 'working_project') buckets[k].sold++
     if (['dead_lead','rejected_not_accepted','not_in_buy_box'].includes(l.status)) buckets[k].dead++
   }
   const rows = Object.entries(buckets)
