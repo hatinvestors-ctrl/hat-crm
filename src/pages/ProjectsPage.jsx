@@ -33,10 +33,22 @@ function FilterGroup({ label, options, value, onChange }) {
   )
 }
 
-function StatCard({ label, value, sub, color, wide }) {
+function StatCard({ label, value, sub, color, id, activeId, onToggle }) {
+  const isOpen = activeId === id
+  const clickable = !!id
   return (
-    <div className={`rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 ${wide ? 'col-span-2' : ''}`}>
-      <div className={`text-[10px] uppercase tracking-wider font-medium mb-1 ${dim}`}>{label}</div>
+    <div
+      onClick={clickable ? () => onToggle(id) : undefined}
+      className={`rounded-xl border p-4 transition-colors ${
+        isOpen
+          ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]'
+          : 'border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)]'
+      } ${clickable ? 'cursor-pointer hover:border-[color:var(--color-accent)] select-none' : ''}`}
+    >
+      <div className={`text-[10px] uppercase tracking-wider font-medium mb-1 flex items-center gap-1 ${isOpen ? 'text-[color:var(--color-accent-text)]' : dim}`}>
+        {label}
+        {clickable && <span className="opacity-50 text-[9px]">{isOpen ? '▲' : '▼'}</span>}
+      </div>
       <div className={`text-[22px] font-bold leading-none ${color || 'text-[color:var(--color-text)]'}`}>{value}</div>
       {sub && <div className={`text-[11px] mt-1.5 ${muted}`}>{sub}</div>}
     </div>
@@ -56,6 +68,121 @@ function InsightCard({ icon, title, body, tone = 'neutral' }) {
     <div className={`rounded-xl border p-3.5 ${bg}`}>
       <div className={`text-[12px] font-semibold mb-1 ${titleColor}`}>{icon} {title}</div>
       <div className={`text-[11.5px] leading-snug ${muted}`}>{body}</div>
+    </div>
+  )
+}
+
+function StatBreakdownPanel({ id, rows, navigate, workspaceId }) {
+  const active = rows.filter(r => r.lead?.status !== 'sold')
+  const sold   = rows.filter(r => r.lead?.status === 'sold')
+
+  const configs = {
+    locked: {
+      title: 'Cash Locked — Active Deals',
+      subtitle: 'Your actual out-of-pocket cash currently tied up in each active deal',
+      source: active,
+      getValue:   r => r.calc?.totalCashInvested || 0,
+      getSecond:  r => ({ label: 'Expected Profit', val: r.calc?.expected?.netProfit || 0, color: 'success' }),
+      valueLabel: 'Cash Invested',
+      valueColor: 'text-[color:var(--color-text)]',
+    },
+    pipeline: {
+      title: 'Expected Pipeline — Active Deals',
+      subtitle: 'Expected profit per deal when sold at projected price (your share for JV deals)',
+      source: active,
+      getValue:   r => r.calc?.expected?.netProfit || 0,
+      getSecond:  r => ({ label: 'Cash In', val: r.calc?.totalCashInvested || 0, color: 'muted' }),
+      valueLabel: 'Expected Profit',
+      valueColor: success,
+    },
+    realized: {
+      title: 'Realized Profit — Sold Deals',
+      subtitle: 'Actual profit collected from completed deals',
+      source: sold,
+      getValue:   r => r.calc?.actual?.netProfit ?? r.calc?.expected?.netProfit ?? 0,
+      getSecond:  r => ({ label: 'ROI', val: null, formatted: fmtPct(r.calc?.actual?.roi ?? r.calc?.expected?.roi), color: 'success' }),
+      valueLabel: 'Actual Profit',
+      valueColor: success,
+    },
+    pnl: {
+      title: 'Total P&L Breakdown',
+      subtitle: 'Realized (sold) + expected (active) — full portfolio picture',
+      source: rows,
+      getValue:   r => r.lead?.status === 'sold'
+        ? (r.calc?.actual?.netProfit ?? r.calc?.expected?.netProfit ?? 0)
+        : (r.calc?.expected?.netProfit || 0),
+      getSecond:  r => ({ label: r.lead?.status === 'sold' ? 'Sold ✓' : 'Active', val: null, formatted: r.lead?.status === 'sold' ? 'Sold' : 'Active', color: r.lead?.status === 'sold' ? 'success' : 'accent' }),
+      valueLabel: 'Profit',
+      valueColor: success,
+    },
+    roi: {
+      title: 'Annualized ROI — Active Deals',
+      subtitle: 'ROI normalized to a 12-month basis — fairest comparison across different hold times',
+      source: active,
+      getValue:   r => r.calc?.expected?.annualizedRoi || 0,
+      getSecond:  r => ({ label: 'Hold', val: null, formatted: `${r.financials.hold_months || '?'}mo`, color: 'muted' }),
+      valueLabel: 'Ann. ROI',
+      valueColor: success,
+      formatValue: v => fmtPct(v),
+    },
+  }
+
+  const cfg = configs[id]
+  if (!cfg) return null
+
+  const sorted = [...cfg.source].sort((a, b) => cfg.getValue(b) - cfg.getValue(a))
+  const total  = sorted.reduce((s, r) => s + cfg.getValue(r), 0)
+  const fmt    = cfg.formatValue || fmtUSD
+
+  return (
+    <div className="rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-bg-card)] shadow-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-[color:var(--color-line)] bg-[color:var(--color-accent-soft)]">
+        <div className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{cfg.title}</div>
+        <div className={`text-[11px] mt-0.5 ${muted}`}>{cfg.subtitle}</div>
+      </div>
+      <div className="divide-y divide-[color:var(--color-line)]">
+        {sorted.map(r => {
+          const val    = cfg.getValue(r)
+          const second = cfg.getSecond(r)
+          const isJV   = !!r.financials.is_jv
+          const isCash = !isJV && r.financials.renovation_financing === 'Cash'
+          const typeCls = isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed
+          const typeLabel = isJV ? 'JV' : isCash ? 'CASH' : 'HML'
+          const addr = (r.lead?.address || '—').split(',')[0]
+          const barPct = total !== 0 ? Math.abs(val) / Math.abs(total) * 100 : 0
+
+          return (
+            <div
+              key={r.financials.id}
+              onClick={() => navigate(`/w/${workspaceId}/projects/${r.lead.id}`)}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--color-bg-elev)] cursor-pointer transition-colors group"
+            >
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${typeCls}`}>{typeLabel}</span>
+              <div className="w-36 shrink-0">
+                <div className="text-[12px] font-medium text-[color:var(--color-text)] truncate group-hover:text-[color:var(--color-accent)] transition-colors">{addr}</div>
+                {second && (
+                  <div className={`text-[10px] ${second.color === 'success' ? success : second.color === 'accent' ? accent : muted}`}>
+                    {second.label}: {second.formatted ?? fmtUSD(second.val)}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 h-2 bg-[color:var(--color-bg-elev-2)] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${val >= 0 ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-danger)]'}`}
+                  style={{ width: `${Math.min(barPct, 100)}%` }}
+                />
+              </div>
+              <div className={`text-[13px] font-bold w-28 text-right shrink-0 ${val >= 0 ? cfg.valueColor : danger}`}>
+                {fmt(val)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="px-4 py-2.5 border-t border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] flex justify-between items-center">
+        <span className={`text-[11px] font-medium ${dim}`}>Total · {sorted.length} deal{sorted.length !== 1 ? 's' : ''}</span>
+        <span className={`text-[13px] font-bold ${cfg.valueColor}`}>{fmt(total)}</span>
+      </div>
     </div>
   )
 }
@@ -90,6 +217,9 @@ export default function ProjectsPage() {
   const [ratingFilter, setRatingFilter] = useState('All')       // All | A | B | C | D
   const [sortBy, setSortBy]             = useState('annRoi')
   const [sortDir, setSortDir]           = useState('desc')
+  const [activePanel, setActivePanel]   = useState(null) // which stat card is expanded
+
+  const togglePanel = (id) => setActivePanel(p => p === id ? null : id)
 
   useEffect(() => {
     const load = async () => {
@@ -272,13 +402,16 @@ export default function ProjectsPage() {
 
         {/* ── TOP STATS BAR ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <StatCard label="Cash Locked (Active)" value={fmtUSD(portfolio.totalLocked)} sub={`${portfolio.active} active deal${portfolio.active !== 1 ? 's' : ''}`} color="text-[color:var(--color-text)]" />
-          <StatCard label="Expected Pipeline"    value={fmtUSD(portfolio.expectedProfit)} sub="from active deals" color={success} />
-          <StatCard label="Realized Profit"      value={fmtUSD(portfolio.realizedProfit)} sub={`${portfolio.sold} sold deal${portfolio.sold !== 1 ? 's' : ''}`} color={success} />
-          <StatCard label="Total P&amp;L"        value={fmtUSD(portfolio.totalPnL)} sub="realized + expected" color={portfolio.totalPnL >= 0 ? success : danger} />
-          <StatCard label="Avg Ann. ROI (active)"value={fmtPct(portfolio.avgAnnRoi)} sub="annualized, all active" />
-          <StatCard label="Avg Hold Time"        value={`${portfolio.avgHold.toFixed(1)} mo`} sub={`across ${rows.length} deals`} />
+          <StatCard id="locked"   label="Cash Locked (Active)" value={fmtUSD(portfolio.totalLocked)}    sub={`${portfolio.active} active deals · click to see breakdown`} color="text-[color:var(--color-text)]" activeId={activePanel} onToggle={togglePanel} />
+          <StatCard id="pipeline" label="Expected Pipeline"    value={fmtUSD(portfolio.expectedProfit)} sub="active deals · click to see breakdown" color={success} activeId={activePanel} onToggle={togglePanel} />
+          <StatCard id="realized" label="Realized Profit"      value={fmtUSD(portfolio.realizedProfit)} sub={`${portfolio.sold} sold deals · click to see breakdown`} color={success} activeId={activePanel} onToggle={togglePanel} />
+          <StatCard id="pnl"      label="Total P&amp;L"        value={fmtUSD(portfolio.totalPnL)}       sub="realized + expected" color={portfolio.totalPnL >= 0 ? success : danger} activeId={activePanel} onToggle={togglePanel} />
+          <StatCard id="roi"      label="Avg Ann. ROI (active)"value={fmtPct(portfolio.avgAnnRoi)}      sub="annualized · click to see breakdown" activeId={activePanel} onToggle={togglePanel} />
+          <StatCard label="Avg Hold Time" value={`${portfolio.avgHold.toFixed(1)} mo`} sub={`across ${rows.length} deals`} />
         </div>
+
+        {/* ── INLINE BREAKDOWN PANEL ── */}
+        {activePanel && <StatBreakdownPanel id={activePanel} rows={rows} navigate={navigate} workspaceId={workspaceId} />}
 
         {/* ── CASH vs HML COMPARISON ── */}
         {portfolio.cashCount > 0 && portfolio.hmlCount > 0 && (
