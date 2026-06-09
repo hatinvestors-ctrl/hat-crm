@@ -34,7 +34,7 @@ export function calcDeal(f, items = []) {
 
   // --- Basic ---
   const purchasePrice  = n(f.purchase_price_actual)
-  const ltvPct         = n(f.loan_to_purchase_pct) || 0.90
+  const ltvPct         = f.loan_to_purchase_pct != null ? n(f.loan_to_purchase_pct) : 0.90
 
   // --- Selling Costs (detailed breakdown or legacy single %) ---
   const agentCommissionPct = f.agent_commission_pct != null ? n(f.agent_commission_pct) : 0.03
