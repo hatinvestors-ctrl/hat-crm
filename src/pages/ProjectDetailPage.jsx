@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useOutletContext, Link } from 'react-router-dom'
+import { useParams, useOutletContext, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { calcDeal, fmtUSD, fmtPct, dealRatingColor, DEAL_RATING_INFO } from '../lib/dealCalculations'
 import Topbar from '../components/Topbar'
@@ -302,6 +302,7 @@ function StatBox({ label, value, sub, color }) {
 export default function ProjectDetailPage() {
   const { leadId } = useParams()
   const { workspace, workspaceId, userRole } = useOutletContext()
+  const navigate = useNavigate()
   const canEdit = userRole !== 'readonly'
 
   const [lead, setLead]             = useState(null)
@@ -315,6 +316,8 @@ export default function ProjectDetailPage() {
   const [soldPrice, setSoldPrice]   = useState('')
   const [soldDate, setSoldDate]     = useState('')
   const [markingSOld, setMarkingSold] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -378,6 +381,14 @@ export default function ProjectDetailPage() {
   if (loading) return <LoadingSpinner fullPage label="Loading project…" />
   if (!lead) return <div className="p-6 text-[color:var(--color-text-muted)]">Project not found.</div>
 
+  const handleDeleteProject = async () => {
+    setDeleting(true)
+    await supabase.from('deal_renovation_items').delete().eq('lead_id', leadId)
+    await supabase.from('deal_financials').delete().eq('lead_id', leadId)
+    await supabase.from('leads').update({ status: 'follow_up' }).eq('id', leadId)
+    navigate(`/w/${workspaceId}/projects`)
+  }
+
   // When user is typing a new reno item (not saved yet), add pending cost to items for live calc
   const calcItems = pendingRenovCost != null
     ? [...items, { estimated_cost: pendingRenovCost, actual_cost: null }]
@@ -412,9 +423,44 @@ export default function ProjectDetailPage() {
             >
               View Lead ↗
             </Link>
+            {canEdit && (
+              <button
+                onClick={() => setConfirmDeleteOpen(true)}
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)] hover:brightness-95 transition"
+              >
+                Delete Project
+              </button>
+            )}
           </div>
         }
       />
+
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[color:var(--color-bg-card)] border border-[color:var(--color-line)] rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h2 className="text-[14px] font-semibold text-[color:var(--color-text)]">Delete Project?</h2>
+            <p className="text-[12px] text-[color:var(--color-text-muted)]">
+              This will remove all financial data and renovation items for <strong>{lead.address}</strong>. The lead will be kept and set back to <em>Follow Up</em>.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConfirmDeleteOpen(false)}
+                disabled={deleting}
+                className="h-8 px-4 text-[12.5px] rounded-md border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                disabled={deleting}
+                className="h-8 px-4 text-[12.5px] font-medium rounded-md bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)] hover:brightness-95 transition disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Yes, Delete Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="px-6 py-4 max-w-[1400px] w-full">
 
