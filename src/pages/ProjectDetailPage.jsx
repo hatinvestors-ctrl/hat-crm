@@ -293,6 +293,7 @@ export default function ProjectDetailPage() {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [importOpen, setImportOpen] = useState(false)
+  const [pendingRenovCost, setPendingRenovCost] = useState(null) // live update while typing new reno item
   const [markSoldOpen, setMarkSoldOpen] = useState(false)
   const [soldPrice, setSoldPrice]   = useState('')
   const [soldDate, setSoldDate]     = useState('')
@@ -360,7 +361,11 @@ export default function ProjectDetailPage() {
   if (loading) return <LoadingSpinner fullPage label="Loading project…" />
   if (!lead) return <div className="p-6 text-[color:var(--color-text-muted)]">Project not found.</div>
 
-  const calc = financials ? calcDeal(financials, items) : null
+  // When user is typing a new reno item (not saved yet), add pending cost to items for live calc
+  const calcItems = pendingRenovCost != null
+    ? [...items, { estimated_cost: pendingRenovCost, actual_cost: null }]
+    : items
+  const calc = financials ? calcDeal(financials, calcItems) : null
   const isSold = lead.status === 'sold'
   const ratingKey = calc?.dealRating?.charAt(0)
   const ratingInfo = DEAL_RATING_INFO[ratingKey]
@@ -729,16 +734,6 @@ export default function ProjectDetailPage() {
 
             {/* Renovation Items — wrapped in Card */}
             <Card title="Renovation Items">
-              <div className="flex justify-end mb-3">
-                {canEdit && (
-                  <button
-                    onClick={() => setImportOpen(true)}
-                    className="inline-flex items-center gap-1.5 h-7 px-3 text-[11.5px] font-medium rounded-md border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev)] transition"
-                  >
-                    ↑ Import CSV
-                  </button>
-                )}
-              </div>
               <DealRenovationItems
                 leadId={leadId}
                 workspaceId={workspaceId}
@@ -746,6 +741,7 @@ export default function ProjectDetailPage() {
                 items={items}
                 onChanged={reloadItems}
                 onOpenImport={() => setImportOpen(true)}
+                onPendingChange={setPendingRenovCost}
               />
             </Card>
 

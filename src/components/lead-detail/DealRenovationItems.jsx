@@ -6,7 +6,7 @@ import Button from '../ui/Button'
 
 const inputCls = 'px-2 py-1 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] w-full'
 
-export default function DealRenovationItems({ leadId, workspaceId, items, onChanged, canEdit, onOpenImport }) {
+export default function DealRenovationItems({ leadId, workspaceId, items, onChanged, canEdit, onOpenImport, onPendingChange }) {
   const [adding, setAdding]     = useState(false)
   const [newItem, setNewItem]   = useState({ category: 'Other', description: '', estimated_cost: '', actual_cost: '', status: 'planned' })
   const [savingId, setSavingId] = useState(null)
@@ -30,6 +30,14 @@ export default function DealRenovationItems({ leadId, workspaceId, items, onChan
     onChanged()
   }
 
+  const updateNewItem = (patch) => {
+    const next = { ...newItem, ...patch }
+    setNewItem(next)
+    // report the effective cost (actual if filled, else estimated) so parent can update calc live
+    const effectiveCost = next.actual_cost !== '' ? Number(next.actual_cost) || 0 : Number(next.estimated_cost) || 0
+    onPendingChange?.(effectiveCost)
+  }
+
   const saveNew = async () => {
     if (!newItem.category) return
     setError(null)
@@ -44,6 +52,7 @@ export default function DealRenovationItems({ leadId, workspaceId, items, onChan
       sort_order:     items.length,
     })
     if (err) { setError(err.message); return }
+    onPendingChange?.(null) // clear pending
     setAdding(false)
     setNewItem({ category: 'Other', description: '', estimated_cost: '', actual_cost: '', status: 'planned' })
     onChanged()
@@ -157,27 +166,27 @@ export default function DealRenovationItems({ leadId, workspaceId, items, onChan
             {adding && (
               <tr className="border-b border-[color:var(--color-accent-soft)]">
                 <td className="py-1.5 pr-2">
-                  <select value={newItem.category} onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))} className={inputCls}>
+                  <select value={newItem.category} onChange={e => updateNewItem({ category: e.target.value })} className={inputCls}>
                     {RENOVATION_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </td>
                 <td className="py-1.5 pr-2">
-                  <input value={newItem.description} onChange={e => setNewItem(p => ({ ...p, description: e.target.value }))} placeholder="Description…" className={inputCls} />
+                  <input value={newItem.description} onChange={e => updateNewItem({ description: e.target.value })} placeholder="Description…" className={inputCls} />
                 </td>
                 <td className="py-1.5 pr-2">
-                  <input type="number" value={newItem.estimated_cost} onChange={e => setNewItem(p => ({ ...p, estimated_cost: e.target.value }))} placeholder="0" className={`${inputCls} text-right`} />
+                  <input type="number" value={newItem.estimated_cost} onChange={e => updateNewItem({ estimated_cost: e.target.value })} placeholder="0" className={`${inputCls} text-right`} />
                 </td>
                 <td className="py-1.5 pr-2">
-                  <input type="number" value={newItem.actual_cost} onChange={e => setNewItem(p => ({ ...p, actual_cost: e.target.value }))} placeholder="—" className={`${inputCls} text-right`} />
+                  <input type="number" value={newItem.actual_cost} onChange={e => updateNewItem({ actual_cost: e.target.value })} placeholder="—" className={`${inputCls} text-right`} />
                 </td>
                 <td className="py-1.5 pr-2">
-                  <select value={newItem.status} onChange={e => setNewItem(p => ({ ...p, status: e.target.value }))} className={inputCls}>
+                  <select value={newItem.status} onChange={e => updateNewItem({ status: e.target.value })} className={inputCls}>
                     {ITEM_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </td>
                 <td className="py-1.5">
-                  <button onClick={saveNew} className="text-[color:var(--color-accent)] text-[12px] hover:opacity-80">✓</button>
-                  <button onClick={() => setAdding(false)} className="text-[color:var(--color-text-dim)] text-[12px] ml-1 hover:opacity-80">×</button>
+                  <button onClick={saveNew} className="text-[color:var(--color-accent)] text-[12px] hover:opacity-80" title="Save item">✓</button>
+                  <button onClick={() => { setAdding(false); onPendingChange?.(null) }} className="text-[color:var(--color-text-dim)] text-[12px] ml-1 hover:opacity-80" title="Cancel">×</button>
                 </td>
               </tr>
             )}
