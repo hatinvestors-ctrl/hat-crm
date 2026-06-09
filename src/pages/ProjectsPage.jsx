@@ -13,6 +13,26 @@ const success = 'text-[color:var(--color-success-text)]'
 const danger  = 'text-[color:var(--color-danger-text)]'
 const accent  = 'text-[color:var(--color-accent-text)]'
 
+function FilterGroup({ label, options, value, onChange }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">{label}</span>
+      <div className="flex gap-1">
+        {options.map(o => (
+          <button key={o.value} onClick={() => onChange(o.value)}
+            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors whitespace-nowrap ${
+              value === o.value
+                ? 'bg-[color:var(--color-accent)] text-white'
+                : 'bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+            }`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function StatCard({ label, value, sub, color, wide }) {
   return (
     <div className={`rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 ${wide ? 'col-span-2' : ''}`}>
@@ -327,33 +347,29 @@ export default function ProjectsPage() {
         )}
 
         {/* ── FILTERS ── */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-1">
-            {['All', 'Active', 'Sold'].map(f => (
-              <button key={f} onClick={() => setStatusFilter(f)}
-                className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${statusFilter === f ? 'bg-[color:var(--color-accent)] text-white' : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'}`}>
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {['All', 'Cash', 'HML'].map(f => (
-              <button key={f} onClick={() => setTypeFilter(f)}
-                className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${typeFilter === f ? 'bg-[color:var(--color-accent)] text-white' : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'}`}>
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {['All', 'A', 'B', 'C', 'D'].map(f => (
-              <button key={f} onClick={() => setRatingFilter(f)}
-                className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${ratingFilter === f ? 'bg-[color:var(--color-accent)] text-white' : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'}`}>
-                {f === 'All' ? 'All Ratings' : `${f}-Rating`}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-4 items-end">
+          <FilterGroup label="Status" options={[
+            { value: 'All',    label: 'All Deals' },
+            { value: 'Active', label: 'Active' },
+            { value: 'Sold',   label: 'Sold' },
+          ]} value={statusFilter} onChange={setStatusFilter} />
+
+          <FilterGroup label="Deal Type" options={[
+            { value: 'All',  label: 'All Types' },
+            { value: 'Cash', label: 'Cash' },
+            { value: 'HML',  label: 'HML / Financed' },
+          ]} value={typeFilter} onChange={setTypeFilter} />
+
+          <FilterGroup label="Deal Rating" options={[
+            { value: 'All', label: 'All Ratings' },
+            { value: 'A',   label: 'A — Excellent' },
+            { value: 'B',   label: 'B — Good' },
+            { value: 'C',   label: 'C — Fair' },
+            { value: 'D',   label: 'D — Poor' },
+          ]} value={ratingFilter} onChange={setRatingFilter} />
+
           <div className="flex items-center gap-1.5 ml-auto">
-            <span className={`text-[11px] ${dim}`}>Sort:</span>
+            <span className={`text-[11px] ${dim}`}>Sort by:</span>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)}
               className="h-7 px-2 text-[12px] rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-input)] text-[color:var(--color-text)]">
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
