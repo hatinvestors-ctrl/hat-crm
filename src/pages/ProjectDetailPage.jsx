@@ -379,15 +379,28 @@ export default function ProjectDetailPage() {
     setMarkingSold(true)
     const { data: updatedLead } = await supabase
       .from('leads').update({ status: 'sold' }).eq('id', leadId).select().single()
-    await supabase.from('deal_financials').update({
+
+    // Auto-calculate hold months if we have both purchase_date and sold_date
+    let autoHoldMonths = financials.hold_months
+    const closingDate = soldDate || null
+    if (financials.purchase_date && closingDate) {
+      const purchase = new Date(financials.purchase_date)
+      const closing  = new Date(closingDate)
+      const diffMs   = closing - purchase
+      autoHoldMonths = Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44))
+    }
+
+    const updates = {
       actual_sale_price: Number(soldPrice),
-      sold_date: soldDate || null,
+      sold_date: closingDate,
+      hold_months: autoHoldMonths,
       updated_at: new Date().toISOString(),
-    }).eq('id', financials.id)
+    }
+    await supabase.from('deal_financials').update(updates).eq('id', financials.id)
     setMarkingSold(false)
     setMarkSoldOpen(false)
     if (updatedLead) setLead(updatedLead)
-    setFinancials(prev => ({ ...prev, actual_sale_price: Number(soldPrice), sold_date: soldDate || null }))
+    setFinancials(prev => ({ ...prev, ...updates }))
   }
 
   if (loading) return <LoadingSpinner fullPage label="Loading project…" />
@@ -493,6 +506,16 @@ export default function ProjectDetailPage() {
           }`}>
             {isSold ? '✓ Sold' : 'Active Project'}
           </span>
+          {financials?.purchase_date && (
+            <span className="text-[11.5px] text-[color:var(--color-text-dim)]">
+              Purchased <strong className="text-[color:var(--color-text-muted)]">{financials.purchase_date}</strong>
+              {isSold && financials.sold_date && (
+                <> · Sold <strong className="text-[color:var(--color-text-muted)]">{financials.sold_date}</strong>
+                  {' · '}<strong className="text-[color:var(--color-text-muted)]">{financials.hold_months}mo hold</strong>
+                </>
+              )}
+            </span>
+          )}
           {canEdit && (
             editingAddress ? (
               <div className="flex items-center gap-2">
@@ -533,7 +556,7 @@ export default function ProjectDetailPage() {
                   autoFocus
                 />
               </Field>
-              <Field label="Sold Date">
+              <Field label="Closing Date">
                 <input
                   type="date"
                   value={soldDate}
@@ -542,6 +565,17 @@ export default function ProjectDetailPage() {
                 />
               </Field>
             </div>
+            {/* Auto-calculated hold months preview */}
+            {financials.purchase_date && soldDate && (() => {
+              const purchase = new Date(financials.purchase_date)
+              const closing  = new Date(soldDate)
+              const months   = Math.round((closing - purchase) / (1000 * 60 * 60 * 24 * 30.44))
+              return (
+                <div className="text-[12px] text-[color:var(--color-success-text)] bg-[color:var(--color-success-soft)] border border-[color:var(--color-success)] rounded-lg px-3 py-2">
+                  Hold time will be auto-calculated: <strong>{months} months</strong> (from {financials.purchase_date} to {soldDate})
+                </div>
+              )
+            })()}
             <div className="flex gap-2">
               <button
                 onClick={handleMarkSold}
@@ -693,7 +727,16 @@ export default function ProjectDetailPage() {
             {/* Deal Parameters (formerly Assumptions) */}
             <Card title="Deal Parameters">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Field label="Hold Months">
+                <Field label="Purchase Date" tip="Date you closed on the property. Used to auto-calculate hold time when sold.">
+                  <input
+                    type="date"
+                    defaultValue={financials.purchase_date || ''}
+                    onBlur={e => save({ purchase_date: e.target.value || null })}
+                    disabled={!canEdit}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Hold Months" tip={financials.purchase_date ? 'Auto-calculated from purchase date when sold' : 'Estimated hold time'}>
                   <NumInput value={financials.hold_months} onChange={handleLive('hold_months')} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="5" />
                 </Field>
                 <Field label="Loan-to-Purchase % (LTV)">
