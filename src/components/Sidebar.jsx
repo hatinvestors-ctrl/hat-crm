@@ -164,7 +164,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
           <span className="text-[color:var(--color-text-dim)]">{ICONS.agents}</span>
           <span className="flex-1">Agents</span>
         </NavLink>
-        {userRole !== 'readonly' && (
+        {userRole === 'admin' && (
           <NavLink to={`${base}/projects`} className={navItemClasses}>
             <span className="text-[color:var(--color-text-dim)]">{ICONS.projects}</span>
             <span className="flex-1">Projects</span>
