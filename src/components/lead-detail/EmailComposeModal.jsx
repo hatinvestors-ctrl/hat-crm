@@ -17,7 +17,7 @@ const SITUATION_OPTIONS = [
 
 // recipientEmail / recipientName override the listing-agent defaults when
 // opening from a different contact (e.g. the seller/agent in ContactInfoSection).
-export default function EmailComposeModal({ open, onClose, lead, onSent, recipientEmail, recipientName }) {
+export default function EmailComposeModal({ open, onClose, lead, onSent, recipientEmail }) {
   const { user, workspaceId } = useOutletContext()
   const [activeTab,  setActiveTab]  = useState('initial')
   const [to,         setTo]         = useState('')
@@ -46,7 +46,7 @@ export default function EmailComposeModal({ open, onClose, lead, onSent, recipie
     setError(null)
     setSending(false)
     setGenerating(false)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, lead, recipientEmail]) // reset fields whenever modal opens or lead changes while open
 
   const toggleSituation = (id) =>
     setSituations(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
@@ -106,7 +106,11 @@ export default function EmailComposeModal({ open, onClose, lead, onSent, recipie
       })
       if (cc.trim()) params.set('cc', cc.trim())
       const url = `https://mail.google.com/mail/?${params.toString()}`
-      window.open(url, '_blank', 'noopener,noreferrer')
+      const win = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!win) {
+        setError('Pop-up blocked — allow pop-ups for this site and try again.')
+        return
+      }
       await logEmailSent(lead.id, user.id, { to: to.trim(), cc: cc.trim(), subject })
       onSent?.()
       onClose()
@@ -126,7 +130,7 @@ export default function EmailComposeModal({ open, onClose, lead, onSent, recipie
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={sending}>Cancel</Button>
-          <Button variant="primary" onClick={handleSend} loading={sending} disabled={!to.trim() || sending}>
+          <Button variant="primary" onClick={handleSend} loading={sending} disabled={!to.trim() || sending || generating}>
             Open in Gmail ↗
           </Button>
         </>
