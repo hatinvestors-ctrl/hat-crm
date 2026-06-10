@@ -57,12 +57,17 @@ Your job is to write professional, ready-to-send negotiation emails on behalf of
 - For high counters: validate their number, then re-anchor with deal math (ARV - reno - profit margin)
 - For leaseback/stay-longer requests: show flexibility, use it as a closing lever`
 
+const MAX_REPLY_LEN = 4000
+function sanitize(s) {
+  return String(s ?? '').replace(/"""/g, '"" "').slice(0, MAX_REPLY_LEN)
+}
+
 function buildUserPrompt({ mode, lead, situation, their_reply }) {
   const addr = [lead.address, lead.city, lead.state].filter(Boolean).join(', ')
   const fmt  = (n) => n ? `$${Number(n).toLocaleString()}` : 'not set'
 
-  const offerPrice  = lead.offer_price  || lead.mao || null
-  const askingPrice = lead.asking_price || null
+  const offerPrice  = Number(lead.offer_price  || lead.mao)  || null
+  const askingPrice = Number(lead.asking_price) || null
 
   let gapStrategy = ''
   if (offerPrice && askingPrice) {
@@ -101,11 +106,12 @@ Negotiation Strategy: ${gapStrategy}
 Write the full email body now. No placeholders. Use all available data above.`
   }
 
-  const situationText = situation.length > 0
-    ? `Situation: ${situation.join(', ')}`
+  const safeArr = Array.isArray(situation) ? situation : []
+  const situationText = safeArr.length > 0
+    ? `Situation: ${safeArr.join(', ')}`
     : ''
   const replyText = their_reply?.trim()
-    ? `Their response:\n"""\n${their_reply.trim()}\n"""`
+    ? `Their response:\n"""\n${sanitize(their_reply)}\n"""`
     : ''
 
   return `Write a negotiation reply email for this property.
@@ -150,7 +156,7 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
+        max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
       }),
