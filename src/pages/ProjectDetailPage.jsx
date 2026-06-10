@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useOutletContext, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { calcDeal, fmtUSD, fmtPct, dealRatingColor, DEAL_RATING_INFO } from '../lib/dealCalculations'
+import { calcDeal, calcBRRRR, fmtUSD, fmtPct, dealRatingColor, DEAL_RATING_INFO } from '../lib/dealCalculations'
 import Topbar from '../components/Topbar'
 import Card from '../components/ui/Card'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -298,6 +298,124 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
   )
 }
 
+// Live BRRRR analysis panel (right column for BRRRR strategy projects)
+function LiveBRRRRPanel({ bc }) {
+  if (!bc) return (
+    <div className="text-[12px] text-[color:var(--color-text-dim)] py-6 text-center">
+      Fill in deal details to see BRRRR analysis.
+    </div>
+  )
+
+  const dim = 'text-[color:var(--color-text-dim)]'
+
+  const Row = ({ label, value, indent = 0, total = false, positive, negative, divider = false }) => (
+    <>
+      {divider && <div className="my-2 border-t border-[color:var(--color-line)]" />}
+      <div
+        className={`flex justify-between items-baseline py-[3px] text-[11.5px] ${total ? 'font-semibold border-t border-[color:var(--color-line)] mt-1 pt-2' : ''}`}
+        style={{ paddingLeft: indent * 12 }}
+      >
+        <span className={total ? 'text-[color:var(--color-text)]' : dim}>{label}</span>
+        <span className={
+          positive ? 'text-[color:var(--color-success-text)] font-semibold' :
+          negative  ? 'text-[color:var(--color-danger-text)] font-semibold'  :
+          total     ? 'font-semibold text-[color:var(--color-text)]' :
+          'text-[color:var(--color-text-muted)]'
+        }>{value}</span>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="space-y-5 text-[11.5px]">
+
+      {/* Acquisition */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Acquisition Cost</div>
+        <Row label="Purchase Price"      value={fmtUSD(bc.purchasePrice)} />
+        <Row label="+ Renovation Budget" value={fmtUSD(bc.renovBudget)} />
+        <Row label="+ Lender Fees"       value={fmtUSD(bc.hmlClosing)} />
+        <Row label="+ Purchase Closing"  value={fmtUSD(bc.purchaseClosing)} />
+        {bc.sellerCredits > 0 && <Row label="− Seller Credits" value={`− ${fmtUSD(bc.sellerCredits)}`} />}
+        <Row label="= Total at Closing"  value={fmtUSD(bc.totalAtAcquisition - bc.sellerCredits)} total />
+        <Row label="− Acquisition Loan"  value={`− ${fmtUSD(bc.acquisitionLoan)}`} />
+        <Row label="= Our Cash In"       value={fmtUSD(bc.ourCashInvested)} total positive />
+        {bc.totalHoldingCosts > 0 && <Row label={`+ Holding (${bc.holdMonths}mo)`} value={fmtUSD(bc.totalHoldingCosts)} />}
+        {bc.totalAcqInterest > 0 && <Row label={`+ Acq Interest (${bc.holdMonths}mo)`} value={fmtUSD(bc.totalAcqInterest)} />}
+        {(bc.totalHoldingCosts > 0 || bc.totalAcqInterest > 0) && (
+          <Row label="= Total All-In" value={fmtUSD(bc.totalAllIn)} total />
+        )}
+      </div>
+
+      {/* Refinance */}
+      <div className="border-t border-[color:var(--color-line)] pt-4">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Refinance</div>
+        <Row label={`ARV × ${fmtPct(bc.refiLtvPct)}`}   value={fmtUSD(bc.refiLoan)} />
+        <Row label="− Payoff Acq Loan"                    value={`− ${fmtUSD(bc.acquisitionLoan)}`} />
+        <Row
+          label="= Cash Back at Refi"
+          value={fmtUSD(bc.cashRecaptured)}
+          total
+          positive={bc.cashRecaptured > 0}
+          negative={bc.cashRecaptured < 0}
+        />
+        <Row
+          label="Net Cash Left in Deal"
+          value={bc.netCashInDeal <= 0
+            ? `${fmtUSD(Math.abs(bc.netCashInDeal))} pulled out!`
+            : fmtUSD(bc.netCashInDeal)}
+          total
+          positive={bc.netCashInDeal <= 0}
+          negative={bc.netCashInDeal > bc.ourCashInvested * 0.5}
+        />
+        <Row label="Equity at Refi"    value={fmtUSD(bc.equityAtRefi)} positive={bc.equityAtRefi > 0} />
+        <Row label="All-In vs ARV"     value={fmtPct(bc.allInVsARV)} negative={bc.allInVsARV > 0.80} />
+      </div>
+
+      {/* Monthly Cash Flow */}
+      <div className="border-t border-[color:var(--color-line)] pt-4">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Monthly Cash Flow (Post-Refi)</div>
+        <Row label="Gross Rent"                         value={fmtUSD(bc.monthlyRent)} />
+        <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)})`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
+        <Row label="− Property Taxes"                   value={`− ${fmtUSD(bc.monthlyTax)}`} />
+        <Row label="− Insurance"                        value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
+        <Row label={`− Vacancy (${fmtPct(bc.vacancyPct)})`}   value={`− ${fmtUSD(bc.monthlyVacancy)}`} />
+        <Row label={`− Mgmt (${fmtPct(bc.mgmtPct)})`}         value={`− ${fmtUSD(bc.monthlyMgmt)}`} />
+        <Row label="− Maintenance"                      value={`− ${fmtUSD(bc.maintenanceMonthly)}`} />
+        <Row
+          label="= Monthly Cash Flow"
+          value={fmtUSD(bc.monthlyCashFlow)}
+          total
+          positive={bc.monthlyCashFlow >= 0}
+          negative={bc.monthlyCashFlow < 0}
+        />
+        <Row label="Annual Cash Flow" value={fmtUSD(bc.annualCashFlow)} positive={bc.annualCashFlow >= 0} />
+      </div>
+
+      {/* Returns */}
+      <div className="border-t border-[color:var(--color-line)] pt-4">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Returns</div>
+        <Row label="Cap Rate"        value={fmtPct(bc.capRate)} positive={bc.capRate >= 0.07} negative={bc.capRate < 0.05} />
+        <Row label="GRM"             value={bc.grm > 0 ? bc.grm.toFixed(1) + 'x' : '—'} />
+        <Row label="NOI (Annual)"    value={fmtUSD(bc.annualNOI)} positive={bc.annualNOI >= 0} />
+        <Row
+          label="Cash-on-Cash ROI"
+          value={bc.cashOnCash != null ? fmtPct(bc.cashOnCash) : '∞ (cash recaptured)'}
+          positive
+        />
+        {bc.cashRecapturedPct >= 0 && (
+          <Row
+            label="Cash Recaptured"
+            value={`${Math.round(bc.cashRecapturedPct * 100)}%`}
+            positive={bc.cashRecapturedPct >= 1}
+          />
+        )}
+      </div>
+
+    </div>
+  )
+}
+
 // Hero stat box
 function StatBox({ label, value, sub, color }) {
   return (
@@ -426,7 +544,9 @@ export default function ProjectDetailPage() {
   const calcItems = pendingRenovCost != null
     ? [...items, { estimated_cost: pendingRenovCost, actual_cost: null }]
     : items
-  const calc = financials ? calcDeal(financials, calcItems) : null
+  const isBRRRR = financials?.project_strategy === 'brrrr'
+  const calc  = !isBRRRR && financials ? calcDeal(financials, calcItems) : null
+  const bCalc = isBRRRR  && financials ? calcBRRRR(financials) : null
   const isSold = lead.status === 'flip_sold' || lead.status === 'sold'
   const ratingKey = calc?.dealRating?.charAt(0)
   const ratingInfo = DEAL_RATING_INFO[ratingKey]
@@ -442,13 +562,18 @@ export default function ProjectDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            {canEdit && !isSold && financials && (
+            {canEdit && !isSold && !isBRRRR && financials && (
               <button
                 onClick={() => setMarkSoldOpen(true)}
                 className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)] hover:brightness-95 transition"
               >
                 ✓ Mark as Sold
               </button>
+            )}
+            {isBRRRR && (
+              <span className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                🏠 BRRRR Strategy
+              </span>
             )}
             <Link
               to={`/w/${workspaceId}/leads/${leadId}`}
@@ -599,8 +724,42 @@ export default function ProjectDetailPage() {
         {/* ── Left column: forms ── */}
         <div className="flex-1 min-w-0 space-y-4">
 
-        {/* ── Hero summary strip ── */}
-        {calc && (
+        {/* ── BRRRR Hero summary strip ── */}
+        {isBRRRR && bCalc && (
+          <div className="flex gap-3 flex-wrap">
+            <StatBox label="Our Cash In" value={fmtUSD(bCalc.ourCashInvested)} sub="at closing" />
+            <StatBox
+              label="Cash Recaptured at Refi"
+              value={fmtUSD(bCalc.cashRecaptured)}
+              sub={`${Math.round(bCalc.cashRecapturedPct * 100)}% recaptured`}
+              color={bCalc.cashRecaptured > 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}
+            />
+            <StatBox
+              label="Net Cash In Deal"
+              value={bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} out` : fmtUSD(bCalc.netCashInDeal)}
+              sub={bCalc.netCashInDeal <= 0 ? '✓ Perfect BRRRR!' : 'still in deal'}
+              color={bCalc.netCashInDeal <= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text)]'}
+            />
+            <StatBox
+              label="Monthly Cash Flow"
+              value={fmtUSD(bCalc.monthlyCashFlow)}
+              sub={`${fmtUSD(bCalc.annualCashFlow)}/yr`}
+              color={bCalc.monthlyCashFlow >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}
+            />
+            <StatBox label="Cap Rate" value={fmtPct(bCalc.capRate)} sub={`GRM ${bCalc.grm > 0 ? bCalc.grm.toFixed(1) : '—'}x`} color="text-[color:var(--color-text)]" />
+            <StatBox label="Equity at Refi" value={fmtUSD(bCalc.equityAtRefi)} sub={`${fmtUSD(bCalc.refiLoan)} new loan`} color="text-[color:var(--color-success-text)]" />
+          </div>
+        )}
+
+        {/* BRRRR warnings */}
+        {isBRRRR && bCalc?.warnings?.map((w, i) => (
+          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[oklch(0.97_0.04_80)] border border-[oklch(0.85_0.08_80)] text-[12px] text-[oklch(0.45_0.12_80)]">
+            ⚠ {w}
+          </div>
+        ))}
+
+        {/* ── Flip Hero summary strip ── */}
+        {!isBRRRR && calc && (
           <div className="flex gap-3 flex-wrap">
             <StatBox
               label="Purchase Price"
@@ -907,13 +1066,18 @@ export default function ProjectDetailPage() {
 
             {/* Purchase Closing Costs */}
             <Card title="Purchase Closing Costs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Field label="Title & Closing Costs" tip="Title search, title insurance (owner's), attorney, recording fees">
                   <NumInput value={financials.title_closing_costs} onChange={handleLive('title_closing_costs')} onBlur={handleBlur('title_closing_costs')} disabled={!canEdit} />
                 </Field>
                 <Field label="Other">
                   <NumInput value={financials.purchase_closing_costs_other} onChange={handleLive('purchase_closing_costs_other')} onBlur={handleBlur('purchase_closing_costs_other')} disabled={!canEdit} />
                 </Field>
+                {isBRRRR && (
+                  <Field label="Seller Credits" tip="Credits from seller (tax prorations, repairs, etc.) — reduces your cash to close">
+                    <NumInput value={financials.seller_credits} onChange={handleLive('seller_credits')} onBlur={handleBlur('seller_credits')} disabled={!canEdit} placeholder="0" />
+                  </Field>
+                )}
               </div>
             </Card>
 
@@ -971,7 +1135,100 @@ export default function ProjectDetailPage() {
               />
             </Card>
 
-            {/* Selling Price & Profit */}
+            {/* BRRRR Strategy — Refinance & Rental (shown only for BRRRR projects) */}
+            {isBRRRR && (
+              <Card title="BRRRR Plan — Refinance & Rental">
+                <div className="rounded-lg border border-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 mb-4 text-[11.5px] text-blue-800 dark:text-blue-300 font-medium">
+                  Buy · Rehab · Rent · Refinance · Repeat — hold as a rental, pull equity out via cash-out refi
+                </div>
+
+                <div className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)] mb-2 mt-1">Refinance Plan</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <Field label="ARV (After Repair Value)" tip="Target value after renovation — drives the refi loan amount">
+                    <NumInput value={financials.expected_sell_price} onChange={handleLive('expected_sell_price')} onBlur={handleBlur('expected_sell_price')} disabled={!canEdit} />
+                  </Field>
+                  <Field label="Refi LTV %" tip="Loan-to-value for permanent refi loan. Typical: 70–75%">
+                    <NumInput
+                      value={financials.refi_ltv_pct != null ? financials.refi_ltv_pct * 100 : 70}
+                      onChange={v => setFinancials(prev => prev ? { ...prev, refi_ltv_pct: v / 100 } : prev)}
+                      onBlur={v => save({ refi_ltv_pct: v === '' ? 0.70 : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="70"
+                    />
+                  </Field>
+                  <Field label="Refi Rate (Annual %)" tip="Interest rate on permanent refi loan">
+                    <NumInput
+                      value={financials.refi_interest_rate != null ? financials.refi_interest_rate * 100 : ''}
+                      onChange={v => setFinancials(prev => prev ? { ...prev, refi_interest_rate: v / 100 } : prev)}
+                      onBlur={v => save({ refi_interest_rate: v === '' ? null : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="6.7"
+                    />
+                  </Field>
+                  <Field label="Months to Refi" tip="How long until refinance (renovation + lease-up period)">
+                    <NumInput value={financials.hold_months} onChange={handleLive('hold_months')} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="6" />
+                  </Field>
+                </div>
+                {bCalc && bCalc.refiLoan > 0 && (
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {[
+                      { label: 'Refi Loan',    value: fmtUSD(bCalc.refiLoan),      sub: `${fmtPct(bCalc.refiLtvPct)} of ARV` },
+                      { label: 'Cash at Refi', value: fmtUSD(bCalc.cashRecaptured), sub: 'refi − payoff', green: bCalc.cashRecaptured > 0 },
+                      { label: 'Net Cash In',  value: bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} out` : fmtUSD(bCalc.netCashInDeal), sub: bCalc.netCashInDeal <= 0 ? '✓ Perfect BRRRR!' : '', green: bCalc.netCashInDeal <= 0 },
+                    ].map(({ label, value, sub, green }) => (
+                      <div key={label} className="rounded-lg bg-[color:var(--color-bg-elev-2)] px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
+                        <div className={`text-[14px] font-bold ${green ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text)]'}`}>{value}</div>
+                        {sub && <div className="text-[10px] text-[color:var(--color-text-dim)]">{sub}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)] mb-2 mt-3 border-t border-[color:var(--color-line)] pt-3">Rental Income & Expenses</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Field label="Monthly Rent" tip="Expected monthly rent once stabilized">
+                    <NumInput value={financials.monthly_rent} onChange={handleLive('monthly_rent')} onBlur={handleBlur('monthly_rent')} disabled={!canEdit} placeholder="1600" />
+                  </Field>
+                  <Field label="Vacancy Rate %" tip="Estimated vacancy. Default 5%">
+                    <NumInput
+                      value={financials.vacancy_rate_pct != null ? financials.vacancy_rate_pct * 100 : 5}
+                      onChange={v => setFinancials(prev => prev ? { ...prev, vacancy_rate_pct: v / 100 } : prev)}
+                      onBlur={v => save({ vacancy_rate_pct: v === '' ? 0.05 : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="5"
+                    />
+                  </Field>
+                  <Field label="Mgmt Fee %" tip="Property management fee as % of rent. Default 10%">
+                    <NumInput
+                      value={financials.property_mgmt_pct != null ? financials.property_mgmt_pct * 100 : 10}
+                      onChange={v => setFinancials(prev => prev ? { ...prev, property_mgmt_pct: v / 100 } : prev)}
+                      onBlur={v => save({ property_mgmt_pct: v === '' ? 0.10 : Number(v) / 100 })}
+                      disabled={!canEdit} placeholder="10"
+                    />
+                  </Field>
+                  <Field label="Maintenance (Monthly)" tip="Monthly maintenance reserve. Defaults to 5% of rent if blank">
+                    <NumInput value={financials.maintenance_monthly} onChange={handleLive('maintenance_monthly')} onBlur={handleBlur('maintenance_monthly')} disabled={!canEdit} placeholder="auto (5%)" />
+                  </Field>
+                </div>
+
+                {bCalc && bCalc.monthlyRent > 0 && (
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Monthly Cash Flow', value: fmtUSD(bCalc.monthlyCashFlow), sub: `${fmtUSD(bCalc.annualCashFlow)}/yr`, green: bCalc.monthlyCashFlow >= 0, red: bCalc.monthlyCashFlow < 0 },
+                      { label: 'Cap Rate',           value: fmtPct(bCalc.capRate),          sub: `GRM ${bCalc.grm.toFixed(1)}x`,       green: bCalc.capRate >= 0.07 },
+                      { label: 'NOI (Annual)',        value: fmtUSD(bCalc.annualNOI),        sub: 'before mortgage',                   green: bCalc.annualNOI >= 0 },
+                    ].map(({ label, value, sub, green, red }) => (
+                      <div key={label} className="rounded-lg bg-[color:var(--color-bg-elev-2)] px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
+                        <div className={`text-[14px] font-bold ${green ? 'text-[color:var(--color-success-text)]' : red ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-text)]'}`}>{value}</div>
+                        {sub && <div className="text-[10px] text-[color:var(--color-text-dim)]">{sub}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Selling Price & Profit (flip only) */}
+            {!isBRRRR && (
             <Card title="Selling Price & Profit">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -1076,6 +1333,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </Card>
+            )}
 
           </>
         )}
@@ -1086,9 +1344,12 @@ export default function ProjectDetailPage() {
         <div className="w-[300px] shrink-0 sticky top-4 self-start">
           <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
             <div className="text-[11px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-3 flex items-center gap-1.5">
-              <span>📊</span> Live Calculation
+              <span>📊</span> {isBRRRR ? 'BRRRR Analysis' : 'Live Calculation'}
             </div>
-            <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
+            {isBRRRR
+              ? <LiveBRRRRPanel bc={bCalc} />
+              : <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
+            }
           </div>
         </div>
 

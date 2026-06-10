@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { calcDeal, fmtUSD, fmtPct, dealRatingColor } from '../lib/dealCalculations'
+import { calcDeal, calcBRRRR, fmtUSD, fmtPct, dealRatingColor } from '../lib/dealCalculations'
 import Topbar from '../components/Topbar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ProjectsIntelligencePage from './ProjectsIntelligencePage'
@@ -192,6 +192,7 @@ const TYPE_BADGE = {
   Cash:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   Financed: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   JV:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  BRRRR:    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 }
 
 const isSoldStatus = s => s === 'flip_sold' || s === 'sold'
@@ -251,12 +252,13 @@ export default function ProjectsPage() {
         itemsByLead[item.lead_id].push(item)
       }
 
-      setRows(projectFins.map(f => ({
-        financials: f,
-        lead: f.leads,
-        items: itemsByLead[f.lead_id] || [],
-        calc: calcDeal(f, itemsByLead[f.lead_id] || []),
-      })))
+      setRows(projectFins.map(f => {
+        const isBRRRR = f.project_strategy === 'brrrr'
+        const items   = itemsByLead[f.lead_id] || []
+        const calc    = isBRRRR ? null : calcDeal(f, items)
+        const bCalc   = isBRRRR ? calcBRRRR(f) : null
+        return { financials: f, lead: f.leads, items, calc, bCalc, isBRRRR }
+      }))
       setLoading(false)
     }
     load()
@@ -269,26 +271,33 @@ export default function ProjectsPage() {
     const cash   = active.filter(r => r.financials.renovation_financing === 'Cash')
     const hml    = active.filter(r => r.financials.renovation_financing !== 'Cash')
 
-    const totalLocked       = active.reduce((s, r) => s + (r.calc?.totalCashInvested || 0), 0)
-    const cashLocked        = cash.reduce((s, r)   => s + (r.calc?.totalCashInvested || 0), 0)
-    const hmlLocked         = hml.reduce((s, r)    => s + (r.calc?.totalCashInvested || 0), 0)
-    const expectedProfit    = active.reduce((s, r) => s + (r.calc?.expected?.netProfit || 0), 0)
-    const realizedProfit    = sold.reduce((s, r)   => s + (r.calc?.actual?.netProfit || r.calc?.expected?.netProfit || 0), 0)
-    const cashExpected      = cash.reduce((s, r)   => s + (r.calc?.expected?.netProfit || 0), 0)
-    const hmlExpected       = hml.reduce((s, r)    => s + (r.calc?.expected?.netProfit || 0), 0)
-    const avgAnnRoi         = active.length > 0
-      ? active.reduce((s, r) => s + (r.calc?.expected?.annualizedRoi || 0), 0) / active.length : 0
+    // Helper: cash invested for any row type
+    const cashIn = r => r.isBRRRR ? (r.bCalc?.ourCashInvested || 0) : (r.calc?.totalCashInvested || 0)
 
-    // Best / worst by annualized ROI (active only)
-    const byAnnRoi = [...active].sort((a, b) => (b.calc?.expected?.annualizedRoi || 0) - (a.calc?.expected?.annualizedRoi || 0))
+    const totalLocked       = active.reduce((s, r) => s + cashIn(r), 0)
+    const cashLocked        = cash.reduce((s, r)   => s + cashIn(r), 0)
+    const hmlLocked         = hml.reduce((s, r)    => s + cashIn(r), 0)
+    const expectedProfit    = active.reduce((s, r) => s + (r.isBRRRR ? (r.bCalc?.annualCashFlow || 0) : (r.calc?.expected?.netProfit || 0)), 0)
+    const realizedProfit    = sold.reduce((s, r)   => s + (r.calc?.actual?.netProfit || r.calc?.expected?.netProfit || 0), 0)
+    const cashExpected      = cash.reduce((s, r)   => s + (r.isBRRRR ? (r.bCalc?.annualCashFlow || 0) : (r.calc?.expected?.netProfit || 0)), 0)
+    const hmlExpected       = hml.reduce((s, r)    => s + (r.isBRRRR ? (r.bCalc?.annualCashFlow || 0) : (r.calc?.expected?.netProfit || 0)), 0)
+    const avgAnnRoi         = active.length > 0
+      ? active.reduce((s, r) => s + (r.isBRRRR ? (r.bCalc?.capRate || 0) : (r.calc?.expected?.annualizedRoi || 0)), 0) / active.length : 0
+
+    // Best / worst by annualized ROI / cap rate (active only)
+    const byAnnRoi = [...active].sort((a, b) => {
+      const ra = a.isBRRRR ? (a.bCalc?.capRate || 0) : (a.calc?.expected?.annualizedRoi || 0)
+      const rb = b.isBRRRR ? (b.bCalc?.capRate || 0) : (b.calc?.expected?.annualizedRoi || 0)
+      return rb - ra
+    })
     const best  = byAnnRoi[0]
     const worst = byAnnRoi[byAnnRoi.length - 1]
 
     // Most cash locked
-    const mostLocked = [...active].sort((a, b) => (b.calc?.totalCashInvested || 0) - (a.calc?.totalCashInvested || 0))[0]
+    const mostLocked = [...active].sort((a, b) => cashIn(b) - cashIn(a))[0]
 
     // Risk: all-in vs ARV > 80%
-    const risky = active.filter(r => (r.calc?.allInVsARV || 0) > 0.80)
+    const risky = active.filter(r => ((r.isBRRRR ? r.bCalc?.allInVsARV : r.calc?.allInVsARV) || 0) > 0.80)
 
     // Average hold months
     const avgHold = rows.length > 0
@@ -355,17 +364,18 @@ export default function ProjectsPage() {
     let r = [...rows]
     if (statusFilter === 'Active') r = r.filter(x => !isSoldStatus(x.lead?.status))
     if (statusFilter === 'Sold')   r = r.filter(x => isSoldStatus(x.lead?.status))
-    if (typeFilter === 'Cash') r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing === 'Cash')
-    if (typeFilter === 'HML')  r = r.filter(x => !x.financials.is_jv && x.financials.renovation_financing !== 'Cash')
-    if (typeFilter === 'JV')   r = r.filter(x => !!x.financials.is_jv)
+    if (typeFilter === 'Cash')  r = r.filter(x => !x.financials.is_jv && !x.isBRRRR && x.financials.renovation_financing === 'Cash')
+    if (typeFilter === 'HML')   r = r.filter(x => !x.financials.is_jv && !x.isBRRRR && x.financials.renovation_financing !== 'Cash')
+    if (typeFilter === 'JV')    r = r.filter(x => !!x.financials.is_jv)
+    if (typeFilter === 'BRRRR') r = r.filter(x => !!x.isBRRRR)
     if (ratingFilter !== 'All') r = r.filter(x => x.calc?.dealRating?.startsWith(ratingFilter))
 
     const key = (x) => {
       const c = x.calc
-      if (sortBy === 'annRoi')     return c?.actual?.annualizedRoi ?? c?.expected?.annualizedRoi ?? 0
-      if (sortBy === 'profit')     return c?.actual?.netProfit ?? c?.expected?.netProfit ?? 0
-      if (sortBy === 'cashIn')     return c?.totalCashInvested ?? 0
-      if (sortBy === 'allInVsARV') return c?.allInVsARV ?? 0
+      if (sortBy === 'annRoi')     return x.isBRRRR ? (x.bCalc?.capRate ?? 0) : (c?.actual?.annualizedRoi ?? c?.expected?.annualizedRoi ?? 0)
+      if (sortBy === 'profit')     return x.isBRRRR ? (x.bCalc?.annualCashFlow ?? 0) : (c?.actual?.netProfit ?? c?.expected?.netProfit ?? 0)
+      if (sortBy === 'cashIn')     return x.isBRRRR ? (x.bCalc?.ourCashInvested ?? 0) : (c?.totalCashInvested ?? 0)
+      if (sortBy === 'allInVsARV') return x.isBRRRR ? (x.bCalc?.allInVsARV ?? 0) : (c?.allInVsARV ?? 0)
       if (sortBy === 'hold')       return x.financials.hold_months ?? 0
       return 0
     }
@@ -383,16 +393,13 @@ export default function ProjectsPage() {
   const sortIcon = (col) => sortBy === col ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ''
 
   // ── Chart data: annualized ROI per deal ──────────────────────────────────
+  const getAnnRoi = r => r.isBRRRR ? (r.bCalc?.capRate || 0) : (r.calc?.actual?.annualizedRoi ?? r.calc?.expected?.annualizedRoi ?? 0)
   const chartRows = useMemo(() =>
     [...rows]
-      .filter(r => r.calc?.expected || r.calc?.actual)
-      .sort((a, b) => {
-        const ra = a.calc?.actual?.annualizedRoi ?? a.calc?.expected?.annualizedRoi ?? 0
-        const rb = b.calc?.actual?.annualizedRoi ?? b.calc?.expected?.annualizedRoi ?? 0
-        return rb - ra
-      })
+      .filter(r => r.isBRRRR ? !!r.bCalc : (r.calc?.expected || r.calc?.actual))
+      .sort((a, b) => getAnnRoi(b) - getAnnRoi(a))
   , [rows])
-  const maxAnnRoi = chartRows.length > 0 ? Math.max(...chartRows.map(r => Math.abs(r.calc?.actual?.annualizedRoi ?? r.calc?.expected?.annualizedRoi ?? 0))) : 1
+  const maxAnnRoi = chartRows.length > 0 ? Math.max(...chartRows.map(r => Math.abs(getAnnRoi(r)))) : 1
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -478,30 +485,36 @@ export default function ProjectsPage() {
           <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4">
             <div className={`text-[10px] uppercase tracking-wider font-semibold mb-3 ${dim}`}>Annualized ROI by Deal</div>
             <div className="space-y-2">
-              {chartRows.map(({ financials: f, lead, calc }) => {
-                const annRoi  = calc?.actual?.annualizedRoi ?? calc?.expected?.annualizedRoi ?? 0
-                const profit  = calc?.actual?.netProfit ?? calc?.expected?.netProfit ?? 0
-                const barPct  = maxAnnRoi > 0 ? Math.min(Math.abs(annRoi) / maxAnnRoi * 100, 100) : 0
-                const isJV    = !!f.is_jv
-                const isCash  = !isJV && f.renovation_financing === 'Cash'
-                const isSold  = isSoldStatus(lead?.status)
-                const isActual = calc?.actual?.netProfit != null
+              {chartRows.map(r => {
+                const { financials: f, lead, calc, bCalc, isBRRRR: isB } = r
+                const annRoi    = isB ? (bCalc?.capRate || 0) : (calc?.actual?.annualizedRoi ?? calc?.expected?.annualizedRoi ?? 0)
+                const profitLbl = isB ? `${fmtUSD(bCalc?.monthlyCashFlow)}/mo cash flow` : `${fmtUSD(calc?.actual?.netProfit ?? calc?.expected?.netProfit ?? 0)} profit`
+                const barPct    = maxAnnRoi > 0 ? Math.min(Math.abs(annRoi) / maxAnnRoi * 100, 100) : 0
+                const isJV      = !!f.is_jv
+                const isCash    = !isJV && !isB && f.renovation_financing === 'Cash'
+                const typeCls   = isB ? TYPE_BADGE.BRRRR : isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed
+                const typeLabel = isB ? 'BRRRR' : isJV ? 'JV' : isCash ? 'CASH' : 'HML'
+                const isSold    = isSoldStatus(lead?.status)
+                const isActual  = !isB && calc?.actual?.netProfit != null
                 const shortAddr = (lead?.address || '—').split(',')[0]
                 return (
                   <div key={f.id} className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate(`/w/${workspaceId}/projects/${lead.id}`)}>
                     <div className="flex items-center gap-1.5 w-44 shrink-0">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>{isJV ? 'JV' : isCash ? 'CASH' : 'HML'}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeCls}`}>{typeLabel}</span>
                       <span className={`text-[11px] truncate group-hover:text-[color:var(--color-accent)] transition-colors ${muted}`}>{shortAddr}</span>
                     </div>
                     <div className="flex-1 h-5 bg-[color:var(--color-bg-elev-2)] rounded overflow-hidden">
                       <div
-                        className={`h-full rounded transition-all duration-500 ${annRoi >= 0 ? (isSold ? 'bg-[color:var(--color-success)]' : 'bg-[color:var(--color-accent)]') : 'bg-[color:var(--color-danger)]'}`}
+                        className={`h-full rounded transition-all duration-500 ${annRoi >= 0 ? (isSold ? 'bg-[color:var(--color-success)]' : isB ? 'bg-teal-500' : 'bg-[color:var(--color-accent)]') : 'bg-[color:var(--color-danger)]'}`}
                         style={{ width: `${barPct}%` }}
                       />
                     </div>
-                    <div className="text-right shrink-0 w-28">
-                      <div className={`text-[11px] font-semibold ${annRoi >= 0 ? success : danger}`}>{fmtPct(annRoi)}{!isActual && <span className={`font-normal ${dim}`}> est</span>}</div>
-                      <div className={`text-[10px] ${dim}`}>{fmtUSD(profit)} profit</div>
+                    <div className="text-right shrink-0 w-32">
+                      <div className={`text-[11px] font-semibold ${annRoi >= 0 ? success : danger}`}>
+                        {isB ? `${fmtPct(annRoi)} cap` : fmtPct(annRoi)}
+                        {!isActual && !isB && <span className={`font-normal ${dim}`}> est</span>}
+                      </div>
+                      <div className={`text-[10px] ${dim}`}>{profitLbl}</div>
                     </div>
                   </div>
                 )
@@ -519,10 +532,11 @@ export default function ProjectsPage() {
           ]} value={statusFilter} onChange={setStatusFilter} />
 
           <FilterGroup label="Deal Type" options={[
-            { value: 'All',  label: 'All Types' },
-            { value: 'Cash', label: 'Cash' },
-            { value: 'HML',  label: 'HML / Financed' },
-            { value: 'JV',   label: 'Joint Venture' },
+            { value: 'All',   label: 'All Types' },
+            { value: 'Cash',  label: 'Cash' },
+            { value: 'HML',   label: 'HML / Financed' },
+            { value: 'JV',    label: 'Joint Venture' },
+            { value: 'BRRRR', label: 'BRRRR' },
           ]} value={typeFilter} onChange={setTypeFilter} />
 
           <FilterGroup label="Deal Rating" options={[
@@ -618,27 +632,28 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ financials: f, lead, calc }) => {
-              const expectedProfit = calc?.expected?.netProfit
-              const actualProfit   = calc?.actual?.netProfit
+            {rows.map(({ financials: f, lead, calc, bCalc, isBRRRR: isB }) => {
+              const expectedProfit = isB ? (bCalc?.annualCashFlow || 0) : calc?.expected?.netProfit
+              const actualProfit   = !isB ? calc?.actual?.netProfit : null
               const displayProfit  = showActual && actualProfit != null ? actualProfit : expectedProfit
-              const annRoi = showActual && actualProfit != null ? calc?.actual?.annualizedRoi : calc?.expected?.annualizedRoi
-              const allInVsARV = calc?.allInVsARV || 0
-              const cashIn = calc?.totalCashInvested || 0
+              const annRoi = isB ? (bCalc?.capRate || 0) : (showActual && actualProfit != null ? calc?.actual?.annualizedRoi : calc?.expected?.annualizedRoi)
+              const allInVsARV = isB ? (bCalc?.allInVsARV || 0) : (calc?.allInVsARV || 0)
+              const cashIn = isB ? (bCalc?.ourCashInvested || 0) : (calc?.totalCashInvested || 0)
               const isJV   = !!f.is_jv
-              const isCash = !isJV && f.renovation_financing === 'Cash'
+              const isCash = !isJV && !isB && f.renovation_financing === 'Cash'
               const shortAddr = (lead?.address || '—').split(',')[0]
 
-              // variance: actual vs expected
-              const variance = (showActual && actualProfit != null && expectedProfit != null)
+              // variance: actual vs expected (flip only)
+              const variance = (!isB && showActual && actualProfit != null && expectedProfit != null)
                 ? actualProfit - expectedProfit : null
 
               // flags
               const flags = []
               if (allInVsARV > 0.85) flags.push({ label: '>85% ARV', cls: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]' })
               else if (allInVsARV > 0.75) flags.push({ label: '>75% ARV', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' })
-              if (displayProfit != null && displayProfit < 20000) flags.push({ label: 'Low Profit', cls: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]' })
-              if ((annRoi || 0) < 0.20 && (annRoi || 0) > -999) flags.push({ label: 'Low ROI', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' })
+              if (!isB && displayProfit != null && displayProfit < 20000) flags.push({ label: 'Low Profit', cls: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]' })
+              if (!isB && (annRoi || 0) < 0.20 && (annRoi || 0) > -999) flags.push({ label: 'Low ROI', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' })
+              if (isB && (bCalc?.monthlyCashFlow || 0) < 0) flags.push({ label: 'Neg CF', cls: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]' })
 
               return (
                 <tr
@@ -651,12 +666,12 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                     <div className="text-[10px] text-[color:var(--color-text-dim)] truncate">{(lead?.address || '').replace(shortAddr, '').replace(/^,\s*/, '')}</div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>
-                      {isCash ? 'CASH' : 'HML'}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isB ? TYPE_BADGE.BRRRR : isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>
+                      {isB ? 'BRRRR' : isJV ? 'JV' : isCash ? 'CASH' : 'HML'}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{fmtUSD(f.purchase_price_actual)}</td>
-                  <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{calc ? fmtUSD(calc.totalAllInCost) : '—'}</td>
+                  <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{isB ? fmtUSD(bCalc?.totalAllIn) : calc ? fmtUSD(calc.totalAllInCost) : '—'}</td>
                   <td className="px-3 py-2.5">
                     <span className={allInVsARV > 0.80 ? 'text-[color:var(--color-danger-text)] font-semibold' : allInVsARV > 0.75 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-text-muted)]'}>
                       {allInVsARV > 0 ? fmtPct(allInVsARV) : '—'}
@@ -665,8 +680,8 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                   <td className="px-3 py-2.5 text-[color:var(--color-text-muted)] font-medium">{fmtUSD(cashIn)}</td>
                   <td className="px-3 py-2.5">
                     {displayProfit != null ? (
-                      <span className={`font-semibold ${displayProfit >= 30000 ? 'text-[color:var(--color-success-text)]' : displayProfit >= 0 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-danger-text)]'}`}>
-                        {fmtUSD(displayProfit)}
+                      <span className={`font-semibold ${isB ? (displayProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]') : displayProfit >= 30000 ? 'text-[color:var(--color-success-text)]' : displayProfit >= 0 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-danger-text)]'}`}>
+                        {fmtUSD(displayProfit)}{isB && <span className="text-[9px] text-[color:var(--color-text-dim)] ml-0.5">/yr CF</span>}
                       </span>
                     ) : '—'}
                   </td>
@@ -680,13 +695,16 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                     </td>
                   )}
                   <td className="px-3 py-2.5">
-                    <span className={`font-semibold ${(annRoi||0) >= 0.50 ? 'text-[color:var(--color-success-text)]' : (annRoi||0) >= 0.20 ? 'text-[color:var(--color-text-muted)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                    <span className={`font-semibold ${(annRoi||0) >= 0.07 ? 'text-[color:var(--color-success-text)]' : (annRoi||0) >= 0.05 ? 'text-[color:var(--color-text-muted)]' : 'text-[color:var(--color-danger-text)]'}`}>
                       {annRoi != null ? fmtPct(annRoi) : '—'}
+                      {isB && annRoi != null && <span className="text-[9px] text-[color:var(--color-text-dim)] ml-0.5">cap</span>}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{f.hold_months ? `${f.hold_months}mo` : '—'}</td>
                   <td className="px-3 py-2.5">
-                    {calc?.dealRating && (
+                    {isB ? (
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">BRRRR</span>
+                    ) : calc?.dealRating && (
                       <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${dealRatingColor(calc.dealRating)}`}>
                         {calc.dealRating.split(' - ')[0]}
                       </span>

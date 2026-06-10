@@ -172,6 +172,121 @@ export function calcDeal(f, items = []) {
   }
 }
 
+/**
+ * BRRRR strategy financial calculations.
+ * Buy → Rehab → Rent → Refinance → Repeat
+ * @param {object} f - deal_financials row (project_strategy === 'brrrr')
+ * @returns {object} all derived BRRRR metrics
+ */
+export function calcBRRRR(f) {
+  if (!f) return null
+
+  const purchasePrice   = n(f.purchase_price_actual)
+  const acquisitionLoan = n(f.purchase_loan_amount)   // total rehab/acquisition loan (covers purchase + reno + fees)
+  const renovBudget     = n(f.renovation_lender_amount) // reno escrow (part of acq loan)
+  const arv             = n(f.expected_sell_price)     // After Repair Value
+  const holdMonths      = n(f.hold_months) || 6
+
+  // Closing costs at acquisition
+  const hmlClosing    = n(f.title_lender_insurance) + n(f.interest_portion) +
+                        n(f.doc_stamps_mortgage) + n(f.intangible_tax) + n(f.extension_fee)
+  const purchaseClosing = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
+  const sellerCredits = n(f.seller_credits)
+
+  // Total project cost at closing (purchase + reno + all closing fees)
+  const totalAtAcquisition = purchasePrice + renovBudget + hmlClosing + purchaseClosing
+
+  // Our cash out of pocket (what we actually wired/paid)
+  const ourCashInvested = Math.max(0, totalAtAcquisition - acquisitionLoan - sellerCredits)
+
+  // Holding costs during renovation period
+  const monthlyHoldCosts = n(f.insurance_monthly) + n(f.utilities_monthly) +
+                           n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
+  const totalHoldingCosts = monthlyHoldCosts * holdMonths
+
+  // Interest on acquisition loan during renovation (if rate known)
+  const acqRate            = n(f.interest_rate_annual)
+  const monthlyAcqInterest = acquisitionLoan * (acqRate / 12)
+  const totalAcqInterest   = monthlyAcqInterest * holdMonths
+
+  // Total all-in cost at time of refinance
+  const totalAllIn = totalAtAcquisition + totalHoldingCosts + totalAcqInterest
+
+  // ── Refinance ──
+  const refiLtvPct     = f.refi_ltv_pct != null ? n(f.refi_ltv_pct) : 0.70
+  const refiRate       = f.refi_interest_rate != null ? n(f.refi_interest_rate) : 0.067
+  const refiLoan       = arv * refiLtvPct                  // new permanent loan
+  const cashRecaptured = refiLoan - acquisitionLoan         // cash back at refi
+  const netCashInDeal  = ourCashInvested - cashRecaptured  // can be negative (ideal BRRRR!)
+  const cashRecapturedPct = ourCashInvested > 0 ? cashRecaptured / ourCashInvested : 0
+
+  // 30-year amortized P&I payment on refi loan
+  const refiMonthlyRate = refiRate / 12
+  const refiMonthlyPI   = refiLoan > 0 && refiMonthlyRate > 0
+    ? refiLoan * (refiMonthlyRate * Math.pow(1 + refiMonthlyRate, 360)) /
+      (Math.pow(1 + refiMonthlyRate, 360) - 1)
+    : 0
+
+  // ── Rental income & operating expenses (post-refi, ongoing) ──
+  const monthlyRent        = n(f.monthly_rent)
+  const vacancyPct         = f.vacancy_rate_pct    != null ? n(f.vacancy_rate_pct)    : 0.05
+  const mgmtPct            = f.property_mgmt_pct   != null ? n(f.property_mgmt_pct)   : 0.10
+  const maintenanceMonthly = f.maintenance_monthly != null ? n(f.maintenance_monthly) : monthlyRent * 0.05
+
+  const monthlyTax      = n(f.taxes_monthly)
+  const monthlyInsurance = n(f.insurance_monthly)
+  const monthlyHOA      = n(f.hoa_monthly)
+  const monthlyVacancy  = monthlyRent * vacancyPct
+  const monthlyMgmt     = monthlyRent * mgmtPct
+
+  // Operating expenses excluding debt service
+  const monthlyOpex = monthlyTax + monthlyInsurance + monthlyHOA +
+                      monthlyVacancy + monthlyMgmt + maintenanceMonthly
+
+  // NOI = rent - opex (no mortgage)
+  const monthlyNOI  = monthlyRent - monthlyOpex
+  const annualNOI   = monthlyNOI * 12
+
+  // Cash flow = rent - mortgage - opex
+  const monthlyCashFlow = monthlyRent - refiMonthlyPI - monthlyOpex
+  const annualCashFlow  = monthlyCashFlow * 12
+
+  // Cap Rate = NOI / ARV
+  const capRate = arv > 0 ? annualNOI / arv : 0
+
+  // Cash-on-cash ROI (null = infinite, money was fully recaptured)
+  const cashOnCash = netCashInDeal > 0 ? annualCashFlow / netCashInDeal : null
+
+  // Gross Rent Multiplier = property value / annual rent
+  const grm = monthlyRent > 0 ? arv / (monthlyRent * 12) : 0
+
+  // Equity at refinance
+  const equityAtRefi = arv - refiLoan
+
+  // All-in vs ARV (risk check)
+  const allInVsARV = arv > 0 ? totalAllIn / arv : 0
+
+  const warnings = []
+  if (allInVsARV > 0.80) warnings.push(`All-In vs ARV: ${(allInVsARV * 100).toFixed(1)}% — above 80%, refi may not fully recapture`)
+  if (capRate < 0.06) warnings.push(`Cap rate ${(capRate * 100).toFixed(1)}% below 6% — verify expenses and rent`)
+  if (monthlyCashFlow < 0) warnings.push('Negative monthly cash flow after refi')
+
+  return {
+    purchasePrice, acquisitionLoan, renovBudget, hmlClosing, purchaseClosing, sellerCredits,
+    totalAtAcquisition, ourCashInvested, monthlyHoldCosts, totalHoldingCosts,
+    monthlyAcqInterest, totalAcqInterest, totalAllIn,
+    refiLtvPct, refiRate, refiLoan, cashRecaptured, netCashInDeal, cashRecapturedPct,
+    refiMonthlyPI,
+    monthlyRent, vacancyPct, mgmtPct, maintenanceMonthly,
+    monthlyTax, monthlyInsurance, monthlyHOA, monthlyVacancy, monthlyMgmt,
+    monthlyOpex, monthlyNOI, annualNOI,
+    monthlyCashFlow, annualCashFlow,
+    capRate, cashOnCash, grm,
+    equityAtRefi, allInVsARV, holdMonths,
+    warnings,
+  }
+}
+
 export function fmtUSD(v) {
   if (v == null || isNaN(Number(v))) return '—'
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(v))
