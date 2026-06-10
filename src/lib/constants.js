@@ -24,7 +24,7 @@ export const LEAD_STATUSES = [
   { value: 'offer_accepted',             label: 'Offer Accepted',        category: 'Outcome',   tone: 'success' },
   { value: 'rejected_not_accepted',      label: 'Rejected / Not Accepted', category: 'Outcome', tone: 'danger'  },
   { value: 'sold',                       label: 'Sold (Wholesale)',       category: 'Outcome',   tone: 'success' },
-  { value: 'flip_sold',                  label: 'Flip Sold ✓',           category: 'Outcome',   tone: 'success' },
+  { value: 'flip_sold',                  label: 'Flip Sold ✓',           category: 'Project Result', tone: 'success' },
   { value: 'dead_lead',                  label: 'Dead Lead',             category: 'Outcome',   tone: 'danger'  },
 
   // ── Process / automation ────────────────────────────────────────
@@ -80,7 +80,7 @@ export const SIGNED_STATUSES = [
 ]
 
 // Group statuses by category for the picker grid.
-export const STATUS_CATEGORIES = ['Triage','Pipeline','Follow-Up','Outcome','Process','Other'].map(cat => ({
+export const STATUS_CATEGORIES = ['Triage','Pipeline','Follow-Up','Outcome','Project Result','Process','Other'].map(cat => ({
   name: cat,
   statuses: LEAD_STATUSES.filter(s => s.category === cat),
 }))

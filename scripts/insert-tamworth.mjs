@@ -3,13 +3,24 @@
 // Run: node scripts/insert-tamworth.mjs
 
 import { createClient } from '@supabase/supabase-js'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// Load .env from project root
+try {
+  const env = readFileSync(resolve(process.cwd(), '.env'), 'utf8')
+  for (const line of env.split('\n')) {
+    const [k, ...v] = line.split('=')
+    if (k && v.length) process.env[k.trim()] = v.join('=').trim()
+  }
+} catch {}
 
 const SUPABASE_URL = 'https://pyrgotfotmwazigewlke.supabase.co'
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const WORKSPACE_ID = 'd854b1e3-b174-45f7-b11d-1b92d8e7b87d'
 
 if (!SERVICE_KEY) {
-  console.error('Set SUPABASE_SERVICE_KEY env var')
+  console.error('No service key found in .env (SUPABASE_SERVICE_ROLE_KEY)')
   process.exit(1)
 }
 
@@ -47,7 +58,7 @@ async function main() {
       state:         'FL',
       zip_code:      '32208',
       status:        'working_project',
-      lead_source:   'direct',
+      lead_source:   'other',
     })
     .select()
     .single()

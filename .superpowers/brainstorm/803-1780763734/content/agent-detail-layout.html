@@ -1,0 +1,126 @@
+<h2>Agent Detail Panel — Which layout feels right?</h2>
+<p class="subtitle">Click an option to select it, then let me know in the terminal</p>
+
+<div class="cards">
+
+  <!-- Option A: Right-side Drawer (like TaskDetailDrawer) -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:12px;background:#0f1117;border-radius:6px;font-size:11px;font-family:monospace;color:#aaa;min-height:260px;position:relative;overflow:hidden;">
+      <!-- Table behind -->
+      <div style="opacity:0.35;padding:4px 8px;background:#1a1d27;border-radius:4px;margin-bottom:4px;">
+        <div style="display:flex;gap:20px;color:#666;font-size:9px;margin-bottom:4px;">AGENT · EMAIL · LEADS · LAST CONTACTED</div>
+        <div style="display:flex;gap:20px;color:#888;font-size:9px;padding:2px 0;background:#222;border-radius:2px;">Jane Smith · jane@abc.com · 4 · 12d ago</div>
+        <div style="display:flex;gap:20px;color:#ddd;font-size:9px;padding:2px 0;">Bob Lee · bob@xyz.com · 2 · 45d ago</div>
+        <div style="display:flex;gap:20px;color:#888;font-size:9px;padding:2px 0;">Sara K · sara@mls.com · 7 · —</div>
+      </div>
+      <!-- Drawer overlay -->
+      <div style="position:absolute;top:0;right:0;width:55%;height:100%;background:#1e2130;border-left:1px solid #333;box-shadow:-8px 0 24px rgba(0,0,0,0.5);padding:10px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #333;padding-bottom:6px;">
+          <span style="color:#e2e8f0;font-weight:600;font-size:11px;">Jane Smith</span>
+          <span style="color:#555;font-size:10px;">✕</span>
+        </div>
+        <div style="font-size:9px;color:#aaa;">jane@realty.com · (555) 234-5678</div>
+        <div style="font-size:9px;color:#888;font-style:italic;">Sunrise Realty Group</div>
+        <div style="background:#252a3a;border-radius:3px;padding:5px;font-size:9px;color:#aaa;">
+          <div style="color:#666;font-size:8px;margin-bottom:2px;">NOTES</div>
+          Met at open house May 2. Prefer text contact...
+        </div>
+        <div style="background:#252a3a;border-radius:3px;padding:5px;font-size:9px;color:#aaa;flex:1;">
+          <div style="color:#666;font-size:8px;margin-bottom:3px;">ACTIVITY</div>
+          <div style="color:#7c9;font-size:8px;">📧 Email sent — 12d ago</div>
+          <div style="color:#888;font-size:8px;margin-top:2px;">📝 Note added — 20d ago</div>
+        </div>
+        <div style="background:#1a1d27;border:1px solid #333;border-radius:3px;padding:4px;font-size:9px;color:#666;">
+          Leave a comment…
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Right-side Drawer</h3>
+      <p>Slides in from the right over the table (same as Tasks). Quick to open/close. Table stays visible underneath with a dim overlay.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Full detail page (like LeadDetailPage) -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:12px;background:#0f1117;border-radius:6px;font-size:11px;font-family:monospace;color:#aaa;min-height:260px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333;padding-bottom:6px;margin-bottom:8px;">
+        <div>
+          <span style="color:#888;font-size:9px;">← Agents /</span>
+          <span style="color:#e2e8f0;font-size:10px;font-weight:600;margin-left:4px;">Jane Smith</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <span style="background:#2a3a5e;color:#7ab;font-size:8px;padding:2px 5px;border-radius:3px;">Send Email</span>
+          <span style="background:#2a2a2a;color:#888;font-size:8px;padding:2px 5px;border-radius:3px;">Edit</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;">
+        <div style="background:#1a1d27;border-radius:3px;padding:5px;">
+          <div style="color:#555;font-size:8px;margin-bottom:2px;">CONTACT</div>
+          <div style="color:#ccc;">jane@realty.com</div>
+          <div style="color:#888;">(555) 234-5678</div>
+          <div style="color:#888;">Sunrise Realty Group</div>
+        </div>
+        <div style="background:#1a1d27;border-radius:3px;padding:5px;">
+          <div style="color:#555;font-size:8px;margin-bottom:2px;">NOTES</div>
+          <div style="color:#aaa;">Met at open house May 2. Prefer text contact...</div>
+        </div>
+        <div style="background:#1a1d27;border-radius:3px;padding:5px;grid-column:1/-1;">
+          <div style="color:#555;font-size:8px;margin-bottom:3px;">ACTIVITY & COMMENTS</div>
+          <div style="color:#7c9;font-size:8px;">📧 Email "Intro" sent — 12d ago</div>
+          <div style="color:#888;font-size:8px;margin-top:2px;">💬 "Following up next week" — you, 15d ago</div>
+          <div style="color:#888;font-size:8px;margin-top:2px;">📝 Note updated — 20d ago</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Full Detail Page</h3>
+      <p>Navigates to a dedicated page (new URL like <code>/agents/:id</code>). More space. Same pattern as Lead Detail. Back button returns to table.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Wide drawer (expanded) -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:12px;background:#0f1117;border-radius:6px;font-size:11px;font-family:monospace;color:#aaa;min-height:260px;position:relative;overflow:hidden;">
+      <div style="opacity:0.25;padding:4px 8px;background:#1a1d27;border-radius:4px;margin-bottom:4px;">
+        <div style="display:flex;gap:20px;color:#888;font-size:9px;padding:2px 0;">Jane Smith · jane@abc.com · 4 · 12d ago</div>
+      </div>
+      <!-- Wide drawer with 2-col layout inside -->
+      <div style="position:absolute;top:0;right:0;width:75%;height:100%;background:#1e2130;border-left:1px solid #333;box-shadow:-8px 0 24px rgba(0,0,0,0.5);padding:10px;display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #333;padding-bottom:5px;">
+          <span style="color:#e2e8f0;font-weight:600;font-size:11px;">Jane Smith</span>
+          <span style="color:#555;font-size:10px;">✕</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="background:#252a3a;border-radius:3px;padding:5px;font-size:9px;">
+              <div style="color:#555;font-size:7px;margin-bottom:2px;">CONTACT INFO</div>
+              <div style="color:#ccc;">jane@realty.com</div>
+              <div style="color:#888;">(555) 234-5678</div>
+              <div style="color:#888;">Sunrise Realty Group</div>
+            </div>
+            <div style="background:#252a3a;border-radius:3px;padding:5px;font-size:9px;flex:1;">
+              <div style="color:#555;font-size:7px;margin-bottom:2px;">NOTES</div>
+              <div style="color:#aaa;">Met at open house May 2...</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="background:#252a3a;border-radius:3px;padding:5px;font-size:9px;flex:1;">
+              <div style="color:#555;font-size:7px;margin-bottom:3px;">ACTIVITY</div>
+              <div style="color:#7c9;font-size:8px;">📧 Email sent — 12d ago</div>
+              <div style="color:#888;font-size:8px;margin-top:2px;">💬 Comment — 15d ago</div>
+            </div>
+            <div style="background:#1a1d27;border:1px solid #333;border-radius:3px;padding:4px;font-size:9px;color:#666;">
+              Leave a comment…
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Wide Drawer (2-col inside)</h3>
+      <p>Wider drawer (~70% of screen) with a 2-column layout inside: contact+notes on the left, activity+comments on the right. No navigation needed.</p>
+    </div>
+  </div>
+
+</div>

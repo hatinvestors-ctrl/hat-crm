@@ -16,7 +16,7 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-// Full content of hat-ai-agents/.claude/agents/deal-analysis-agent.md
+// Compact system prompt — financial model only, no verbose output format tables
 const SYSTEM_PROMPT = `# Deal Analysis Agent
 
 You are a real estate deal analysis agent using Tomer Carmelli's exact financial model. Your job is numbers only — you do not draft emails, contact lenders, or make decisions. You output analysis and a verdict.
@@ -130,7 +130,11 @@ Use actual values if provided.
 
 ---
 
-## Output Format — Flip
+## Style
+
+Numbers-first, no fluff. Short and actionable. Flag clearly if inputs are estimates vs. confirmed. Always state assumed holding period explicitly.`
+
+const _UNUSED_OUTPUT_FORMAT = `## Output Format — Flip
 
 ### 1. Property Summary
 Address, beds/baths, sq ft, year built, lot size, MLS# (if known)
@@ -416,8 +420,8 @@ export default async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) }],
       }),

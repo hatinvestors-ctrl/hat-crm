@@ -3,7 +3,19 @@
     "allow": [
       "PowerShell(node --version)",
       "PowerShell(npm --version)",
-      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; node --version; npm --version)"
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; node --version; npm --version)",
+      "Bash(npm run *)",
+      "Bash(grep -v \"^.*//\\\\|const handle\")",
+      "Bash(grep -v \"^.*function\\\\|^.*const\\\\|^.*//\\\\|^.*Row\\\\|^.*import\")",
+      "Bash(node -e ' *)",
+      "Bash(node --input-type=module)",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\tomer\\\\Documents\\\\PrivateNew180425\\\\CloudeCode\\\\HatCRM\" -Force | Where-Object { $_.Name -match 'env' } | Select-Object Name)",
+      "Bash(node scripts/insert-darlington.mjs)",
+      "Bash(npx supabase *)",
+      "Bash(node \"c:\\\\Users\\\\tomer\\\\Documents\\\\PrivateNew180425\\\\CloudeCode\\\\HatCRM\\\\scripts\\\\portfolio-analysis.mjs\")",
+      "Bash(npx tsc *)",
+      "Bash(node scripts/insert-tamworth.mjs)",
+      "Bash(start cmd *)"
     ]
   }
 }

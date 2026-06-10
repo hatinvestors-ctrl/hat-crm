@@ -181,109 +181,129 @@ export function calcDeal(f, items = []) {
 export function calcBRRRR(f) {
   if (!f) return null
 
-  const purchasePrice   = n(f.purchase_price_actual)
-  const acquisitionLoan = n(f.purchase_loan_amount)   // total rehab/acquisition loan (covers purchase + reno + fees)
-  const renovBudget     = n(f.renovation_lender_amount) // reno escrow (part of acq loan)
-  const arv             = n(f.expected_sell_price)     // After Repair Value
-  const holdMonths      = n(f.hold_months) || 6
+  const purchasePrice = n(f.purchase_price_actual)
+  const renovBudget   = n(f.renovation_lender_amount)
+  const arv           = n(f.expected_sell_price)
+  const holdMonths    = n(f.hold_months) || 6
 
-  // Closing costs at acquisition
-  const hmlClosing    = n(f.title_lender_insurance) + n(f.interest_portion) +
-                        n(f.doc_stamps_mortgage) + n(f.intangible_tax) + n(f.extension_fee)
+  // ── Phase 1: Acquisition Loans (same structure as calcDeal) ──
+  const ltvPct       = f.loan_to_purchase_pct != null ? n(f.loan_to_purchase_pct) : 0.90
+  const purchaseLoan = f.purchase_loan_amount  != null ? n(f.purchase_loan_amount) : purchasePrice * ltvPct
+  const downPayment  = purchasePrice - purchaseLoan
+
+  const renovLenderPct = f.renovation_lender_pct != null ? n(f.renovation_lender_pct) : 1.0
+  const renovLoan      = f.renovation_financing === 'Cash' ? 0 : renovBudget * renovLenderPct
+  const renovGap       = Math.max(0, renovBudget - renovLoan)
+  const totalLoan      = purchaseLoan + renovLoan
+
+  const pointsBase  = f.points_charged_on === 'Purchase Only' ? purchaseLoan : totalLoan
+  const pointsCost  = pointsBase * n(f.points_pct)
+  const monthlyInterest = totalLoan * (n(f.interest_rate_annual) / 12)
+  const totalInterest   = monthlyInterest * holdMonths
+
+  const hmlClosing = pointsCost
+    + n(f.title_lender_insurance)
+    + n(f.interest_portion)
+    + n(f.doc_stamps_mortgage)
+    + n(f.intangible_tax)
+    + n(f.extension_fee)
+
   const purchaseClosing = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
-  const sellerCredits = n(f.seller_credits)
+  const sellerCredits   = n(f.seller_credits)
 
-  // Total project cost at closing (purchase + reno + all closing fees)
-  const totalAtAcquisition = purchasePrice + renovBudget + hmlClosing + purchaseClosing
+  // Cash we pay at closing (out of pocket on day 1)
+  const cashAtClose = downPayment + hmlClosing + purchaseClosing + renovGap - sellerCredits
 
-  // Our cash out of pocket (what we actually wired/paid)
-  const ourCashInvested = Math.max(0, totalAtAcquisition - acquisitionLoan - sellerCredits)
-
-  // Holding costs during renovation period
-  const monthlyHoldCosts = n(f.insurance_monthly) + n(f.utilities_monthly) +
-                           n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
+  // ── Phase 2: Carrying Costs During Renovation ──
+  const monthlyHoldCosts  = n(f.insurance_monthly) + n(f.utilities_monthly) +
+                            n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
   const totalHoldingCosts = monthlyHoldCosts * holdMonths
+  const totalCarrying     = totalInterest + totalHoldingCosts   // paid during reno
 
-  // Interest on acquisition loan during renovation (if rate known)
-  const acqRate            = n(f.interest_rate_annual)
-  const monthlyAcqInterest = acquisitionLoan * (acqRate / 12)
-  const totalAcqInterest   = monthlyAcqInterest * holdMonths
+  // Total cash we have put in before refinance
+  const totalCashIn = cashAtClose + totalCarrying
 
-  // Total all-in cost at time of refinance
-  const totalAllIn = totalAtAcquisition + totalHoldingCosts + totalAcqInterest
+  // Total all-in project cost
+  const totalAllIn  = purchasePrice + renovBudget + hmlClosing + purchaseClosing + totalCarrying
 
-  // ── Refinance ──
-  const refiLtvPct     = f.refi_ltv_pct != null ? n(f.refi_ltv_pct) : 0.70
-  const refiRate       = f.refi_interest_rate != null ? n(f.refi_interest_rate) : 0.067
-  const refiLoan       = arv * refiLtvPct                  // new permanent loan
-  const cashRecaptured = refiLoan - acquisitionLoan         // cash back at refi
-  const netCashInDeal  = ourCashInvested - cashRecaptured  // can be negative (ideal BRRRR!)
-  const cashRecapturedPct = ourCashInvested > 0 ? cashRecaptured / ourCashInvested : 0
+  // ── Phase 3: Refinance ──
+  const refiLtvPct       = f.refi_ltv_pct        != null ? n(f.refi_ltv_pct)        : 0.70
+  const refiRate         = f.refi_interest_rate   != null ? n(f.refi_interest_rate)  : 0.067
+  const refiClosingCosts = f.refi_closing_costs   != null ? n(f.refi_closing_costs)  : 2000
+  const refiLoan         = arv * refiLtvPct
+  const loanPayoff       = totalLoan
 
-  // 30-year amortized P&I payment on refi loan
+  // Cash received at refi (refi loan − pay off HML − refi closing costs)
+  const refiCashOut = refiLoan - loanPayoff - refiClosingCosts
+
+  // Net cash still left in the deal after pulling refi cash out
+  const netCashInDeal      = totalCashIn - refiCashOut   // positive = still have money in deal
+  const cashRecapturedPct  = totalCashIn > 0 ? refiCashOut / totalCashIn : 0
+
+  // Equity position at refi
+  const equityAtRefi = arv - refiLoan
+  const allInVsARV   = arv > 0 ? totalAllIn / arv : 0
+
+  // 30-year P&I on new refi loan
   const refiMonthlyRate = refiRate / 12
   const refiMonthlyPI   = refiLoan > 0 && refiMonthlyRate > 0
     ? refiLoan * (refiMonthlyRate * Math.pow(1 + refiMonthlyRate, 360)) /
       (Math.pow(1 + refiMonthlyRate, 360) - 1)
     : 0
 
-  // ── Rental income & operating expenses (post-refi, ongoing) ──
+  // ── Phase 4: Ongoing Rental Cash Flow (post-refi) ──
   const monthlyRent        = n(f.monthly_rent)
   const vacancyPct         = f.vacancy_rate_pct    != null ? n(f.vacancy_rate_pct)    : 0.05
   const mgmtPct            = f.property_mgmt_pct   != null ? n(f.property_mgmt_pct)   : 0.10
   const maintenanceMonthly = f.maintenance_monthly != null ? n(f.maintenance_monthly) : monthlyRent * 0.05
 
-  const monthlyTax      = n(f.taxes_monthly)
+  const monthlyTax       = n(f.taxes_monthly)
   const monthlyInsurance = n(f.insurance_monthly)
-  const monthlyHOA      = n(f.hoa_monthly)
-  const monthlyVacancy  = monthlyRent * vacancyPct
-  const monthlyMgmt     = monthlyRent * mgmtPct
+  const monthlyHOA       = n(f.hoa_monthly)
+  const monthlyVacancy   = monthlyRent * vacancyPct
+  const monthlyMgmt      = monthlyRent * mgmtPct
 
-  // Operating expenses excluding debt service
-  const monthlyOpex = monthlyTax + monthlyInsurance + monthlyHOA +
-                      monthlyVacancy + monthlyMgmt + maintenanceMonthly
+  const monthlyOpex     = monthlyTax + monthlyInsurance + monthlyHOA +
+                          monthlyVacancy + monthlyMgmt + maintenanceMonthly
+  const monthlyNOI      = monthlyRent - monthlyOpex
+  const annualNOI       = monthlyNOI * 12
 
-  // NOI = rent - opex (no mortgage)
-  const monthlyNOI  = monthlyRent - monthlyOpex
-  const annualNOI   = monthlyNOI * 12
-
-  // Cash flow = rent - mortgage - opex
   const monthlyCashFlow = monthlyRent - refiMonthlyPI - monthlyOpex
   const annualCashFlow  = monthlyCashFlow * 12
 
-  // Cap Rate = NOI / ARV
-  const capRate = arv > 0 ? annualNOI / arv : 0
-
-  // Cash-on-cash ROI (null = infinite, money was fully recaptured)
+  const capRate    = arv > 0 ? annualNOI / arv : 0
   const cashOnCash = netCashInDeal > 0 ? annualCashFlow / netCashInDeal : null
-
-  // Gross Rent Multiplier = property value / annual rent
-  const grm = monthlyRent > 0 ? arv / (monthlyRent * 12) : 0
-
-  // Equity at refinance
-  const equityAtRefi = arv - refiLoan
-
-  // All-in vs ARV (risk check)
-  const allInVsARV = arv > 0 ? totalAllIn / arv : 0
+  const grm        = monthlyRent > 0 ? arv / (monthlyRent * 12) : 0
 
   const warnings = []
-  if (allInVsARV > 0.80) warnings.push(`All-In vs ARV: ${(allInVsARV * 100).toFixed(1)}% — above 80%, refi may not fully recapture`)
-  if (capRate < 0.06) warnings.push(`Cap rate ${(capRate * 100).toFixed(1)}% below 6% — verify expenses and rent`)
+  if (allInVsARV > 0.80) warnings.push(`All-In vs ARV: ${(allInVsARV * 100).toFixed(1)}% — above 80%`)
+  if (capRate > 0 && capRate < 0.06) warnings.push(`Cap rate ${(capRate * 100).toFixed(1)}% below 6%`)
   if (monthlyCashFlow < 0) warnings.push('Negative monthly cash flow after refi')
 
   return {
-    purchasePrice, acquisitionLoan, renovBudget, hmlClosing, purchaseClosing, sellerCredits,
-    totalAtAcquisition, ourCashInvested, monthlyHoldCosts, totalHoldingCosts,
-    monthlyAcqInterest, totalAcqInterest, totalAllIn,
-    refiLtvPct, refiRate, refiLoan, cashRecaptured, netCashInDeal, cashRecapturedPct,
-    refiMonthlyPI,
+    // Loan structure
+    ltvPct, purchaseLoan, downPayment, renovLoan, renovGap, totalLoan,
+    pointsCost, monthlyInterest, totalInterest,
+    hmlClosing, purchaseClosing, sellerCredits,
+    // Phase 1
+    cashAtClose,
+    // Phase 2
+    monthlyHoldCosts, totalHoldingCosts, totalCarrying,
+    totalCashIn, totalAllIn,
+    // Phase 3
+    refiLtvPct, refiRate, refiLoan, refiClosingCosts, loanPayoff,
+    refiCashOut, netCashInDeal, cashRecapturedPct,
+    refiMonthlyPI, equityAtRefi, allInVsARV,
+    // Phase 4
     monthlyRent, vacancyPct, mgmtPct, maintenanceMonthly,
     monthlyTax, monthlyInsurance, monthlyHOA, monthlyVacancy, monthlyMgmt,
     monthlyOpex, monthlyNOI, annualNOI,
     monthlyCashFlow, annualCashFlow,
     capRate, cashOnCash, grm,
-    equityAtRefi, allInVsARV, holdMonths,
-    warnings,
+    holdMonths, warnings,
+    // Legacy compat
+    purchasePrice, renovBudget,
+    ourCashInvested: cashAtClose,  // alias for ProjectsPage stat cards
   }
 }
 

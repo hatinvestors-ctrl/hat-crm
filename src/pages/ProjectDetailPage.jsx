@@ -326,62 +326,78 @@ function LiveBRRRRPanel({ bc }) {
     </>
   )
 
+  const SectionHeader = ({ title }) => (
+    <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">{title}</div>
+  )
+
   return (
     <div className="space-y-5 text-[11.5px]">
 
-      {/* Acquisition */}
+      {/* ── Phase 1: Cash at Close ── */}
       <div>
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Acquisition Cost</div>
-        <Row label="Purchase Price"      value={fmtUSD(bc.purchasePrice)} />
-        <Row label="+ Renovation Budget" value={fmtUSD(bc.renovBudget)} />
-        <Row label="+ Lender Fees"       value={fmtUSD(bc.hmlClosing)} />
-        <Row label="+ Purchase Closing"  value={fmtUSD(bc.purchaseClosing)} />
-        {bc.sellerCredits > 0 && <Row label="− Seller Credits" value={`− ${fmtUSD(bc.sellerCredits)}`} />}
-        <Row label="= Total at Closing"  value={fmtUSD(bc.totalAtAcquisition - bc.sellerCredits)} total />
-        <Row label="− Acquisition Loan"  value={`− ${fmtUSD(bc.acquisitionLoan)}`} />
-        <Row label="= Our Cash In"       value={fmtUSD(bc.ourCashInvested)} total positive />
-        {bc.totalHoldingCosts > 0 && <Row label={`+ Holding (${bc.holdMonths}mo)`} value={fmtUSD(bc.totalHoldingCosts)} />}
-        {bc.totalAcqInterest > 0 && <Row label={`+ Acq Interest (${bc.holdMonths}mo)`} value={fmtUSD(bc.totalAcqInterest)} />}
-        {(bc.totalHoldingCosts > 0 || bc.totalAcqInterest > 0) && (
-          <Row label="= Total All-In" value={fmtUSD(bc.totalAllIn)} total />
-        )}
+        <SectionHeader title="Phase 1 — Cash at Close" />
+        <Row label="Down Payment"           value={fmtUSD(bc.downPayment)} />
+        <Row label="+ Lender Fees"          value={fmtUSD(bc.hmlClosing)} />
+        {bc.pointsCost > 0 && <Row label="  Points" value={fmtUSD(bc.pointsCost)} indent={1} />}
+        <Row label="+ Purchase Closing"     value={fmtUSD(bc.purchaseClosing)} />
+        {bc.renovGap > 0 && <Row label="+ Reno Cash Gap" value={fmtUSD(bc.renovGap)} />}
+        {bc.sellerCredits > 0 && <Row label="− Seller Credits" value={`− ${fmtUSD(bc.sellerCredits)}`} positive />}
+        <Row label="= Cash at Close"        value={fmtUSD(bc.cashAtClose)} total positive={bc.cashAtClose >= 0} />
       </div>
 
-      {/* Refinance */}
+      {/* ── Phase 2: Carrying Costs ── */}
       <div className="border-t border-[color:var(--color-line)] pt-4">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Refinance</div>
-        <Row label={`ARV × ${fmtPct(bc.refiLtvPct)}`}   value={fmtUSD(bc.refiLoan)} />
-        <Row label="− Payoff Acq Loan"                    value={`− ${fmtUSD(bc.acquisitionLoan)}`} />
+        <SectionHeader title={`Phase 2 — Carrying (${bc.holdMonths}mo reno)`} />
+        <Row label={`Interest (${bc.holdMonths}mo × ${fmtUSD(bc.monthlyInterest)}/mo)`} value={fmtUSD(bc.totalInterest)} />
+        {bc.monthlyHoldCosts > 0 && (
+          <Row label={`Holding (${bc.holdMonths}mo × ${fmtUSD(bc.monthlyHoldCosts)}/mo)`} value={fmtUSD(bc.totalHoldingCosts)} />
+        )}
+        <Row label="= Total Carrying"       value={fmtUSD(bc.totalCarrying)} total />
+        <div className="mt-2 pt-2 border-t border-dashed border-[color:var(--color-line)] flex justify-between font-bold text-[12px]">
+          <span className="text-[color:var(--color-text)]">Total Cash In (phases 1+2)</span>
+          <span className="text-[color:var(--color-text)]">{fmtUSD(bc.totalCashIn)}</span>
+        </div>
+      </div>
+
+      {/* ── Phase 3: Refinance ── */}
+      <div className="border-t border-[color:var(--color-line)] pt-4">
+        <SectionHeader title={`Phase 3 — Refinance (${fmtPct(bc.refiLtvPct)} LTV)`} />
+        <Row label={`New Loan (${fmtPct(bc.refiLtvPct)} × ARV)`} value={fmtUSD(bc.refiLoan)} />
+        <Row label="− Refi Closing Costs"   value={`− ${fmtUSD(bc.refiClosingCosts)}`} />
+        <Row label="− HML Payoff"           value={`− ${fmtUSD(bc.loanPayoff)}`} />
         <Row
-          label="= Cash Back at Refi"
-          value={fmtUSD(bc.cashRecaptured)}
+          label="= Cash Out at Refi"
+          value={fmtUSD(bc.refiCashOut)}
           total
-          positive={bc.cashRecaptured > 0}
-          negative={bc.cashRecaptured < 0}
+          positive={bc.refiCashOut >= 0}
+          negative={bc.refiCashOut < 0}
         />
+        <div className="my-2 border-t border-[color:var(--color-line)]" />
+        <Row label="Total Cash In"          value={fmtUSD(bc.totalCashIn)} />
+        <Row label="− Cash Out at Refi"     value={`− ${fmtUSD(bc.refiCashOut)}`} />
         <Row
-          label="Net Cash Left in Deal"
+          label="= Net Cash Left in Deal"
           value={bc.netCashInDeal <= 0
-            ? `${fmtUSD(Math.abs(bc.netCashInDeal))} pulled out!`
+            ? `${fmtUSD(Math.abs(bc.netCashInDeal))} back in pocket`
             : fmtUSD(bc.netCashInDeal)}
           total
           positive={bc.netCashInDeal <= 0}
-          negative={bc.netCashInDeal > bc.ourCashInvested * 0.5}
         />
-        <Row label="Equity at Refi"    value={fmtUSD(bc.equityAtRefi)} positive={bc.equityAtRefi > 0} />
-        <Row label="All-In vs ARV"     value={fmtPct(bc.allInVsARV)} negative={bc.allInVsARV > 0.80} />
+        <Row label="Cash Recaptured"        value={`${Math.round(bc.cashRecapturedPct * 100)}%`} positive={bc.cashRecapturedPct >= 1} />
+        <Row label="Equity at Refi"         value={fmtUSD(bc.equityAtRefi)} positive />
+        <Row label="Refi Monthly P&I"       value={fmtUSD(bc.refiMonthlyPI)} />
       </div>
 
-      {/* Monthly Cash Flow */}
+      {/* ── Phase 4: Rental Cash Flow ── */}
       <div className="border-t border-[color:var(--color-line)] pt-4">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Monthly Cash Flow (Post-Refi)</div>
-        <Row label="Gross Rent"                         value={fmtUSD(bc.monthlyRent)} />
-        <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)})`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
-        <Row label="− Property Taxes"                   value={`− ${fmtUSD(bc.monthlyTax)}`} />
-        <Row label="− Insurance"                        value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
-        <Row label={`− Vacancy (${fmtPct(bc.vacancyPct)})`}   value={`− ${fmtUSD(bc.monthlyVacancy)}`} />
-        <Row label={`− Mgmt (${fmtPct(bc.mgmtPct)})`}         value={`− ${fmtUSD(bc.monthlyMgmt)}`} />
-        <Row label="− Maintenance"                      value={`− ${fmtUSD(bc.maintenanceMonthly)}`} />
+        <SectionHeader title="Phase 4 — Monthly Cash Flow (post-refi)" />
+        <Row label="Gross Rent"                                     value={fmtUSD(bc.monthlyRent)} />
+        <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)}, 30yr)`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
+        <Row label="− Property Taxes"                                value={`− ${fmtUSD(bc.monthlyTax)}`} />
+        <Row label="− Insurance"                                     value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
+        <Row label={`− Vacancy (${fmtPct(bc.vacancyPct)})`}         value={`− ${fmtUSD(bc.monthlyVacancy)}`} />
+        <Row label={`− Mgmt (${fmtPct(bc.mgmtPct)})`}               value={`− ${fmtUSD(bc.monthlyMgmt)}`} />
+        <Row label="− Maintenance"                                   value={`− ${fmtUSD(bc.maintenanceMonthly)}`} />
         <Row
           label="= Monthly Cash Flow"
           value={fmtUSD(bc.monthlyCashFlow)}
@@ -394,22 +410,16 @@ function LiveBRRRRPanel({ bc }) {
 
       {/* Returns */}
       <div className="border-t border-[color:var(--color-line)] pt-4">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Returns</div>
-        <Row label="Cap Rate"        value={fmtPct(bc.capRate)} positive={bc.capRate >= 0.07} negative={bc.capRate < 0.05} />
-        <Row label="GRM"             value={bc.grm > 0 ? bc.grm.toFixed(1) + 'x' : '—'} />
-        <Row label="NOI (Annual)"    value={fmtUSD(bc.annualNOI)} positive={bc.annualNOI >= 0} />
+        <SectionHeader title="Returns" />
+        <Row label="Cap Rate (on ARV)"      value={fmtPct(bc.capRate)} positive={bc.capRate >= 0.07} negative={bc.capRate > 0 && bc.capRate < 0.05} />
+        <Row label="GRM"                    value={bc.grm > 0 ? bc.grm.toFixed(1) + 'x' : '—'} />
+        <Row label="NOI (Annual)"           value={fmtUSD(bc.annualNOI)} positive={bc.annualNOI >= 0} />
         <Row
           label="Cash-on-Cash ROI"
-          value={bc.cashOnCash != null ? fmtPct(bc.cashOnCash) : '∞ (cash recaptured)'}
+          value={bc.cashOnCash != null ? fmtPct(bc.cashOnCash) : '∞'}
           positive
         />
-        {bc.cashRecapturedPct >= 0 && (
-          <Row
-            label="Cash Recaptured"
-            value={`${Math.round(bc.cashRecapturedPct * 100)}%`}
-            positive={bc.cashRecapturedPct >= 1}
-          />
-        )}
+        <Row label="All-In vs ARV"          value={fmtPct(bc.allInVsARV)} negative={bc.allInVsARV > 0.80} />
       </div>
 
     </div>
@@ -998,33 +1008,40 @@ export default function ProjectDetailPage() {
               <div className="mb-4">
                 <div className={labelCls + ' mb-2'}>Calculated Automatically</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Field label="Purchase Loan" tip="Purchase price × LTV%">
-                    <CalcDisplay value={calc ? fmtUSD(calc.purchaseLoan) : '—'} lines={calc ? [
-                      { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
-                      '---', { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan), bold: true },
-                    ] : []} />
-                  </Field>
-                  <Field label="Renovation Loan" tip="Renovation Budget × Lender Covers %">
-                    <CalcDisplay value={calc ? fmtUSD(calc.renovationLoan) : '—'} lines={calc ? [
-                      { label: `${fmtUSD(calc.totalRenovationCost)} × ${fmtPct(calc.renovLenderPct)}`, value: '' },
-                      '---', { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan), bold: true },
-                      { label: 'Your cash portion', value: fmtUSD(calc.renovationGap) },
-                    ] : []} />
-                  </Field>
-                  <Field label="Total Loan" tip="Purchase Loan + Renovation Loan">
-                    <CalcDisplay value={calc ? fmtUSD(calc.totalLoan) : '—'} className="font-semibold text-[color:var(--color-text)]" lines={calc ? [
-                      { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan) },
-                      { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan) },
-                      '---', { label: 'Total Loan', value: fmtUSD(calc.totalLoan), bold: true },
-                    ] : []} />
-                  </Field>
-                  <Field label="Monthly Interest" tip="Total Loan × (Rate ÷ 12)">
-                    <CalcDisplay value={calc ? fmtUSD(calc.monthlyInterest) : '—'} className="font-semibold text-[color:var(--color-accent-text)]" lines={calc ? [
-                      { label: `${fmtUSD(calc.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
-                      '---', { label: 'Monthly', value: fmtUSD(calc.monthlyInterest), bold: true },
-                      { label: `× ${calc.holdMonths}mo total`, value: fmtUSD(calc.totalInterest) },
-                    ] : []} />
-                  </Field>
+                  {(() => {
+                    const c = isBRRRR ? bCalc : calc
+                    const renovLoan = isBRRRR ? c?.renovLoan : c?.renovationLoan
+                    const renovGap  = isBRRRR ? c?.renovGap  : c?.renovationGap
+                    return <>
+                      <Field label="Purchase Loan" tip="Purchase price × LTV%">
+                        <CalcDisplay value={c ? fmtUSD(c.purchaseLoan) : '—'} lines={c ? [
+                          { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
+                          '---', { label: 'Purchase Loan', value: fmtUSD(c.purchaseLoan), bold: true },
+                        ] : []} />
+                      </Field>
+                      <Field label="Renovation Loan" tip="Renovation Budget × Lender Covers %">
+                        <CalcDisplay value={c ? fmtUSD(renovLoan) : '—'} lines={c ? [
+                          { label: `${fmtUSD(financials?.renovation_lender_amount)} × ${fmtPct(financials?.renovation_lender_pct ?? 1.0)}`, value: '' },
+                          '---', { label: 'Renovation Loan', value: fmtUSD(renovLoan), bold: true },
+                          { label: 'Your cash portion', value: fmtUSD(renovGap) },
+                        ] : []} />
+                      </Field>
+                      <Field label="Total Loan" tip="Purchase Loan + Renovation Loan">
+                        <CalcDisplay value={c ? fmtUSD(c.totalLoan) : '—'} className="font-semibold text-[color:var(--color-text)]" lines={c ? [
+                          { label: 'Purchase Loan', value: fmtUSD(c.purchaseLoan) },
+                          { label: 'Renovation Loan', value: fmtUSD(renovLoan) },
+                          '---', { label: 'Total Loan', value: fmtUSD(c.totalLoan), bold: true },
+                        ] : []} />
+                      </Field>
+                      <Field label="Monthly Interest" tip="Total Loan × (Rate ÷ 12)">
+                        <CalcDisplay value={c ? fmtUSD(c.monthlyInterest) : '—'} className="font-semibold text-[color:var(--color-accent-text)]" lines={c ? [
+                          { label: `${fmtUSD(c.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
+                          '---', { label: 'Monthly', value: fmtUSD(c.monthlyInterest), bold: true },
+                          { label: `× ${c.holdMonths}mo total`, value: fmtUSD(c.totalInterest) },
+                        ] : []} />
+                      </Field>
+                    </>
+                  })()}
                 </div>
               </div>
 
@@ -1166,13 +1183,21 @@ export default function ProjectDetailPage() {
                   <Field label="Months to Refi" tip="How long until refinance (renovation + lease-up period)">
                     <NumInput value={financials.hold_months} onChange={handleLive('hold_months')} onBlur={handleBlur('hold_months')} disabled={!canEdit} placeholder="6" />
                   </Field>
+                  <Field label="Refi Closing Costs" tip="Estimated closing costs on the permanent refinance loan">
+                    <NumInput
+                      value={financials.refi_closing_costs != null ? financials.refi_closing_costs : 2000}
+                      onChange={v => setFinancials(prev => prev ? { ...prev, refi_closing_costs: v } : prev)}
+                      onBlur={v => save({ refi_closing_costs: v === '' ? 2000 : Number(v) })}
+                      disabled={!canEdit} placeholder="2000"
+                    />
+                  </Field>
                 </div>
                 {bCalc && bCalc.refiLoan > 0 && (
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
-                      { label: 'Refi Loan',    value: fmtUSD(bCalc.refiLoan),      sub: `${fmtPct(bCalc.refiLtvPct)} of ARV` },
-                      { label: 'Cash at Refi', value: fmtUSD(bCalc.cashRecaptured), sub: 'refi − payoff', green: bCalc.cashRecaptured > 0 },
-                      { label: 'Net Cash In',  value: bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} out` : fmtUSD(bCalc.netCashInDeal), sub: bCalc.netCashInDeal <= 0 ? '✓ Perfect BRRRR!' : '', green: bCalc.netCashInDeal <= 0 },
+                      { label: 'Refi Loan',      value: fmtUSD(bCalc.refiLoan),      sub: `${fmtPct(bCalc.refiLtvPct)} of ARV` },
+                      { label: 'Cash Out at Refi', value: fmtUSD(bCalc.refiCashOut),  sub: 'after payoff & closing', green: bCalc.refiCashOut > 0 },
+                      { label: 'Net Cash In Deal', value: bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} out` : fmtUSD(bCalc.netCashInDeal), sub: bCalc.netCashInDeal <= 0 ? '✓ Perfect BRRRR!' : '', green: bCalc.netCashInDeal <= 0 },
                     ].map(({ label, value, sub, green }) => (
                       <div key={label} className="rounded-lg bg-[color:var(--color-bg-elev-2)] px-3 py-2">
                         <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>

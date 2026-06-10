@@ -8,7 +8,7 @@ headers = []
 publish = "C:\\Users\\tomer\\Documents\\PrivateNew180425\\CloudeCode\\HatCRM\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
-command = "npm run build"
+command = "npm install && node node_modules/vite/bin/vite.js build"
 functions = "C:\\Users\\tomer\\Documents\\PrivateNew180425\\CloudeCode\\HatCRM\\netlify\\functions"
 
 [build.environment]
@@ -27,7 +27,14 @@ functions = "C:\\Users\\tomer\\Documents\\PrivateNew180425\\CloudeCode\\HatCRM\\
 
 [functions]
 
+[functions.analyze-deal]
+timeout = 120.0
+
+[functions.generate-report]
+timeout = 120.0
+
 [functions."*"]
+node_bundler = "esbuild"
 
 [[redirects]]
 from = "/*"
