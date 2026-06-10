@@ -6,80 +6,107 @@ import Textarea from '../ui/Textarea'
 import Button from '../ui/Button'
 import { logEmailSent } from '../../lib/activityLogger'
 
-function buildDefaultBody(recipientName, lead, senderName) {
-  const firstName = recipientName ? recipientName.split(' ')[0] : null
-  const greeting = firstName ? `Hi ${firstName},` : 'Hi there,'
-  const addr = [lead.address, lead.city, lead.state].filter(Boolean).join(', ')
-  const price = lead.list_price ? ` listed at $${Number(lead.list_price).toLocaleString()}` : ''
-
-  return [
-    greeting,
-    '',
-    `My name is ${senderName || 'your name'} with HAT Investors — we're a local real estate company based in Jacksonville. We buy and renovate a high volume of properties across Jacksonville and are very active in the market.`,
-    '',
-    `I came across ${addr}${price} and wanted to reach out directly. We're cash buyers with the ability to close in 14–21 days, no financing contingency.`,
-    '',
-    `A few quick questions:`,
-    `- Is the seller open to offers below list?`,
-    `- Any known issues with the property?`,
-    `- How long has it been on market?`,
-    '',
-    `Happy to schedule a walk at your convenience. Look forward to connecting.`,
-    '',
-    `Best,`,
-    senderName || '',
-    `HAT Investors`,
-  ].join('\n')
-}
+const SITUATION_OPTIONS = [
+  { id: 'countered_higher',     label: 'Countered higher' },
+  { id: 'asked_proof_of_funds', label: 'Asked for proof of funds' },
+  { id: 'said_not_interested',  label: 'Said not interested' },
+  { id: 'no_response_ghosted',  label: 'No response / ghosted' },
+  { id: 'wants_faster_close',   label: 'Wants faster close' },
+  { id: 'wants_leaseback',      label: 'Wants leaseback / stay longer' },
+]
 
 // recipientEmail / recipientName override the listing-agent defaults when
 // opening from a different contact (e.g. the seller/agent in ContactInfoSection).
 export default function EmailComposeModal({ open, onClose, lead, onSent, recipientEmail, recipientName }) {
-  const { user, profile, workspaceId } = useOutletContext()
-  const [to, setTo]         = useState('')
-  const [cc, setCc]         = useState('')
-  const [subject, setSubject] = useState('')
-  const [body, setBody]     = useState('')
-  const [sending, setSending] = useState(false)
-  const [error, setError]   = useState(null)
+  const { user, workspaceId } = useOutletContext()
+  const [activeTab,  setActiveTab]  = useState('initial')
+  const [to,         setTo]         = useState('')
+  const [cc,         setCc]         = useState('')
+  const [subject,    setSubject]    = useState('')
+  const [body,       setBody]       = useState('')
+  const [sending,    setSending]    = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [genError,   setGenError]   = useState(null)
+  const [error,      setError]      = useState(null)
+  const [situations, setSituations] = useState([])
+  const [theirReply, setTheirReply] = useState('')
 
   useEffect(() => {
     if (!open) return
-    const city = lead.city ? `, ${lead.city}` : ''
-    const toEmail    = recipientEmail ?? lead.listing_agent_email ?? ''
-    const toName     = recipientName  ?? lead.listing_agent_name  ?? ''
+    const city    = lead.city ? `, ${lead.city}` : ''
+    const toEmail = recipientEmail ?? lead.listing_agent_email ?? ''
     setTo(toEmail)
     setCc('')
     setSubject(`Inquiry about ${lead.address || ''}${city}`)
-    setBody(buildDefaultBody(toName, lead, profile?.full_name))
+    setBody('')
+    setActiveTab('initial')
+    setSituations([])
+    setTheirReply('')
+    setGenError(null)
     setError(null)
     setSending(false)
+    setGenerating(false)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Opens Gmail's compose window in a new tab, pre-filled with To/CC/Subject/Body.
-  // Sends from whatever Gmail account the user is currently logged in as
-  // (e.g. hatinvestors.automation@gmail.com). The user reviews in Gmail and
-  // clicks Send — we log the activity here when they hit our button.
+  const toggleSituation = (id) =>
+    setSituations(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+
+  async function handleGenerate(mode) {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const res = await fetch('/.netlify/functions/generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          lead: {
+            address:            lead.address,
+            city:               lead.city,
+            state:              lead.state,
+            property_type:      lead.property_type,
+            bedrooms:           lead.bedrooms,
+            bathrooms:          lead.bathrooms,
+            sqft:               lead.sqft,
+            year_built:         lead.year_built,
+            asking_price:       lead.asking_price,
+            offer_price:        lead.offer_price,
+            arv:                lead.arv,
+            renovation_cost:    lead.renovation_cost,
+            mao:                lead.mao,
+            rent_estimate:      lead.rent_estimate,
+            mls_status:         lead.mls_status,
+            listing_agent_name: lead.listing_agent_name,
+          },
+          situation:   mode === 'reply' ? situations : [],
+          their_reply: mode === 'reply' ? theirReply : '',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Generation failed.')
+      setBody(data.body)
+    } catch (err) {
+      setGenError(err.message || 'Could not generate email.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   async function handleSend() {
     if (!to.trim()) { setError('A "To" email address is required.'); return }
     setSending(true)
     setError(null)
     try {
       const params = new URLSearchParams({
-        view: 'cm',           // compose mode
-        fs:   '1',            // full screen
+        view: 'cm',
+        fs:   '1',
         to:   to.trim(),
-        su:   subject || '',  // subject
+        su:   subject || '',
         body: body || '',
       })
       if (cc.trim()) params.set('cc', cc.trim())
       const url = `https://mail.google.com/mail/?${params.toString()}`
-      // Open compose tab. Browsers will block popups only if not triggered by a
-      // user click — this is in a click handler, so it works.
       window.open(url, '_blank', 'noopener,noreferrer')
-
-      // Log the send-attempt as an activity. The user still has to click Send
-      // in Gmail, but logging here matches how most CRMs work.
       await logEmailSent(lead.id, user.id, { to: to.trim(), cc: cc.trim(), subject })
       onSent?.()
       onClose()
@@ -109,37 +136,90 @@ export default function EmailComposeModal({ open, onClose, lead, onSent, recipie
         <div className="px-3 py-2 rounded-md bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] text-[11.5px] leading-relaxed">
           Opens Gmail compose in a new tab pre-filled with these fields. Sends from the Gmail account you're currently signed in to (<span className="font-medium text-[color:var(--color-text)]">hatinvestors.automation@gmail.com</span> if you're signed in there). Review in Gmail and click Send — no SMTP setup required.
         </div>
+
         {error && (
           <div className="px-3 py-2 rounded-md bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)] text-[12.5px]">
             {error}
           </div>
         )}
-        <Input
-          label="To"
-          required
-          value={to}
-          onChange={e => setTo(e.target.value)}
-          placeholder="agent@brokerage.com"
-          type="email"
-        />
-        <Input
-          label="CC"
-          value={cc}
-          onChange={e => setCc(e.target.value)}
-          placeholder="optional"
-          type="email"
-        />
-        <Input
-          label="Subject"
-          value={subject}
-          onChange={e => setSubject(e.target.value)}
-          placeholder="Email subject"
-        />
+
+        <Input label="To" required value={to} onChange={e => setTo(e.target.value)} placeholder="agent@brokerage.com" type="email" />
+        <Input label="CC" value={cc} onChange={e => setCc(e.target.value)} placeholder="optional" type="email" />
+        <Input label="Subject" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject" />
+
+        {/* Tabs */}
+        <div className="border-b border-[color:var(--color-line)] flex gap-0">
+          {[
+            { id: 'initial', label: 'Initial Outreach' },
+            { id: 'reply',   label: 'Reply / Follow-up' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-[12px] font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab.id
+                  ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
+                  : 'border-transparent text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Reply tab inputs */}
+        {activeTab === 'reply' && (
+          <div className="space-y-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1.5">Situation</div>
+              <div className="flex flex-wrap gap-1.5">
+                {SITUATION_OPTIONS.map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => toggleSituation(opt.id)}
+                    className={`px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors ${
+                      situations.includes(opt.id)
+                        ? 'bg-[color:var(--color-accent)] text-white border-[color:var(--color-accent)]'
+                        : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] border-[color:var(--color-line)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-text)]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Textarea
+              label="Paste their reply (optional)"
+              value={theirReply}
+              onChange={e => setTheirReply(e.target.value)}
+              rows={4}
+              placeholder="Paste the email they sent back…"
+            />
+          </div>
+        )}
+
+        {genError && (
+          <div className="px-3 py-2 rounded-md bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)] text-[12px]">
+            {genError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => handleGenerate(activeTab)}
+          disabled={generating}
+          className="w-full h-9 flex items-center justify-center gap-2 rounded-md bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)] border border-[color:var(--color-accent)] text-[12.5px] font-semibold hover:bg-[color:var(--color-accent)] hover:text-white disabled:opacity-50 transition-colors"
+        >
+          {generating ? 'Generating…' : activeTab === 'initial' ? '✦ Generate Email' : '✦ Generate Reply'}
+        </button>
+
         <Textarea
           label="Body"
           value={body}
           onChange={e => setBody(e.target.value)}
-          rows={9}
+          rows={10}
         />
       </div>
     </Modal>
