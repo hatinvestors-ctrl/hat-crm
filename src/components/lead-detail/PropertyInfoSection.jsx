@@ -70,8 +70,12 @@ export default function PropertyInfoSection({ lead, userId, members, canEdit, on
           onSave={(v) => update({ has_garage: v })}
           disabled={!canEdit}
         />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-warn-text)]">Seller's Asking Price</span>
         <EditableField
-          label="Asking Price"
+          label=""
           type="currency"
           value={lead.asking_price}
           formatter={formatCurrency}
