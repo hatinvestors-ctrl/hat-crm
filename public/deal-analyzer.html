@@ -1648,10 +1648,10 @@ function emailOffer(c) {
 
   const opener =
     atAsking && tone === 'strong'
-      ? `I hope you're having a good day. I'm writing on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We've reviewed the property thoroughly and we are ready to go — full price offer at ${fmtN(offerPrice)}, and we want to make this as easy as possible for the seller.`
+      ? `I hope you're having a good day. I'm writing on behalf of my client, HAT Investors,, regarding ${address}. We've reviewed the property thoroughly and we are ready to go — full price offer at ${fmtN(offerPrice)}, and we want to make this as easy as possible for the seller.`
       : atAsking
-        ? `I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We have completed our analysis and are submitting an offer at ${fmtN(offerPrice)}. We are prepared to move quickly and close cleanly.`
-        : `I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}. We have done a thorough analysis of the property — renovation scope, market comps, and all carrying costs — and are submitting an offer of ${fmtN(offerPrice)}. I want to walk you through exactly how we got there so you can present this confidently to the seller.`;
+        ? `I'm reaching out on behalf of my client, HAT Investors,, regarding ${address}. We have completed our analysis and are submitting an offer at ${fmtN(offerPrice)}. We are prepared to move quickly and close cleanly.`
+        : `I'm reaching out on behalf of my client, HAT Investors,, regarding ${address}. We have done a thorough analysis of the property — renovation scope, market comps, and all carrying costs — and are submitting an offer of ${fmtN(offerPrice)}. I want to walk you through exactly how we got there so you can present this confidently to the seller.`;
 
   const termsBlock = `
 OUR BUYER PROFILE — WHY THIS OFFER IS STRONGER THAN IT MAY APPEAR ON PAPER
@@ -1700,9 +1700,9 @@ ${bigGap
 Happy to jump on a call if that would help. Looking forward to your response.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   return { subject, body: opener + termsBlock + mathBlock + strategyLine + closer };
 }
@@ -1747,9 +1747,9 @@ I want to be honest: our renovation budget for this property is ${fmtN(reno)}. T
 What can we do to get this across the finish line? I am available for a call right now if that would help.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   } else if (bigGap) {
     subject = `Re: ${address} — Our Full Analysis — Please Share With Seller`;
@@ -1810,9 +1810,9 @@ We are not going away. We want to close this deal at a price that makes sense fo
 Can we schedule a 15-minute call? These conversations go faster person-to-person.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   } else {
     subject = `Re: ${address} — Our Position & What We Offer in Return`;
@@ -1850,9 +1850,9 @@ A retail buyer who offers ${fmtN(pp)} with conventional financing needs 30–45 
 We would like to move forward. What does the seller need to see to say yes?
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
   }
 
   return { subject, body };
@@ -1912,9 +1912,9 @@ We are not asking the seller to take less. We are asking them to take a sure thi
 If the seller would like to proceed or wants to discuss, I am available immediately.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   return { subject, body };
 }
@@ -1934,7 +1934,7 @@ function emailMotivated(c) {
   const body =
 `Hi [Listing Agent Name],
 
-I hope you're doing well. I'm reaching out on behalf of my client, Tomer Carmelli with HAT Investors, regarding ${address}.
+I hope you're doing well. I'm reaching out on behalf of my client, HAT Investors,, regarding ${address}.
 
 We understand that selling a property — especially one that needs work — can be stressful. There are a lot of moving parts, and it is not always clear which buyer is truly serious and which will disappear once the inspection comes back.
 
@@ -1966,9 +1966,9 @@ If the seller has specific concerns — timing, a lease that needs to run out, b
 Looking forward to hearing from you.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   return { subject, body };
 }
@@ -2011,9 +2011,9 @@ If the seller has moved in another direction, I completely understand — just l
 Either way, thank you for your time throughout this process. You have been professional and easy to work with.
 
 Best regards,
-[Your Agent Name]
-[Your Agent Phone] | [Your Agent Email]
-On behalf of Tomer Carmelli — HAT Investors`;
+Kevin Bachman
+Broker/Owner | Bachman Property Brokers LLC
+(904) 748-9141`;
 
   return { subject, body };
 }
@@ -2153,7 +2153,7 @@ function phoneScriptFirstCall(c) {
 ${br}
 [OPENING — when they pick up]
 
-"Hi, is this [Agent Name]? Great. My name is [Your Name], I'm an agent working with Tomer Carmelli — he's an investor who buys and renovates properties in Jacksonville. I'm calling about [address]. Is this still available?"
+"Hi, is this [Agent Name]? Great. My name is Kevin Bachman, I'm an agent working with HAT Investors — who buy and renovate properties in Jacksonville. I'm calling about [address]. Is this still available?"
 ${P}
 [IF YES — continue]
 
@@ -2180,7 +2180,7 @@ ${br}
 
 "I want to give you a quick picture of who my client is, because it matters for deals like this.
 
-Tomer closes with hard money — Rob Shackleford at 3 Shacks Capital here in Jacksonville. Pre-approved, committed capital. No underwriting surprises.
+Our buyer closes with hard money — Rob Shackleford at 3 Shacks Capital here in Jacksonville. Pre-approved, committed capital. No underwriting surprises.
 
 We do our inspection at the showing. We bring our contractor, we walk the property, and we make our decision before we leave. We don't tie up the property for two weeks.
 
@@ -2222,7 +2222,7 @@ function phoneScriptFollowOffer(c) {
   const script =
 `[OPENING]
 
-"Hi [Agent Name], it's [Your Name] — I represent Tomer Carmelli, we submitted an offer on [address] last [day/week]. Do you have 60 seconds?"
+"Hi [Agent Name], it's Kevin Bachman — I represent HAT Investors, we submitted an offer on [address] last [day/week]. Do you have 60 seconds?"
 ${P}
 ${br}
 [IF THEY HAVEN'T PRESENTED IT YET]
@@ -2276,7 +2276,7 @@ function phoneScriptNegotiate(c) {
   const script =
 `[OPENING]
 
-"Hi [Agent Name], it's [Your Name] — calling about [address]. I know we're a bit apart on price and I wanted to have a real conversation about it rather than just trade numbers back and forth in email. Do you have five minutes?"
+"Hi [Agent Name], it's Kevin Bachman — calling about [address]. I know we're a bit apart on price and I wanted to have a real conversation about it rather than just trade numbers back and forth in email. Do you have five minutes?"
 ${P}
 ${br}
 [SET THE FRAME — before any numbers]
@@ -2349,7 +2349,7 @@ function phoneScriptCompete(c) {
   const script =
 `[OPENING]
 
-"Hi [Agent Name], it's [Your Name]. I heard you may have multiple offers on [address] and I wanted to call personally rather than just sit in the pile. Do you have two minutes?"
+"Hi [Agent Name], it's Kevin Bachman. I heard you may have multiple offers on [address] and I wanted to call personally rather than just sit in the pile. Do you have two minutes?"
 ${P}
 ${br}
 [REFRAME IMMEDIATELY — before they tell you about the other offer]
