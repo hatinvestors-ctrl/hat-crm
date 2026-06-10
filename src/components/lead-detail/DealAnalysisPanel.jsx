@@ -41,7 +41,7 @@ export default function DealAnalysisPanel({ analysis, lead }) {
 
   const dashboardUrl = (() => {
     const p = new URLSearchParams({
-      pp:      lead.asking_price    || lead.offer_price || '',
+      pp:      lead.offer_price     || lead.asking_price || '',
       arv:     lead.arv             || '',
       reno:    lead.renovation_cost || '',
       rent:    lead.rent_estimate   || '0',

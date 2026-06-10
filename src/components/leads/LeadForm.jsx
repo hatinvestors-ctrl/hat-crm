@@ -416,6 +416,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
               value={form.has_garage === null || form.has_garage === undefined ? '' : String(form.has_garage)}
               onChange={e => update({ has_garage: e.target.value === '' ? null : e.target.value === 'true' })}
             />
+            <CurrencyInput label="Asking Price" value={form.asking_price} onChange={v => update({ asking_price: v })} containerClassName="sm:col-span-2" />
           </div>
         </section>
 
@@ -442,12 +443,11 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
         <section>
           <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2.5">Financial</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <CurrencyInput label="Asking Price" value={form.asking_price} onChange={v => update({ asking_price: v })} />
+            <CurrencyInput label="Offer Price" value={form.offer_price} onChange={v => update({ offer_price: v })} />
             <CurrencyInput label="ARV (After Repair Value)" value={form.arv} onChange={v => update({ arv: v })} />
             <CurrencyInput label="Renovation Cost" value={form.renovation_cost} onChange={v => update({ renovation_cost: v })} />
             <CurrencyInput label="Rent Estimate" value={form.rent_estimate} onChange={v => update({ rent_estimate: v })} />
             <CurrencyInput label="MAO (auto-calculated, editable)" value={form.mao} onChange={v => update({ mao: v })} />
-            <CurrencyInput label="Offer Price" value={form.offer_price} onChange={v => update({ offer_price: v })} />
           </div>
           <p className="text-[11px] text-[color:var(--color-text-dim)] mt-2">MAO = 75% × ARV − Renovation</p>
         </section>

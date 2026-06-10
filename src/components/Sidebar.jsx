@@ -211,7 +211,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
                   setQuickAnalysisPrefill({
                     address: [data.address, data.city, data.state].filter(Boolean).join(', '),
                     arv: data.arv || '',
-                    purchase_price: data.asking_price || data.offer_price || '',
+                    purchase_price: data.offer_price || data.asking_price || '',
                     renovation_cost: data.renovation_cost || '',
                   })
                 }
