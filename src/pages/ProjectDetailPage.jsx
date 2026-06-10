@@ -1008,40 +1008,62 @@ export default function ProjectDetailPage() {
               <div className="mb-4">
                 <div className={labelCls + ' mb-2'}>Calculated Automatically</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {(() => {
-                    const c = isBRRRR ? bCalc : calc
-                    const renovLoan = isBRRRR ? c?.renovLoan : c?.renovationLoan
-                    const renovGap  = isBRRRR ? c?.renovGap  : c?.renovationGap
-                    return <>
-                      <Field label="Purchase Loan" tip="Purchase price × LTV%">
-                        <CalcDisplay value={c ? fmtUSD(c.purchaseLoan) : '—'} lines={c ? [
-                          { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
-                          '---', { label: 'Purchase Loan', value: fmtUSD(c.purchaseLoan), bold: true },
-                        ] : []} />
-                      </Field>
-                      <Field label="Renovation Loan" tip="Renovation Budget × Lender Covers %">
-                        <CalcDisplay value={c ? fmtUSD(renovLoan) : '—'} lines={c ? [
-                          { label: `${fmtUSD(financials?.renovation_lender_amount)} × ${fmtPct(financials?.renovation_lender_pct ?? 1.0)}`, value: '' },
-                          '---', { label: 'Renovation Loan', value: fmtUSD(renovLoan), bold: true },
-                          { label: 'Your cash portion', value: fmtUSD(renovGap) },
-                        ] : []} />
-                      </Field>
-                      <Field label="Total Loan" tip="Purchase Loan + Renovation Loan">
-                        <CalcDisplay value={c ? fmtUSD(c.totalLoan) : '—'} className="font-semibold text-[color:var(--color-text)]" lines={c ? [
-                          { label: 'Purchase Loan', value: fmtUSD(c.purchaseLoan) },
-                          { label: 'Renovation Loan', value: fmtUSD(renovLoan) },
-                          '---', { label: 'Total Loan', value: fmtUSD(c.totalLoan), bold: true },
-                        ] : []} />
-                      </Field>
-                      <Field label="Monthly Interest" tip="Total Loan × (Rate ÷ 12)">
-                        <CalcDisplay value={c ? fmtUSD(c.monthlyInterest) : '—'} className="font-semibold text-[color:var(--color-accent-text)]" lines={c ? [
-                          { label: `${fmtUSD(c.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
-                          '---', { label: 'Monthly', value: fmtUSD(c.monthlyInterest), bold: true },
-                          { label: `× ${c.holdMonths}mo total`, value: fmtUSD(c.totalInterest) },
-                        ] : []} />
-                      </Field>
-                    </>
-                  })()}
+                  <Field label="Purchase Loan" tip="Purchase price × LTV%">
+                    <CalcDisplay
+                      value={isBRRRR ? (bCalc ? fmtUSD(bCalc.purchaseLoan) : '—') : (calc ? fmtUSD(calc.purchaseLoan) : '—')}
+                      lines={isBRRRR ? (bCalc ? [
+                        { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
+                        '---', { label: 'Purchase Loan', value: fmtUSD(bCalc.purchaseLoan), bold: true },
+                      ] : []) : (calc ? [
+                        { label: `${fmtUSD(financials?.purchase_price_actual)} × ${fmtPct(financials?.loan_to_purchase_pct ?? 0.9)}`, value: '' },
+                        '---', { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan), bold: true },
+                      ] : [])}
+                    />
+                  </Field>
+                  <Field label="Renovation Loan" tip="Renovation Budget × Lender Covers %">
+                    <CalcDisplay
+                      value={isBRRRR ? (bCalc ? fmtUSD(bCalc.renovLoan) : '—') : (calc ? fmtUSD(calc.renovationLoan) : '—')}
+                      lines={isBRRRR ? (bCalc ? [
+                        { label: `${fmtUSD(financials?.renovation_lender_amount)} × ${fmtPct(financials?.renovation_lender_pct ?? 1.0)}`, value: '' },
+                        '---', { label: 'Renovation Loan', value: fmtUSD(bCalc.renovLoan), bold: true },
+                        { label: 'Your cash portion', value: fmtUSD(bCalc.renovGap) },
+                      ] : []) : (calc ? [
+                        { label: `${fmtUSD(calc.totalRenovationCost)} × ${fmtPct(calc.renovLenderPct)}`, value: '' },
+                        '---', { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan), bold: true },
+                        { label: 'Your cash portion', value: fmtUSD(calc.renovationGap) },
+                      ] : [])}
+                    />
+                  </Field>
+                  <Field label="Total Loan" tip="Purchase Loan + Renovation Loan">
+                    <CalcDisplay
+                      value={isBRRRR ? (bCalc ? fmtUSD(bCalc.totalLoan) : '—') : (calc ? fmtUSD(calc.totalLoan) : '—')}
+                      className="font-semibold text-[color:var(--color-text)]"
+                      lines={isBRRRR ? (bCalc ? [
+                        { label: 'Purchase Loan', value: fmtUSD(bCalc.purchaseLoan) },
+                        { label: 'Renovation Loan', value: fmtUSD(bCalc.renovLoan) },
+                        '---', { label: 'Total Loan', value: fmtUSD(bCalc.totalLoan), bold: true },
+                      ] : []) : (calc ? [
+                        { label: 'Purchase Loan', value: fmtUSD(calc.purchaseLoan) },
+                        { label: 'Renovation Loan', value: fmtUSD(calc.renovationLoan) },
+                        '---', { label: 'Total Loan', value: fmtUSD(calc.totalLoan), bold: true },
+                      ] : [])}
+                    />
+                  </Field>
+                  <Field label="Monthly Interest" tip="Total Loan × (Rate ÷ 12)">
+                    <CalcDisplay
+                      value={isBRRRR ? (bCalc ? fmtUSD(bCalc.monthlyInterest) : '—') : (calc ? fmtUSD(calc.monthlyInterest) : '—')}
+                      className="font-semibold text-[color:var(--color-accent-text)]"
+                      lines={isBRRRR ? (bCalc ? [
+                        { label: `${fmtUSD(bCalc.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
+                        '---', { label: 'Monthly', value: fmtUSD(bCalc.monthlyInterest), bold: true },
+                        { label: `× ${bCalc.holdMonths}mo total`, value: fmtUSD(bCalc.totalInterest) },
+                      ] : []) : (calc ? [
+                        { label: `${fmtUSD(calc.totalLoan)} × (${fmtPct(financials?.interest_rate_annual)} ÷ 12)`, value: '' },
+                        '---', { label: 'Monthly', value: fmtUSD(calc.monthlyInterest), bold: true },
+                        { label: `× ${calc.holdMonths}mo total`, value: fmtUSD(calc.totalInterest) },
+                      ] : [])}
+                    />
+                  </Field>
                 </div>
               </div>
 
