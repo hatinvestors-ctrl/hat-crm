@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import { PROPERTY_TYPES } from '../../lib/constants'
-import { formatNumber } from '../../lib/calculations'
+import { formatNumber, formatCurrency } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { mlsStatusMeta } from '../../lib/mlsStatus'
 import { safeUrl } from '../../lib/urlSafety'
@@ -68,6 +68,14 @@ export default function PropertyInfoSection({ lead, userId, members, canEdit, on
           type="bool"
           value={lead.has_garage}
           onSave={(v) => update({ has_garage: v })}
+          disabled={!canEdit}
+        />
+        <EditableField
+          label="Asking Price"
+          type="currency"
+          value={lead.asking_price}
+          formatter={formatCurrency}
+          onSave={(v) => update({ asking_price: v })}
           disabled={!canEdit}
         />
       </div>
