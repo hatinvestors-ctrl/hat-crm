@@ -29,7 +29,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         body: JSON.stringify({
           lead_id:         lead.id,
           address:         [lead.address, lead.city, lead.state].filter(Boolean).join(', '),
-          purchase_price:  lead.asking_price || lead.offer_price,
+          purchase_price:  lead.offer_price || lead.asking_price,
           arv:             lead.arv,
           renovation_cost: lead.renovation_cost,
           monthly_rent:    strategy === 'brrrr' ? (parseFloat(monthlyRent) || null) : null,
@@ -52,11 +52,11 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
     <Card title="Financials">
       <div className="grid grid-cols-2 gap-4">
         <EditableField
-          label="Asking Price"
+          label="Offer Price"
           type="currency"
-          value={lead.asking_price}
+          value={lead.offer_price}
           formatter={formatCurrency}
-          onSave={(v) => update({ asking_price: v })}
+          onSave={(v) => update({ offer_price: v })}
           disabled={!canEdit}
         />
         <EditableField
