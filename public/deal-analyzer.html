@@ -2481,6 +2481,11 @@ loadDeal(_dealData);
 updateHoldLabel('flip');
 updateHoldLabel('brrrr');
 calc();
+
+// Auto-open a modal when linked from CRM (openModal=email or openModal=phone)
+const _autoModal = _p.get('openModal');
+if (_autoModal === 'email') setTimeout(openEmailModal, 300);
+else if (_autoModal === 'phone') setTimeout(openPhoneModal, 300);
 </script>
 </body>
 </html>
