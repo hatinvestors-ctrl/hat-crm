@@ -193,6 +193,13 @@ export default function TasksPage() {
     if (error) { alert(error.message); return }
     setTasks(prev => [...prev, data])
     await logTaskActivity(data.id, user.id, 'activity', 'Task created')
+    if ((data.assignee_ids || []).length > 0) {
+      fetch('/.netlify/functions/notify-task-assigned', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: data.id, workspace_id: workspaceId, actor_user_id: user.id, new_assignee_ids: data.assignee_ids }),
+      }).catch(() => {})
+    }
   }
 
   // Drag-move
@@ -256,13 +263,25 @@ export default function TasksPage() {
       />
 
       <div className="px-6 py-4 flex flex-col gap-3 flex-1 min-w-0">
-        <TaskFilters
-          filters={filters}
-          onChange={setFilters}
-          members={members || []}
-          projects={projects}
-          currentUserId={user.id}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setFilters(f => ({ ...f, assignee_id: f.assignee_id === 'me' ? undefined : 'me' }))}
+            className={`h-7 px-3 text-[12px] font-medium rounded-full border transition-colors ${
+              filters.assignee_id === 'me'
+                ? 'bg-[color:var(--color-accent)] text-white border-[color:var(--color-accent)]'
+                : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] border-[color:var(--color-line)] hover:text-[color:var(--color-text)]'
+            }`}
+          >
+            My Tasks
+          </button>
+          <TaskFilters
+            filters={filters}
+            onChange={setFilters}
+            members={members || []}
+            projects={projects}
+            currentUserId={user.id}
+          />
+        </div>
 
         {loading ? (
           <LoadingSpinner label="Loading tasks…" />

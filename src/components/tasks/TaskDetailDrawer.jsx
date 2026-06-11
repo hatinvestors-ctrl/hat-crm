@@ -63,6 +63,20 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
     setTask(data)
     initialRef.current = data
     await logTaskChanges(task.id, userId, before, data, memberMap, projectMap)
+
+    // Notify newly added assignees
+    if ('assignee_ids' in changes) {
+      const prevIds = before.assignee_ids || []
+      const newIds  = (data.assignee_ids || []).filter(id => !prevIds.includes(id))
+      if (newIds.length > 0) {
+        fetch('/.netlify/functions/notify-task-assigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task_id: task.id, workspace_id: workspaceId, actor_user_id: userId, new_assignee_ids: newIds }),
+        }).catch(() => {})
+      }
+    }
+
     setActivityRefresh(v => v + 1)
     onChanged?.(data)
   }

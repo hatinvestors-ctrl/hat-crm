@@ -80,8 +80,7 @@ export default function TodayPage() {
       .eq('workspace_id', workspaceId)
       .contains('assignee_ids', [user.id])
       .neq('status', 'done')
-      .lte('due_date', today)
-      .order('due_date', { ascending: true })
+      .order('due_date', { ascending: true, nullsFirst: false })
       .then(({ data }) => setMyTasks(data || []))
 
     supabase
@@ -157,8 +156,9 @@ export default function TodayPage() {
   const memberMap = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
   const taskProjectMap = Object.fromEntries(taskProjects.map(p => [p.id, p]))
   const todayStr = new Date().toISOString().slice(0, 10)
-  const overdueTasks = myTasks.filter(t => t.due_date < todayStr)
-  const todayTasks   = myTasks.filter(t => t.due_date === todayStr)
+  const overdueTasks    = myTasks.filter(t => t.due_date && t.due_date < todayStr)
+  const todayTasks      = myTasks.filter(t => t.due_date === todayStr)
+  const upcomingTasks   = myTasks.filter(t => !t.due_date || t.due_date > todayStr)
   const { byBucket, totalCount } = categorizeLeads(leads, workspace?.settings)
 
   if (loading) return <LoadingSpinner fullPage label="Scanning your pipeline…" />
@@ -281,7 +281,7 @@ export default function TodayPage() {
           <div className="w-[380px] shrink-0 space-y-4">
 
             {/* My Tasks */}
-            {(overdueTasks.length > 0 || todayTasks.length > 0) && (
+            {(overdueTasks.length > 0 || todayTasks.length > 0 || upcomingTasks.length > 0) && (
               <section className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg overflow-hidden">
                 <header className="px-4 py-3 border-b border-[color:var(--color-line)]">
                   <h3 className="text-[14px] font-semibold text-[color:var(--color-text)]">My Tasks</h3>
@@ -334,6 +334,35 @@ export default function TodayPage() {
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               <span className="text-[11px] text-[color:var(--color-warn-text)]">Today</span>
+                              <button type="button" onClick={(e) => markTaskDone(e, task.id)}
+                                className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors">
+                                ✓
+                              </button>
+                            </div>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {upcomingTasks.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 bg-[color:var(--color-accent-soft)] border-b border-[color:var(--color-line)]">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-accent-text)]">Upcoming — {upcomingTasks.length}</span>
+                    </div>
+                    <ul className="divide-y divide-[color:var(--color-line)]">
+                      {upcomingTasks.map(task => (
+                        <li key={task.id}>
+                          <a href={`/w/${workspaceId}/tasks/${task.id}`}
+                            className="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-[color:var(--color-bg-elev-2)] transition-colors">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12.5px] font-medium text-[color:var(--color-text)] truncate">{task.title}</div>
+                              {task.project_id && taskProjectMap[task.project_id] && (
+                                <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">🏠 {taskProjectMap[task.project_id].address}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-[color:var(--color-text-dim)]">{task.due_date || 'No due date'}</span>
                               <button type="button" onClick={(e) => markTaskDone(e, task.id)}
                                 className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-success-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-success-text)] border border-[color:var(--color-line)] transition-colors">
                                 ✓
