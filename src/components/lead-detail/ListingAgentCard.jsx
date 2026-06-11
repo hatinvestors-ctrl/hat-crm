@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import { safeTelHref, safeMailtoHref } from '../../lib/urlSafety'
 import { formatPhone } from '../../lib/calculations'
-import EmailComposeModal from './EmailComposeModal'
+import AgentNegotiationModal from './AgentNegotiationModal'
 
 // Shows the LISTING agent contact (from RentCast). This is the person
 // representing the seller — different from `seller_name`/`phone`/`email`
@@ -54,7 +54,7 @@ export default function ListingAgentCard({ lead }) {
             onClick={() => setComposeOpen(true)}
             className="text-[12px] px-2 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors"
           >
-            ✉ Compose Email
+            📧 Generate Agent Email
           </button>
         </div>
 
@@ -69,11 +69,11 @@ export default function ListingAgentCard({ lead }) {
         <ListingHistory lead={lead} />
       </div>
 
-      <EmailComposeModal
+      <AgentNegotiationModal
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
         lead={lead}
-        onSent={() => setComposeOpen(false)}
+        recipientEmail={lead.listing_agent_email}
       />
     </Card>
   )

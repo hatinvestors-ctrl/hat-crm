@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
-import EmailComposeModal from './EmailComposeModal'
+import AgentNegotiationModal from './AgentNegotiationModal'
 import { LEAD_SOURCES } from '../../lib/constants'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { safeTelHref, safeMailtoHref } from '../../lib/urlSafety'
@@ -71,19 +71,17 @@ export default function ContactInfoSection({ lead, userId, members, canEdit, onU
               onClick={() => setComposeOpen(true)}
               className="text-[12px] px-2 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors"
             >
-              ✉ Compose Email
+              📧 Generate Agent Email
             </button>
           )}
         </div>
       )}
 
-      <EmailComposeModal
+      <AgentNegotiationModal
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
         lead={lead}
         recipientEmail={lead.email}
-        recipientName={lead.seller_name}
-        onSent={() => setComposeOpen(false)}
       />
     </Card>
   )

@@ -1,12 +1,12 @@
 // src/components/lead-detail/AgentNegotiationModal.jsx
 //
 // Full AI negotiation modal — generates initial outreach emails and counter-replies
-// using psychology/negotiation techniques. Opened from DealAnalysisPanel.
+// using psychology/negotiation techniques. Opened from DealAnalysisPanel, ContactInfoSection,
+// and ListingAgentCard — the single place to email agents.
 
 import { useState, useEffect, useRef } from 'react'
 import Modal from '../ui/Modal'
 import Textarea from '../ui/Textarea'
-import Button from '../ui/Button'
 
 // ── Situation tabs for Initial mode ────────────────────────────────────────────
 const INITIAL_TABS = [
@@ -49,25 +49,25 @@ const INITIAL_TABS = [
 
 // ── Situation chips for Reply mode ─────────────────────────────────────────────
 const REPLY_SITUATIONS = [
-  { id: 'countered_higher',     label: 'Countered higher' },
-  { id: 'high_counter',         label: 'Far above our number' },
-  { id: 'not_interested',       label: 'Said not interested' },
-  { id: 'competing_offers',     label: 'Has competing offers' },
-  { id: 'proof_of_funds',       label: 'Asked for proof of funds' },
-  { id: 'no_response',          label: 'No response / ghosted' },
-  { id: 'wants_leaseback',      label: 'Wants leaseback / more time' },
-  { id: 'wants_faster_close',   label: 'Wants faster close' },
-  { id: 'open_to_deal',         label: 'Open to deal, wants concession' },
+  { id: 'countered_higher',   label: 'Countered higher' },
+  { id: 'high_counter',       label: 'Far above our number' },
+  { id: 'not_interested',     label: 'Said not interested' },
+  { id: 'competing_offers',   label: 'Has competing offers' },
+  { id: 'proof_of_funds',     label: 'Asked for proof of funds' },
+  { id: 'no_response',        label: 'No response / ghosted' },
+  { id: 'wants_leaseback',    label: 'Wants leaseback / more time' },
+  { id: 'wants_faster_close', label: 'Wants faster close' },
+  { id: 'open_to_deal',       label: 'Open to deal, wants concession' },
 ]
 
 // ── Desired response tone chips ────────────────────────────────────────────────
 const REPLY_TONES = [
-  { id: 'hold_firm',         label: '🪨 Hold firm on price' },
-  { id: 'small_concession',  label: '🤏 Small concession' },
-  { id: 'meet_in_middle',    label: '↔ Meet in the middle' },
-  { id: 'urgency',           label: '⚡ Create urgency' },
-  { id: 'walkaway_signal',   label: '🚪 Walk-away signal' },
-  { id: 'build_rapport',     label: '🤝 Build rapport / stay warm' },
+  { id: 'hold_firm',        label: '🪨 Hold firm on price' },
+  { id: 'small_concession', label: '🤏 Small concession' },
+  { id: 'meet_in_middle',   label: '↔ Meet in the middle' },
+  { id: 'urgency',          label: '⚡ Create urgency' },
+  { id: 'walkaway_signal',  label: '🚪 Walk-away signal' },
+  { id: 'build_rapport',    label: '🤝 Build rapport / stay warm' },
 ]
 
 function CopyBtn({ text, label = 'Copy' }) {
@@ -105,7 +105,7 @@ function Chip({ label, active, onClick }) {
   )
 }
 
-function EmailOutput({ subject, body, loading, error }) {
+function EmailOutput({ subject, body, loading, error, toEmail }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8 text-[13px] text-[color:var(--color-text-muted)]">
@@ -126,6 +126,11 @@ function EmailOutput({ subject, body, loading, error }) {
   }
   if (!body) return null
 
+  const gmailParams = new URLSearchParams({ view: 'cm', fs: '1' })
+  if (toEmail) gmailParams.set('to', toEmail)
+  if (subject) gmailParams.set('su', subject)
+  if (body)    gmailParams.set('body', body)
+
   return (
     <div className="space-y-2">
       {subject && (
@@ -144,77 +149,73 @@ function EmailOutput({ subject, body, loading, error }) {
       <div className="flex gap-1.5 flex-wrap">
         <CopyBtn text={body} label="Copy Body" />
         <CopyBtn text={subject ? `Subject: ${subject}\n\n${body}` : body} label="Copy All" />
-        {subject && (
-          <a
-            href={`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[11.5px] px-2.5 py-1 rounded bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent)] hover:text-white transition-colors"
-          >
-            Open in Gmail ↗
-          </a>
-        )}
+        <a
+          href={`https://mail.google.com/mail/?${gmailParams.toString()}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11.5px] px-2.5 py-1 rounded bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent)] hover:text-white transition-colors"
+        >
+          Open in Gmail ↗
+        </a>
       </div>
     </div>
   )
 }
 
-// ── Detect gap strategy label for display ──────────────────────────────────────
 function gapLabel(lead) {
-  const offer   = Number(lead.offer_price || lead.mao) || null
-  const asking  = Number(lead.asking_price) || null
+  const offer  = Number(lead.offer_price || lead.mao) || null
+  const asking = Number(lead.asking_price) || null
   if (!offer || !asking) return null
   const gap = (asking - offer) / asking
-  if (gap < 0.05)  return { label: 'Near Ask',     color: 'text-[color:var(--color-success-text)]' }
-  if (gap <= 0.20) return { label: 'Moderate Gap',  color: 'text-[color:var(--color-warn-text)]' }
-  return                  { label: 'Large Gap',     color: 'text-[color:var(--color-danger-text)]' }
+  if (gap < 0.05)  return { label: 'Near Ask',    color: 'text-[color:var(--color-success-text)]' }
+  if (gap <= 0.20) return { label: 'Moderate Gap', color: 'text-[color:var(--color-warn-text)]' }
+  return               { label: 'Large Gap',     color: 'text-[color:var(--color-danger-text)]' }
 }
 
-// ── Main Modal ─────────────────────────────────────────────────────────────────
-export default function AgentNegotiationModal({ open, onClose, lead }) {
+// recipientEmail: optional override — use when opening from Contact section
+//                 (may be a different email than listing_agent_email)
+export default function AgentNegotiationModal({ open, onClose, lead, recipientEmail }) {
+  const toEmail = recipientEmail || lead.listing_agent_email || ''
+
   const [activeTab,      setActiveTab]      = useState('initial')
   const [initialSubject, setInitialSubject] = useState('')
   const [initialBody,    setInitialBody]    = useState('')
   const [initialLoading, setInitialLoading] = useState(false)
   const [initialError,   setInitialError]   = useState(null)
 
-  const [replyExpanded,  setReplyExpanded]  = useState(false)
-  const [theirReply,     setTheirReply]     = useState('')
-  const [situations,     setSituations]     = useState([])
-  const [tones,          setTones]          = useState([])
-  const [replySubject,   setReplySubject]   = useState('')
-  const [replyBody,      setReplyBody]      = useState('')
-  const [replyLoading,   setReplyLoading]   = useState(false)
-  const [replyError,     setReplyError]     = useState(null)
+  const [replyExpanded, setReplyExpanded]  = useState(false)
+  const [theirReply,    setTheirReply]     = useState('')
+  const [situations,    setSituations]     = useState([])
+  const [tones,         setTones]          = useState([])
+  const [replySubject,  setReplySubject]   = useState('')
+  const [replyBody,     setReplyBody]      = useState('')
+  const [replyLoading,  setReplyLoading]   = useState(false)
+  const [replyError,    setReplyError]     = useState(null)
 
-  const prevTab = useRef(activeTab)
+  const prevTab = useRef(null)
 
-  // Reset on open
   useEffect(() => {
     if (!open) return
     setActiveTab('initial')
     setInitialSubject(''); setInitialBody(''); setInitialLoading(false); setInitialError(null)
     setReplyExpanded(false); setTheirReply(''); setSituations([]); setTones([])
     setReplySubject(''); setReplyBody(''); setReplyLoading(false); setReplyError(null)
+    prevTab.current = null
   }, [open])
 
-  // Auto-generate initial email when tab changes or modal opens
   useEffect(() => {
     if (!open) return
-    if (prevTab.current === activeTab && initialBody) return
+    if (prevTab.current === activeTab) return
     prevTab.current = activeTab
     generateInitial(activeTab)
   }, [open, activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function callApi({ mode, situation_type, situation, their_reply }) {
+  async function callApi(payload) {
     const res = await fetch('/.netlify/functions/generate-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        mode,
-        situation_type,
-        situation,
-        their_reply,
+        ...payload,
         lead: {
           address:            lead.address,
           city:               lead.city,
@@ -257,12 +258,12 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
   async function generateReply() {
     setReplyLoading(true); setReplyError(null)
     setReplySubject(''); setReplyBody('')
-    const combined = [
-      ...situations,
-      ...tones.map(t => `DESIRED TONE: ${t}`),
-    ]
     try {
-      const data = await callApi({ mode: 'reply', situation: combined, their_reply: theirReply })
+      const data = await callApi({
+        mode: 'reply',
+        situation: [...situations, ...tones.map(t => `DESIRED TONE: ${t}`)],
+        their_reply: theirReply,
+      })
       setReplySubject(data.subject || '')
       setReplyBody(data.body || '')
     } catch (err) {
@@ -279,14 +280,10 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
   const currentTab = INITIAL_TABS.find(t => t.id === activeTab)
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Generate Agent Email"
-      size="lg"
-    >
+    <Modal open={open} onClose={onClose} title="Generate Agent Email" size="lg">
       <div className="space-y-4">
-        {/* Lead context strip */}
+
+        {/* Lead + recipient strip */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-md bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
           <span className="text-[12px] font-medium text-[color:var(--color-text)]">
             {lead.address}{lead.city ? `, ${lead.city}` : ''}
@@ -296,6 +293,9 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
               Agent: {lead.listing_agent_name}
             </span>
           )}
+          {toEmail && (
+            <span className="text-[11px] text-[color:var(--color-text-dim)]">→ {toEmail}</span>
+          )}
           {gap && (
             <span className={`text-[11px] font-semibold uppercase tracking-wide ${gap.color}`}>
               {gap.label}
@@ -303,7 +303,7 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
           )}
         </div>
 
-        {/* Situation tabs */}
+        {/* Strategy tabs */}
         <div className="space-y-2">
           <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Email Strategy</div>
           <div className="flex flex-wrap gap-1.5">
@@ -324,7 +324,6 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
             ))}
           </div>
 
-          {/* Strategy context box */}
           {currentTab && (
             <div className="px-3 py-2 rounded-md bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] space-y-1">
               <div className="text-[12px] text-[color:var(--color-text-muted)]">{currentTab.desc}</div>
@@ -335,7 +334,7 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
           )}
         </div>
 
-        {/* Regenerate button */}
+        {/* Regenerate */}
         <button
           type="button"
           onClick={() => generateInitial(activeTab)}
@@ -345,15 +344,15 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
           {initialLoading ? '…' : '✦'} {initialLoading ? 'Generating…' : 'Regenerate'}
         </button>
 
-        {/* Generated initial email */}
         <EmailOutput
           subject={initialSubject}
           body={initialBody}
           loading={initialLoading}
           error={initialError}
+          toEmail={toEmail}
         />
 
-        {/* ── Reply section ─────────────────────────────────────────────────── */}
+        {/* ── Reply section ──────────────────────────────────────────────────── */}
         <div className="border-t border-[color:var(--color-line)] pt-3">
           <button
             type="button"
@@ -420,6 +419,7 @@ export default function AgentNegotiationModal({ open, onClose, lead }) {
                 body={replyBody}
                 loading={replyLoading}
                 error={replyError}
+                toEmail={toEmail}
               />
             </div>
           )}
