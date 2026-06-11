@@ -1,11 +1,8 @@
 import { supabase } from '../lib/supabase'
 import { logChanges } from '../lib/activityLogger'
 import { calculateMAO } from '../lib/calculations'
-import { fireLeadNotifications } from '../lib/leadNotifications'
+import { fireLeadNotifications, fireLeadNotification } from '../lib/leadNotifications'
 
-// Returns a function `update(patch)` that updates the lead in Supabase,
-// auto-recalculates MAO when ARV or renovation_cost change, and logs
-// tracked changes to the activity timeline.
 export function useLeadUpdate(lead, userId, members, onUpdated) {
   return async function update(patch) {
     const next = { ...lead, ...patch }
@@ -38,6 +35,27 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
       const userLookup = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles]))
       await logChanges(lead.id, userId, lead, updated, userLookup).catch(() => {})
       fireLeadNotifications(lead, updated, lead.workspace_id, userId).catch(() => {})
+
+      // assigned
+      if ('assigned_to' in patch && patch.assigned_to !== lead.assigned_to) {
+        fireLeadNotification('assigned', lead.id, lead.workspace_id, userId).catch(() => {})
+      }
+
+      // offer_price
+      if ('offer_price' in patch && patch.offer_price !== lead.offer_price) {
+        fireLeadNotification('offer_price', lead.id, lead.workspace_id, userId, {
+          old_value: lead.offer_price != null ? `$${Number(lead.offer_price).toLocaleString()}` : '—',
+          new_value: patch.offer_price != null ? `$${Number(patch.offer_price).toLocaleString()}` : '—',
+        }).catch(() => {})
+      }
+
+      // follow_up_date
+      if ('follow_up_date' in patch && patch.follow_up_date !== lead.follow_up_date) {
+        fireLeadNotification('follow_up_date', lead.id, lead.workspace_id, userId, {
+          new_value: patch.follow_up_date || '(cleared)',
+        }).catch(() => {})
+      }
+
       onUpdated?.(updated)
     }
     return updated

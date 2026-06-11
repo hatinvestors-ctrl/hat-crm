@@ -198,6 +198,7 @@ export default function LeadDetailPage() {
               <CommentBox
                 leadId={lead.id}
                 userId={user.id}
+                workspaceId={workspaceId}
                 onPosted={() => setActivityRefresh(v => v + 1)}
               />
             )}

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import Button from '../ui/Button'
 import { logComment } from '../../lib/activityLogger'
+import { fireLeadNotification } from '../../lib/leadNotifications'
 
-export default function CommentBox({ leadId, userId, onPosted }) {
+export default function CommentBox({ leadId, userId, workspaceId, onPosted }) {
   const [text, setText] = useState('')
   const [posting, setPosting] = useState(false)
 
@@ -10,6 +11,10 @@ export default function CommentBox({ leadId, userId, onPosted }) {
     if (!text.trim()) return
     setPosting(true)
     await logComment(leadId, userId, text)
+    if (workspaceId) {
+      fireLeadNotification('comment', leadId, workspaceId, userId, { comment_text: text.trim() })
+        .catch(() => {})
+    }
     setText('')
     setPosting(false)
     onPosted?.()
