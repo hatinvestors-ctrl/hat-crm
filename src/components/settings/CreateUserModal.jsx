@@ -12,6 +12,7 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const isEdit = !!editUser
 
@@ -106,14 +107,41 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
           />
         )}
         {!form.addExisting && (
-          <Input
-            label={isEdit ? 'New Password (leave blank to keep current)' : 'Password'}
-            type="password"
-            placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Min 6 characters'}
-            value={form.password}
-            onChange={set('password')}
-            required={!isEdit}
-          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
+              {isEdit ? 'New Password (leave blank to keep current)' : 'Password'}
+              {!isEdit && <span className="text-[color:var(--color-danger-text)]"> *</span>}
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Min 6 characters'}
+                value={form.password}
+                onChange={set('password')}
+                className="w-full h-8 px-2.5 pr-8 text-[13px] rounded-md bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] border border-[color:var(--color-line)] hover:border-[color:var(--color-line-strong)] transition-colors focus:outline-none focus:border-[color:var(--color-accent)] focus:ring-1 focus:ring-[color:var(--color-accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
         )}
         <Select
           label="Role"
