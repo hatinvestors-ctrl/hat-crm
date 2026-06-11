@@ -43,6 +43,7 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
       if (isEdit) {
         const patch = { user_id: editUser.user_id, role: form.role }
         if (form.full_name.trim()) patch.full_name = form.full_name.trim()
+        if (form.email.trim()) patch.email = form.email.trim()
         if (form.password.trim()) patch.password = form.password.trim()
         await updateUser(workspaceId, patch)
       } else {
@@ -96,16 +97,14 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
             required
           />
         )}
-        {!isEdit && (
-          <Input
-            label="Email"
-            type="email"
-            placeholder="jane@example.com"
-            value={form.email}
-            onChange={set('email')}
-            required
-          />
-        )}
+        <Input
+          label={isEdit ? 'New Email (leave blank to keep current)' : 'Email'}
+          type="email"
+          placeholder={isEdit ? 'Enter new email address' : 'jane@example.com'}
+          value={form.email}
+          onChange={set('email')}
+          required={!isEdit}
+        />
         {!form.addExisting && (
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
