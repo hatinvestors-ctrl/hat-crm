@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatCurrency } from '../../lib/calculations'
 import AgentNegotiationModal from './AgentNegotiationModal'
+import AgentPhoneScriptModal from './AgentPhoneScriptModal'
 
 const VERDICT_STYLES = {
   BUY:         { bg: 'bg-[color:var(--color-success-soft)]', text: 'text-[color:var(--color-success-text)]', border: 'border-[color:var(--color-success)]' },
@@ -34,6 +35,7 @@ function ScoreRing({ score }) {
 export default function DealAnalysisPanel({ analysis, lead }) {
   const [expanded, setExpanded] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [phoneOpen, setPhoneOpen] = useState(false)
   if (!analysis) return null
 
   const { verdict = 'UNKNOWN', score, profit, roi, annualized_roi, total_cash_needed,
@@ -126,14 +128,13 @@ export default function DealAnalysisPanel({ analysis, lead }) {
           >
             📧 Generate Agent Email
           </button>
-          <a
-            href={`${dashboardUrl}&openModal=phone`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setPhoneOpen(true)}
             className="text-[12px] px-2.5 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors"
           >
             📞 Generate Phone Script
-          </a>
+          </button>
           <a
             href={dashboardUrl}
             target="_blank"
@@ -148,6 +149,11 @@ export default function DealAnalysisPanel({ analysis, lead }) {
       <AgentNegotiationModal
         open={emailOpen}
         onClose={() => setEmailOpen(false)}
+        lead={lead}
+      />
+      <AgentPhoneScriptModal
+        open={phoneOpen}
+        onClose={() => setPhoneOpen(false)}
         lead={lead}
       />
     </div>
