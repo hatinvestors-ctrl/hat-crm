@@ -4,7 +4,7 @@ import Input from '../ui/Input'
 import Select from '../ui/Select'
 import Button from '../ui/Button'
 import { USER_ROLES } from '../../lib/constants'
-import { createUser, updateUser } from '../../lib/adminUsers'
+import { createUser, updateUser, getUser } from '../../lib/adminUsers'
 
 const EMPTY = { full_name: '', email: '', password: '', role: 'regular', addExisting: false }
 
@@ -23,6 +23,11 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
         : EMPTY
       )
       setError(null)
+      if (isEdit) {
+        getUser(workspaceId, editUser.user_id)
+          .then(({ email }) => setForm(f => ({ ...f, email: email || '' })))
+          .catch(() => {})
+      }
     }
   }, [open, editUser])
 

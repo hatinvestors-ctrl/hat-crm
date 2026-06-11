@@ -116,6 +116,15 @@ async function updateUser({ user_id, email, password, full_name, role, workspace
   return { ok: true }
 }
 
+async function getUser({ user_id }) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user_id}`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error('Failed to fetch user')
+  const u = await res.json()
+  return { email: u.email || '' }
+}
+
 async function deleteUser({ user_id, workspace_id }) {
   // Remove from workspace
   await fetch(`${SUPABASE_URL}/rest/v1/workspace_members?workspace_id=eq.${workspace_id}&user_id=eq.${user_id}`, {
@@ -152,6 +161,7 @@ export default async (req) => {
     if (action === 'create') result = await createUser(payload)
     else if (action === 'update') result = await updateUser(payload)
     else if (action === 'delete') result = await deleteUser(payload)
+    else if (action === 'get') result = await getUser(payload)
     else throw new Error(`Unknown action: ${action}`)
 
     return new Response(JSON.stringify(result), { status: 200, headers: HEADERS })

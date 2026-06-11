@@ -17,6 +17,10 @@ export function updateUser(workspaceId, { user_id, email, password, full_name, r
   return invoke('update', workspaceId, { user_id, email, password, full_name, role })
 }
 
+export function getUser(workspaceId, user_id) {
+  return invoke('get', workspaceId, { user_id })
+}
+
 export function deleteUser(workspaceId, user_id) {
   return invoke('delete', workspaceId, { user_id })
 }
