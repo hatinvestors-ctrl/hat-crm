@@ -1,8 +1,4 @@
 // netlify/functions/notify-lead-event.mjs
-// Generic lead event notification function.
-// POST body: { event, lead_id, workspace_id }
-// Fetches lead, resolves recipient email, renders template, sends email.
-
 import nodemailer from 'nodemailer'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
@@ -63,40 +59,192 @@ async function fetchUserName(userId) {
   return rows?.[0]?.full_name || 'Agent'
 }
 
+async function fetchAssigneeMemberPrefs(userId, workspaceId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/workspace_members?user_id=eq.${userId}&workspace_id=eq.${workspaceId}&select=notification_prefs`,
+    { headers: supabaseHeaders(SUPABASE_PAT) }
+  )
+  if (!res.ok) return {}
+  const rows = await res.json()
+  return rows?.[0]?.notification_prefs || {}
+}
+
+async function fetchActivityHistory(leadId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/lead_activities?lead_id=eq.${leadId}&select=type,content,created_at,profiles:user_id(full_name)&order=created_at.desc&limit=5`,
+    { headers: supabaseHeaders(SUPABASE_PAT) }
+  )
+  if (!res.ok) return []
+  return await res.json()
+}
+
 function fmt(n) {
   if (n == null) return '—'
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
-function renderTemplate(template, lead, agentName, leadUrl) {
-  switch (template) {
+function fmtDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function renderLeadSummary(lead) {
+  const addr = [lead.address, lead.city, lead.state].filter(Boolean).join(', ')
+  return [
+    '── LEAD SUMMARY ─────────────────────────────',
+    `Address:      ${addr || '—'}`,
+    `Status:       ${lead.status || '—'}`,
+    `Offer Price:  ${fmt(lead.offer_price || lead.mao)}`,
+    `ARV:          ${fmt(lead.arv)}`,
+  ].join('\n')
+}
+
+function renderActivityHistory(activities) {
+  if (!activities?.length) return '── RECENT ACTIVITY ───────────────────────────\n(no activity yet)'
+  const lines = activities.map(a => {
+    const who  = a.profiles?.full_name || 'System'
+    const date = fmtDate(a.created_at)
+    const text = a.content?.slice(0, 120) || ''
+    return `${date} · ${who} · ${text}`
+  })
+  return ['── RECENT ACTIVITY ───────────────────────────', ...lines].join('\n')
+}
+
+function renderEventSection(event, lead, extra, actorName, leadUrl) {
+  const actor = actorName || 'A team member'
+  switch (event) {
+    case 'assigned':
+      return [
+        '── LEAD ASSIGNED TO YOU ──────────────────────',
+        `Assigned by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'status_change': {
+      const from = extra?.old_status || '—'
+      const to   = extra?.new_status || '—'
+      return [
+        '── STATUS CHANGED ────────────────────────────',
+        `From:        ${from}`,
+        `To:          ${to}`,
+        `Changed by:  ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+    }
+
     case 'offer_signed':
       return [
-        `Hi ${agentName},`,
+        '── CONTRACT SIGNED ───────────────────────────',
+        'HAT has signed the contract. Please send the offer to the listing agent immediately.',
         '',
-        `HAT has signed the contract on ${lead.address}, ${lead.city || ''}, ${lead.state || ''} ${lead.zip_code || ''}.`.trim(),
+        `Listing agent: ${lead.listing_agent_name || '—'}  ${lead.listing_agent_phone || ''}`,
         '',
-        'Please send the offer to the listing agent immediately.',
-        '',
-        'Deal details:',
-        `  MAO:          ${fmt(lead.mao)}`,
-        `  Offer Price:  ${fmt(lead.offer_price)}`,
-        `  ARV:          ${fmt(lead.arv)}`,
-        `  Asking Price: ${fmt(lead.asking_price)}`,
-        `  Seller:       ${lead.seller_name || '—'}`,
-        '',
-        'Once you\'ve sent the offer, please update the deal status in HatCRM to "Offer Sent":',
-        leadUrl,
-        '',
-        '— HAT Investors',
+        `Update status to "Offer Sent" once done: ${leadUrl}`,
       ].join('\n')
+
+    case 'closed':
+      return [
+        '── LEAD CLOSED / WON ─────────────────────────',
+        `Marked closed by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'dead':
+      return [
+        '── LEAD MARKED DEAD ──────────────────────────',
+        `Marked dead by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'comment': {
+      const text = extra?.comment_text || '(no content)'
+      return [
+        '── NEW COMMENT ───────────────────────────────',
+        `From: ${actor}`,
+        '',
+        text,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+    }
+
+    case 'file_attached':
+      return [
+        '── FILE ATTACHED ─────────────────────────────',
+        `File: ${extra?.filename || '(unnamed)'}`,
+        `Attached by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'deal_analysis': {
+      const verdict = extra?.verdict || '—'
+      const profit  = extra?.profit  != null ? fmt(extra.profit) : '—'
+      const roi     = extra?.roi     != null ? `${extra.roi}%` : '—'
+      const cash    = extra?.total_cash_needed != null ? fmt(extra.total_cash_needed) : '—'
+      return [
+        '── DEAL ANALYSIS RUN ─────────────────────────',
+        `Verdict:      ${verdict}`,
+        `Est. Profit:  ${profit}`,
+        `ROI:          ${roi}`,
+        `Cash Needed:  ${cash}`,
+        '',
+        `View analysis: ${leadUrl}`,
+      ].join('\n')
+    }
+
+    case 'offer_price':
+      return [
+        '── OFFER PRICE UPDATED ───────────────────────',
+        `From: ${extra?.old_value || '—'}`,
+        `To:   ${extra?.new_value || '—'}`,
+        `Updated by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'follow_up_date':
+      return [
+        '── FOLLOW-UP DATE CHANGED ────────────────────',
+        `Set to: ${extra?.new_value || '—'}`,
+        `Updated by: ${actor}`,
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
+    case 'enriched':
+      return [
+        '── LEAD ENRICHED (MLS/RENTCAST) ──────────────',
+        extra?.summary || 'MLS data was updated.',
+        '',
+        `View lead: ${leadUrl}`,
+      ].join('\n')
+
     default:
-      throw new Error(`Unknown template: ${template}`)
+      return `── EVENT: ${event} ────────────────────────────\nView lead: ${leadUrl}`
   }
 }
 
-function renderSubject(subjectTemplate, lead) {
-  return subjectTemplate.replace('{address}', lead.address || '')
+function renderSubject(event, lead, extra) {
+  const addr = lead.address || 'lead'
+  switch (event) {
+    case 'assigned':       return `Lead assigned to you: ${addr}`
+    case 'status_change':  return `Status update on ${addr}: ${extra?.old_status || '?'} → ${extra?.new_status || '?'}`
+    case 'offer_signed':   return `HAT signed contract — send offer ASAP: ${addr}`
+    case 'closed':         return `Lead closed: ${addr}`
+    case 'dead':           return `Lead marked dead: ${addr}`
+    case 'comment':        return `New comment on ${addr}`
+    case 'file_attached':  return `File attached to ${addr}`
+    case 'deal_analysis':  return `Deal analysis on ${addr}: ${extra?.verdict || '?'}`
+    case 'offer_price':    return `Offer price updated on ${addr}`
+    case 'follow_up_date': return `Follow-up date changed on ${addr}`
+    case 'enriched':       return `Lead enriched: ${addr}`
+    default:               return `Update on ${addr}`
+  }
 }
 
 function createTransport(settings) {
@@ -116,14 +264,10 @@ function createTransport(settings) {
   })
 }
 
-// Notification config — server-side registry mapping event → template config
-const TEMPLATES = {
-  offer_signed: {
-    recipient: 'assigned_user',
-    subjectTemplate: 'HAT signed contract — send offer ASAP: {address}',
-    template: 'offer_signed',
-  },
-}
+const KNOWN_EVENTS = new Set([
+  'assigned','status_change','offer_signed','closed','dead',
+  'comment','file_attached','deal_analysis','offer_price','follow_up_date','enriched',
+])
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
@@ -132,51 +276,72 @@ export default async (req) => {
   }
 
   if (!SUPABASE_URL || !SUPABASE_PAT || !SERVICE_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: 'Server misconfigured: missing SUPABASE_URL, SUPABASE_PAT, or SUPABASE_SERVICE_ROLE_KEY.' }), { status: 500, headers: HEADERS })
+    return new Response(JSON.stringify({ ok: false, error: 'Server misconfigured' }), { status: 500, headers: HEADERS })
   }
 
   try {
-    const { event, lead_id, workspace_id } = await req.json().catch(() => ({}))
+    const { event, lead_id, workspace_id, actor_user_id, extra = {} } =
+      await req.json().catch(() => ({}))
 
     if (!event || !lead_id || !workspace_id) {
       return new Response(JSON.stringify({ ok: false, error: 'event, lead_id, workspace_id required' }), { status: 400, headers: HEADERS })
     }
-
-    const config = TEMPLATES[event]
-    if (!config) {
+    if (!KNOWN_EVENTS.has(event)) {
       return new Response(JSON.stringify({ ok: false, error: `Unknown event: ${event}` }), { status: 400, headers: HEADERS })
     }
 
     const lead = await fetchLead(lead_id)
 
-    // Resolve recipient
     if (!lead.assigned_to) {
       return new Response(JSON.stringify({ ok: true, skipped: 'no assigned user' }), { status: 200, headers: HEADERS })
     }
+
+    const prefs = await fetchAssigneeMemberPrefs(lead.assigned_to, workspace_id)
+    if (prefs[event] === false) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'notification disabled for user' }), { status: 200, headers: HEADERS })
+    }
+
+    const settings = await fetchWorkspaceSettings(workspace_id)
+    const wsNotifs = settings.notifications || {}
+    if (wsNotifs[event] === false) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'notification disabled workspace-wide' }), { status: 200, headers: HEADERS })
+    }
+
     const toEmail = await fetchUserEmail(lead.assigned_to)
     if (!toEmail) {
       return new Response(JSON.stringify({ ok: true, skipped: 'assigned user has no email' }), { status: 200, headers: HEADERS })
     }
 
-    const settings = await fetchWorkspaceSettings(workspace_id)
+    const [assigneeName, actorName, activities] = await Promise.all([
+      fetchUserName(lead.assigned_to),
+      actor_user_id ? fetchUserName(actor_user_id) : Promise.resolve('System'),
+      fetchActivityHistory(lead_id),
+    ])
 
-    // Check if this notification is enabled (default: true if not configured)
-    const notifSettings = settings.notifications || {}
-    if (notifSettings[event] === false) {
-      return new Response(JSON.stringify({ ok: true, skipped: 'notification disabled' }), { status: 200, headers: HEADERS })
-    }
+    const leadUrl      = `${APP_URL}/w/${workspace_id}/leads/${lead_id}`
+    const subject      = renderSubject(event, lead, extra)
+    const summaryBlock = renderLeadSummary(lead)
+    const eventBlock   = renderEventSection(event, lead, extra, actorName, leadUrl)
+    const historyBlock = renderActivityHistory(activities)
 
-    const agentName = await fetchUserName(lead.assigned_to)
-    const leadUrl   = `${APP_URL}/w/${workspace_id}/leads/${lead_id}`
-    const body      = renderTemplate(config.template, lead, agentName, leadUrl)
-    const subject   = renderSubject(config.subjectTemplate, lead)
+    const body = [
+      `Hi ${assigneeName},`,
+      '',
+      summaryBlock,
+      '',
+      eventBlock,
+      '',
+      historyBlock,
+      '',
+      '— HAT Investors',
+    ].join('\n')
 
     const transport = createTransport(settings)
     const fromName  = settings.mail_from_name?.trim()
     const fromEmail = settings.mail_from_email?.trim() || settings.mail_smtp_user
     const from      = fromName ? `"${fromName}" <${fromEmail}>` : fromEmail
+    const cc        = settings.notification_cc || undefined
 
-    const cc = settings.notification_cc || undefined
     await transport.sendMail({ from, to: toEmail, cc, subject, text: body })
 
     return new Response(JSON.stringify({ ok: true, to: toEmail, subject }), { status: 200, headers: HEADERS })
