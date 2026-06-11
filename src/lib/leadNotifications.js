@@ -52,14 +52,24 @@ export const LEAD_NOTIFICATIONS = [
 // Returns rules whose trigger condition was met between before and after lead objects.
 export function matchNotifications(before, after) {
   if (!before || !after) return []
-  return LEAD_NOTIFICATIONS.filter(rule => {
+
+  const exactMatches = LEAD_NOTIFICATIONS.filter(rule => {
     const { field, value, anyChange } = rule.trigger
-    if (anyChange) {
-      // Fires when the field changes at all (any value, but not same value)
-      return after[field] != null && after[field] !== before[field]
-    }
+    if (anyChange) return false
     return after[field] === value && before[field] !== value
   })
+
+  // Fields already covered by an exact-value rule this cycle
+  const exactFields = new Set(exactMatches.map(r => r.trigger.field))
+
+  const anyChangeMatches = LEAD_NOTIFICATIONS.filter(rule => {
+    const { field, anyChange } = rule.trigger
+    if (!anyChange) return false
+    if (exactFields.has(field)) return false  // exact rule already fires for this field
+    return after[field] != null && after[field] !== before[field]
+  })
+
+  return [...exactMatches, ...anyChangeMatches]
 }
 
 // Fires all matching field-change notifications. Called from useLeadUpdate.
