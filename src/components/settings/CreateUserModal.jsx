@@ -100,6 +100,7 @@ export default function CreateUserModal({ open, onClose, workspaceId, editUser, 
         <Input
           label={isEdit ? 'New Email (leave blank to keep current)' : 'Email'}
           type="email"
+          autoComplete="off"
           placeholder={isEdit ? 'Enter new email address' : 'jane@example.com'}
           value={form.email}
           onChange={set('email')}
