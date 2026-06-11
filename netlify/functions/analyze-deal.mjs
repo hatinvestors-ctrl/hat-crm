@@ -448,6 +448,11 @@ export default async (req) => {
       key_risks:         summary.key_risks         || [],
       markdown,
       analyzed_at:       new Date().toISOString(),
+      inputs: {
+        purchase_price: Number(purchase_price),
+        arv:            Number(arv),
+        renovation_cost: Number(renovation_cost || 0),
+      },
     }
 
     if (!skip_save && lead_id) {

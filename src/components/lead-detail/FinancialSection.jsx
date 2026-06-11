@@ -19,6 +19,15 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
 
   const hasAnalysis = !!lead.deal_analysis
 
+  const isStale = (() => {
+    const inp = lead.deal_analysis?.inputs
+    if (!inp) return false
+    const curPP   = Number(lead.offer_price || lead.asking_price || 0)
+    const curArv  = Number(lead.arv || 0)
+    const curReno = Number(lead.renovation_cost || 0)
+    return curPP !== inp.purchase_price || curArv !== inp.arv || curReno !== inp.renovation_cost
+  })()
+
   async function handleAnalyze() {
     setAnalyzing(true)
     setAnalyzeError(null)
@@ -139,6 +148,19 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           {analyzing ? 'Analyzing…' : hasAnalysis ? '↺ Re-analyze' : '✦ Analyze Deal'}
         </Button>
       </div>
+
+      {isStale && !analyzing && (
+        <div className="mt-2 flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">
+          <span className="text-[11.5px] text-[color:var(--color-warn-text)]">⚠ Numbers changed since last analysis — results may be outdated.</span>
+          <button
+            onClick={handleAnalyze}
+            disabled={!canEdit || analyzing}
+            className="shrink-0 text-[11.5px] font-semibold px-2.5 py-1 rounded bg-[color:var(--color-warn)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            Re-analyze now
+          </button>
+        </div>
+      )}
 
       {analyzeError && (
         <p className="mt-2 text-[11.5px] text-[color:var(--color-danger-text)]">{analyzeError}</p>
