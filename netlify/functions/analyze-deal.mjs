@@ -340,29 +340,118 @@ Numbers-first, no fluff. Short and actionable. Flag clearly if inputs are estima
 - Include: distance, similarity %, beds/baths, sq ft, listed rent, rent/sqft, last seen
 - State estimated rent range and midpoint used in analysis`
 
-function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) {
-  const strategyLabel = strategy === 'brrrr' ? 'BRRRR' : 'flip'
-  const rentLine = strategyLabel === 'BRRRR' && monthly_rent
-    ? `\n- Expected Monthly Rent: $${Number(monthly_rent).toLocaleString()}`
-    : strategyLabel === 'BRRRR' ? '\n- Expected Monthly Rent: Not provided (estimate based on market)' : ''
-  return `Analyze this ${strategyLabel} deal (be concise — skip sensitivity tables and scenario tables):
-- Address: ${address || 'Not provided'}
-- Purchase Price: $${Number(purchase_price).toLocaleString()}
-- Renovation Cost: $${Number(renovation_cost).toLocaleString()}
-- ARV: $${Number(arv).toLocaleString()}${rentLine}
-- Strategy: ${strategyLabel}
+function computeFlipMetrics(pp, arv, reno, holdMonths = 3) {
+  const hmlLoan       = pp * 0.90 + reno
+  const monthlyPmt    = hmlLoan * 0.01
+  const points        = hmlLoan * 0.02
+  const fixedCosts    = 2450                          // title + lender insurance + doc stamps + intangible
+  const downPayment   = pp * 0.10
+  const totalCashNeeded = downPayment + points + fixedCosts
+  const holdingPerMo  = monthlyPmt + 208 + 100        // loan pmt + taxes + insurance
+  const totalHolding  = holdingPerMo * holdMonths
+  const saleProceeds  = arv * 0.93
+  const totalProfit   = saleProceeds - hmlLoan - totalHolding - totalCashNeeded
+  const roi           = totalCashNeeded > 0 ? (totalProfit / totalCashNeeded) * 100 : 0
+  const annualizedRoi = holdMonths > 0 ? (roi / holdMonths) * 12 : 0
+  return { hmlLoan, monthlyPmt, points, downPayment, totalCashNeeded, holdingPerMo, totalHolding, saleProceeds, totalProfit, roi, annualizedRoi }
+}
 
-Give a brief analysis (3-4 paragraphs max), then append a JSON summary block in exactly this format (no other text after it):
+function computeBrrrrMetrics(pp, arv, reno, monthlyRent, holdMonths = 6) {
+  const hmlLoan       = pp * 0.90 + reno
+  const monthlyPmt    = hmlLoan * 0.01
+  const points        = hmlLoan * 0.02
+  const fixedCosts    = 2450
+  const downPayment   = pp * 0.10
+  const totalCashNeeded = downPayment + points + fixedCosts
+  const holdingPerMo  = monthlyPmt + 208 + 100
+  const totalHolding  = holdingPerMo * holdMonths
+  const refiLoan      = arv * 0.70
+  const refiCosts     = refiLoan * 0.03
+  const refiCashOut   = refiLoan - refiCosts - hmlLoan - totalHolding
+  const totalCashInvested = refiCashOut >= 0
+    ? Math.max(0, totalCashNeeded - refiCashOut)
+    : totalCashNeeded + Math.abs(refiCashOut)
+  const refiMoPmt     = refiLoan * 0.006607
+  const monthlyCF     = monthlyRent > 0 ? monthlyRent - refiMoPmt - 208 - 100 : null
+  const annualCF      = monthlyCF != null ? monthlyCF * 12 : null
+  const coc           = totalCashInvested > 0 && annualCF != null ? (annualCF / totalCashInvested) * 100 : null
+  return { hmlLoan, monthlyPmt, points, downPayment, totalCashNeeded, holdingPerMo, totalHolding, refiLoan, refiCosts, refiCashOut, totalCashInvested, refiMoPmt, monthlyCF, annualCF, coc }
+}
+
+function fmt(n) { return n == null ? 'N/A' : '$' + Math.round(n).toLocaleString('en-US') }
+function pct(n) { return n == null ? 'N/A' : n.toFixed(1) + '%' }
+
+function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) {
+  const pp   = Number(purchase_price)
+  const rv   = Number(arv)
+  const reno = Number(renovation_cost || 0)
+  const rent = Number(monthly_rent || 0)
+  const strategyLabel = strategy === 'brrrr' ? 'BRRRR' : 'flip'
+
+  let computedBlock = ''
+  let jsonDefaults = {}
+
+  if (strategyLabel === 'flip') {
+    const m = computeFlipMetrics(pp, rv, reno)
+    const verdict = m.totalProfit >= 40000 ? 'BUY' : m.totalProfit >= 30000 ? 'CONDITIONAL' : 'PASS'
+    const score = Math.max(0, Math.min(100, Math.round(50 + (m.totalProfit - 30000) / 1500)))
+    computedBlock = `
+PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
+- HML Loan (90% purchase + 100% reno): ${fmt(m.hmlLoan)}
+- Monthly loan payment (1%/mo): ${fmt(m.monthlyPmt)}
+- Points (2%): ${fmt(m.points)}
+- Down payment (10%): ${fmt(m.downPayment)}
+- Fixed purchase costs (title, insurance, doc stamps, intangible): $2,450
+- Total Cash Needed: ${fmt(m.totalCashNeeded)}
+- Holding costs/mo (loan + taxes $208 + insurance $100): ${fmt(m.holdingPerMo)}
+- Total holding (3 months): ${fmt(m.totalHolding)}
+- Sale proceeds (ARV × 93%): ${fmt(m.saleProceeds)}
+- Total Profit = Sale Proceeds − HML Loan − Holding − Cash Needed: ${fmt(m.totalProfit)}
+- ROI: ${pct(m.roi)}
+- Annualized ROI (×12/3): ${pct(m.annualizedRoi)}
+`
+    jsonDefaults = { verdict, score, profit: Math.round(m.totalProfit), roi: Math.round(m.roi * 10) / 10, annualized_roi: Math.round(m.annualizedRoi * 10) / 10, total_cash_needed: Math.round(m.totalCashNeeded) }
+  } else {
+    const m = computeBrrrrMetrics(pp, rv, reno, rent)
+    const verdict = m.coc != null && m.coc >= 8 && (m.monthlyCF ?? 0) >= 200 ? 'BUY'
+      : m.coc != null && m.coc >= 5 && (m.monthlyCF ?? 0) >= 100 ? 'CONDITIONAL' : 'PASS'
+    const score = m.coc != null ? Math.max(0, Math.min(100, Math.round(50 + (m.coc - 6) * 5))) : 20
+    computedBlock = `
+PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
+- HML Loan: ${fmt(m.hmlLoan)}
+- Total Cash Needed: ${fmt(m.totalCashNeeded)}
+- Total Holding (6 months): ${fmt(m.totalHolding)}
+- Refi Loan (70% ARV): ${fmt(m.refiLoan)}
+- Refi Costs (3%): ${fmt(m.refiCosts)}
+- Refi Cash Out: ${fmt(m.refiCashOut)}
+- Total Cash Invested after refi: ${fmt(m.totalCashInvested)}
+- Refi monthly mortgage: ${fmt(m.refiMoPmt)}
+- Monthly Cash Flow (rent − mortgage − taxes − insurance): ${fmt(m.monthlyCF)}
+- Annual Cash Flow: ${fmt(m.annualCF)}
+- Cash-on-Cash Return: ${m.coc != null ? pct(m.coc) : 'N/A (no rent provided)'}
+`
+    jsonDefaults = { verdict, score, profit: Math.round(m.annualCF ?? 0), roi: Math.round((m.coc ?? 0) * 10) / 10, annualized_roi: Math.round((m.coc ?? 0) * 10) / 10, total_cash_needed: Math.round(m.totalCashInvested) }
+  }
+
+  return `Analyze this ${strategyLabel} deal for ${address || 'the property below'}.
+
+INPUTS:
+- Purchase Price: ${fmt(pp)}
+- Renovation Cost: ${fmt(reno)}
+- ARV: ${fmt(rv)}${rent > 0 ? `\n- Monthly Rent: ${fmt(rent)}` : ''}
+- Strategy: ${strategyLabel}
+${computedBlock}
+The numbers above are correct. Do NOT recompute them. Write 2-3 sentences of qualitative commentary on the deal quality, market risk, and what needs to be confirmed. Then output the JSON block below with the exact computed values filled in.
 
 \`\`\`json
 {
-  "verdict": "BUY",
-  "score": 74,
-  "profit": 54600,
-  "roi": 18.3,
-  "annualized_roi": 73.2,
-  "total_cash_needed": 42000,
-  "recommendation": "2-3 sentence summary of the deal and key reason for verdict.",
+  "verdict": "${jsonDefaults.verdict}",
+  "score": ${jsonDefaults.score},
+  "profit": ${jsonDefaults.profit},
+  "roi": ${jsonDefaults.roi},
+  "annualized_roi": ${jsonDefaults.annualized_roi},
+  "total_cash_needed": ${jsonDefaults.total_cash_needed},
+  "recommendation": "YOUR 2-3 SENTENCE QUALITATIVE SUMMARY HERE.",
   "key_risks": ["Risk one", "Risk two", "Risk three"]
 }
 \`\`\``
