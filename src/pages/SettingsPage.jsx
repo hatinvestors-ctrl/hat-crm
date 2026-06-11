@@ -7,14 +7,16 @@ import ActionTriggersForm from '../components/settings/ActionTriggersForm'
 import MlsRefreshForm from '../components/settings/MlsRefreshForm'
 import MailServerForm from '../components/settings/MailServerForm'
 import NotificationTriggersForm from '../components/settings/NotificationTriggersForm'
+import AssigneeNotificationsForm from '../components/settings/AssigneeNotificationsForm'
 
 const TABS = [
-  { id: 'workspace', label: 'Workspace' },
-  { id: 'triggers', label: 'Action Triggers' },
-  { id: 'mls', label: 'MLS Auto-Refresh' },
-  { id: 'mail', label: 'Mail Server' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'users', label: 'Users' },
+  { id: 'workspace',      label: 'Workspace' },
+  { id: 'triggers',       label: 'Action Triggers' },
+  { id: 'mls',            label: 'MLS Auto-Refresh' },
+  { id: 'mail',           label: 'Mail Server' },
+  { id: 'notifications',  label: 'Notifications' },
+  { id: 'assignee_notif', label: 'Assignee Notifications' },
+  { id: 'users',          label: 'Users' },
 ]
 
 export default function SettingsPage() {
@@ -63,6 +65,13 @@ export default function SettingsPage() {
         )}
         {tab === 'notifications' && (
           <NotificationTriggersForm workspace={workspace} canEdit={userRole === 'admin'} onUpdated={() => window.location.reload()} />
+        )}
+        {tab === 'assignee_notif' && (
+          <AssigneeNotificationsForm
+            workspaceId={workspaceId}
+            members={members}
+            canEdit={userRole === 'admin'}
+          />
         )}
         {tab === 'users' && (
           <UserManagement
