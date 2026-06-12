@@ -356,11 +356,6 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                   {lookingUp ? 'Looking up…' : '🔍 Look up'}
                 </button>
               </div>
-              {/,|\b[A-Z]{2}\b|\b\d{5}\b/.test(form.address || '') && (
-                <div className="text-[11.5px] px-2 py-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]">
-                  Address looks like it includes city/state/zip — enter street only (e.g. "2712 Cherrywood Road"). Use the City, State, Zip fields below.
-                </div>
-              )}
               {lookupNotice && (
                 <div className={`text-[11.5px] px-2 py-1 rounded ${
                   lookupNotice.kind === 'ok'
