@@ -296,6 +296,11 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: 'no assigned user' }), { status: 200, headers: HEADERS })
     }
 
+    // Don't notify the person who performed the action
+    if (actor_user_id && lead.assigned_to === actor_user_id) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'actor is assignee' }), { status: 200, headers: HEADERS })
+    }
+
     const prefs = await fetchAssigneeMemberPrefs(lead.assigned_to, workspace_id)
     if (prefs[event] === false) {
       return new Response(JSON.stringify({ ok: true, skipped: 'notification disabled for user' }), { status: 200, headers: HEADERS })
