@@ -20,7 +20,7 @@ import { upsertAgentFromLead } from '../../lib/agentOutreach'
 
 const EMPTY_LEAD = {
   address: '',
-  city: 'Jacksonville',
+  city: '',
   state: 'FL',
   zip_code: '',
   property_type: '',
@@ -86,7 +86,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
       const setIfEmpty = (key, value) => {
         if (value === null || value === undefined || value === '') return
         const cur = form[key]
-        if (cur === null || cur === undefined || cur === '' || cur === 'Jacksonville' && key === 'city' || cur === 'FL' && key === 'state') {
+        if (cur === null || cur === undefined || cur === '') {
           patch[key] = value
         }
       }
@@ -345,7 +345,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2 space-y-2">
               <div className="flex items-end gap-2">
-                <Input label="Address" required value={form.address} onChange={e => update({ address: e.target.value })} containerClassName="flex-1" />
+                <Input label="Address" required placeholder="Street address only" hint="Fill City & Zip below before looking up for best results" value={form.address} onChange={e => update({ address: e.target.value })} containerClassName="flex-1" />
                 <button
                   type="button"
                   onClick={runLookup}
@@ -404,7 +404,7 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                 </div>
               )}
             </div>
-            <Input label="City" value={form.city} onChange={e => update({ city: e.target.value })} />
+            <Input label="City" placeholder="e.g. Jacksonville" value={form.city} onChange={e => update({ city: e.target.value })} />
             <Input label="State" value={form.state} onChange={e => update({ state: e.target.value })} />
             <Input label="Zip Code" value={form.zip_code} onChange={e => update({ zip_code: e.target.value })} />
             <Select label="Property Type" placeholder="Select…" options={PROPERTY_TYPES} value={form.property_type} onChange={e => update({ property_type: e.target.value })} />
