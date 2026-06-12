@@ -279,10 +279,17 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
       title={lead ? 'Edit Lead' : 'New Lead'}
       size="lg"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSubmit} loading={saving}>{lead ? 'Save Changes' : 'Create Lead'}</Button>
-        </>
+        <div className="flex flex-col gap-2 w-full">
+          {error && (
+            <div className="p-2 bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)] text-[12px] rounded">
+              {error}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button onClick={handleSubmit} loading={saving}>{lead ? 'Save Changes' : 'Create Lead'}</Button>
+          </div>
+        </div>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -358,9 +365,9 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
                 <div className={`text-[11.5px] px-2 py-1 rounded ${
                   lookupNotice.kind === 'ok'
                     ? 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
-                    : 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]'
+                    : 'bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]'
                 }`}>
-                  {lookupNotice.text}
+                  {lookupNotice.kind === 'err' ? `⚠ ${lookupNotice.text} You can still create the lead manually.` : lookupNotice.text}
                 </div>
               )}
               {duplicates.length > 0 && (
