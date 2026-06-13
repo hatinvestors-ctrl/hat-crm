@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Button from '../ui/Button'
 import { logTaskComment } from '../../lib/taskHelpers'
 
-export default function TaskComment({ taskId, userId, onPosted }) {
+export default function TaskComment({ taskId, userId, workspaceId, onPosted }) {
   const [text, setText] = useState('')
   const [posting, setPosting] = useState(false)
 
@@ -10,6 +10,17 @@ export default function TaskComment({ taskId, userId, onPosted }) {
     if (!text.trim()) return
     setPosting(true)
     await logTaskComment(taskId, userId, text)
+    fetch('/.netlify/functions/notify-task-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task_id: taskId,
+        workspace_id: workspaceId,
+        actor_user_id: userId,
+        event: 'comment',
+        extra: { comment: text.trim() },
+      }),
+    }).catch(() => {})
     setText('')
     setPosting(false)
     onPosted?.()

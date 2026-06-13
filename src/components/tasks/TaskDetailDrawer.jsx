@@ -285,7 +285,7 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
             {/* Comments + Activity */}
             <div className="pt-2 border-t border-[color:var(--color-line)] space-y-3">
               <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Activity</div>
-              {canEdit && <TaskComment taskId={task.id} userId={userId} onPosted={() => setActivityRefresh(v => v + 1)} />}
+              {canEdit && <TaskComment taskId={task.id} userId={userId} workspaceId={workspaceId} onPosted={() => setActivityRefresh(v => v + 1)} />}
               <TaskActivity taskId={task.id} refreshKey={activityRefresh} />
             </div>
 
