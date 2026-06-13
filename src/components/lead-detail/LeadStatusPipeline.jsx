@@ -33,13 +33,11 @@ const DATE_REQUIRED = {
     helper: 'The lead will show up in Follow-Up Today and Past Follow-Ups views on/after that date.',
     defaultToToday: false,
   },
-  offer_signed: {
-    field: 'contract_signed_date',
-    title: 'Contract Sign Date',
-    label: 'When was the contract signed?',
-    helper: 'This date is saved on the lead for your records.',
-    defaultToToday: true,
-  },
+}
+
+// Statuses that auto-set a date field to today without prompting.
+const AUTO_DATE_TODAY = {
+  offer_signed: 'contract_signed_date',
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -68,6 +66,11 @@ export default function LeadStatusPipeline({ lead, members, userId, workspaceId,
 
   const onPick = (newStatus) => {
     if (newStatus === lead.status) return
+    const autoField = AUTO_DATE_TODAY[newStatus]
+    if (autoField) {
+      apply(newStatus, { [autoField]: lead[autoField] || todayISO() })
+      return
+    }
     const cfg = DATE_REQUIRED[newStatus]
     if (cfg) {
       const existing = lead[cfg.field] || (cfg.defaultToToday ? todayISO() : '')
