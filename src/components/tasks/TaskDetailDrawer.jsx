@@ -77,6 +77,22 @@ export default function TaskDetailDrawer({ open, taskId, onClose, onChanged, onD
       }
     }
 
+    // Notify creator + assignees of the change (skip pure assignee-only patches — already handled above)
+    const changedFields = Object.keys(changes)
+    const notifyEvent = changedFields.includes('status') ? 'status_change'
+      : changedFields.every(f => f === 'assignee_ids') ? null
+      : 'field_change'
+    if (notifyEvent) {
+      const extra = notifyEvent === 'status_change'
+        ? { old_status: before.status, new_status: data.status }
+        : { description: `${changedFields.join(', ')} updated` }
+      fetch('/.netlify/functions/notify-task-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: task.id, workspace_id: workspaceId, actor_user_id: userId, event: notifyEvent, extra }),
+      }).catch(() => {})
+    }
+
     setActivityRefresh(v => v + 1)
     onChanged?.(data)
   }
