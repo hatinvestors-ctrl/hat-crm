@@ -188,3 +188,39 @@ export const ACTIVITY_TRACKED_FIELDS = [
   'follow_up_date',
   'contract_signed_date',
 ]
+
+export const AGENT_TYPES = [
+  { value: 'realtor',          label: 'Realtor' },
+  { value: 'wholesaler',       label: 'Wholesaler' },
+  { value: 'lender',           label: 'Lender' },
+  { value: 'title',            label: 'Title' },
+  { value: 'insurance',        label: 'Insurance' },
+  { value: 'contractor',       label: 'Contractor' },
+  { value: 'property_manager', label: 'Property Manager' },
+]
+
+export const RELATIONSHIP_STATUSES = [
+  { value: 'new',            label: 'New',            tone: 'neutral' },
+  { value: 'contacted',      label: 'Contacted',      tone: 'accent' },
+  { value: 'active',         label: 'Active',         tone: 'accent' },
+  { value: 'warm',           label: 'Warm',           tone: 'success' },
+  { value: 'high_value',     label: 'High Value',     tone: 'success' },
+  { value: 'dormant',        label: 'Dormant',        tone: 'warn' },
+  { value: 'do_not_contact', label: 'Do Not Contact', tone: 'danger' },
+]
+
+export const SCENARIO_TYPES = [
+  { value: 'introduction', label: 'Introduction' },
+  { value: 'reactivation', label: 'Reactivation' },
+  { value: 'post_close',   label: 'Post-Close' },
+  { value: 'check_in',     label: 'Check-In' },
+  { value: 'custom',       label: 'Custom' },
+]
+
+export const AI_SCENARIO_TYPES = [
+  { value: 'intro',        label: 'Introduction' },
+  { value: 'check_in',     label: 'Check-In' },
+  { value: 'reactivation', label: 'Reactivation' },
+  { value: 'post_close',   label: 'Post-Close' },
+  { value: 'passed_deal',  label: 'Passed Deal' },
+]
