@@ -1,6 +1,17 @@
 // src/components/agents/AgentTable.jsx
+import { AGENT_TYPES, RELATIONSHIP_STATUSES } from '../../lib/constants'
 
 const STATUS_DAYS = 30
+
+const REL_STATUS_COLORS = {
+  new:            'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)]',
+  contacted:      'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]',
+  active:         'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]',
+  warm:           'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
+  high_value:     'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)] font-semibold',
+  dormant:        'bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]',
+  do_not_contact: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]',
+}
 
 function contactStatus(lastContactedAt) {
   if (!lastContactedAt) return { label: 'Never contacted', cls: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]' }
@@ -26,6 +37,8 @@ export default function AgentTable({ agents, selected, onToggle, onToggleAll, le
               />
             </th>
             <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Agent</th>
+            <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Type</th>
+            <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Relationship</th>
             <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Email</th>
             <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Leads</th>
             <th className="px-3 py-2.5 text-left text-[10.5px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Last Contacted</th>
@@ -33,7 +46,9 @@ export default function AgentTable({ agents, selected, onToggle, onToggleAll, le
         </thead>
         <tbody>
           {agents.map(agent => {
-            const status = contactStatus(agent.last_contacted_at)
+            const contactBadge = contactStatus(agent.last_contacted_at)
+            const relStatus = RELATIONSHIP_STATUSES.find(s => s.value === agent.relationship_status)
+            const agentType = AGENT_TYPES.find(t => t.value === agent.agent_type)
             return (
               <tr
                 key={agent.id}
@@ -49,14 +64,30 @@ export default function AgentTable({ agents, selected, onToggle, onToggleAll, le
                   />
                 </td>
                 <td className="px-3 py-2.5">
-                  <div className="font-medium text-[color:var(--color-text)]">{agent.name || '—'}</div>
+                  <div className="flex items-center gap-1.5">
+                    {agent.is_strategic && <span title="Strategic" className="text-[13px]">⭐</span>}
+                    <span className="font-medium text-[color:var(--color-text)]">{agent.name || '—'}</span>
+                  </div>
                   {agent.brokerage && <div className="text-[11px] text-[color:var(--color-text-dim)]">{agent.brokerage}</div>}
+                </td>
+                <td className="px-3 py-2.5 text-[11px] text-[color:var(--color-text-muted)]">
+                  {agentType?.label || 'Realtor'}
+                </td>
+                <td className="px-3 py-2.5">
+                  {relStatus && (
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] ${REL_STATUS_COLORS[relStatus.value] || ''}`}>
+                      {relStatus.label}
+                    </span>
+                  )}
+                  {!relStatus && (
+                    <span className="text-[11px] text-[color:var(--color-text-dim)]">New</span>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{agent.email || '—'}</td>
                 <td className="px-3 py-2.5 text-center text-[color:var(--color-text-muted)]">{leadCounts?.[agent.id] ?? 0}</td>
                 <td className="px-3 py-2.5">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${status.cls}`}>
-                    {status.label}
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${contactBadge.cls}`}>
+                    {contactBadge.label}
                   </span>
                 </td>
               </tr>
@@ -64,7 +95,7 @@ export default function AgentTable({ agents, selected, onToggle, onToggleAll, le
           })}
           {agents.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-8 text-center text-[12px] text-[color:var(--color-text-dim)]">
+              <td colSpan={7} className="px-3 py-8 text-center text-[12px] text-[color:var(--color-text-dim)]">
                 No agents yet. Click "Sync from leads" to extract agents from your leads.
               </td>
             </tr>
