@@ -8,6 +8,7 @@ import AddAgentModal from './AddAgentModal'
 import AgentContactsSection from './AgentContactsSection'
 import AgentProfileSection from './AgentProfileSection'
 import AgentDealsSection from './AgentDealsSection'
+import AgentScenarioPanel from './AgentScenarioPanel'
 import { supabase } from '../../lib/supabase'
 
 function lastContactedBadge(lastContactedAt) {
@@ -134,6 +135,15 @@ export default function AgentDetailDrawer({
                 <div>
                   <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Linked Deals</div>
                   <AgentDealsSection agent={agent} workspaceId={workspaceId} canEdit={canEdit} />
+                </div>
+
+                <div className="pt-3 border-t border-[color:var(--color-line)]">
+                  <AgentScenarioPanel
+                    agent={agent}
+                    workspaceId={workspaceId}
+                    userId={userId}
+                    canEdit={canEdit}
+                  />
                 </div>
 
                 {/* Notes */}
