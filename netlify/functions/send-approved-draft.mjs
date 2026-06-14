@@ -175,7 +175,7 @@ export default async (req) => {
         const nextStep = nextSteps[0]
 
         if (nextStep) {
-          const nextDate = new Date()
+          const nextDate = new Date(now)
           nextDate.setDate(nextDate.getDate() + nextStep.day_offset)
           await sbPost('scheduled_messages', {
             workspace_id,
