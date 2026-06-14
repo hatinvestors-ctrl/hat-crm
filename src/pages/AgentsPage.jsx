@@ -1,6 +1,6 @@
 // src/pages/AgentsPage.jsx
 import { useEffect, useState, useMemo } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { syncAgentsFromLeads, sendAgentEmails } from '../lib/agentOutreach'
 import { AGENT_TYPES, RELATIONSHIP_STATUSES } from '../lib/constants'
@@ -152,6 +152,30 @@ export default function AgentsPage() {
           </div>
         }
       />
+
+      {/* Sub-nav tabs */}
+      <div className="border-b border-[color:var(--color-line)] px-4 flex gap-1">
+        {[
+          { to: `/w/${workspaceId}/agents`,           label: 'Agents',    end: true },
+          { to: `/w/${workspaceId}/agents/scenarios`, label: 'Scenarios', end: false },
+          { to: `/w/${workspaceId}/agents/drafts`,    label: 'Drafts',    end: false },
+        ].map(tab => (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            end={tab.end}
+            className={({ isActive }) =>
+              `px-3 py-2 text-[13px] font-medium border-b-2 transition-colors ${
+                isActive
+                  ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)]'
+                  : 'border-transparent text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+              }`
+            }
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </div>
 
       <div className="p-4 flex flex-col gap-4">
         {/* Contact filters */}
