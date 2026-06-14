@@ -6,6 +6,8 @@ import AgentNotesSection from './AgentNotesSection'
 import AgentActivityFeed from './AgentActivityFeed'
 import AddAgentModal from './AddAgentModal'
 import AgentContactsSection from './AgentContactsSection'
+import AgentProfileSection from './AgentProfileSection'
+import AgentDealsSection from './AgentDealsSection'
 import { supabase } from '../../lib/supabase'
 
 function lastContactedBadge(lastContactedAt) {
@@ -121,6 +123,18 @@ export default function AgentDetailDrawer({
                   canEdit={canEdit}
                   onAgentUpdated={handleAgentUpdated}
                 />
+
+                {/* Profile */}
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Profile</div>
+                  <AgentProfileSection agent={agent} canEdit={canEdit} onUpdated={handleAgentUpdated} />
+                </div>
+
+                {/* Linked Deals */}
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-2">Linked Deals</div>
+                  <AgentDealsSection agent={agent} workspaceId={workspaceId} canEdit={canEdit} />
+                </div>
 
                 {/* Notes */}
                 <div className="flex-1">
