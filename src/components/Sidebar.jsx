@@ -53,6 +53,7 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
   const [hotCount, setHotCount] = useState(0)
   const [triageCount, setTriageCount] = useState(0)
   const [myOpenTaskCount, setMyOpenTaskCount] = useState(0)
+  const [draftsPendingCount, setDraftsPendingCount] = useState(0)
 
   useEffect(() => {
     if (!workspaceId) return
@@ -90,6 +91,20 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
       })
     return () => { cancel = true }
   }, [workspaceId, profile?.id])
+
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancel = false
+    supabase
+      .from('scheduled_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'draft_created')
+      .then(({ count }) => {
+        if (!cancel) setDraftsPendingCount(count || 0)
+      })
+    return () => { cancel = true }
+  }, [workspaceId])
 
   return (
     <>
@@ -163,6 +178,14 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
         <NavLink to={`${base}/agents`} className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">{ICONS.agents}</span>
           <span className="flex-1">Agents</span>
+          {draftsPendingCount > 0 && (
+            <span
+              title={`${draftsPendingCount} draft${draftsPendingCount === 1 ? '' : 's'} pending review`}
+              className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-[color:var(--color-accent)] text-white tabular-nums"
+            >
+              {draftsPendingCount}
+            </span>
+          )}
         </NavLink>
         {userRole === 'admin' && (
           <NavLink to={`${base}/projects`} className={navItemClasses}>

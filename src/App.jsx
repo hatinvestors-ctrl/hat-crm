@@ -11,6 +11,8 @@ import InboxPage from './pages/InboxPage'
 import LeadsPage from './pages/LeadsPage'
 import LeadDetailPage from './pages/LeadDetailPage'
 import AgentsPage from './pages/AgentsPage'
+import ScenariosPage from './pages/ScenariosPage'
+import DraftsInboxPage from './pages/DraftsInboxPage'
 import TasksPage from './pages/TasksPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
@@ -55,6 +57,8 @@ export default function App() {
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
         <Route path="agents" element={<AgentsPage />} />
+        <Route path="agents/scenarios" element={<ScenariosPage />} />
+        <Route path="agents/drafts" element={<DraftsInboxPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="tasks/:taskId" element={<TasksPage />} />
         <Route path="projects" element={<ProjectsPage />} />
