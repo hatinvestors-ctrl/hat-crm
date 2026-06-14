@@ -144,7 +144,7 @@ export default function DraftsInboxPage() {
                 className={`w-full text-left px-4 py-3 border-b border-[color:var(--color-line)] hover:bg-[color:var(--color-bg-elev)] transition-colors ${selected?.id === d.id ? 'bg-[color:var(--color-bg-elev)]' : ''}`}
               >
                 <div className="text-[12.5px] font-medium text-[color:var(--color-text)] truncate">{d.agent?.name || '—'}</div>
-                <div className="text-[11.5px] text-[color:var(--color-text-dim)] truncate mt-0.5">{d.subject}</div>
+                <div className="text-[11.5px] text-[color:var(--color-text-dim)] truncate mt-0.5">{d.edited_subject || d.subject}</div>
                 <div className="text-[11px] text-[color:var(--color-text-faint)] mt-1">Due {formatDate(d.scheduled_message?.scheduled_for)}</div>
               </button>
             ))
