@@ -35,6 +35,7 @@ export default function ScenariosPage() {
   const [form, setForm] = useState({ name: '', description: '', type: 'introduction' })
   const [steps, setSteps] = useState([emptyStep(1)])
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   const [scenarioSteps, setScenarioSteps] = useState({})
 
@@ -78,17 +79,20 @@ export default function ScenariosPage() {
   const save = async () => {
     if (!form.name.trim()) return
     setSaving(true)
+    setSaveError(null)
     try {
       let scenarioId = editing?.id
       if (!scenarioId) {
-        const { data } = await supabase.from('outreach_scenarios').insert({ workspace_id: workspaceId, created_by: userId, ...form }).select('id').single()
+        const { data, error } = await supabase.from('outreach_scenarios').insert({ workspace_id: workspaceId, created_by: userId, ...form }).select('id').single()
+        if (error) throw new Error(error.message)
         scenarioId = data.id
       } else {
-        await supabase.from('outreach_scenarios').update({ ...form, updated_at: new Date().toISOString() }).eq('id', scenarioId)
+        const { error } = await supabase.from('outreach_scenarios').update({ ...form, updated_at: new Date().toISOString() }).eq('id', scenarioId)
+        if (error) throw new Error(error.message)
         await supabase.from('scenario_steps').delete().eq('scenario_id', scenarioId)
       }
       for (const step of steps) {
-        await supabase.from('scenario_steps').insert({
+        const { error } = await supabase.from('scenario_steps').insert({
           scenario_id: scenarioId,
           workspace_id: workspaceId,
           step_number: step.step_number,
@@ -103,9 +107,12 @@ export default function ScenariosPage() {
           min_days_since_last_contact: Number(step.min_days_since_last_contact) || 7,
           stop_on_reply: step.stop_on_reply,
         })
+        if (error) throw new Error(error.message)
       }
       setModalOpen(false)
       load()
+    } catch (err) {
+      setSaveError(err.message)
     } finally {
       setSaving(false)
     }
@@ -195,6 +202,9 @@ export default function ScenariosPage() {
         }
       >
         <div className="space-y-4">
+          {saveError && (
+            <div className="text-[12px] text-[color:var(--color-danger-text)] bg-[color:var(--color-danger-soft)] px-3 py-2 rounded">{saveError}</div>
+          )}
           <div>
             <label className={labelCls}>Name</label>
             <input className={inputCls + ' mt-1'} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. New Realtor Intro" />
