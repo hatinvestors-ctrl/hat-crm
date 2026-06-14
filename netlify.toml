@@ -12,6 +12,9 @@
 [functions."generate-report"]
   timeout = 120
 
+[functions."process-agent-sequences"]
+  schedule = "0 13 * * *"
+
 # SPA fallback. The Netlify CLI/runtime routes /.netlify/functions/* to functions
 # automatically — no redirect needed for that.
 [[redirects]]
