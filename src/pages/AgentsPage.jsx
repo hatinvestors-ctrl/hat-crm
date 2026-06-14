@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { syncAgentsFromLeads, sendAgentEmails } from '../lib/agentOutreach'
+import { AGENT_TYPES, RELATIONSHIP_STATUSES } from '../lib/constants'
 import Topbar from '../components/Topbar'
 import Button from '../components/ui/Button'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -11,10 +12,10 @@ import AgentEmailModal from '../components/agents/AgentEmailModal'
 import AddAgentModal from '../components/agents/AddAgentModal'
 import AgentDetailDrawer from '../components/agents/AgentDetailDrawer'
 
-const FILTER_OPTIONS = [
+const CONTACT_FILTERS = [
   { value: 'all',   label: 'All agents' },
   { value: 'never', label: 'Never contacted' },
-  { value: 'due',   label: 'Due for follow-up (30+ days)' },
+  { value: 'due',   label: 'Due 30+ days' },
 ]
 
 export default function AgentsPage() {
@@ -25,6 +26,9 @@ export default function AgentsPage() {
   const [syncing, setSyncing]             = useState(false)
   const [selected, setSelected]           = useState(new Set())
   const [filter, setFilter]               = useState('all')
+  const [typeFilter, setTypeFilter]       = useState('')
+  const [relFilter, setRelFilter]         = useState('')
+  const [strategicOnly, setStrategicOnly] = useState(false)
   const [brokFilter, setBrokFilter]       = useState('')
   const [emailModal, setEmailModal]       = useState(false)
   const [addModal, setAddModal]           = useState(false)
@@ -68,12 +72,15 @@ export default function AgentsPage() {
         return Math.floor((Date.now() - new Date(a.last_contacted_at)) / 86400000) > 30
       })
     }
+    if (typeFilter) list = list.filter(a => (a.agent_type || 'realtor') === typeFilter)
+    if (relFilter)  list = list.filter(a => (a.relationship_status || 'new') === relFilter)
+    if (strategicOnly) list = list.filter(a => a.is_strategic)
     if (brokFilter.trim()) {
       const q = brokFilter.toLowerCase()
       list = list.filter(a => a.brokerage?.toLowerCase().includes(q) || a.name?.toLowerCase().includes(q))
     }
     return list
-  }, [agents, filter, brokFilter])
+  }, [agents, filter, typeFilter, relFilter, strategicOnly, brokFilter])
 
   const toggleAgent = id => setSelected(prev => {
     const next = new Set(prev)
@@ -103,9 +110,9 @@ export default function AgentsPage() {
     }
   }
 
-  const handleSend = async ({ template, subject }) => {
+  const handleSend = async ({ template, subject, body }) => {
     const agentIds = [...selected]
-    const result = await sendAgentEmails({ workspaceId, userId: user.id, agentIds, template, subject })
+    const result = await sendAgentEmails({ workspaceId, userId: user.id, agentIds, template, subject, body })
     setSelected(new Set())
     await load()
     setToast(`Sent to ${result.sent} agent${result.sent === 1 ? '' : 's'}${result.failed ? `. ${result.failed} failed.` : '.'}`)
@@ -117,6 +124,16 @@ export default function AgentsPage() {
   }
 
   const selectedCount = [...selected].filter(id => filtered.some(a => a.id === id)).length
+  const selectedAgent = selectedCount === 1
+    ? agents.find(a => [...selected].find(id => id === a.id))
+    : null
+
+  const filterPillCls = (active) =>
+    `px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+      active
+        ? 'bg-[color:var(--color-accent)] text-white'
+        : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+    }`
 
   return (
     <>
@@ -137,21 +154,23 @@ export default function AgentsPage() {
       />
 
       <div className="p-4 flex flex-col gap-4">
-        {/* Filters */}
+        {/* Contact filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {FILTER_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setFilter(opt.value)}
-              className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
-                filter === opt.value
-                  ? 'bg-[color:var(--color-accent)] text-white'
-                  : 'bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
-              }`}
-            >
+          {CONTACT_FILTERS.map(opt => (
+            <button key={opt.value} onClick={() => setFilter(opt.value)} className={filterPillCls(filter === opt.value)}>
               {opt.label}
             </button>
           ))}
+
+          {/* Strategic toggle */}
+          <button
+            onClick={() => setStrategicOnly(v => !v)}
+            className={filterPillCls(strategicOnly)}
+            title="Strategic contacts only"
+          >
+            ⭐ Strategic
+          </button>
+
           <input
             type="text"
             value={brokFilter}
@@ -159,6 +178,27 @@ export default function AgentsPage() {
             placeholder="Filter by name or brokerage"
             className="px-3 py-1 text-[12px] rounded-full bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] w-44"
           />
+        </div>
+
+        {/* Type + relationship filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setTypeFilter('')} className={filterPillCls(!typeFilter)}>
+            All types
+          </button>
+          {AGENT_TYPES.map(t => (
+            <button key={t.value} onClick={() => setTypeFilter(typeFilter === t.value ? '' : t.value)} className={filterPillCls(typeFilter === t.value)}>
+              {t.label}
+            </button>
+          ))}
+          <span className="text-[color:var(--color-line)] mx-1">|</span>
+          <button onClick={() => setRelFilter('')} className={filterPillCls(!relFilter)}>
+            All statuses
+          </button>
+          {RELATIONSHIP_STATUSES.map(s => (
+            <button key={s.value} onClick={() => setRelFilter(relFilter === s.value ? '' : s.value)} className={filterPillCls(relFilter === s.value)}>
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {toast && (
@@ -188,6 +228,9 @@ export default function AgentsPage() {
       <AgentEmailModal
         open={emailModal}
         onClose={() => setEmailModal(false)}
+        agentCount={selectedCount}
+        agent={selectedAgent}
+        workspaceId={workspaceId}
         onSend={handleSend}
       />
 
