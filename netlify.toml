@@ -12,6 +12,9 @@
 [functions."generate-report"]
   timeout = 120
 
+[functions."generate-ai-notes"]
+  timeout = 60
+
 [functions."process-agent-sequences"]
   schedule = "0 13 * * *"
 
