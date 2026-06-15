@@ -10,7 +10,8 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
   const [saving,     setSaving]     = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError,   setGenError]   = useState(null)
-  const [confirm,    setConfirm]    = useState(false)  // true = show overwrite confirm
+  const [confirm,    setConfirm]    = useState(false)
+  const [collapsed,  setCollapsed]  = useState(false)
 
   useEffect(() => { setDraft(lead.notes || '') }, [lead.notes])
 
@@ -63,32 +64,50 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
   return (
     <Card
       title="Notes"
-      action={canEdit && !editing && (
+      action={
         <div className="flex items-center gap-2">
+          {canEdit && !editing && (
+            <>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="flex items-center gap-1 text-[12px] text-[color:var(--color-accent-text)] hover:opacity-80 transition-opacity disabled:opacity-40"
+              >
+                {generating ? (
+                  <>
+                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    Generating…
+                  </>
+                ) : '✦ AI Notes'}
+              </button>
+              <button
+                onClick={() => setEditing(true)}
+                className="text-[12px] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors"
+              >
+                {lead.notes ? 'Edit' : '+ Add'}
+              </button>
+            </>
+          )}
+          {/* Collapse toggle */}
           <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex items-center gap-1 text-[12px] text-[color:var(--color-accent-text)] hover:opacity-80 transition-opacity disabled:opacity-40"
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand notes' : 'Collapse notes'}
+            className="flex items-center justify-center w-6 h-6 rounded text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
           >
-            {generating ? (
-              <>
-                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-                </svg>
-                Generating…
-              </>
-            ) : '✦ AI Notes'}
-          </button>
-          <button
-            onClick={() => setEditing(true)}
-            className="text-[12px] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors"
-          >
-            {lead.notes ? 'Edit' : '+ Add notes'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              className="w-3.5 h-3.5 transition-transform duration-200"
+              style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         </div>
-      )}
+      }
     >
+      {collapsed ? null : (<>
+
       {/* Overwrite confirm banner */}
       {confirm && (
         <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">
@@ -139,6 +158,8 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       ) : (
         <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">No notes yet.</p>
       )}
+
+      </>)}
     </Card>
   )
 }

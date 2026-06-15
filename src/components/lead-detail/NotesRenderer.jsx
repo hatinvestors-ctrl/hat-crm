@@ -1,10 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 
 function parseNotes(text) {
   if (!text?.trim()) return null
-  // Notes are delimited by ===== lines; section name sits between two separators
   const chunks = text.split(/={5,}/).map(c => c.trim()).filter(Boolean)
   const sections = []
   for (let i = 0; i + 1 < chunks.length; i += 2) {
@@ -39,8 +38,6 @@ function parseScenarios(body) {
     const title = lines[0]?.trim() || ''
     const verdictLine = lines.find(l => /^Verdict:/i.test(l.trim()))
     const verdict = verdictLine?.replace(/^Verdict:\s*/i, '').trim() || ''
-
-    // Extract key metric for this scenario type
     let metric = null
     const titleU = title.toUpperCase()
     if (titleU.includes('BRRRR')) {
@@ -48,12 +45,11 @@ function parseScenarios(body) {
       if (m) metric = { label: 'Cash left in', value: '$' + m[1] }
     } else if (titleU.includes('FLIP')) {
       const m = chunk.match(/Net (?:flip )?profit:\s*(?:approx|~)?\s*(-?\$[0-9,]+|-[0-9,]+)/i)
-      if (m) metric = { label: 'Net profit', value: m[1].startsWith('-') ? m[1] : m[1] }
+      if (m) metric = { label: 'Net profit', value: m[1] }
     } else if (titleU.includes('RENTAL')) {
       const m = chunk.match(/Cap rate.*?:\s*~?([0-9.]+)%/i)
       if (m) metric = { label: 'Cap rate', value: m[1] + '%' }
     }
-
     return { title, verdict, metric }
   })
 }
@@ -79,17 +75,17 @@ function verdictStyle(text = '') {
 
 // ─── Section renderers ────────────────────────────────────────────────────────
 
+function PlainText({ body }) {
+  return <p className="text-[12.5px] text-[color:var(--color-text-muted)] leading-relaxed whitespace-pre-wrap">{body}</p>
+}
+
 function SnapshotSection({ body }) {
   const fields = body.split('\n').filter(Boolean).reduce((acc, line) => {
     const ci = line.indexOf(':')
-    if (ci > 0 && ci < 22) {
-      acc.push({ key: line.slice(0, ci).trim(), val: line.slice(ci + 1).trim() })
-    }
+    if (ci > 0 && ci < 22) acc.push({ key: line.slice(0, ci).trim(), val: line.slice(ci + 1).trim() })
     return acc
   }, [])
-
   if (fields.length < 2) return <PlainText body={body} />
-
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
       {fields.map(({ key, val }, i) => (
@@ -104,25 +100,20 @@ function SnapshotSection({ body }) {
 
 function ARVSection({ body }) {
   const arv = extractARV(body)
-  const lines = body.split('\n').filter(Boolean)
-
   return (
     <div className="space-y-3">
       {arv && (
         <div className="p-3 rounded-lg bg-[color:var(--color-bg)] border border-[color:var(--color-line)]">
           <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-3">ARV Range</div>
-          {/* Bar */}
           <div className="relative h-1.5 rounded-full bg-[color:var(--color-line)] mb-4 mx-2">
-            <div className="absolute inset-y-0 rounded-full bg-[color:var(--color-accent)] opacity-30"
+            <div className="absolute inset-y-0 rounded-full bg-[color:var(--color-accent)] opacity-25"
               style={{ left: '0%', right: '0%' }} />
             {[0, 50, 100].map((pct, i) => (
-              <div key={i} className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
-                style={{ left: `${pct}%` }}>
+              <div key={i} className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct}%` }}>
                 <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--color-accent)] border-2 border-[color:var(--color-bg)]" />
               </div>
             ))}
           </div>
-          {/* Labels */}
           <div className="flex justify-between text-center">
             {[
               { label: 'Conservative', value: arv.conservative },
@@ -130,9 +121,7 @@ function ARVSection({ body }) {
               { label: 'Aggressive', value: arv.aggressive },
             ].map(({ label, value }) => (
               <div key={label}>
-                <div className="text-[13px] font-bold text-[color:var(--color-text)]">
-                  ${(value / 1000).toFixed(0)}K
-                </div>
+                <div className="text-[13px] font-bold text-[color:var(--color-text)]">${(value / 1000).toFixed(0)}K</div>
                 <div className="text-[9.5px] text-[color:var(--color-text-dim)]">{label}</div>
               </div>
             ))}
@@ -148,24 +137,19 @@ function ScoreSection({ body }) {
   const score = extractScore(body)
   const conf = extractConfidence(body)
   const driverLines = body.split('\n').filter(l => /^\s*[+\-]\d+ pts/.test(l))
-  const otherLines = body.split('\n').filter(l =>
-    l.trim() && !/^\s*[+\-]\d+ pts/.test(l) && !/^Score:/.test(l.trim()) && !/^Deal Confidence:/.test(l.trim()) && !/^Score drivers:/.test(l.trim()) && !/^Promotion path:/.test(l.trim())
-  )
-
   return (
     <div className="space-y-3">
-      {/* Score ring + confidence bar */}
       <div className="flex items-center gap-4">
         {score != null && (
-          <div className="relative shrink-0 w-14 h-14">
-            <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
+          <div className="relative shrink-0 w-16 h-16">
+            <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--color-line)" strokeWidth="3" />
               <circle cx="18" cy="18" r="15.9" fill="none"
                 stroke={scoreColor(score)} strokeWidth="3"
                 strokeDasharray={`${score} ${100 - score}`} strokeLinecap="round" />
             </svg>
             <span className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[14px] font-bold leading-none" style={{ color: scoreColor(score) }}>{score}</span>
+              <span className="text-[15px] font-bold leading-none" style={{ color: scoreColor(score) }}>{score}</span>
               <span className="text-[9px] text-[color:var(--color-text-dim)]">/100</span>
             </span>
           </div>
@@ -182,14 +166,12 @@ function ScoreSection({ body }) {
               <div className="h-full rounded-full" style={{
                 width: `${conf.pct}%`,
                 backgroundColor: conf.level === 'HIGH' ? 'var(--color-success)' : conf.level === 'MEDIUM' ? 'var(--color-warn)' : 'var(--color-danger)',
-                transition: 'width 0.6s ease'
+                transition: 'width 0.6s ease',
               }} />
             </div>
           </div>
         )}
       </div>
-
-      {/* Score drivers */}
       {driverLines.length > 0 && (
         <div className="space-y-1">
           {driverLines.map((l, i) => {
@@ -214,16 +196,14 @@ function ScoreSection({ body }) {
 
 function DealMathSection({ body }) {
   const scenarios = parseScenarios(body)
-  const maoLine = body.split('\n').find(l => /^MAO:/i.test(l.trim()))
+  const maoLine    = body.split('\n').find(l => /^MAO:/i.test(l.trim()))
   const spreadLine = body.split('\n').find(l => /^Gross spread/i.test(l.trim()))
-
   return (
     <div className="space-y-3">
-      {/* Quick metrics row */}
       {(maoLine || spreadLine) && (
         <div className="grid grid-cols-2 gap-2">
           {[maoLine, spreadLine].filter(Boolean).map((line, i) => {
-            const ci = line.indexOf(':')
+            const ci  = line.indexOf(':')
             const key = line.slice(0, ci).trim()
             const val = line.slice(ci + 1).trim()
             return (
@@ -235,8 +215,6 @@ function DealMathSection({ body }) {
           })}
         </div>
       )}
-
-      {/* Scenario cards */}
       {scenarios.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {scenarios.map((s, i) => {
@@ -256,7 +234,7 @@ function DealMathSection({ body }) {
                 )}
                 {s.verdict && (
                   <p className="text-[10px] leading-relaxed opacity-75 mt-auto" style={{ color: vs.txt }}>
-                    {s.verdict.replace(/^[A-Z\s]+[-–]\s*/,'').replace(/^[A-Z\s]+\s*\.\s*/,'').slice(0, 70)}
+                    {s.verdict.replace(/^[A-Z\s]+[-–]\s*/, '').slice(0, 70)}
                   </p>
                 )}
               </div>
@@ -271,24 +249,19 @@ function DealMathSection({ body }) {
 function BulletSection({ body, variant = 'success' }) {
   const items = body.split('\n').filter(l => /^\s*(\d+\.|•)/.test(l))
   if (items.length === 0) return <PlainText body={body} />
-
   const isPos = variant === 'success'
   return (
     <div className="space-y-2">
       {items.map((item, i) => {
         const text = item.replace(/^\s*(\d+\.\s*|•\s*)/, '')
-        // Split "LABEL — detail" for bold label
         const dashIdx = text.search(/\s[—-]\s/)
-        const label = dashIdx > 0 ? text.slice(0, dashIdx) : null
+        const label  = dashIdx > 0 ? text.slice(0, dashIdx) : null
         const detail = dashIdx > 0 ? text.slice(dashIdx + 3) : text
         return (
           <div key={i} className="flex items-start gap-2.5 p-2 rounded-lg"
             style={{ background: isPos ? 'var(--color-success-soft)' : 'var(--color-danger-soft)' }}>
             <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mt-0.5"
-              style={{
-                background: isPos ? 'var(--color-success)' : 'var(--color-danger)',
-                color: '#fff'
-              }}>
+              style={{ background: isPos ? 'var(--color-success)' : 'var(--color-danger)', color: '#fff' }}>
               {isPos ? '✓' : '!'}
             </span>
             <p className="text-[12px] leading-relaxed flex-1"
@@ -304,17 +277,15 @@ function BulletSection({ body, variant = 'success' }) {
 }
 
 function InsightsSection({ body }) {
-  // Split on lines starting with bullet •
   const blocks = body.split(/\n(?=•)/).filter(Boolean)
   if (blocks.length === 0) return <PlainText body={body} />
-
   return (
     <div className="space-y-2">
       {blocks.map((block, i) => {
-        const lines = block.split('\n').filter(Boolean)
+        const lines   = block.split('\n').filter(Boolean)
         const heading = lines[0].replace(/^•\s*/, '')
         const dashIdx = heading.search(/\s[—-]\s/)
-        const label = dashIdx > 0 ? heading.slice(0, dashIdx) : heading
+        const label   = dashIdx > 0 ? heading.slice(0, dashIdx) : heading
         const summary = dashIdx > 0 ? heading.slice(dashIdx + 3) : ''
         const bodyLines = lines.slice(1)
         return (
@@ -339,25 +310,19 @@ function InsightsSection({ body }) {
 }
 
 function StrategySection({ body }) {
-  const lines = body.split('\n').filter(Boolean)
+  const lines    = body.split('\n').filter(Boolean)
   const exitLine = lines.find(l => /^Best exit:/i.test(l))
   const whyLine  = lines.find(l => /^Why:/i.test(l))
-  const rest = lines.filter(l => l !== exitLine && l !== whyLine)
-
-  const exit = exitLine?.replace(/^Best exit:\s*/i, '').trim() || ''
-  const why  = whyLine?.replace(/^Why:\s*/i, '').trim() || ''
-
-  const isGo   = /BRRRR|FLIP|RENTAL/i.test(exit) && !/PASS/i.test(exit)
-  const isPass = /PASS/i.test(exit)
-
-  const color = isGo ? {
-    bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)'
-  } : isPass ? {
-    bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)'
-  } : {
-    bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)'
-  }
-
+  const rest     = lines.filter(l => l !== exitLine && l !== whyLine)
+  const exit     = exitLine?.replace(/^Best exit:\s*/i, '').trim() || ''
+  const why      = whyLine?.replace(/^Why:\s*/i, '').trim() || ''
+  const isGo     = /BRRRR|FLIP|RENTAL/i.test(exit) && !/PASS/i.test(exit)
+  const isPass   = /PASS/i.test(exit)
+  const color    = isGo
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)' }
+    : isPass
+    ? { bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)' }
+    : { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
   return (
     <div className="space-y-2">
       <div className="rounded-lg border p-3 flex items-start gap-3"
@@ -377,18 +342,16 @@ function StrategySection({ body }) {
 
 function ActionSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
-  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
-
+  const get   = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
   const action = get('Action')
   const offer  = get('Offer range')
   const walk   = get('Walk')
   const follow = get('Follow-up')
-
-  const scriptIdx = lines.findIndex(l => /^Agent call:/i.test(l.trim()))
+  const scriptIdx  = lines.findIndex(l => /^Agent call:/i.test(l.trim()))
   const scriptText = scriptIdx >= 0
     ? lines.slice(scriptIdx).map(l => l.replace(/^Agent call:\s*/i, '')).join(' ').trim()
     : null
-
   return (
     <div className="space-y-2">
       {action && (
@@ -427,60 +390,110 @@ function ActionSection({ body }) {
   )
 }
 
-function PlainText({ body }) {
-  return (
-    <p className="text-[12.5px] text-[color:var(--color-text-muted)] leading-relaxed whitespace-pre-wrap">{body}</p>
-  )
-}
-
 // ─── Section registry ─────────────────────────────────────────────────────────
 
-const SECTIONS = {
-  'DEAL SNAPSHOT':                       { icon: '📊', render: s => <SnapshotSection  body={s} /> },
-  'ARV ANALYSIS & COMP SUPPORT':         { icon: '🏠', render: s => <ARVSection       body={s} /> },
-  'OPPORTUNITY SCORE & CONFIDENCE':      { icon: '🎯', render: s => <ScoreSection     body={s} /> },
-  'DEAL MATH - THREE SCENARIOS':         { icon: '💰', render: s => <DealMathSection  body={s} /> },
-  'DEAL MATH — THREE SCENARIOS':         { icon: '💰', render: s => <DealMathSection  body={s} /> },
-  'PROS - WHY THIS DEAL IS INTERESTING': { icon: '✅', render: s => <BulletSection    body={s} variant="success" /> },
-  'PROS — WHY THIS DEAL IS INTERESTING': { icon: '✅', render: s => <BulletSection    body={s} variant="success" /> },
-  'CONS - RISKS AND CONCERNS':           { icon: '⚠️', render: s => <BulletSection    body={s} variant="danger"  /> },
-  'CONS — RISKS AND CONCERNS':           { icon: '⚠️', render: s => <BulletSection    body={s} variant="danger"  /> },
-  'KEY INSIGHTS & HIDDEN SIGNALS':       { icon: '💡', render: s => <InsightsSection  body={s} /> },
-  'STRATEGY RECOMMENDATION':             { icon: '🗺️', render: s => <StrategySection  body={s} /> },
-  'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection    body={s} /> },
+const SECTION_META = {
+  'DEAL SNAPSHOT':                       { icon: '📊', render: s => <SnapshotSection body={s} /> },
+  'ARV ANALYSIS & COMP SUPPORT':         { icon: '🏠', render: s => <ARVSection      body={s} /> },
+  'OPPORTUNITY SCORE & CONFIDENCE':      { icon: '🎯', render: s => <ScoreSection    body={s} /> },
+  'DEAL MATH - THREE SCENARIOS':         { icon: '💰', render: s => <DealMathSection body={s} /> },
+  'DEAL MATH — THREE SCENARIOS':         { icon: '💰', render: s => <DealMathSection body={s} /> },
+  'PROS - WHY THIS DEAL IS INTERESTING': { icon: '✅', render: s => <BulletSection   body={s} variant="success" /> },
+  'PROS — WHY THIS DEAL IS INTERESTING': { icon: '✅', render: s => <BulletSection   body={s} variant="success" /> },
+  'CONS - RISKS AND CONCERNS':           { icon: '⚠️', render: s => <BulletSection   body={s} variant="danger"  /> },
+  'CONS — RISKS AND CONCERNS':           { icon: '⚠️', render: s => <BulletSection   body={s} variant="danger"  /> },
+  'KEY INSIGHTS & HIDDEN SIGNALS':       { icon: '💡', render: s => <InsightsSection body={s} /> },
+  'STRATEGY RECOMMENDATION':             { icon: '🗺️', render: s => <StrategySection body={s} /> },
+  'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection   body={s} /> },
+}
+
+// Tab definitions — sections are matched by name prefix
+const TABS = [
+  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^OPPORTUNITY SCORE/.test(n) },
+  { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
+  { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
+  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
+]
+
+// ─── SectionCard ──────────────────────────────────────────────────────────────
+
+function SectionCard({ name, body }) {
+  const meta = SECTION_META[name] || { icon: '📝', render: s => <PlainText body={s} /> }
+  return (
+    <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+        <span className="text-[13px]">{meta.icon}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">{name}</span>
+      </div>
+      <div className="p-3 bg-[color:var(--color-bg)]">
+        {meta.render(body)}
+      </div>
+    </div>
+  )
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function NotesRenderer({ notes }) {
+  const [activeTab, setActiveTab] = useState('summary')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
+  // Unstructured notes — plain scrollable text, no tabs
   if (!sections) {
-    // Not structured — plain scrollable text
     return (
-      <div className="max-h-[60vh] overflow-y-auto pr-1">
+      <div className="max-h-[60vh] overflow-y-auto pr-1"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--color-line) transparent' }}>
         <p className="text-[13px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{notes}</p>
       </div>
     )
   }
 
+  // Build tabs, skip any that have no matching sections
+  const tabSections = TABS.map(tab => ({
+    ...tab,
+    items: sections.filter(s => tab.match(s.name)),
+  })).filter(tab => tab.items.length > 0)
+
+  // Ensure active tab is valid
+  const validTab = tabSections.find(t => t.id === activeTab) ? activeTab : tabSections[0]?.id
+  const currentSections = tabSections.find(t => t.id === validTab)?.items || []
+
   return (
-    <div className="max-h-[72vh] overflow-y-auto space-y-2 pr-0.5"
-      style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--color-line) transparent' }}>
-      {sections.map(({ name, body }, i) => {
-        const meta = SECTIONS[name] || { icon: '📝', render: s => <PlainText body={s} /> }
-        return (
-          <div key={i} className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
-              <span className="text-[13px]">{meta.icon}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">{name}</span>
-            </div>
-            <div className="p-3 bg-[color:var(--color-bg)]">
-              {meta.render(body)}
-            </div>
-          </div>
-        )
-      })}
+    <div>
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-3 p-1 rounded-lg bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
+        {tabSections.map(tab => {
+          const isActive = tab.id === validTab
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold transition-all"
+              style={{
+                background: isActive ? 'var(--color-accent)' : 'transparent',
+                color: isActive ? '#fff' : 'var(--color-text-muted)',
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div
+        className="space-y-2 overflow-y-auto pr-0.5"
+        style={{
+          maxHeight: '55vh',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'var(--color-line) transparent',
+        }}
+      >
+        {currentSections.map(({ name, body }) => (
+          <SectionCard key={name} name={name} body={body} />
+        ))}
+      </div>
     </div>
   )
 }
