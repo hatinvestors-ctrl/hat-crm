@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
+import NotesRenderer from './NotesRenderer'
 
 export default function NotesSection({ lead, canEdit, onUpdated }) {
   const [editing,    setEditing]    = useState(false)
@@ -132,7 +133,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
           </div>
         </div>
       ) : lead.notes ? (
-        <p className="text-[13px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{lead.notes}</p>
+        <NotesRenderer notes={lead.notes} />
       ) : generating ? (
         <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis…</p>
       ) : (
