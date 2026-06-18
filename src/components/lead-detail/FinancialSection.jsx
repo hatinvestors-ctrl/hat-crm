@@ -51,12 +51,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
       await logDealAnalysis(lead.id, userId, data.analysis)
       // Pass the updated lead back so the parent re-renders with the new deal_analysis
       onUpdated?.({ ...lead, deal_analysis: data.analysis })
-      fireLeadNotification('deal_analysis', lead.id, workspaceId, userId, {
-        verdict:           data.analysis?.verdict,
-        profit:            data.analysis?.profit,
-        roi:               data.analysis?.roi,
-        total_cash_needed: data.analysis?.total_cash_needed,
-      }).catch(() => {})
+      // deal_analysis is internal — no outbound notification
     } catch (err) {
       setAnalyzeError(err.message || 'Something went wrong.')
     } finally {

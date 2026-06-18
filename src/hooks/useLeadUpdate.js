@@ -41,14 +41,6 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
         fireLeadNotification('assigned', lead.id, lead.workspace_id, userId).catch(() => {})
       }
 
-      // offer_price
-      if ('offer_price' in patch && patch.offer_price !== lead.offer_price) {
-        fireLeadNotification('offer_price', lead.id, lead.workspace_id, userId, {
-          old_value: lead.offer_price != null ? `$${Number(lead.offer_price).toLocaleString()}` : '—',
-          new_value: patch.offer_price != null ? `$${Number(patch.offer_price).toLocaleString()}` : '—',
-        }).catch(() => {})
-      }
-
       // follow_up_date
       if ('follow_up_date' in patch && patch.follow_up_date !== lead.follow_up_date) {
         fireLeadNotification('follow_up_date', lead.id, lead.workspace_id, userId, {
