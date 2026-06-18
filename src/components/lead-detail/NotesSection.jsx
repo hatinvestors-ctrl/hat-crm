@@ -43,6 +43,10 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: lead.id, lead }),
       })
+      const ct = res.headers.get('content-type') || ''
+      if (!ct.includes('application/json')) {
+        throw new Error(`Function error (${res.status}) — likely a timeout. Try again.`)
+      }
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Generation failed.')
       onUpdated?.({ ...lead, notes: data.notes })
