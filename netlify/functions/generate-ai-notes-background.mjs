@@ -319,8 +319,10 @@ async function saveNotes(leadId, notes) {
   }
 }
 
-// Background function — Netlify runs this async for up to 15 minutes.
-// Client gets 202 immediately, then polls Supabase for lead.notes to appear.
+// Background function — Netlify automatically returns 202 to the client and
+// keeps this handler alive until it resolves (up to 15 minutes).
+// IMPORTANT: Do NOT fire-and-forget. Returning early kills the Lambda before
+// Claude finishes, so notes never reach Supabase and polling times out.
 export default async (req) => {
   if (req.method !== 'POST') return new Response(null, { status: 405 })
 
@@ -328,38 +330,40 @@ export default async (req) => {
   const { lead_id, lead } = body
 
   if (!lead_id || !lead) return new Response(null, { status: 400 })
+  if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
+    return new Response(JSON.stringify({ error: 'Missing env vars' }), { status: 500, headers: HEADERS })
+  }
 
-  // Fire-and-forget — background function body runs after 202 is returned
-  ;(async () => {
-    try {
-      if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) return
+  try {
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2400,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: buildUserPrompt(lead) }],
+      }),
+    })
 
-      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2400,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: buildUserPrompt(lead) }],
-        }),
-      })
-
-      if (!claudeRes.ok) return
-
-      const claudeData = await claudeRes.json()
-      const notes = claudeData.content?.[0]?.text?.trim() || ''
-      if (!notes) return
-
-      await saveNotes(lead_id, notes)
-    } catch (err) {
-      console.error('[generate-ai-notes-background]', err.message)
+    if (!claudeRes.ok) {
+      const text = await claudeRes.text()
+      console.error('[generate-ai-notes-background] Claude error', claudeRes.status, text)
+      return new Response(JSON.stringify({ error: 'Claude failed' }), { status: 502, headers: HEADERS })
     }
-  })()
 
-  return new Response(JSON.stringify({ ok: true, queued: true }), { status: 202, headers: HEADERS })
+    const claudeData = await claudeRes.json()
+    const notes = claudeData.content?.[0]?.text?.trim() || ''
+    if (!notes) return new Response(JSON.stringify({ error: 'Empty response' }), { status: 502, headers: HEADERS })
+
+    await saveNotes(lead_id, notes)
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: HEADERS })
+  } catch (err) {
+    console.error('[generate-ai-notes-background]', err.message)
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: HEADERS })
+  }
 }
