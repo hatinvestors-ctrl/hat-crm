@@ -54,7 +54,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       const start = Date.now()
       const poll = async () => {
         if (cancelled) return
-        if (Date.now() - start > 60000) {
+        if (Date.now() - start > 120000) {
           setGenError('Taking longer than expected. Check back in a moment.')
           setGenerating(false)
           return
