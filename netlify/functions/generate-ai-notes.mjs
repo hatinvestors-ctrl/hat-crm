@@ -68,6 +68,17 @@ MAO formula: 0.75 × ARV − renovation cost
 Write ONLY the plain text notes — no JSON, no markdown headers with ##, no intro sentence. Start directly with the first section header.
 
 =====================================
+RECOMMENDED ACTION
+=====================================
+Verdict:        [BUY / PASS / WATCH]
+Strategy:       [BRRRR / Flip / Rental Hold / N/A]
+Our ARV:        $[X]  ← your calibrated number, not the seller's
+Starting Offer: $[X]  ← opening negotiation price (can walk away from if rejected)
+Target Price:   $[X]  ← MAO / the number that makes the deal work
+Max Walk-Away:  $[X]  ← absolute ceiling — do NOT pay more than this
+[If PASS: At $[X] this becomes a [strategy]. Watch for price drop to $[X].]
+
+=====================================
 DEAL SNAPSHOT
 =====================================
 Address:    [full address + ZIP]

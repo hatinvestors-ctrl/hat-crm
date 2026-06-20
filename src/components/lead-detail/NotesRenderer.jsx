@@ -340,6 +340,71 @@ function StrategySection({ body }) {
   )
 }
 
+function RecommendedActionSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+  const verdict  = get('Verdict')
+  const strategy = get('Strategy')
+  const arv      = get('Our ARV')
+  const starting = get('Starting Offer')
+  const target   = get('Target Price')
+  const maxWalk  = get('Max Walk-Away')
+  const watchLine = lines.find(l => /^\[If PASS/i.test(l.trim()) || /^At \$/i.test(l.trim()))
+
+  const isPass = /^PASS/i.test(verdict || '')
+  const isWatch = /^WATCH/i.test(verdict || '')
+  const verdictColor = isPass
+    ? { bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)' }
+    : isWatch
+    ? { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
+    : { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)' }
+
+  return (
+    <div className="space-y-2.5">
+      {verdict && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border"
+          style={{ background: verdictColor.bg, borderColor: verdictColor.bdr }}>
+          <span className="text-[22px]">{isPass ? '⛔' : isWatch ? '👀' : '✅'}</span>
+          <div>
+            <div className="text-[15px] font-black" style={{ color: verdictColor.txt }}>{verdict}</div>
+            {strategy && <div className="text-[11px] mt-0.5" style={{ color: verdictColor.txt }}>Strategy: {strategy}</div>}
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        {arv && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Our ARV</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-text)]">{arv.split('←')[0].trim()}</div>
+          </div>
+        )}
+        {starting && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Starting Offer</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{starting.split('←')[0].trim()}</div>
+          </div>
+        )}
+        {target && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">Target Price (MAO)</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-success-text)]">{target.split('←')[0].trim()}</div>
+          </div>
+        )}
+        {maxWalk && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-danger-text)] mb-0.5">Max Walk-Away</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-danger-text)]">{maxWalk.split('←')[0].trim()}</div>
+          </div>
+        )}
+      </div>
+      {watchLine && (
+        <p className="text-[11.5px] text-[color:var(--color-text-muted)] italic px-1">{watchLine.replace(/^\[|\]$/g, '')}</p>
+      )}
+    </div>
+  )
+}
+
 function ActionSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
   const get   = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
@@ -393,6 +458,7 @@ function ActionSection({ body }) {
 // ─── Section registry ─────────────────────────────────────────────────────────
 
 const SECTION_META = {
+  'RECOMMENDED ACTION':                  { icon: '🎯', render: s => <RecommendedActionSection body={s} /> },
   'DEAL SNAPSHOT':                       { icon: '📊', render: s => <SnapshotSection body={s} /> },
   'ARV ANALYSIS & COMP SUPPORT':         { icon: '🏠', render: s => <ARVSection      body={s} /> },
   'OPPORTUNITY SCORE & CONFIDENCE':      { icon: '🎯', render: s => <ScoreSection    body={s} /> },
@@ -412,7 +478,7 @@ const TABS = [
   { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^OPPORTUNITY SCORE/.test(n) },
   { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
-  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
+  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
@@ -435,7 +501,7 @@ function SectionCard({ name, body }) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function NotesRenderer({ notes }) {
-  const [activeTab, setActiveTab] = useState('summary')
+  const [activeTab, setActiveTab] = useState('action')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
   // Unstructured notes — plain scrollable text, no tabs
