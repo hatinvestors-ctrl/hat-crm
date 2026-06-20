@@ -38,40 +38,33 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
     setConfirm(false)
     setGenerating(true)
     setGenError(null)
-    const prevNotes = lead.notes  // capture before generation starts
     let cancelled = false
     generationCancelRef.current = () => { cancelled = true }
 
     try {
-      const res = await fetch('/.netlify/functions/generate-ai-notes-background', {
+      const res = await fetch('/.netlify/functions/generate-ai-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: lead.id, lead }),
       })
-      if (!res.ok) throw new Error(`Failed to start generation (${res.status}).`)
 
-      // Poll Supabase every 3s until notes change (max 60s)
-      const start = Date.now()
-      const poll = async () => {
-        if (cancelled) return
-        if (Date.now() - start > 120000) {
-          setGenError('Taking longer than expected. Check back in a moment.')
-          setGenerating(false)
-          return
-        }
-        const { data } = await supabase
-          .from('leads').select('notes, updated_at').eq('id', lead.id).single()
-        if (data?.notes && data.notes !== prevNotes) {
-          onUpdated?.({ ...lead, notes: data.notes })
-          setGenerating(false)
-        } else {
-          setTimeout(poll, 3000)
-        }
+      if (cancelled) return
+
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server error (${res.status}). Try again.`)
       }
-      setTimeout(poll, 2000)
-    } catch (err) {
-      setGenError(err.message || 'Something went wrong.')
+
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error || `Generation failed (${res.status}).`)
+
+      onUpdated?.({ ...lead, notes: data.notes })
       setGenerating(false)
+    } catch (err) {
+      if (!cancelled) {
+        setGenError(err.message || 'Something went wrong.')
+        setGenerating(false)
+      }
     }
   }
 

@@ -13,7 +13,7 @@
   timeout = 120
 
 [functions."generate-ai-notes"]
-  timeout = 60
+  timeout = 26
 
 [functions."process-agent-sequences"]
   schedule = "0 13 * * *"
