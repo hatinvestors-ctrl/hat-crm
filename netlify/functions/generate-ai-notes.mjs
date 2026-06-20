@@ -201,29 +201,7 @@ Offer Amount:   $[X]  (only if Make Offer = YES)
 Follow-Up In:   [X days — or N/A if making offer now]
 Follow-Up Trigger: [exactly what condition to re-check: price drops below $X / DOM hits X / seller reaches back out / inspection done / etc.]
 Priority:       [HIGH — act today / MEDIUM — this week / LOW — watch and wait]
-Notes for CRM:  [1-2 sentences: what to log as the internal note when updating the lead — specific, actionable, written as if Tomer is writing it himself]
-
-=====================================
-COMPARABLE SALES
-=====================================
-[List 4-6 of the strongest comps. Format each as:]
-COMP 1: [address/area] | [X]BR/[X]BA | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe] | [relevance note]
-COMP 2: [same format]
-COMP 3: [same format]
-COMP 4: [same format]
-COMP 5: [same format — only if strong]
-Comp Summary: [1 sentence: what the comps collectively say about the ARV]
-
-[ONLY INCLUDE THIS SECTION IF PROPERTY IS 2 BEDROOMS:]
-=====================================
-BEDROOM ADD OPPORTUNITY
-=====================================
-Current:    2BR / [X]BA — ARV as-is: $[X]
-After Add:  3BR / [X]BA — ARV post-add: $[X] (+$[X] lift)
-Add Cost:   ~$[X]–$[X] (new room + permit + finish work)
-Net Gain:   $[X] lift − $[X] cost = $[X] net value added
-Worth It:   [YES / MARGINAL / NO]
-Recommendation: [1-2 sentences]`
+Notes for CRM:  [1-2 sentences: what to log as the internal note when updating the lead — specific, actionable, written as if Tomer is writing it himself]`
 
 function buildUserPrompt(lead) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')
@@ -343,7 +321,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1400,
+        max_tokens: 900,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt(lead) }],
       }),
