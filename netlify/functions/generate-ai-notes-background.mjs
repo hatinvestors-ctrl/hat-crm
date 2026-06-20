@@ -189,7 +189,18 @@ Action:      [CALL TODAY / SCHEDULE WALK / MAKE OFFER / WATCH / WAIT FOR DROP]
 Offer range: $[X]–$[X]  (target $[X])
 Walk:        [Required / Not needed / Only if price drops to $X]
 Agent call:  [Verbatim script — 3-4 sentences Tomer or Kevin can say on the phone]
-Follow-up:   [Specific trigger or date — not "check back later"]`
+Follow-up:   [Specific trigger or date — not "check back later"]
+
+=====================================
+CRM WORKFLOW
+=====================================
+Set Status:     [exact status to set in CRM: new_lead / contacted / offer_sent / negotiating / dead_lead / follow_up]
+Make Offer:     [YES — $[X] / NO / NOT YET]
+Offer Amount:   $[X]  (only if Make Offer = YES)
+Follow-Up In:   [X days — or N/A if making offer now]
+Follow-Up Trigger: [exactly what condition to re-check: price drops below $X / DOM hits X / seller reaches back out / inspection done / etc.]
+Priority:       [HIGH — act today / MEDIUM — this week / LOW — watch and wait]
+Notes for CRM:  [1-2 sentences: what to log as the internal note when updating the lead — specific, actionable, written as if Tomer is writing it himself]`
 
 function buildUserPrompt(lead) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')

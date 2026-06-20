@@ -455,6 +455,87 @@ function ActionSection({ body }) {
   )
 }
 
+function CRMWorkflowSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+
+  const status    = get('Set Status')
+  const offer     = get('Make Offer')
+  const amount    = get('Offer Amount')
+  const followIn  = get('Follow-Up In')
+  const trigger   = get('Follow-Up Trigger')
+  const priority  = get('Priority')
+  const crmNote   = get('Notes for CRM')
+
+  const isHighPri  = /^HIGH/i.test(priority || '')
+  const isMedPri   = /^MEDIUM/i.test(priority || '')
+  const priColor   = isHighPri
+    ? { bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)' }
+    : isMedPri
+    ? { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
+    : { bg: 'var(--color-bg-elev-2)', txt: 'var(--color-text-muted)', bdr: 'var(--color-line)' }
+
+  const isYesOffer = /^YES/i.test(offer || '')
+
+  return (
+    <div className="space-y-2.5">
+      {priority && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border font-bold text-[12.5px]"
+          style={{ background: priColor.bg, borderColor: priColor.bdr, color: priColor.txt }}>
+          {isHighPri ? '🔴' : isMedPri ? '🟡' : '🟢'} Priority: {priority}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {status && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Set Status To</div>
+            <div className="text-[12px] font-bold text-[color:var(--color-text)] font-mono">{status}</div>
+          </div>
+        )}
+        {followIn && followIn.toLowerCase() !== 'n/a' && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Follow Up In</div>
+            <div className="text-[12px] font-bold text-[color:var(--color-text)]">{followIn}</div>
+          </div>
+        )}
+      </div>
+
+      {isYesOffer && amount && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
+          <span className="text-[20px]">💰</span>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">Make Offer</div>
+            <div className="text-[16px] font-black text-[color:var(--color-success-text)]">{amount}</div>
+          </div>
+        </div>
+      )}
+
+      {!isYesOffer && offer && (
+        <div className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Make Offer</div>
+          <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{offer}</div>
+        </div>
+      )}
+
+      {trigger && (
+        <div className="p-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1">Re-check When</div>
+          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-snug">{trigger}</p>
+        </div>
+      )}
+
+      {crmNote && (
+        <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Log This Note in CRM</div>
+          <p className="text-[12px] text-[color:var(--color-text)] leading-relaxed italic">"{crmNote}"</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Section registry ─────────────────────────────────────────────────────────
 
 const SECTION_META = {
@@ -470,7 +551,8 @@ const SECTION_META = {
   'CONS — RISKS AND CONCERNS':           { icon: '⚠️', render: s => <BulletSection   body={s} variant="danger"  /> },
   'KEY INSIGHTS & HIDDEN SIGNALS':       { icon: '💡', render: s => <InsightsSection body={s} /> },
   'STRATEGY RECOMMENDATION':             { icon: '🗺️', render: s => <StrategySection body={s} /> },
-  'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection   body={s} /> },
+  'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection      body={s} /> },
+  'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection body={s} /> },
 }
 
 // Tab definitions — sections are matched by name prefix
@@ -478,7 +560,7 @@ const TABS = [
   { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^OPPORTUNITY SCORE/.test(n) },
   { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
-  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
+  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
