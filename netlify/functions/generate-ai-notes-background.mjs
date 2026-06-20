@@ -66,6 +66,7 @@ MAO formula: 0.75 × ARV − renovation cost
 ## Output Format — REQUIRED, every section, no exceptions
 
 Write ONLY the plain text notes — no JSON, no markdown headers with ##, no intro sentence. Start directly with the first section header.
+Be concise. Every field: one line. Every narrative: 1-2 sentences max. No padding, no repetition. Total output under 1,500 tokens.
 
 =====================================
 RECOMMENDED ACTION
@@ -314,7 +315,7 @@ export default async (req) => {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 4096,
+          max_tokens: 1800,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: buildUserPrompt(lead) }],
         }),

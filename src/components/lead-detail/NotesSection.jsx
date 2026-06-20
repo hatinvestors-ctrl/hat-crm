@@ -63,7 +63,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
           setTimeout(poll, 3000)
         }
       }
-      setTimeout(poll, 4000)
+      setTimeout(poll, 2000)
     } catch (err) {
       setGenError(err.message || 'Something went wrong.')
       setGenerating(false)
