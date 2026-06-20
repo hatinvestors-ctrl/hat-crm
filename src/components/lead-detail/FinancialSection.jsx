@@ -23,7 +23,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
   const isStale = (() => {
     const inp = lead.deal_analysis?.inputs
     if (!inp) return false
-    const curPP   = Number(lead.offer_price || lead.asking_price || 0)
+    const curPP   = Number(lead.mao || 0)
     const curArv  = Number(lead.arv || 0)
     const curReno = Number(lead.renovation_cost || 0)
     return curPP !== inp.purchase_price || curArv !== inp.arv || curReno !== inp.renovation_cost
@@ -39,7 +39,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         body: JSON.stringify({
           lead_id:         lead.id,
           address:         [lead.address, lead.city, lead.state].filter(Boolean).join(', '),
-          purchase_price:  lead.offer_price || lead.asking_price,
+          purchase_price:  lead.mao,
           arv:             lead.arv,
           renovation_cost: lead.renovation_cost,
           monthly_rent:    strategy === 'brrrr' ? (parseFloat(monthlyRent) || null) : null,
@@ -63,11 +63,11 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
     <Card title="Financials">
       <div className="grid grid-cols-2 gap-4">
         <EditableField
-          label="Offer Price"
+          label="MAO · Our Offer"
           type="currency"
-          value={lead.offer_price}
+          value={lead.mao}
           formatter={formatCurrency}
-          onSave={(v) => update({ offer_price: v })}
+          onSave={(v) => update({ mao: v })}
           disabled={!canEdit}
         />
         <EditableField
@@ -86,18 +86,10 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           onSave={(v) => update({ renovation_cost: v })}
           disabled={!canEdit}
         />
-        <EditableField
-          label="MAO · Max Allowable Offer"
-          type="currency"
-          value={lead.mao}
-          formatter={formatCurrency}
-          onSave={(v) => update({ mao: v })}
-          disabled={!canEdit}
-        />
       </div>
 
       <p className="text-[11px] text-[color:var(--color-text-dim)] mt-3 leading-relaxed">
-        MAO = 75% × ARV − Renovation (auto-recalculates when ARV or Renovation changes).
+        MAO auto-calculates as 75% × ARV − Renovation. Edit to override.
       </p>
 
       {/* Analyze trigger row */}
