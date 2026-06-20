@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -12,6 +12,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
   const [genError,   setGenError]   = useState(null)
   const [confirm,    setConfirm]    = useState(false)
   const [collapsed,  setCollapsed]  = useState(false)
+  const generationCancelRef = useRef(null)
 
   useEffect(() => { setDraft(lead.notes || '') }, [lead.notes])
 
@@ -37,8 +38,11 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
     setConfirm(false)
     setGenerating(true)
     setGenError(null)
+    const prevNotes = lead.notes  // capture before generation starts
+    let cancelled = false
+    generationCancelRef.current = () => { cancelled = true }
+
     try {
-      // Background function returns 202 immediately — Claude runs async
       const res = await fetch('/.netlify/functions/generate-ai-notes-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,17 +50,18 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       })
       if (!res.ok) throw new Error(`Failed to start generation (${res.status}).`)
 
-      // Poll Supabase every 3s until notes appear (max 90s)
+      // Poll Supabase every 3s until notes change (max 60s)
       const start = Date.now()
       const poll = async () => {
-        if (Date.now() - start > 90000) {
-          setGenError('Generation timed out after 90s. Try again.')
+        if (cancelled) return
+        if (Date.now() - start > 60000) {
+          setGenError('Taking longer than expected. Check back in a moment.')
           setGenerating(false)
           return
         }
         const { data } = await supabase
-          .from('leads').select('notes').eq('id', lead.id).single()
-        if (data?.notes && data.notes !== lead.notes) {
+          .from('leads').select('notes, updated_at').eq('id', lead.id).single()
+        if (data?.notes && data.notes !== prevNotes) {
           onUpdated?.({ ...lead, notes: data.notes })
           setGenerating(false)
         } else {
@@ -68,6 +73,12 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       setGenError(err.message || 'Something went wrong.')
       setGenerating(false)
     }
+  }
+
+  const cancelGenerate = () => {
+    generationCancelRef.current?.()
+    setGenerating(false)
+    setGenError(null)
   }
 
   const handleGenerate = () => {
@@ -97,6 +108,12 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                     </svg>
                     Generating…
+                    <button
+                      onClick={cancelGenerate}
+                      className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </>
                 ) : '✦ AI Notes'}
               </button>
