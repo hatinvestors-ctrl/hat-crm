@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "c:\\Users\\tomer\\.claude\\projects\\c--Users-tomer-Documents-PrivateNew180425-CloudeCode-HatCRM\\memory"
+    ],
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node node_modules/vite/bin/vite.js build)"
+    ]
+  }
+}

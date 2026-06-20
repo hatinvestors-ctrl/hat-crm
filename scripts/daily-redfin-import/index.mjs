@@ -138,7 +138,7 @@ async function insertLead(lead) {
        lead_source, redfin_trigger_type, status, auto_imported,
        mls_status, is_hot, notes,
        listing_agent_name, listing_agent_phone, listing_agent_email,
-       created_at, updated_at)
+       assigned_to, created_at, updated_at)
     VALUES (
       ${sqlStr(WORKSPACE_ID)}, ${sqlStr(lead.address)}, 'Jacksonville', 'FL', ${sqlStr(lead.zip_code)},
       'single_family', ${sqlNum(lead.bedrooms)}, ${sqlNum(lead.bathrooms)}, ${sqlNum(lead.sqft)},
@@ -146,7 +146,7 @@ async function insertLead(lead) {
       'redfin_auto', ${sqlStr(lead.redfin_trigger_type)}, 'triage', true, 'active',
       ${lead.is_hot ? 'true' : 'false'}, ${sqlStr(lead.notes)},
       ${sqlStr(lead.listing_agent_name)}, ${sqlStr(lead.listing_agent_phone)}, ${sqlStr(lead.listing_agent_email)},
-      ${sqlStr(now)}, ${sqlStr(now)}
+      '6d551c7a-6191-4f33-9d48-e7fd3a985fad', ${sqlStr(now)}, ${sqlStr(now)}
     )
     RETURNING id, address
   `)

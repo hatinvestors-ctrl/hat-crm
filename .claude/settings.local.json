@@ -15,7 +15,11 @@
       "Bash(node \"c:\\\\Users\\\\tomer\\\\Documents\\\\PrivateNew180425\\\\CloudeCode\\\\HatCRM\\\\scripts\\\\portfolio-analysis.mjs\")",
       "Bash(npx tsc *)",
       "Bash(node scripts/insert-tamworth.mjs)",
-      "Bash(start cmd *)"
+      "Bash(start cmd *)",
+      "Bash(git config *)",
+      "Bash(git ls-tree *)",
+      "Bash(git submodule *)",
+      "Bash(curl -s \"https://api.netlify.com/api/v1/sites/hat-crm.netlify.app/deploys\")"
     ]
   }
 }

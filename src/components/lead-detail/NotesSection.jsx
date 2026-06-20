@@ -5,16 +5,20 @@ import { supabase } from '../../lib/supabase'
 import NotesRenderer from './NotesRenderer'
 
 export default function NotesSection({ lead, canEdit, onUpdated }) {
-  const [editing,    setEditing]    = useState(false)
-  const [draft,      setDraft]      = useState(lead.notes || '')
-  const [saving,     setSaving]     = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [genError,   setGenError]   = useState(null)
-  const [confirm,    setConfirm]    = useState(false)
-  const [collapsed,  setCollapsed]  = useState(false)
+  const [editing,     setEditing]    = useState(false)
+  const [localNotes,  setLocalNotes] = useState(lead.notes || '')
+  const [draft,       setDraft]      = useState(lead.notes || '')
+  const [saving,      setSaving]     = useState(false)
+  const [generating,  setGenerating] = useState(false)
+  const [genError,    setGenError]   = useState(null)
+  const [confirm,     setConfirm]    = useState(false)
+  const [collapsed,   setCollapsed]  = useState(false)
   const generationCancelRef = useRef(null)
 
-  useEffect(() => { setDraft(lead.notes || '') }, [lead.notes])
+  useEffect(() => {
+    setDraft(lead.notes || '')
+    setLocalNotes(lead.notes || '')
+  }, [lead.notes])
 
   const save = async () => {
     setSaving(true)
@@ -58,8 +62,9 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || `Generation failed (${res.status}).`)
 
-      onUpdated?.({ ...lead, notes: data.notes })
+      setLocalNotes(data.notes)
       setGenerating(false)
+      onUpdated?.({ ...lead, notes: data.notes })
     } catch (err) {
       if (!cancelled) {
         setGenError(err.message || 'Something went wrong.')
@@ -75,7 +80,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
   }
 
   const handleGenerate = () => {
-    if (lead.notes) {
+    if (localNotes) {
       setConfirm(true)  // existing notes → ask before overwriting
     } else {
       runGenerate()
@@ -178,8 +183,8 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
             <Button size="sm" onClick={save} loading={saving}>Save</Button>
           </div>
         </div>
-      ) : lead.notes ? (
-        <NotesRenderer notes={lead.notes} />
+      ) : localNotes ? (
+        <NotesRenderer notes={localNotes} />
       ) : generating ? (
         <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis… this takes 20–40 seconds.</p>
       ) : (

@@ -33,6 +33,12 @@ timeout = 120.0
 [functions.generate-report]
 timeout = 120.0
 
+[functions.generate-ai-notes]
+timeout = 26.0
+
+[functions.process-agent-sequences]
+schedule = "0 13 * * *"
+
 [functions."*"]
 node_bundler = "esbuild"
 
