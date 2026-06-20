@@ -344,12 +344,13 @@ function RecommendedActionSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
   const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
     ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
-  const verdict  = get('Verdict')
-  const strategy = get('Strategy')
-  const arv      = get('Our ARV')
-  const starting = get('Starting Offer')
-  const target   = get('Target Price')
-  const maxWalk  = get('Max Walk-Away')
+  const verdict   = get('Verdict')
+  const strategy  = get('Strategy')
+  const arv       = get('Our ARV')
+  const starting  = get('Starting Offer')
+  const target    = get('Target Price')
+  const maxWalk   = get('Max Walk-Away')
+  const bedroomAdd = get('Bedroom Add')
   const watchLine = lines.find(l => /^\[If PASS/i.test(l.trim()) || /^At \$/i.test(l.trim()))
 
   const isPass = /^PASS/i.test(verdict || '')
@@ -398,6 +399,15 @@ function RecommendedActionSection({ body }) {
           </div>
         )}
       </div>
+      {bedroomAdd && !/^N\/A/i.test(bedroomAdd) && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+          <span className="text-[13px]">🛏️</span>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Bedroom Add</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{bedroomAdd}</div>
+          </div>
+        </div>
+      )}
       {watchLine && (
         <p className="text-[11.5px] text-[color:var(--color-text-muted)] italic px-1">{watchLine.replace(/^\[|\]$/g, '')}</p>
       )}
@@ -450,6 +460,119 @@ function ActionSection({ body }) {
           <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">📞 Agent Call Script</div>
           <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed italic">{scriptText}</p>
         </div>
+      )}
+    </div>
+  )
+}
+
+function ComparableSalesSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const comps = lines.filter(l => /^COMP\s+\d+:/i.test(l.trim()))
+  const summary = lines.find(l => /^Comp Summary:/i.test(l.trim()))?.replace(/^Comp Summary:\s*/i, '').trim()
+
+  if (comps.length === 0) return <PlainText body={body} />
+
+  return (
+    <div className="space-y-2">
+      {comps.map((line, i) => {
+        const parts = line.replace(/^COMP\s+\d+:\s*/i, '').split('|').map(s => s.trim())
+        const [area, profile, sqft, sold, ppsf, timeframe, note] = parts
+        return (
+          <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="text-[12px] font-semibold text-[color:var(--color-text)] leading-snug">{area}</div>
+              {sold && <div className="shrink-0 text-[13px] font-bold text-[color:var(--color-success-text)]">{sold.replace('Sold ', '')}</div>}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
+              {profile && <span>{profile}</span>}
+              {sqft && <span>{sqft}</span>}
+              {ppsf && <span className="text-[color:var(--color-accent-text)]">{ppsf}</span>}
+              {timeframe && <span>{timeframe}</span>}
+            </div>
+            {note && <p className="mt-1 text-[10.5px] text-[color:var(--color-text-dim)] italic">{note}</p>}
+          </div>
+        )
+      })}
+      {summary && (
+        <div className="mt-1 px-3 py-2 rounded-lg bg-[color:var(--color-bg)] border border-[color:var(--color-line)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Comp Summary</div>
+          <p className="text-[12px] text-[color:var(--color-text)] leading-snug">{summary}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BedroomAddSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+
+  const current    = get('Current')
+  const afterAdd   = get('After Add')
+  const addCost    = get('Add Cost')
+  const netGain    = get('Net Gain')
+  const worthIt    = get('Worth It')
+  const rec        = get('Recommendation')
+  const comps      = lines.filter(l => /^COMP\s+[A-Z]:/i.test(l.trim()))
+
+  const isYes = /^YES/i.test(worthIt || '')
+  const isNo  = /^NO/i.test(worthIt || '')
+  const worthColor = isYes
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)' }
+    : isNo
+    ? { bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)' }
+    : { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border font-semibold text-[12.5px]"
+        style={{ background: worthColor.bg, borderColor: worthColor.bdr, color: worthColor.txt }}>
+        🛏️ Bedroom Add: {worthIt}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {current && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">As-Is (2BR)</div>
+            <div className="text-[12px] text-[color:var(--color-text)]">{current}</div>
+          </div>
+        )}
+        {afterAdd && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">After Add (3BR)</div>
+            <div className="text-[12px] font-bold text-[color:var(--color-success-text)]">{afterAdd}</div>
+          </div>
+        )}
+        {addCost && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Add Cost</div>
+            <div className="text-[12px] text-[color:var(--color-text)]">{addCost}</div>
+          </div>
+        )}
+        {netGain && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Net Gain</div>
+            <div className="text-[12px] font-bold text-[color:var(--color-accent-text)]">{netGain}</div>
+          </div>
+        )}
+      </div>
+      {comps.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">3BR Comps in ZIP</div>
+          {comps.map((line, i) => {
+            const parts = line.replace(/^COMP\s+[A-Z]:\s*/i, '').split('|').map(s => s.trim())
+            const [area, profile, sqft, sold, ppsf, timeframe] = parts
+            return (
+              <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[11.5px]">
+                <span className="text-[color:var(--color-text-muted)]">{area} {profile && `· ${profile}`}</span>
+                <span className="font-bold text-[color:var(--color-success-text)] shrink-0">{sold?.replace('Sold ', '')}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {rec && (
+        <p className="text-[12px] text-[color:var(--color-text)] leading-relaxed px-1">{rec}</p>
       )}
     </div>
   )
@@ -552,7 +675,9 @@ const SECTION_META = {
   'KEY INSIGHTS & HIDDEN SIGNALS':       { icon: '💡', render: s => <InsightsSection body={s} /> },
   'STRATEGY RECOMMENDATION':             { icon: '🗺️', render: s => <StrategySection body={s} /> },
   'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection      body={s} /> },
-  'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection body={s} /> },
+  'COMPARABLE SALES':                    { icon: '🏡', render: s => <ComparableSalesSection body={s} /> },
+  'BEDROOM ADD OPPORTUNITY':             { icon: '🛏️', render: s => <BedroomAddSection     body={s} /> },
+  'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection    body={s} /> },
 }
 
 // Tab definitions — sections are matched by name prefix
@@ -560,6 +685,7 @@ const TABS = [
   { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^OPPORTUNITY SCORE/.test(n) },
   { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
+  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^BEDROOM ADD/.test(n) },
   { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
 ]
 

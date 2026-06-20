@@ -77,6 +77,7 @@ Our ARV:        $[X]  ← your calibrated number, not the seller's
 Starting Offer: $[X]  ← opening negotiation price (can walk away from if rejected)
 Target Price:   $[X]  ← MAO / the number that makes the deal work
 Max Walk-Away:  $[X]  ← absolute ceiling — do NOT pay more than this
+Bedroom Add:    [YES — adds ~$[X] to ARV, costs ~$[X] / NO — not worth it / N/A]
 [If PASS: At $[X] this becomes a [strategy]. Watch for price drop to $[X].]
 
 =====================================
@@ -191,6 +192,33 @@ Offer range: $[X]–$[X]  (target $[X])
 Walk:        [Required / Not needed / Only if price drops to $X]
 Agent call:  [Verbatim script — 3-4 sentences Tomer or Kevin can say on the phone]
 Follow-up:   [Specific trigger or date — not "check back later"]
+
+=====================================
+COMPARABLE SALES
+=====================================
+[List 4-6 of the strongest comps that support the ARV. Use your JAX market knowledge — cite real comparable properties based on ZIP band, beds/baths, sqft, and condition. Format each as:]
+COMP 1: [address/area] | [X]BR/[X]BA | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe, e.g. "6 mo ago"] | [relevance note: "same ZIP, renovated, 200sqft larger"]
+COMP 2: [same format]
+COMP 3: [same format]
+COMP 4: [same format]
+COMP 5: [same format — only if strong]
+COMP 6: [same format — only if strong]
+Comp Summary: [1 sentence: what the comps collectively say about the ARV — range they support, any outliers]
+
+[ONLY INCLUDE THIS SECTION IF PROPERTY IS 2 BEDROOMS:]
+=====================================
+BEDROOM ADD OPPORTUNITY
+=====================================
+Current:    2BR / [X]BA — ARV as-is: $[X]
+After Add:  3BR / [X]BA — ARV post-add: $[X] (+$[X] lift)
+Add Cost:   ~$[X]–$[X] (new room + permit + finish work)
+Net Gain:   $[X] lift − $[X] cost = $[X] net value added
+Worth It:   [YES — strong ROI on the add / MARGINAL / NO — cost exceeds lift]
+3BR Comps:  [2-3 comps showing what renovated 3BRs sell/rent for in this ZIP]
+COMP A: [same format as above]
+COMP B: [same format]
+COMP C: [same format — if available]
+Recommendation: [1-2 sentences: should they add the bedroom, what does it do to the deal math, does it change BRRRR/flip viability]
 
 =====================================
 CRM WORKFLOW
@@ -315,7 +343,7 @@ export default async (req) => {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1800,
+          max_tokens: 2400,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: buildUserPrompt(lead) }],
         }),
