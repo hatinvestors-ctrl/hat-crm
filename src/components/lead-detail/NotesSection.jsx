@@ -38,21 +38,34 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
     setGenerating(true)
     setGenError(null)
     try {
-      const res = await fetch('/.netlify/functions/generate-ai-notes', {
+      // Background function returns 202 immediately — Claude runs async
+      const res = await fetch('/.netlify/functions/generate-ai-notes-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: lead.id, lead }),
       })
-      const ct = res.headers.get('content-type') || ''
-      if (!ct.includes('application/json')) {
-        throw new Error(`Function error (${res.status}) — likely a timeout. Try again.`)
+      if (!res.ok) throw new Error(`Failed to start generation (${res.status}).`)
+
+      // Poll Supabase every 3s until notes appear (max 90s)
+      const start = Date.now()
+      const poll = async () => {
+        if (Date.now() - start > 90000) {
+          setGenError('Generation timed out after 90s. Try again.')
+          setGenerating(false)
+          return
+        }
+        const { data } = await supabase
+          .from('leads').select('notes').eq('id', lead.id).single()
+        if (data?.notes && data.notes !== lead.notes) {
+          onUpdated?.({ ...lead, notes: data.notes })
+          setGenerating(false)
+        } else {
+          setTimeout(poll, 3000)
+        }
       }
-      const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Generation failed.')
-      onUpdated?.({ ...lead, notes: data.notes })
+      setTimeout(poll, 4000)
     } catch (err) {
       setGenError(err.message || 'Something went wrong.')
-    } finally {
       setGenerating(false)
     }
   }
@@ -158,7 +171,7 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       ) : lead.notes ? (
         <NotesRenderer notes={lead.notes} />
       ) : generating ? (
-        <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis…</p>
+        <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis… this takes 20–40 seconds.</p>
       ) : (
         <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">No notes yet.</p>
       )}
