@@ -110,24 +110,10 @@ Pre-computed Flip numbers (use these — do not recalculate):
   Net flip profit: ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
   }
 
-  return `Generate full investor notes for this property.
+  return `Fill in the 3 required sections for this deal. Be concise — one line per field. No extra text.
 
-PROPERTY DATA:
-Address:         ${addr}
-Beds/Baths/Sqft: ${lead.bedrooms || '?'}BR / ${lead.bathrooms || '?'}BA / ${lead.sqft || 'Unknown'} sqft
-Property type:   ${lead.property_type || 'single_family'}
-Asking price:    ${fmt(pp)}${ppsf ? ` ($${ppsf}/sqft)` : ''}
-ARV:             ${fmt(arv)}${lead.conservative_arv ? ` (conservative ${fmt(lead.conservative_arv)} / aggressive ${fmt(lead.aggressive_arv)})` : ''}
-Renovation cost: ${fmt(reno)}
-MAO:             ${fmt(mao)}
-Rent estimate:   ${fmt(rent)}
-ZIP code:        ${lead.zip_code || 'Unknown'}
-${brrrrBlock}
-${flipBlock}
-
-Use the pre-computed numbers above exactly. Add your qualitative analysis, comp reasoning, insights, and narrative throughout the notes — that is where your value is. Numbers come from above; intelligence comes from you.
-
-Write the full notes now. Start directly with the first section — no intro, no preamble.`
+${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
+Ask: ${fmt(pp)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | MAO: ${fmt(mao)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}`
 }
 
 async function saveNotes(leadId, notes) {
@@ -180,7 +166,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 600,
+        max_tokens: 350,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt(lead) }],
       }),
