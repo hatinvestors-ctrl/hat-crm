@@ -142,9 +142,20 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       )}
 
       {localNotes ? (<>
-        <NotesRenderer notes={localNotes} />
-        <WhatIfPanel lead={lead} />
-        <DealQA lead={lead} aiNotes={localNotes} />
+        <NotesRenderer
+          notes={localNotes}
+          extraTabs={[{
+            id: 'askai',
+            label: 'Ask AI',
+            icon: '💬',
+            content: (
+              <div className="space-y-2">
+                <WhatIfPanel lead={lead} />
+                <DealQA lead={lead} aiNotes={localNotes} />
+              </div>
+            ),
+          }]}
+        />
       </>) : generating ? (
         <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis… this takes 20–40 seconds.</p>
       ) : (

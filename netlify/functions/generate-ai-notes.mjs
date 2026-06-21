@@ -103,14 +103,6 @@ How used: [1 sentence — what this comp told you about ARV, reno, or offer pric
 Overall: [1-2 sentences — what the CRM history tells us collectively about this ZIP and deal type]
 
 =====================================
-DEAL MATH — THREE SCENARIOS
-=====================================
-BRRRR:  HML $[X] | HML costs $[X] (points + fees + interest) | True all-in $[X] | Refi $[X] | Cash left $[X] ([GREAT/OK/FAILS]) | Rent $[X] − P&I $[X] − exp $308 = $[X]/mo cash flow
-Flip:   All-in $[X] | ARV $[X] | Carry+close $[X] | Net profit $[X] ([STRONG ≥$40K / THIN / FAILS])
-Rental: All-in $[X] | Rent $[X]/mo | Gross yield [X]% | Cap rate [X]%
-Verdict: [which scenario works and why in 1 sentence, or why none work]
-
-=====================================
 PROS — WHY THIS DEAL IS INTERESTING
 =====================================
 1. [market/zip signal with specific number]

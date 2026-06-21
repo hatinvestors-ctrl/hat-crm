@@ -946,10 +946,9 @@ const SECTION_META = {
 // Tab definitions — sections are matched by name prefix
 const TABS = [
   { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE/.test(n) },
-  { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
+  { id: 'strategy', label: 'Strategy', icon: '🎯', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
-  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD/.test(n) },
-  { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
+  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
@@ -971,8 +970,8 @@ function SectionCard({ name, body }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export default function NotesRenderer({ notes }) {
-  const [activeTab, setActiveTab] = useState('action')
+export default function NotesRenderer({ notes, extraTabs = [] }) {
+  const [activeTab, setActiveTab] = useState('strategy')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
   // Unstructured notes — plain scrollable text, no tabs
@@ -985,15 +984,19 @@ export default function NotesRenderer({ notes }) {
     )
   }
 
-  // Build tabs, skip any that have no matching sections
-  const tabSections = TABS.map(tab => ({
-    ...tab,
-    items: sections.filter(s => tab.match(s.name)),
-  })).filter(tab => tab.items.length > 0)
+  // Build tabs, skip any that have no matching sections; append extraTabs at end
+  const tabSections = [
+    ...TABS.map(tab => ({
+      ...tab,
+      items: sections.filter(s => tab.match(s.name)),
+      content: null,
+    })).filter(tab => tab.items.length > 0),
+    ...extraTabs.map(t => ({ ...t, items: [], content: t.content })),
+  ]
 
   // Ensure active tab is valid
   const validTab = tabSections.find(t => t.id === activeTab) ? activeTab : tabSections[0]?.id
-  const currentSections = tabSections.find(t => t.id === validTab)?.items || []
+  const currentTab = tabSections.find(t => t.id === validTab)
 
   return (
     <div>
@@ -1027,9 +1030,12 @@ export default function NotesRenderer({ notes }) {
           scrollbarColor: 'var(--color-line) transparent',
         }}
       >
-        {currentSections.map(({ name, body }) => (
-          <SectionCard key={name} name={name} body={body} />
-        ))}
+        {currentTab?.content
+          ? currentTab.content
+          : (currentTab?.items || []).map(({ name, body }) => (
+              <SectionCard key={name} name={name} body={body} />
+            ))
+        }
       </div>
     </div>
   )
