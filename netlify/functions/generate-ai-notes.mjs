@@ -58,13 +58,14 @@ Summary:        [2 sentences — deal viability at MAO, what must be true to clo
 =====================================
 DEAL SCORE
 =====================================
-Total:               [X]/100
-Spread Quality:      [X]/25 — [one line: how close is ask to MAO, is gap closeable]
-BRRRR Math:          [X]/25 — [one line: cash left in at MAO, EXCELLENT/ACCEPTABLE/FAILS]
-Cash Flow:           [X]/20 — [one line: monthly cash flow at MAO, positive/negative/marginal]
-Market Confidence:   [X]/20 — [one line: ARV confidence based on comps and ZIP knowledge]
-Negotiation Position:[X]/10 — [one line: motivation signals, DOM, price history, gap size]
-Verdict:             [STRONG ≥75 / SOLID 55–74 / MARGINAL 35–54 / WEAK <35]
+Total:              [X]/100
+Price Gap:          [X]/25 — [ask vs MAO: % above MAO, closeable or not. Scoring: ≤MAO=25, 1-10% above=20, 11-20%=13, 21-30%=7, >30%=2]
+Deal Math:          [X]/25 — [best exit at MAO: BRRRR cash left in $X OR flip net profit $X — whichever scores higher. BRRRR: <$20K=25, $20-35K=20, $35-50K=13, $50-70K=7, >$70K=2. Flip: >$50K=25, $35-50K=20, $20-35K=13, $10-20K=7, <$10K=2]
+Cash Flow:          [X]/15 — [monthly income after PITIE at MAO. >$400/mo=15, $250-400=12, $100-250=8, $0-100=4, negative=0]
+ZIP Quality:        [X]/15 — [A-tier(32205,32216)=15, B-tier(32210,32244,32211,32218,32219)=10, C-tier(32208,32254,32221)=6, unknown=5. State which tier and why: appreciation trend, rental demand, vacancy]
+Seller Motivation:  [X]/10 — [estate/divorce/foreclosure/price drop >15%/as-is=9-10, price drop <15% OR DOM >90=6-8, DOM 30-90 with some signals=4-5, new listing DOM <30 no signals=1-3, institutional/retail=0-1]
+ARV Confidence:     [X]/10 — [HIGH(3+ solid recent comps)=10, MEDIUM(2 comps, reasonable)=6, LOW(sparse/wide range/unusual)=2. State what drives the confidence level]
+Verdict:            [EXCEPTIONAL ≥80 / STRONG 65–79 / WATCH 45–64 / MARGINAL 25–44 / DEAD <25]
 
 =====================================
 DEAL SNAPSHOT

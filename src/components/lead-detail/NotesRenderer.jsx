@@ -89,11 +89,12 @@ function DealScoreSection({ body }) {
   const total    = totalRaw ? parseInt(totalRaw) : null
 
   const subScores = [
-    { key: 'Spread Quality',       max: 25 },
-    { key: 'BRRRR Math',           max: 25 },
-    { key: 'Cash Flow',            max: 20 },
-    { key: 'Market Confidence',    max: 20 },
-    { key: 'Negotiation Position', max: 10 },
+    { key: 'Price Gap',          max: 25 },
+    { key: 'Deal Math',          max: 25 },
+    { key: 'Cash Flow',          max: 15 },
+    { key: 'ZIP Quality',        max: 15 },
+    { key: 'Seller Motivation',  max: 10 },
+    { key: 'ARV Confidence',     max: 10 },
   ].map(({ key, max }) => {
     const raw = get(key)
     if (!raw) return null
@@ -108,9 +109,9 @@ function DealScoreSection({ body }) {
     return pct >= 0.75 ? 'var(--color-success)' : pct >= 0.5 ? 'var(--color-warn)' : 'var(--color-danger)'
   }
 
-  const totalColor = total >= 75 ? { txt: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)' }
-    : total >= 55 ? { txt: 'var(--color-accent-text)', bg: 'var(--color-accent-soft)', bdr: 'var(--color-accent)' }
-    : total >= 35 ? { txt: 'var(--color-warn-text)', bg: 'var(--color-warn-soft)', bdr: 'var(--color-warn)' }
+  const totalColor = total >= 80 ? { txt: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)' }
+    : total >= 65 ? { txt: 'var(--color-accent-text)', bg: 'var(--color-accent-soft)', bdr: 'var(--color-accent)' }
+    : total >= 45 ? { txt: 'var(--color-warn-text)', bg: 'var(--color-warn-soft)', bdr: 'var(--color-warn)' }
     : { txt: 'var(--color-text-muted)', bg: 'var(--color-bg-elev-2)', bdr: 'var(--color-line)' }
 
   return (
@@ -132,7 +133,7 @@ function DealScoreSection({ body }) {
           </div>
           <div>
             <div className="text-[15px] font-black" style={{ color: totalColor.txt }}>
-              {total >= 75 ? 'STRONG DEAL' : total >= 55 ? 'SOLID DEAL' : total >= 35 ? 'MARGINAL' : 'WEAK'}
+              {total >= 80 ? 'EXCEPTIONAL' : total >= 65 ? 'STRONG' : total >= 45 ? 'WATCH' : total >= 25 ? 'MARGINAL' : 'DEAD LEAD'}
             </div>
             {verdict && <p className="text-[11px] mt-0.5" style={{ color: totalColor.txt }}>{verdict.replace(/^(STRONG|SOLID|MARGINAL|WEAK)[^—–-]*/i, '')}</p>}
           </div>
