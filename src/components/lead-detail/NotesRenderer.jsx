@@ -805,7 +805,9 @@ function CRMCompsUsedSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
   const compLines = lines.filter(l => /^COMP:/i.test(l.trim()))
   const howLines  = lines.filter(l => /^How used:/i.test(l.trim()))
-  const overall   = lines.find(l => /^Overall:/i.test(l.trim()))?.replace(/^Overall:\s*/i, '').trim()
+  const zipPattern       = lines.find(l => /^ZIP Pattern:/i.test(l.trim()))?.replace(/^ZIP Pattern:\s*/i, '').trim()
+  const confidenceImpact = lines.find(l => /^Confidence Impact:/i.test(l.trim()))?.replace(/^Confidence Impact:\s*/i, '').trim()
+  const overall          = lines.find(l => /^Overall:/i.test(l.trim()))?.replace(/^Overall:\s*/i, '').trim()
 
   if (compLines.length === 0) return <PlainText body={body} />
 
@@ -841,10 +843,16 @@ function CRMCompsUsedSection({ body }) {
           </div>
         )
       })}
-      {overall && (
+      {(zipPattern || overall) && (
         <div className="px-3 py-2.5 rounded-lg bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)]">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1">What CRM History Tells Us</div>
-          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-relaxed">{overall}</p>
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1">ZIP Pattern</div>
+          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-relaxed">{zipPattern || overall}</p>
+        </div>
+      )}
+      {confidenceImpact && (
+        <div className="px-3 py-2 rounded-lg bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Confidence Impact</div>
+          <p className="text-[12px] text-[color:var(--color-text)] leading-relaxed">{confidenceImpact}</p>
         </div>
       )}
     </div>
