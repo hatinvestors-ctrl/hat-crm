@@ -755,21 +755,42 @@ function BedroomAddSection({ body }) {
 }
 
 function MarketCompsSection({ body }) {
-  const lines = body.split('\n').filter(Boolean)
-  const compLines = lines.filter(l => /^COMP:/i.test(l.trim()))
-  const whyLines  = lines.filter(l => /^Why relevant:/i.test(l.trim()))
-  const conclusion = lines.find(l => /^ARV Conclusion:/i.test(l.trim()))?.replace(/^ARV Conclusion:\s*/i, '').trim()
+  const lines = body.split('\n')
+  const allLines = lines.filter(Boolean)
+  const conclusion = allLines.find(l => /^ARV Conclusion:/i.test(l.trim()))?.replace(/^ARV Conclusion:\s*/i, '').trim()
 
-  if (compLines.length === 0) return <PlainText body={body} />
+  // Parse comp blocks with multi-line "Why relevant" support
+  const SECTION_FIELDS = /^(COMP:|ARV Conclusion:|Why relevant:)/i
+  const compBlocks = []
+  let current = null
+  for (const line of lines) {
+    const t = line.trim()
+    if (/^COMP:/i.test(t)) {
+      if (current) compBlocks.push(current)
+      current = { compLine: t, whyLines: [], inWhy: false }
+    } else if (current) {
+      if (/^Why relevant:/i.test(t)) {
+        current.inWhy = true
+        current.whyLines.push(t.replace(/^Why relevant:\s*/i, '').trim())
+      } else if (current.inWhy && t && !SECTION_FIELDS.test(t)) {
+        current.whyLines.push(t)
+      } else if (/^(COMP:|ARV Conclusion:)/i.test(t)) {
+        current.inWhy = false
+      }
+    }
+  }
+  if (current) compBlocks.push(current)
+
+  if (compBlocks.length === 0) return <PlainText body={body} />
 
   return (
     <div className="space-y-2.5">
       <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Sold Comps Used for ARV</div>
-      {compLines.map((line, i) => {
-        const content = line.replace(/^COMP:\s*/i, '')
+      {compBlocks.map(({ compLine, whyLines }, i) => {
+        const content = compLine.replace(/^COMP:\s*/i, '')
         const parts   = content.split('|').map(s => s.trim())
         const [area, profile, sqft, sold, ppsf, timeframe, condition] = parts
-        const why = whyLines[i]?.replace(/^Why relevant:\s*/i, '').trim()
+        const why = whyLines.join(' ').trim() || null
         return (
           <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
             <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
@@ -785,7 +806,7 @@ function MarketCompsSection({ body }) {
             </div>
             {why && (
               <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed break-words whitespace-normal">{why}</p>
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{why}</p>
               </div>
             )}
           </div>
@@ -802,22 +823,44 @@ function MarketCompsSection({ body }) {
 }
 
 function CRMCompsUsedSection({ body }) {
-  const lines = body.split('\n').filter(Boolean)
-  const compLines = lines.filter(l => /^COMP:/i.test(l.trim()))
-  const howLines  = lines.filter(l => /^How used:/i.test(l.trim()))
-  const zipPattern       = lines.find(l => /^ZIP Pattern:/i.test(l.trim()))?.replace(/^ZIP Pattern:\s*/i, '').trim()
-  const confidenceImpact = lines.find(l => /^Confidence Impact:/i.test(l.trim()))?.replace(/^Confidence Impact:\s*/i, '').trim()
-  const overall          = lines.find(l => /^Overall:/i.test(l.trim()))?.replace(/^Overall:\s*/i, '').trim()
+  const lines = body.split('\n')
+  const allLines = lines.filter(Boolean)
 
-  if (compLines.length === 0) return <PlainText body={body} />
+  const zipPattern       = allLines.find(l => /^ZIP Pattern:/i.test(l.trim()))?.replace(/^ZIP Pattern:\s*/i, '').trim()
+  const confidenceImpact = allLines.find(l => /^Confidence Impact:/i.test(l.trim()))?.replace(/^Confidence Impact:\s*/i, '').trim()
+  const overall          = allLines.find(l => /^Overall:/i.test(l.trim()))?.replace(/^Overall:\s*/i, '').trim()
+
+  // Parse comp blocks — each COMP: line starts a block; collect until next COMP: or section field
+  const SECTION_FIELDS = /^(COMP:|ZIP Pattern:|Confidence Impact:|Overall:)/i
+  const compBlocks = []
+  let current = null
+  for (const line of lines) {
+    const t = line.trim()
+    if (/^COMP:/i.test(t)) {
+      if (current) compBlocks.push(current)
+      current = { compLine: t, howLines: [], inHow: false }
+    } else if (current) {
+      if (/^How used:/i.test(t)) {
+        current.inHow = true
+        current.howLines.push(t.replace(/^How used:\s*/i, '').trim())
+      } else if (current.inHow && t && !SECTION_FIELDS.test(t)) {
+        current.howLines.push(t)
+      } else if (SECTION_FIELDS.test(t)) {
+        current.inHow = false
+      }
+    }
+  }
+  if (current) compBlocks.push(current)
+
+  if (compBlocks.length === 0) return <PlainText body={body} />
 
   return (
     <div className="space-y-2.5">
-      {compLines.map((line, i) => {
-        const content = line.replace(/^COMP:\s*/i, '')
+      {compBlocks.map(({ compLine, howLines }, i) => {
+        const content = compLine.replace(/^COMP:\s*/i, '')
         const parts   = content.split('|').map(s => s.trim())
         const [addrZip, profile, ask, arv, reno, offer, status] = parts
-        const how = howLines[i]?.replace(/^How used:\s*/i, '').trim()
+        const how = howLines.join(' ').trim() || null
         return (
           <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
             <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
@@ -837,7 +880,7 @@ function CRMCompsUsedSection({ body }) {
             </div>
             {how && (
               <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed break-words whitespace-normal">{how}</p>
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{how}</p>
               </div>
             )}
           </div>
