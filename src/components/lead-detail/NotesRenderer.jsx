@@ -785,7 +785,7 @@ function MarketCompsSection({ body }) {
             </div>
             {why && (
               <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{why}</p>
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed break-words whitespace-normal">{why}</p>
               </div>
             )}
           </div>
@@ -837,7 +837,7 @@ function CRMCompsUsedSection({ body }) {
             </div>
             {how && (
               <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{how}</p>
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed break-words whitespace-normal">{how}</p>
               </div>
             )}
           </div>
@@ -1044,9 +1044,9 @@ export default function NotesRenderer({ notes, extraTabs = [] }) {
 
       {/* Tab content */}
       <div
-        className="space-y-2 overflow-y-auto pr-0.5"
+        className="space-y-2 overflow-y-auto pr-1 pb-2"
         style={{
-          maxHeight: '55vh',
+          maxHeight: '60vh',
           scrollbarWidth: 'thin',
           scrollbarColor: 'var(--color-line) transparent',
         }}
