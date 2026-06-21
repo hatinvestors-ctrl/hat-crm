@@ -59,15 +59,33 @@ Inspection Play: YES — offer $[ask price or $X above ask] to secure contract. 
 [Include ONLY IF genuinely applicable — garage conversion, covered patio in strong rental ZIP, ADU potential, etc.:] Other Upside: [specific opportunity] — adds ~$[X] ARV or rental value, ~$[X] cost
 
 =====================================
+MARKET COMPS
+=====================================
+[Always include at least 2 real sold comps that justify the ARV. Use your JAX market knowledge. Format each as:]
+COMP: [street name or area, e.g. "Mango Ave, 32208"] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe, e.g. "sold 3 months ago"] | [condition: renovated / cosmetic / as-is]
+Why relevant: [1 sentence — how this comp supports or adjusts the ARV for THIS property]
+ARV Conclusion: [1–2 sentences — how the comps together land on the ARV used, what would push it higher or lower]
+
+=====================================
+CRM COMPS USED
+=====================================
+[ONLY include this section if CRM historical comps were provided above. Be specific and reference actual addresses and numbers from the CRM data.]
+[For each past deal directly relevant to ARV, reno, or offer strategy:]
+COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
+How used: [1-2 sentences — what this deal taught us and how it benchmarks the current property]
+ZIP Pattern: [2-3 sentences — ARV range patterns, reno costs, seller behavior, our offer success rate in this ZIP]
+Confidence Impact: [1 sentence — does CRM history increase or decrease confidence in the ARV and offer price?]
+
+=====================================
 DEAL SCORE
 =====================================
 Total:              [X]/100
 Price Gap:          [X]/25 — [ask vs MAO: % above MAO, closeable or not. Scoring: ≤MAO=25, 1-10% above=20, 11-20%=13, 21-30%=7, >30%=2]
-Deal Math:          [X]/25 — [best exit at MAO: BRRRR cash left in $X OR flip net profit $X — whichever scores higher. BRRRR: <$20K=25, $20-35K=20, $35-50K=13, $50-70K=7, >$70K=2. Flip: >$50K=25, $35-50K=20, $20-35K=13, $10-20K=7, <$10K=2]
+Deal Math:          [X]/25 — [best exit at MAO: BRRRR cash left in $X OR flip net profit $X. BRRRR: <$20K=25, $20-35K=20, $35-50K=13, $50-70K=7, >$70K=2. Flip: >$50K=25, $35-50K=20, $20-35K=13, $10-20K=7, <$10K=2]
 Cash Flow:          [X]/15 — [monthly income after PITIE at MAO. >$400/mo=15, $250-400=12, $100-250=8, $0-100=4, negative=0]
-ZIP Quality:        [X]/15 — [A-tier(32205,32216)=15, B-tier(32210,32244,32211,32218,32219)=10, C-tier(32208,32254,32221)=6, unknown=5. State which tier and why: appreciation trend, rental demand, vacancy]
-Seller Motivation:  [X]/10 — [estate/divorce/foreclosure/price drop >15%/as-is=9-10, price drop <15% OR DOM >90=6-8, DOM 30-90 with some signals=4-5, new listing DOM <30 no signals=1-3, institutional/retail=0-1]
-ARV Confidence:     [X]/10 — [HIGH(3+ solid recent comps)=10, MEDIUM(2 comps, reasonable)=6, LOW(sparse/wide range/unusual)=2. State what drives the confidence level]
+ZIP Quality:        [X]/15 — [A-tier(32205,32216)=15, B-tier(32210,32244,32211,32218,32219)=10, C-tier(32208,32254,32221)=6, unknown=5. State tier and why]
+Seller Motivation:  [X]/10 — [estate/divorce/foreclosure/price drop >15%/as-is=9-10, price drop <15% OR DOM >90=6-8, DOM 30-90=4-5, new listing=1-3, institutional=0-1]
+ARV Confidence:     [X]/10 — [HIGH(3+ solid comps)=10, MEDIUM(2 comps)=6, LOW(sparse/wide range)=2]
 Verdict:            [EXCEPTIONAL ≥80 / STRONG 65–79 / WATCH 45–64 / MARGINAL 25–44 / DEAD <25]
 
 =====================================
@@ -88,26 +106,6 @@ ZIP Benchmark:  [what 3/2 renovated sells for in this ZIP and why]
 Adjustments:    [list each: beds, baths, sqft, construction — with $ impact]
 Confidence:     [HIGH / MEDIUM / LOW] — [reason in 1 sentence]
 Watch if wrong: [what would change the ARV and by how much]
-
-=====================================
-MARKET COMPS
-=====================================
-[Always include at least 2 real sold comps that justify the ARV. Use your JAX market knowledge. Format each as:]
-COMP: [street name or area, e.g. "Mango Ave, 32208"] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe, e.g. "sold 3 months ago"] | [condition: renovated / cosmetic / as-is]
-Why relevant: [1 sentence — how this comp supports or adjusts the ARV for THIS property]
-ARV Conclusion: [1–2 sentences — how the comps together land on the ARV used, what would push it higher or lower]
-
-=====================================
-CRM COMPS USED
-=====================================
-[ONLY include this section if CRM historical comps were provided above. This is one of the most important sections — it shows HAT Investors how their own past experience applies to this deal. Be specific and reference actual addresses and numbers from the CRM data.]
-[For each past deal that is directly relevant to ARV, reno estimate, or offer strategy, list it:]
-COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
-How used: [1-2 sentences — specifically what this deal taught us: did the ARV hold up? did the seller negotiate down? what was the reno outcome? how does it benchmark the current property?]
-[List ALL relevant comps from same ZIP first, then nearby ZIPs if useful]
-[If we previously offered on a similar property in the same ZIP, call it out explicitly with the offer amount and outcome]
-ZIP Pattern: [2-3 sentences — what the FULL CRM history for this ZIP tells us: typical ARV range for similar properties, reno cost patterns, seller motivation patterns, our offer success rate, any red flags or opportunities we've learned from past deals]
-Confidence Impact: [1 sentence — does the CRM history INCREASE or DECREASE your confidence in the ARV and offer price for this deal, and why?]
 
 =====================================
 PROS — WHY THIS DEAL IS INTERESTING
@@ -368,7 +366,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 3500,
+        max_tokens: 2800,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
       }),
