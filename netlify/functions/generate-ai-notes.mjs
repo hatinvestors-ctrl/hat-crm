@@ -44,12 +44,15 @@ Verdict:        [use EXACTLY one of these 4 options:]
 At Ask:         [WORKS / FAILS / MARGINAL] — [one line why: spread, cash left in, cash flow]
 At MAO:         [WORKS / FAILS / MARGINAL] — [one line why]
 Gap:            $[X] off ask to reach MAO ([X]% reduction needed)
-Strategy:       [BRRRR / Flip / Rental Hold / None]
+Strategy:       [BRRRR / Flip / Rental Hold / INSPECTION PLAY / None]
 Our ARV:        $[X]
-Starting Offer: $[X]  ← opening ask (can walk if rejected)
+Starting Offer: $[X]  ← opening bid (see Inspection Play note if applicable)
 Target Price:   $[X]  ← MAO, makes deal work
-Max Walk-Away:  $[X]  ← absolute ceiling
+Max Walk-Away:  $[X]  ← absolute ceiling; walk cleanly during inspection if seller won't come down
 Summary:        [2 sentences — deal viability at MAO, what must be true to close]
+[INSPECTION PLAY — include this block ONLY when ALL three conditions are true: (1) ask is 5–15% above MAO, (2) property is older/as-is/shows deferred maintenance that inspection will likely surface, (3) seller shows motivation signals. DO NOT recommend for gaps >20% or well-maintained properties.]
+[If Inspection Play applies:]
+Inspection Play: YES — offer $[ask price or $X above ask] to secure contract. Target $[X] reduction during 3-day inspection period based on [specific likely findings: roof age/HVAC/plumbing/electrical]. Net target price $[MAO]. Walk cleanly if seller holds above $[MAO + $X buffer]. Risk: [1 sentence on what could go wrong].
 [Value-Add Opportunities: ONLY list items below that are genuinely worth doing for THIS specific property. Omit any that don't apply. Never force suggestions.]
 [Include ONLY IF 1–2 BR: ] Bedroom Add:  YES — adds ~$[X] ARV, ~$[X] cost (e.g. convert dining room / garage / large closet)
 [Include ONLY IF 1 bath: ] Bath Add:     YES — master ensuite adds ~$[X] ARV, ~$[X] cost; moves from 1/1 to 2/1 or 3/2 comp tier

@@ -440,6 +440,7 @@ function RecommendedActionSection({ body }) {
   const summary    = get('Summary')
 
   // Value-add lines (optional)
+  const inspectionPlay = get('Inspection Play')
   const bedroomAdd = get('Bedroom Add')
   const bathAdd    = get('Bath Add')
   const otherUp    = get('Other Upside')
@@ -559,6 +560,17 @@ function RecommendedActionSection({ body }) {
       {/* Summary */}
       {summary && (
         <p className="text-[12px] text-[color:var(--color-text-muted)] leading-relaxed px-1 italic">{summary}</p>
+      )}
+
+      {/* Inspection Play strategy (conditional) */}
+      {inspectionPlay && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <span className="text-[14px] mt-0.5">🔍</span>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-warn-text)] mb-0.5">Inspection Play</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-warn-text)] leading-snug">{inspectionPlay}</div>
+          </div>
+        </div>
       )}
 
       {/* Value-add opportunities (optional) */}
