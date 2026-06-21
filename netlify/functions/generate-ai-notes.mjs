@@ -96,11 +96,14 @@ ARV Conclusion: [1–2 sentences — how the comps together land on the ARV used
 =====================================
 CRM COMPS USED
 =====================================
-[ONLY include this section if CRM historical comps were provided above. List each relevant comp used to inform the ARV and offer strategy. Format each as:]
-COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
-How used: [1 sentence — what this comp told you about ARV, reno, or offer price for THIS property]
-[If we previously offered on a similar property in the same ZIP, call it out explicitly.]
-Overall: [1-2 sentences — what the CRM history tells us collectively about this ZIP and deal type]
+[ONLY include this section if CRM historical comps were provided above. This is one of the most important sections — it shows HAT Investors how their own past experience applies to this deal. Be specific and reference actual addresses and numbers from the CRM data.]
+[For each past deal that is directly relevant to ARV, reno estimate, or offer strategy, list it:]
+COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
+How used: [1-2 sentences — specifically what this deal taught us: did the ARV hold up? did the seller negotiate down? what was the reno outcome? how does it benchmark the current property?]
+[List ALL relevant comps from same ZIP first, then nearby ZIPs if useful]
+[If we previously offered on a similar property in the same ZIP, call it out explicitly with the offer amount and outcome]
+ZIP Pattern: [2-3 sentences — what the FULL CRM history for this ZIP tells us: typical ARV range for similar properties, reno cost patterns, seller motivation patterns, our offer success rate, any red flags or opportunities we've learned from past deals]
+Confidence Impact: [1 sentence — does the CRM history INCREASE or DECREASE your confidence in the ARV and offer price for this deal, and why?]
 
 =====================================
 PROS — WHY THIS DEAL IS INTERESTING
@@ -219,52 +222,91 @@ async function fetchComparableLeads(lead) {
   const zips = ZIP_CLUSTERS[lead.zip_code] || [lead.zip_code]
   const zipFilter = zips.map(z => `zip_code.eq.${z}`).join(',')
 
-  // Exclude current lead; fetch leads with enough data to be useful
-  const url = `${SUPABASE_URL}/rest/v1/leads?select=address,city,zip_code,bedrooms,bathrooms,sqft,asking_price,arv,renovation_cost,mao,offer_price,status,notes&or=(${zipFilter})&asking_price=not.is.null&order=created_at.desc&limit=20`
+  const fields = [
+    'address','city','zip_code','bedrooms','bathrooms','sqft',
+    'asking_price','arv','conservative_arv','aggressive_arv',
+    'renovation_cost','mao','offer_price','rent_estimate',
+    'status','notes','ai_notes','deal_analysis','created_at',
+  ].join(',')
+
+  const url = `${SUPABASE_URL}/rest/v1/leads?select=${fields}&or=(${zipFilter})&asking_price=not.is.null&order=created_at.desc&limit=30`
 
   const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   })
   if (!res.ok) return []
 
   const rows = await res.json()
-  // Exclude the current lead itself
-  return (rows || []).filter(r => r.address !== lead.address).slice(0, 10)
+  return (rows || []).filter(r => r.address !== lead.address).slice(0, 15)
+}
+
+// Extract the single most useful line from ai_notes for a given field prefix
+function extractAILine(aiNotes, prefix) {
+  if (!aiNotes) return null
+  const m = aiNotes.match(new RegExp(`^${prefix}:\\s*(.+)`, 'im'))
+  return m ? m[1].trim().slice(0, 150) : null
 }
 
 function buildCompsBlock(comps, currentLead) {
   if (!comps.length) return ''
 
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—'
-
-  // Separate same-ZIP from nearby-ZIP
-  const sameZip  = comps.filter(c => c.zip_code === currentLead.zip_code)
+  const sameZip   = comps.filter(c => c.zip_code === currentLead.zip_code)
   const nearbyZip = comps.filter(c => c.zip_code !== currentLead.zip_code)
 
-  const renderRow = (c) => {
-    const br     = c.bedrooms  ? `${c.bedrooms}BR` : ''
-    const ba     = c.bathrooms ? `${c.bathrooms}BA` : ''
-    const sqft   = c.sqft      ? `${c.sqft}sqft`   : ''
-    const size   = [br, ba, sqft].filter(Boolean).join('/')
-    const ask    = fmt(c.asking_price)
-    const arv    = fmt(c.arv)
-    const reno   = fmt(c.renovation_cost)
-    const offer  = c.offer_price ? `offered ${fmt(c.offer_price)}` : 'no offer recorded'
-    const status = c.status ? c.status.replace(/_/g, ' ') : 'unknown'
-    return `  • ${c.address}, ZIP ${c.zip_code} | ${size} | Ask ${ask} | ARV ${arv} | Reno ${reno} | ${offer} | Status: ${status}`
+  const renderComp = (c) => {
+    const size   = [c.bedrooms && `${c.bedrooms}BR`, c.bathrooms && `${c.bathrooms}BA`, c.sqft && `${c.sqft}sqft`].filter(Boolean).join('/')
+    const status = (c.status || 'unknown').replace(/_/g, ' ')
+    const offer  = c.offer_price ? `offered ${fmt(c.offer_price)}` : 'no offer'
+    const arvRange = (c.conservative_arv || c.aggressive_arv)
+      ? ` (conservative ${fmt(c.conservative_arv)} — aggressive ${fmt(c.aggressive_arv)})`
+      : ''
+    const rent = c.rent_estimate ? ` | rent est ${fmt(c.rent_estimate)}/mo` : ''
+
+    let row = `  • ${c.address}, ZIP ${c.zip_code} | ${size} | Ask ${fmt(c.asking_price)} | Our ARV ${fmt(c.arv)}${arvRange} | Reno ${fmt(c.renovation_cost)} | MAO ${fmt(c.mao)}${rent} | ${offer} | Status: ${status}`
+
+    // Pull key conclusions from AI analysis of this past deal
+    const verdict  = extractAILine(c.ai_notes, 'Verdict')
+    const summary  = extractAILine(c.ai_notes, 'Summary')
+    const dealScore = extractAILine(c.ai_notes, 'Total')
+    const arvUsed  = extractAILine(c.ai_notes, 'ARV Used')
+    const confidence = extractAILine(c.ai_notes, 'Confidence')
+    if (verdict)    row += `\n    → Our verdict: ${verdict}`
+    if (summary)    row += `\n    → Summary: ${summary}`
+    if (dealScore)  row += `\n    → Deal score: ${dealScore}`
+    if (arvUsed)    row += `\n    → ARV rationale: ${arvUsed}`
+    if (confidence) row += `\n    → ARV confidence: ${confidence}`
+
+    // Agent notes (manual notes logged in CRM)
+    if (c.notes?.trim()) row += `\n    → Agent notes: ${c.notes.trim().slice(0, 200).replace(/\n/g, ' ')}`
+
+    // deal_analysis JSON (fast-calc verdict + score)
+    if (c.deal_analysis) {
+      try {
+        const da = typeof c.deal_analysis === 'string' ? JSON.parse(c.deal_analysis) : c.deal_analysis
+        if (da.verdict) row += `\n    → Calc verdict: ${da.verdict}${da.score != null ? ` | Score: ${da.score}` : ''}${da.net_profit != null ? ` | Net profit: ${fmt(da.net_profit)}` : ''}`
+      } catch {}
+    }
+
+    return row
   }
 
-  let block = '\n\n--- HAT CRM HISTORICAL COMPS (learn from these, reference in your analysis) ---'
+  let block = '\n\n--- HAT CRM HISTORICAL DEALS — LEARN FROM THESE (same ZIP and nearby ZIPs) ---'
+  block += '\nThese are real deals HAT Investors has analyzed or worked. Use them to calibrate ARV, reno costs, offer strategy, and ZIP-level patterns.'
   if (sameZip.length) {
-    block += `\nSame ZIP (${currentLead.zip_code}):\n` + sameZip.map(renderRow).join('\n')
+    block += `\n\nSAME ZIP (${currentLead.zip_code}) — highest relevance:\n` + sameZip.map(renderComp).join('\n')
   }
   if (nearbyZip.length) {
-    block += `\nNearby ZIPs:\n` + nearbyZip.map(renderRow).join('\n')
+    block += `\n\nNEARBY ZIPs — secondary reference:\n` + nearbyZip.map(renderComp).join('\n')
   }
-  block += '\nUse these to calibrate ARV, validate reno estimates, and reference prior offer strategy. If we offered on a similar property, note it explicitly in your analysis.'
+  block += `\n\nHOW TO USE THIS DATA:
+- ARV calibration: What ARV did we assign to similar BR/BA/sqft properties in this ZIP? Use that as your anchor — don't deviate without a specific reason.
+- Reno benchmarks: What did we budget for reno on similar properties? Flag if this property needs more or less.
+- Offer patterns: Did we offer on similar properties? At what price relative to ask? What happened?
+- ZIP momentum: Are sellers accepting offers? Are properties going under contract, or sitting? What does the status distribution tell you?
+- Deal quality trend: Are our scores improving? What deals did we WIN vs PASS and why?
+Reference specific past deals by address in the CRM COMPS USED section whenever they're directly relevant.`
+
   return block
 }
 
