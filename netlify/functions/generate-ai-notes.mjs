@@ -120,11 +120,14 @@ function buildUserPrompt(lead) {
   const sqft = num(lead.sqft)
   const ppsf = pp && sqft ? Math.round(pp / sqft) : null
 
+  // Use MAO as purchase price if no asking price (evaluate deal at our number)
+  const calcPrice = pp || mao
+
   // Pre-compute BRRRR scenario so Claude has exact numbers
   let brrrrBlock = ''
-  if (pp && arv && reno != null) {
-    const hml        = pp * 0.90 + reno
-    const allIn      = pp + reno
+  if (calcPrice && arv && reno != null) {
+    const hml        = calcPrice * 0.90 + reno
+    const allIn      = calcPrice + reno
     const refi       = arv * 0.70
     const cashLeftIn = allIn - refi
     const rentEstimate = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
@@ -142,8 +145,8 @@ Pre-computed BRRRR numbers (use these — do not recalculate):
 
   // Pre-compute Flip scenario
   let flipBlock = ''
-  if (pp && arv && reno != null) {
-    const allIn      = pp + reno
+  if (calcPrice && arv && reno != null) {
+    const allIn      = calcPrice + reno
     const grossProfit = arv - allIn
     const carryClose = arv * 0.08
     const netProfit  = grossProfit - carryClose
@@ -155,10 +158,11 @@ Pre-computed Flip numbers (use these — do not recalculate):
   Net flip profit: ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
   }
 
-  return `Fill in the 3 required sections for this deal. Be concise — one line per field. No extra text.
+  return `Generate investor notes for this property using the data and pre-computed numbers below.
 
 ${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | MAO: ${fmt(mao)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}`
+Seller Ask: ${fmt(pp)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | MAO: ${fmt(mao)} | Rent estimate: ${fmt(rent)}
+${!pp && mao ? `NOTE: No asking price on file. Pre-computed numbers use MAO ($${mao.toLocaleString()}) as the purchase price — evaluate the deal at our number.` : ''}${brrrrBlock}${flipBlock}`
 }
 
 async function saveNotes(leadId, notes) {
