@@ -34,14 +34,14 @@ Write EXACTLY these 8 sections. No markdown headers (##). No intro. Start immedi
 =====================================
 RECOMMENDED ACTION
 =====================================
-Verdict:        [BUY / PASS / WATCH]
-Strategy:       [BRRRR / Flip / Rental Hold / Pass]
+Verdict:        [BUY at MAO / MAKE OFFER / WATCH for price drop / PASS — no path]
+Strategy:       [BRRRR / Flip / Rental Hold / None]
 Our ARV:        $[X]
-Starting Offer: $[X]
-Target Price:   $[X]
-Max Walk-Away:  $[X]
+Starting Offer: $[X]  ← opening ask (can walk if rejected)
+Target Price:   $[X]  ← MAO, makes deal work
+Max Walk-Away:  $[X]  ← absolute ceiling
 Bedroom Add:    [YES — adds ~$[X] ARV, costs ~$[X] / NO / N/A]
-Summary:        [2 sentences — why this verdict, what must be true to act]
+Summary:        [2 sentences — deal viability at MAO, what must be true to close]
 
 =====================================
 DEAL SNAPSHOT
@@ -211,7 +211,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1600,
+        max_tokens: 2000,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt(lead) }],
       }),
