@@ -6,6 +6,7 @@ import ActionZone from '../components/lead-detail/ActionZone'
 import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
+import AINotesSection from '../components/lead-detail/AINotesSection'
 import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
@@ -166,6 +167,11 @@ export default function LeadDetailPage() {
               onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
             />
             <NotesSection
+              lead={lead}
+              canEdit={canEdit}
+              onUpdated={(updated) => setLead(updated)}
+            />
+            <AINotesSection
               lead={lead}
               canEdit={canEdit}
               onUpdated={(updated) => setLead(updated)}

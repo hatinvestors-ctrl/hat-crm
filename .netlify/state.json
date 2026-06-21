@@ -1,6 +1,6 @@
 {
+	"siteId": "16abd856-a8b6-4736-a2a4-e8913ebfc8e8",
 	"dbConnectionString": "postgres://localhost:56092/postgres",
-	"siteId": "c2cbe5f0-de2c-402b-a1f9-93f8f1070f9f",
 	"geolocation": {
 		"data": {
 			"city": "Petah Tikva",

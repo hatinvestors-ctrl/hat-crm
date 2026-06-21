@@ -79,6 +79,88 @@ function PlainText({ body }) {
   return <p className="text-[12.5px] text-[color:var(--color-text-muted)] leading-relaxed whitespace-pre-wrap">{body}</p>
 }
 
+function DealScoreSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+
+  const totalRaw = get('Total')
+  const verdict  = get('Verdict')
+  const total    = totalRaw ? parseInt(totalRaw) : null
+
+  const subScores = [
+    { key: 'Spread Quality',       max: 25 },
+    { key: 'BRRRR Math',           max: 25 },
+    { key: 'Cash Flow',            max: 20 },
+    { key: 'Market Confidence',    max: 20 },
+    { key: 'Negotiation Position', max: 10 },
+  ].map(({ key, max }) => {
+    const raw = get(key)
+    if (!raw) return null
+    const scoreMatch = raw.match(/^(\d+)\/\d+/)
+    const score = scoreMatch ? parseInt(scoreMatch[1]) : null
+    const detail = raw.replace(/^\d+\/\d+\s*[—-]\s*/, '').trim()
+    return { key, max, score, detail }
+  }).filter(Boolean)
+
+  const scoreColor = (n, max) => {
+    const pct = n / max
+    return pct >= 0.75 ? 'var(--color-success)' : pct >= 0.5 ? 'var(--color-warn)' : 'var(--color-danger)'
+  }
+
+  const totalColor = total >= 75 ? { txt: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)' }
+    : total >= 55 ? { txt: 'var(--color-accent-text)', bg: 'var(--color-accent-soft)', bdr: 'var(--color-accent)' }
+    : total >= 35 ? { txt: 'var(--color-warn-text)', bg: 'var(--color-warn-soft)', bdr: 'var(--color-warn)' }
+    : { txt: 'var(--color-text-muted)', bg: 'var(--color-bg-elev-2)', bdr: 'var(--color-line)' }
+
+  return (
+    <div className="space-y-3">
+      {/* Gauge */}
+      {total != null && (
+        <div className="flex items-center gap-4 p-3 rounded-lg border" style={{ background: totalColor.bg, borderColor: totalColor.bdr }}>
+          <div className="relative shrink-0 w-16 h-16">
+            <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--color-line)" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none"
+                stroke={totalColor.bdr} strokeWidth="3"
+                strokeDasharray={`${total} ${100 - total}`} strokeLinecap="round" />
+            </svg>
+            <span className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[16px] font-black leading-none" style={{ color: totalColor.txt }}>{total}</span>
+              <span className="text-[9px]" style={{ color: totalColor.txt }}>/100</span>
+            </span>
+          </div>
+          <div>
+            <div className="text-[15px] font-black" style={{ color: totalColor.txt }}>
+              {total >= 75 ? 'STRONG DEAL' : total >= 55 ? 'SOLID DEAL' : total >= 35 ? 'MARGINAL' : 'WEAK'}
+            </div>
+            {verdict && <p className="text-[11px] mt-0.5" style={{ color: totalColor.txt }}>{verdict.replace(/^(STRONG|SOLID|MARGINAL|WEAK)[^—–-]*/i, '')}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-scores */}
+      <div className="space-y-2">
+        {subScores.map(({ key, max, score, detail }) => (
+          <div key={key} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10.5px] font-semibold text-[color:var(--color-text-muted)]">{key}</span>
+              <span className="text-[11px] font-bold" style={{ color: score != null ? scoreColor(score, max) : 'var(--color-text-dim)' }}>
+                {score ?? '?'}/{max}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[color:var(--color-line)] overflow-hidden mb-1.5">
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{ width: score != null ? `${(score / max) * 100}%` : '0%', backgroundColor: score != null ? scoreColor(score, max) : 'transparent' }} />
+            </div>
+            {detail && <p className="text-[10.5px] text-[color:var(--color-text-dim)] leading-snug">{detail}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SnapshotSection({ body }) {
   const fields = body.split('\n').filter(Boolean).reduce((acc, line) => {
     const ci = line.indexOf(':')
@@ -344,35 +426,108 @@ function RecommendedActionSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
   const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
     ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
-  const verdict   = get('Verdict')
-  const strategy  = get('Strategy')
-  const arv       = get('Our ARV')
-  const starting  = get('Starting Offer')
-  const target    = get('Target Price')
-  const maxWalk   = get('Max Walk-Away')
-  const bedroomAdd = get('Bedroom Add')
-  const watchLine = lines.find(l => /^\[If PASS/i.test(l.trim()) || /^At \$/i.test(l.trim()))
 
-  const isPass = /^PASS/i.test(verdict || '')
-  const isWatch = /^WATCH/i.test(verdict || '')
-  const verdictColor = isPass
-    ? { bg: 'var(--color-danger-soft)', txt: 'var(--color-danger-text)', bdr: 'var(--color-danger)' }
+  const verdict    = get('Verdict')
+  const atAsk      = get('At Ask')
+  const atMao      = get('At MAO')
+  const gap        = get('Gap')
+  const strategy   = get('Strategy')
+  const arv        = get('Our ARV')
+  const starting   = get('Starting Offer')
+  const target     = get('Target Price')
+  const maxWalk    = get('Max Walk-Away')
+  const summary    = get('Summary')
+
+  // Value-add lines (optional)
+  const bedroomAdd = get('Bedroom Add')
+  const bathAdd    = get('Bath Add')
+  const otherUp    = get('Other Upside')
+
+  const isBuyNow   = /^BUY NOW/i.test(verdict || '')
+  const isOffer    = /^OFFER/i.test(verdict || '')
+  const isWatch    = /^WATCH/i.test(verdict || '')
+  const isDead     = /^DEAD/i.test(verdict || '')
+
+  const verdictMeta = isBuyNow
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW' }
+    : isOffer
+    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: 'OFFER & NEGOTIATE' }
     : isWatch
-    ? { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
-    : { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)' }
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH' }
+    : isDead
+    ? { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '🚫', label: 'DEAD LEAD' }
+    : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—' }
+
+  // Strip verdict keyword from the full verdict string to get the explanation
+  const verdictDetail = (verdict || '').replace(/^(BUY NOW|OFFER & NEGOTIATE|WATCH|DEAD LEAD)\s*[—-]\s*/i, '')
+
+  // Parse At Ask / At MAO status
+  const parseStatus = (val) => {
+    if (!val) return null
+    const works    = /^WORKS/i.test(val)
+    const marginal = /^MARGINAL/i.test(val)
+    const color = works ? 'var(--color-success-text)' : marginal ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+    const bg    = works ? 'var(--color-success-soft)' : marginal ? 'var(--color-warn-soft)'  : 'var(--color-danger-soft)'
+    const bdr   = works ? 'var(--color-success)'      : marginal ? 'var(--color-warn)'        : 'var(--color-danger)'
+    const label = works ? 'WORKS' : marginal ? 'MARGINAL' : 'FAILS'
+    const detail = val.replace(/^(WORKS|FAILS|MARGINAL)\s*[—-]\s*/i, '')
+    return { label, color, bg, bdr, detail }
+  }
+
+  const askStatus = parseStatus(atAsk)
+  const maoStatus = parseStatus(atMao)
 
   return (
     <div className="space-y-2.5">
+      {/* Main verdict banner */}
       {verdict && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border"
-          style={{ background: verdictColor.bg, borderColor: verdictColor.bdr }}>
-          <span className="text-[22px]">{isPass ? '⛔' : isWatch ? '👀' : '✅'}</span>
-          <div>
-            <div className="text-[15px] font-black" style={{ color: verdictColor.txt }}>{verdict}</div>
-            {strategy && <div className="text-[11px] mt-0.5" style={{ color: verdictColor.txt }}>Strategy: {strategy}</div>}
+        <div className="flex items-start gap-3 p-3 rounded-lg border"
+          style={{ background: verdictMeta.bg, borderColor: verdictMeta.bdr }}>
+          <span className="text-[22px] shrink-0 mt-0.5">{verdictMeta.icon}</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-black leading-tight" style={{ color: verdictMeta.txt }}>{verdictMeta.label}</div>
+            {verdictDetail && (
+              <p className="text-[11.5px] mt-0.5 leading-snug" style={{ color: verdictMeta.txt }}>{verdictDetail}</p>
+            )}
+            {strategy && (
+              <div className="text-[10.5px] mt-1 opacity-75" style={{ color: verdictMeta.txt }}>Strategy: {strategy}</div>
+            )}
           </div>
         </div>
       )}
+
+      {/* At Ask vs At MAO comparison */}
+      {(askStatus || maoStatus) && (
+        <div className="grid grid-cols-2 gap-2">
+          {askStatus && (
+            <div className="rounded-lg border p-2.5" style={{ background: askStatus.bg, borderColor: askStatus.bdr }}>
+              <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: askStatus.color }}>At Seller's Ask</div>
+              <div className="text-[12px] font-bold" style={{ color: askStatus.color }}>{askStatus.label}</div>
+              {askStatus.detail && <p className="text-[10px] mt-0.5 leading-snug opacity-80" style={{ color: askStatus.color }}>{askStatus.detail}</p>}
+            </div>
+          )}
+          {maoStatus && (
+            <div className="rounded-lg border p-2.5" style={{ background: maoStatus.bg, borderColor: maoStatus.bdr }}>
+              <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: maoStatus.color }}>At Our Offer (MAO)</div>
+              <div className="text-[12px] font-bold" style={{ color: maoStatus.color }}>{maoStatus.label}</div>
+              {maoStatus.detail && <p className="text-[10px] mt-0.5 leading-snug opacity-80" style={{ color: maoStatus.color }}>{maoStatus.detail}</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Gap indicator */}
+      {gap && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <span className="text-[12px]">↕️</span>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Negotiation Gap</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{gap}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Price cards */}
       <div className="grid grid-cols-2 gap-2">
         {arv && (
           <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
@@ -393,24 +548,32 @@ function RecommendedActionSection({ body }) {
           </div>
         )}
         {maxWalk && (
-          <div className="p-2.5 rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]">
-            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-danger-text)] mb-0.5">Max Walk-Away</div>
-            <div className="text-[14px] font-bold text-[color:var(--color-danger-text)]">{maxWalk.split('←')[0].trim()}</div>
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Max Walk-Away</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-text)]">{maxWalk.split('←')[0].trim()}</div>
           </div>
         )}
       </div>
-      {bedroomAdd && !/^N\/A/i.test(bedroomAdd) && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
-          <span className="text-[13px]">🛏️</span>
+
+      {/* Summary */}
+      {summary && (
+        <p className="text-[12px] text-[color:var(--color-text-muted)] leading-relaxed px-1 italic">{summary}</p>
+      )}
+
+      {/* Value-add opportunities (optional) */}
+      {[
+        bedroomAdd && { icon: '🛏️', label: 'Bedroom Add', val: bedroomAdd },
+        bathAdd    && { icon: '🚿', label: 'Bath Add',    val: bathAdd    },
+        otherUp    && { icon: '💡', label: 'Other Upside', val: otherUp  },
+      ].filter(Boolean).map(({ icon, label, val }) => (
+        <div key={label} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+          <span className="text-[13px] mt-0.5">{icon}</span>
           <div>
-            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Bedroom Add</div>
-            <div className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{bedroomAdd}</div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">{label}</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{val}</div>
           </div>
         </div>
-      )}
-      {watchLine && (
-        <p className="text-[11.5px] text-[color:var(--color-text-muted)] italic px-1">{watchLine.replace(/^\[|\]$/g, '')}</p>
-      )}
+      ))}
     </div>
   )
 }
@@ -578,6 +741,103 @@ function BedroomAddSection({ body }) {
   )
 }
 
+function MarketCompsSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const compLines = lines.filter(l => /^COMP:/i.test(l.trim()))
+  const whyLines  = lines.filter(l => /^Why relevant:/i.test(l.trim()))
+  const conclusion = lines.find(l => /^ARV Conclusion:/i.test(l.trim()))?.replace(/^ARV Conclusion:\s*/i, '').trim()
+
+  if (compLines.length === 0) return <PlainText body={body} />
+
+  return (
+    <div className="space-y-2.5">
+      <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Sold Comps Used for ARV</div>
+      {compLines.map((line, i) => {
+        const content = line.replace(/^COMP:\s*/i, '')
+        const parts   = content.split('|').map(s => s.trim())
+        const [area, profile, sqft, sold, ppsf, timeframe, condition] = parts
+        const why = whyLines[i]?.replace(/^Why relevant:\s*/i, '').trim()
+        return (
+          <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
+            <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
+              <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{area}</span>
+              {sold && <span className="shrink-0 text-[13px] font-bold text-[color:var(--color-success-text)]">{sold.replace('Sold ', '')}</span>}
+            </div>
+            <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
+              {profile    && <span>{profile}</span>}
+              {sqft       && <span>{sqft}</span>}
+              {ppsf       && <span className="text-[color:var(--color-accent-text)] font-medium">{ppsf}</span>}
+              {timeframe  && <span>{timeframe}</span>}
+              {condition  && <span className="italic">{condition}</span>}
+            </div>
+            {why && (
+              <div className="px-3 pb-2">
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{why}</p>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {conclusion && (
+        <div className="px-3 py-2.5 rounded-lg bg-[color:var(--color-success-soft)] border border-[color:var(--color-success)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-1">ARV Conclusion</div>
+          <p className="text-[12px] text-[color:var(--color-success-text)] leading-relaxed">{conclusion}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CRMCompsUsedSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const compLines = lines.filter(l => /^COMP:/i.test(l.trim()))
+  const howLines  = lines.filter(l => /^How used:/i.test(l.trim()))
+  const overall   = lines.find(l => /^Overall:/i.test(l.trim()))?.replace(/^Overall:\s*/i, '').trim()
+
+  if (compLines.length === 0) return <PlainText body={body} />
+
+  return (
+    <div className="space-y-2.5">
+      {compLines.map((line, i) => {
+        const content = line.replace(/^COMP:\s*/i, '')
+        const parts   = content.split('|').map(s => s.trim())
+        const [addrZip, profile, ask, arv, reno, offer, status] = parts
+        const how = howLines[i]?.replace(/^How used:\s*/i, '').trim()
+        return (
+          <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
+            <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
+              <span className="text-[12px] font-semibold text-[color:var(--color-text)] leading-snug">{addrZip}</span>
+              {status && (
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)]">
+                  {status.replace('Status: ', '')}
+                </span>
+              )}
+            </div>
+            <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
+              {profile && <span>{profile}</span>}
+              {ask     && <span className="text-[color:var(--color-text)]">{ask}</span>}
+              {arv     && <span>ARV {arv.replace('ARV ', '')}</span>}
+              {reno    && <span>Reno {reno.replace('Reno ', '')}</span>}
+              {offer   && <span className="text-[color:var(--color-accent-text)] font-medium">{offer}</span>}
+            </div>
+            {how && (
+              <div className="px-3 pb-2">
+                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{how}</p>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {overall && (
+        <div className="px-3 py-2.5 rounded-lg bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1">What CRM History Tells Us</div>
+          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-relaxed">{overall}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CRMWorkflowSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
   const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
@@ -663,6 +923,7 @@ function CRMWorkflowSection({ body }) {
 
 const SECTION_META = {
   'RECOMMENDED ACTION':                  { icon: '🎯', render: s => <RecommendedActionSection body={s} /> },
+  'DEAL SCORE':                          { icon: '🏆', render: s => <DealScoreSection    body={s} /> },
   'DEAL SNAPSHOT':                       { icon: '📊', render: s => <SnapshotSection body={s} /> },
   'ARV ANALYSIS & COMP SUPPORT':         { icon: '🏠', render: s => <ARVSection      body={s} /> },
   'OPPORTUNITY SCORE & CONFIDENCE':      { icon: '🎯', render: s => <ScoreSection    body={s} /> },
@@ -676,16 +937,18 @@ const SECTION_META = {
   'STRATEGY RECOMMENDATION':             { icon: '🗺️', render: s => <StrategySection body={s} /> },
   'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection      body={s} /> },
   'COMPARABLE SALES':                    { icon: '🏡', render: s => <ComparableSalesSection body={s} /> },
+  'MARKET COMPS':                        { icon: '🏡', render: s => <MarketCompsSection      body={s} /> },
+  'CRM COMPS USED':                      { icon: '🏡', render: s => <CRMCompsUsedSection    body={s} /> },
   'BEDROOM ADD OPPORTUNITY':             { icon: '🛏️', render: s => <BedroomAddSection     body={s} /> },
   'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection    body={s} /> },
 }
 
 // Tab definitions — sections are matched by name prefix
 const TABS = [
-  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^OPPORTUNITY SCORE/.test(n) },
+  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE/.test(n) },
   { id: 'numbers',  label: 'Numbers',  icon: '💰', match: n => /^ARV ANALYSIS|^DEAL MATH/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
-  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^BEDROOM ADD/.test(n) },
+  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD/.test(n) },
   { id: 'action',   label: 'Action',   icon: '📞', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
 ]
 
