@@ -13,7 +13,7 @@
   timeout = 120
 
 [functions."generate-ai-notes"]
-  timeout = 30
+  timeout = 50
 
 [functions."ask-deal-question"]
   timeout = 20
