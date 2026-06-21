@@ -60,7 +60,10 @@ export default function NotesSection({ lead, canEdit, onUpdated }) {
       }
 
       const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error || `Generation failed (${res.status}).`)
+      if (!res.ok || !data.ok) {
+        if (data.error === 'NO_ASKING_PRICE') throw new Error('Please fill in the Seller\'s Asking Price before generating AI notes — the analysis is based on what the seller is asking.')
+        throw new Error(data.error || `Generation failed (${res.status}).`)
+      }
 
       setLocalNotes(data.notes)
       setGenerating(false)
