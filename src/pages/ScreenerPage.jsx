@@ -116,7 +116,7 @@ export default function ScreenerPage() {
       const resp = await fetch('/.netlify/functions/generate-ai-notes', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ lead, skip_save: true }),
+        body: JSON.stringify({ lead, skip_save: true, screener_mode: true }),
       })
       if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
         throw new Error(`Server error ${resp.status} — function may be timing out or not deployed. Try again.`)

@@ -122,6 +122,43 @@ Set Status: [new_lead / contacted / offer_sent / negotiating / dead_lead / follo
 Make Offer: [YES — $[X] / NO / NOT YET]
 Priority:   [HIGH — act today / MEDIUM — this week / LOW — watch]`
 
+// Compact prompt for screener quick-analysis (no CRM comps, shorter response)
+const SCREENER_SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor. Give a fast deal snapshot.
+JAX ARV (3/2 renovated): 32208/32219 $160–240K | 32210/32244/32221 $220–320K | 32205/32216 $230–380K | 32211 $155–200K | Clay Co $200–300K
+Adjustments: 2BR −$20K | 4BR +$15K | 1BA −$20K | <1,000sqft −$15K
+Flip: MAO = 0.75×ARV − reno. Carry+close = 8% ARV.
+BRRRR: refi = 70% ARV. Cash left in <$30K great, $30–60K ok, >$60K fails.
+
+Write EXACTLY these sections, no other text:
+
+=====================================
+RECOMMENDED ACTION
+=====================================
+Verdict:        [BUY NOW / OFFER & NEGOTIATE / WATCH / DEAD LEAD]
+At Ask:         [WORKS / FAILS / MARGINAL] — [one line why]
+Strategy:       [BRRRR / Flip / Rental Hold / None]
+Our ARV:        $[X]
+MAO:            $[X]
+Starting Offer: $[X]
+Summary:        [2 sentences — deal viability and what must be true]
+
+=====================================
+DEAL SCORE
+=====================================
+Total:          [X]/100
+Price Gap:      [X]/20
+Deal Math:      [X]/25
+ZIP Quality:    [X]/15
+ARV Confidence: [X]/10
+Verdict:        [EXCEPTIONAL ≥80 / STRONG 65–79 / WATCH 45–64 / MARGINAL 25–44 / DEAD <25]
+
+=====================================
+CRM WORKFLOW
+=====================================
+Set Status: [new_lead / contacted / offer_sent / negotiating / dead_lead / follow_up]
+Make Offer: [YES — $[X] / NO / NOT YET]
+Priority:   [HIGH — act today / MEDIUM — this week / LOW — watch]`
+
 function buildUserPrompt(lead) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')
   const fmt  = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'Unknown'
@@ -322,7 +359,7 @@ export default async (req) => {
 
   try {
     const body    = await req.json().catch(() => ({}))
-    const { lead_id, lead, skip_save = false } = body
+    const { lead_id, lead, skip_save = false, screener_mode = false } = body
 
     if (!lead) {
       return new Response(JSON.stringify({ ok: false, error: 'lead object is required.' }), { status: 400, headers: HEADERS })
@@ -331,12 +368,14 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: false, error: 'NO_ASKING_PRICE' }), { status: 400, headers: HEADERS })
     }
 
-    // Fetch CRM historical comps in parallel with nothing else — fast Supabase query
-    const comps = await fetchComparableLeads(lead).catch(() => [])
-    const userPrompt = buildUserPrompt(lead) + buildCompsBlock(comps, lead)
+    // Screener mode: skip CRM comps, use short prompt, fewer tokens — targets <10s response
+    const comps = screener_mode ? [] : await fetchComparableLeads(lead).catch(() => [])
+    const systemPrompt = screener_mode ? SCREENER_SYSTEM_PROMPT : SYSTEM_PROMPT
+    const maxTokens    = screener_mode ? 600 : 1800
+    const userPrompt   = buildUserPrompt(lead) + (screener_mode ? '' : buildCompsBlock(comps, lead))
 
     const abortCtrl = new AbortController()
-    const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
+    const abortTimer = setTimeout(() => abortCtrl.abort(), 25000)
 
     let claudeRes
     try {
@@ -349,8 +388,8 @@ export default async (req) => {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1800,
-          system: SYSTEM_PROMPT,
+          max_tokens: maxTokens,
+          system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         }),
         signal: abortCtrl.signal,
