@@ -126,6 +126,7 @@ export default function LeadsPage() {
 
     if (effectiveFilters.status) q = q.eq('status', effectiveFilters.status)
     if (effectiveFilters.is_hot === true) q = q.eq('is_hot', true)
+    if (effectiveFilters.screened === true) q = q.eq('screened', true)
     if (effectiveFilters.assigned_to === 'unassigned') q = q.is('assigned_to', null)
     else if (effectiveFilters.assigned_to) q = q.eq('assigned_to', effectiveFilters.assigned_to)
     if (effectiveFilters.lead_source) q = q.eq('lead_source', effectiveFilters.lead_source)

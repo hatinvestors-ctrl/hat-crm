@@ -130,6 +130,7 @@ export const ROLE_MAP = Object.fromEntries(USER_ROLES.map(r => [r.value, r]))
 
 // System views — auto-generated from statuses + special composites.
 export const SYSTEM_VIEWS = [
+  { id: 'screener',    name: '🔍 Screener Leads',  filters: { screened: true } },
   { id: 'all',         name: 'All Leads',         filters: {} },
   { id: 'hot',         name: '🔥 Hot Leads',      filters: { is_hot: true } },
   { id: 'mine',        name: 'My Assigned Leads', filters: { assigned_to: 'me' } },
