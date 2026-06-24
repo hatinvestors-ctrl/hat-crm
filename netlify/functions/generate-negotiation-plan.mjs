@@ -78,18 +78,15 @@ VOICEMAIL SCRIPT
 [30 seconds when read aloud. Relaxed, confident pace. Introduce yourself, reference the property by address, state your intent clearly, give your number once at normal speed, end with a reason to call back now vs later.]
 ---`
 
-export async function handler(event) {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: HEADERS, body: '' }
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: HEADERS, body: 'Method Not Allowed' }
+export default async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
+  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: HEADERS })
 
-  let body
-  try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ ok: false, error: 'Invalid JSON' }) }
-  }
-
+  const body = await req.json().catch(() => ({}))
   const { lead = {}, ai_notes = '' } = body
+
   if (!lead.address) {
-    return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ ok: false, error: 'lead.address required' }) }
+    return new Response(JSON.stringify({ ok: false, error: 'lead.address required' }), { status: 400, headers: HEADERS })
   }
 
   const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : 'Unknown'
@@ -126,13 +123,13 @@ Write the negotiation plan and all three communications (email, SMS, voicemail) 
 
     if (!resp.ok) {
       const err = await resp.text()
-      return { statusCode: 502, headers: HEADERS, body: JSON.stringify({ ok: false, error: err }) }
+      return new Response(JSON.stringify({ ok: false, error: err }), { status: 502, headers: HEADERS })
     }
 
     const data = await resp.json()
     const notes = data.content?.[0]?.text || ''
-    return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, notes }) }
+    return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
-    return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ ok: false, error: e.message }) }
+    return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
   }
 }
