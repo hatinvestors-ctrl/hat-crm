@@ -375,7 +375,8 @@ export default async (req) => {
     const userPrompt   = buildUserPrompt(lead) + (screener_mode ? '' : buildCompsBlock(comps, lead))
 
     const abortCtrl = new AbortController()
-    const abortTimer = setTimeout(() => abortCtrl.abort(), 25000)
+    // screener_mode targets <10s; full analysis can use up to 45s (Netlify function timeout is 50s)
+    const abortTimer = setTimeout(() => abortCtrl.abort(), screener_mode ? 12000 : 45000)
 
     let claudeRes
     try {
