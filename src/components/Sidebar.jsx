@@ -221,6 +221,24 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
         )}
       </nav>
 
+      {/* Deal Screener nav link */}
+      {userRole !== 'readonly' && (
+        <div className="px-2 pb-1">
+          <NavLink
+            to={`${base}/screener`}
+            className={({ isActive }) =>
+              `w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium transition-colors ${
+                isActive
+                  ? 'bg-[color:var(--color-accent)] text-white'
+                  : 'text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90'
+              }`
+            }
+          >
+            <span>&#x1F50D;</span>
+            Deal Screener
+          </NavLink>
+        </div>
+      )}
       {/* Quick Analysis button */}
       {userRole !== 'readonly' && (
         <div className="px-2 pb-1">
