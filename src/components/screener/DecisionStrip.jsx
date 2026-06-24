@@ -1,5 +1,20 @@
 // Bottom action bar for each deal: Pass / Save to CRM / Get Negotiation Plan
 
+function buildDashboardUrl(deal) {
+  const asking = deal.askingPrice
+    ? parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || ''
+    : ''
+  const p = new URLSearchParams()
+  if (asking)              p.set('pp',      asking)
+  if (deal.enriched?.arv) p.set('arv',     deal.enriched.arv)
+  if (deal.address)        p.set('address', deal.address)
+  if (deal.enriched?.bedrooms)  p.set('beds', deal.enriched.bedrooms)
+  if (deal.enriched?.bathrooms) p.set('baths', deal.enriched.bathrooms)
+  if (deal.enriched?.sqft)      p.set('sqft', deal.enriched.sqft)
+  if (deal.enriched?.zip_code)  p.set('zip', deal.enriched.zip_code)
+  return `/deal-analyzer.html?${p.toString()}`
+}
+
 export default function DecisionStrip({
   deal,
   onPass,
@@ -15,6 +30,7 @@ export default function DecisionStrip({
   const isPassed = deal.status === 'passed'
   const isSaved  = deal.status === 'saved'
   const hasNego  = !!deal.negoNotes
+  const dashUrl  = buildDashboardUrl(deal)
 
   if (isPassed || isSaved) {
     return (
@@ -22,6 +38,15 @@ export default function DecisionStrip({
         <span className="text-[12px] text-[color:var(--color-text-dim)]">
           {isSaved ? '✓ Saved to CRM' : 'Passed — not saving this deal'}
         </span>
+        <div className="flex-1" />
+        <a
+          href={dashUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 h-8 inline-flex items-center rounded-md text-[12px] font-semibold border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+        >
+          📊 Deal Dashboard
+        </a>
       </div>
     )
   }
@@ -34,6 +59,15 @@ export default function DecisionStrip({
       >
         Pass
       </button>
+
+      <a
+        href={dashUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-3 h-8 inline-flex items-center rounded-md text-[12px] font-semibold border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+      >
+        📊 Deal Dashboard
+      </a>
 
       <div className="flex-1" />
 
