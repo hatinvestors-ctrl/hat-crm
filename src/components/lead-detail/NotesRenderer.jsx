@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
+
+const MissingFieldsContext = createContext([])
 
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +82,7 @@ function PlainText({ body }) {
 }
 
 function DealScoreSection({ body }) {
+  const missingFields = useContext(MissingFieldsContext)
   const lines = body.split('\n').filter(Boolean)
   const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
     ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
@@ -116,6 +119,15 @@ function DealScoreSection({ body }) {
 
   return (
     <div className="space-y-3">
+      {/* Missing data warning */}
+      {missingFields.length > 0 && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <span className="text-[11px] shrink-0 mt-px">⚠</span>
+          <p className="text-[11px] text-[color:var(--color-warn-text)] leading-snug">
+            <strong>Score based on incomplete data.</strong> Missing: {missingFields.join(', ')}. Fill these fields and regenerate for a reliable score.
+          </p>
+        </div>
+      )}
       {/* Gauge */}
       {total != null && (
         <div className="flex items-center gap-4 p-3 rounded-lg border" style={{ background: totalColor.bg, borderColor: totalColor.bdr }}>
@@ -759,8 +771,12 @@ function MarketCompsSection({ body }) {
   const allLines = lines.filter(Boolean)
   const conclusion = allLines.find(l => /^ARV Conclusion:/i.test(l.trim()))?.replace(/^ARV Conclusion:\s*/i, '').trim()
 
+  const conservativeARV = allLines.find(l => /^Conservative ARV:/i.test(l.trim()))?.replace(/^Conservative ARV:\s*/i, '').trim()
+  const realisticARV    = allLines.find(l => /^Realistic ARV:/i.test(l.trim()))?.replace(/^Realistic ARV:\s*/i, '').trim()
+  const optimisticARV   = allLines.find(l => /^Optimistic ARV:/i.test(l.trim()))?.replace(/^Optimistic ARV:\s*/i, '').trim()
+
   // Parse comp blocks with multi-line "Why relevant" support
-  const SECTION_FIELDS = /^(COMP:|ARV Conclusion:|Why relevant:)/i
+  const SECTION_FIELDS = /^(COMP:|ARV Conclusion:|Why relevant:|Conservative ARV:|Realistic ARV:|Optimistic ARV:)/i
   const compBlocks = []
   let current = null
   for (const line of lines) {
@@ -781,10 +797,33 @@ function MarketCompsSection({ body }) {
   }
   if (current) compBlocks.push(current)
 
-  if (compBlocks.length === 0) return <PlainText body={body} />
+  if (compBlocks.length === 0 && !conservativeARV && !realisticARV && !optimisticARV) return <PlainText body={body} />
 
   return (
     <div className="space-y-2.5">
+      {(conservativeARV || realisticARV || optimisticARV) && (
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5 space-y-1.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">ARV Range</div>
+          {conservativeARV && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Conservative</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-warn-text)]">{conservativeARV}</span>
+            </div>
+          )}
+          {realisticARV && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Realistic</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{realisticARV}</span>
+            </div>
+          )}
+          {optimisticARV && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Optimistic</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-success-text)]">{optimisticARV}</span>
+            </div>
+          )}
+        </div>
+      )}
       <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Sold Comps Used for ARV</div>
       {compBlocks.map(({ compLine, whyLines }, i) => {
         const content = compLine.replace(/^COMP:\s*/i, '')
@@ -983,6 +1022,150 @@ function CRMWorkflowSection({ body }) {
   )
 }
 
+function NegotiationPlanSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = key => lines.find(l => new RegExp(`^${key}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${key}:\\s*`, 'i'), '').trim()
+
+  const motivation     = get('Motivation')
+  const theirPriority  = get('Their Priority')
+  const leverage       = get('Leverage')
+  const openingOffer   = get('Opening Offer')
+  const leadWith       = get('Lead With')
+  const firstMoveTone  = get('First Move Tone')
+  const walkAway       = get('Walk-Away Price')
+
+  const leverageColor = s => {
+    if (!s) return {}
+    if (/^HIGH/i.test(s)) return { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)' }
+    if (/^LOW/i.test(s)) return  { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)'  }
+    return { bg: 'var(--color-warn-soft)', txt: 'var(--color-warn-text)', bdr: 'var(--color-warn)' }
+  }
+  const lc = leverageColor(leverage)
+
+  const playbook = lines.filter(l => /^If they|^If counter/i.test(l.trim()))
+  const relLine  = lines.find(l => /^RELATIONSHIP NOTE/i.test(l.trim()))
+    ?.replace(/^RELATIONSHIP NOTE\s*/i, '').trim()
+    || lines[lines.findIndex(l => /^RELATIONSHIP NOTE/i.test(l.trim())) + 1]?.trim()
+
+  return (
+    <div className="space-y-2.5">
+      {leverage && (
+        <div className="px-3 py-2 rounded-lg border" style={{ background: lc.bg, borderColor: lc.bdr }}>
+          <div className="text-[9.5px] uppercase tracking-wider mb-0.5" style={{ color: lc.txt }}>Negotiation Leverage</div>
+          <div className="text-[13px] font-bold" style={{ color: lc.txt }}>{leverage}</div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        {motivation && (
+          <div className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Seller Motivation</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{motivation}</div>
+          </div>
+        )}
+        {theirPriority && (
+          <div className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Their Priority</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{theirPriority}</div>
+          </div>
+        )}
+      </div>
+      {(openingOffer || leadWith) && (
+        <div className="px-3 py-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1.5">Opening Strategy</div>
+          {openingOffer && <div className="text-[13px] font-bold text-[color:var(--color-accent-text)] mb-1">{openingOffer}</div>}
+          {leadWith && <p className="text-[11.5px] text-[color:var(--color-accent-text)] leading-snug">{leadWith}</p>}
+          {firstMoveTone && <div className="mt-1 text-[10px] text-[color:var(--color-accent-text)] opacity-70">Tone: {firstMoveTone}</div>}
+        </div>
+      )}
+      {playbook.length > 0 && (
+        <div className="px-3 py-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Counter Playbook</div>
+          <div className="space-y-1.5">
+            {playbook.map((line, i) => (
+              <p key={i} className="text-[11.5px] text-[color:var(--color-text)] leading-snug">{line.trim()}</p>
+            ))}
+          </div>
+        </div>
+      )}
+      {walkAway && (
+        <div className="px-3 py-2 rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-danger-text)] mb-0.5">Walk-Away Price (Hard Floor)</div>
+          <div className="text-[13px] font-bold text-[color:var(--color-danger-text)]">{walkAway}</div>
+        </div>
+      )}
+      {relLine && (
+        <div className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">Relationship Play</div>
+          <p className="text-[11.5px] italic text-[color:var(--color-text)] leading-relaxed">{relLine}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CommunicationsSection({ body }) {
+  const [copied, setCopied] = useState(null)
+
+  const copy = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1500)
+    })
+  }
+
+  const extractBlock = (label, text) => {
+    const re = new RegExp(`${label}\\s*\\n---\\n([\\s\\S]*?)\\n---`, 'i')
+    return text.match(re)?.[1]?.trim() || null
+  }
+
+  const subjectLine = body.match(/^Subject:\s*(.+)$/im)?.[1]?.trim() || null
+  const email       = extractBlock('EMAIL', body)
+  const sms         = extractBlock('SMS', body)
+  const voicemail   = extractBlock('VOICEMAIL SCRIPT', body)
+
+  const Block = ({ label, content, copyKey }) => (
+    <div className="rounded-lg border border-[color:var(--color-line)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">{label}</span>
+        <button
+          onClick={() => copy(content, copyKey)}
+          className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] transition-colors"
+        >
+          {copied === copyKey ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+      <div className="p-3">
+        <p className="text-[12px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{content}</p>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-2.5">
+      {email && (
+        <div className="rounded-lg border border-[color:var(--color-accent)] overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-[color:var(--color-accent-soft)] border-b border-[color:var(--color-accent)]">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-accent-text)]">Email</span>
+              {subjectLine && <p className="text-[11px] text-[color:var(--color-accent-text)] opacity-80 mt-0.5">Subject: {subjectLine}</p>}
+            </div>
+            <button onClick={() => copy(email, 'email')}
+              className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-accent)] bg-transparent text-[color:var(--color-accent-text)] hover:opacity-70 transition-opacity">
+              {copied === 'email' ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="p-3">
+            <p className="text-[12px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{email}</p>
+          </div>
+        </div>
+      )}
+      {sms       && <Block label="SMS / Text"       content={sms}       copyKey="sms" />}
+      {voicemail && <Block label="Voicemail Script" content={voicemail} copyKey="vm"  />}
+    </div>
+  )
+}
+
 // ─── Section registry ─────────────────────────────────────────────────────────
 
 const SECTION_META = {
@@ -1005,6 +1188,8 @@ const SECTION_META = {
   'CRM COMPS USED':                      { icon: '🏡', render: s => <CRMCompsUsedSection    body={s} /> },
   'BEDROOM ADD OPPORTUNITY':             { icon: '🛏️', render: s => <BedroomAddSection     body={s} /> },
   'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection    body={s} /> },
+  'NEGOTIATION PLAN': { icon: '🤝', render: s => <NegotiationPlanSection body={s} /> },
+  'COMMUNICATIONS':   { icon: '✉️', render: s => <CommunicationsSection  body={s} /> },
 }
 
 // Tab definitions — sections are matched by name prefix
@@ -1013,6 +1198,7 @@ const TABS = [
   { id: 'strategy', label: 'Strategy', icon: '🎯', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
   { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
+  { id: 'negotiate', label: 'Negotiate', icon: '🤝', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
@@ -1034,7 +1220,7 @@ function SectionCard({ name, body }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export default function NotesRenderer({ notes, extraTabs = [] }) {
+export default function NotesRenderer({ notes, extraTabs = [], missingFields = [] }) {
   const [activeTab, setActiveTab] = useState('strategy')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
@@ -1063,6 +1249,7 @@ export default function NotesRenderer({ notes, extraTabs = [] }) {
   const currentTab = tabSections.find(t => t.id === validTab)
 
   return (
+    <MissingFieldsContext.Provider value={missingFields}>
     <div>
       {/* Tab bar */}
       <div className="flex gap-1 mb-3 p-1 rounded-lg bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
@@ -1102,5 +1289,6 @@ export default function NotesRenderer({ notes, extraTabs = [] }) {
         }
       </div>
     </div>
+    </MissingFieldsContext.Provider>
   )
 }
