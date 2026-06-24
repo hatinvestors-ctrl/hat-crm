@@ -78,11 +78,12 @@ export default function ScreenerPage() {
   const analyze = async () => {
     const deal = deals.find(d => d.id === selectedId)
     if (!deal?.address || !deal?.askingPrice) return
+    const dealId = deal.id
 
     const dups = await findDuplicateLeads(workspaceId, deal.address)
     const dupWarning = dups.length > 0 ? dups[0] : null
 
-    updateDeal(selectedId, { status: 'enriching', dupWarning, error: null })
+    updateDeal(dealId, { status: 'enriching', dupWarning, error: null })
 
     const enrichResult = await lookupAddress(deal.address)
     const enriched = enrichResult.ok ? enrichResult : null
@@ -109,7 +110,7 @@ export default function ScreenerPage() {
       notes:            '',
     }
 
-    updateDeal(selectedId, { status: 'analyzing', enriched })
+    updateDeal(dealId, { status: 'analyzing', enriched })
 
     try {
       const resp = await fetch('/.netlify/functions/generate-ai-notes', {
@@ -121,7 +122,7 @@ export default function ScreenerPage() {
       if (!data.ok) throw new Error(data.error || 'Analysis failed')
 
       const aiNotes = data.notes || ''
-      updateDeal(selectedId, {
+      updateDeal(dealId, {
         status:  'done',
         aiNotes,
         score:   parseScore(aiNotes),
@@ -129,13 +130,14 @@ export default function ScreenerPage() {
         mao:     parseMao(aiNotes),
       })
     } catch (e) {
-      updateDeal(selectedId, { status: 'done', error: e.message })
+      updateDeal(dealId, { status: 'done', error: e.message })
     }
   }
 
   const getNegoPlan = async () => {
     const deal = deals.find(d => d.id === selectedId)
     if (!deal?.aiNotes) return
+    const dealId = deal.id
     setGettingNego(true)
     try {
       const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
@@ -160,7 +162,7 @@ export default function ScreenerPage() {
       })
       const data = await resp.json()
       if (!data.ok) throw new Error(data.error)
-      updateDeal(selectedId, { negoNotes: data.notes })
+      updateDeal(dealId, { negoNotes: data.notes })
     } catch (e) {
       alert('Could not generate negotiation plan: ' + e.message)
     } finally {
@@ -172,7 +174,8 @@ export default function ScreenerPage() {
 
   const saveToCRM = async () => {
     const deal = deals.find(d => d.id === selectedId)
-    if (!deal) return
+    if (!deal || saving || deal.status === 'saved') return
+    const dealId = deal.id
     setSaving(true)
     try {
       const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
@@ -206,7 +209,7 @@ export default function ScreenerPage() {
           .eq('workspace_id', workspaceId)
           .ilike('name', deal.sourceName)
           .limit(1)
-          .single()
+          .maybeSingle()
         if (existing?.id) {
           agentId = existing.id
         } else {
@@ -231,7 +234,7 @@ export default function ScreenerPage() {
         }
       }
 
-      updateDeal(selectedId, { status: 'saved' })
+      updateDeal(dealId, { status: 'saved' })
     } catch (e) {
       alert('Save failed: ' + e.message)
     } finally {
