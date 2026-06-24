@@ -118,6 +118,9 @@ export default function ScreenerPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ lead, skip_save: true }),
       })
+      if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
+        throw new Error(`Server error ${resp.status} — function may be timing out or not deployed. Try again.`)
+      }
       const data = await resp.json()
       if (!data.ok) throw new Error(data.error || 'Analysis failed')
 
