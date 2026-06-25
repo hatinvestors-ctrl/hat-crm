@@ -6,7 +6,10 @@ const MissingFieldsContext = createContext([])
 
 function parseNotes(text) {
   if (!text?.trim()) return null
-  const chunks = text.split(/={5,}/).map(c => c.trim()).filter(Boolean)
+  // Strip any preamble before the first ===== so AI intro text never misaligns pairing
+  const firstSep = text.search(/={5,}/)
+  const clean = firstSep > 0 ? text.slice(firstSep) : text
+  const chunks = clean.split(/={5,}/).map(c => c.trim()).filter(Boolean)
   const sections = []
   for (let i = 0; i + 1 < chunks.length; i += 2) {
     const name = chunks[i].trim()

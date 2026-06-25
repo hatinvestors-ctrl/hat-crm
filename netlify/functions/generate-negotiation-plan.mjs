@@ -98,7 +98,10 @@ Write the negotiation plan and all three communications (email, SMS, voicemail) 
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 900,
           system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [
+            { role: 'user',      content: userPrompt },
+            { role: 'assistant', content: '=====================================' },
+          ],
         }),
         signal: abortCtrl.signal,
       })
@@ -112,7 +115,8 @@ Write the negotiation plan and all three communications (email, SMS, voicemail) 
     }
 
     const data = await resp.json()
-    const notes = data.content?.[0]?.text || ''
+    const raw = data.content?.[0]?.text?.trim() || ''
+    const notes = '=====================================\n' + raw
     return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
