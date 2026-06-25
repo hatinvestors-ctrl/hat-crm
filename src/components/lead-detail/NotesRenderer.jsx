@@ -459,6 +459,8 @@ function RecommendedActionSection({ body }) {
   const summary    = get('Summary')
 
   // Value-add lines (optional)
+  const maxRenoBRRRR = get('Max Reno (BRRRR)')
+  const maxRenoFlip  = get('Max Reno (Flip)')
   const inspectionPlay = get('Inspection Play')
   const bedroomAdd = get('Bedroom Add')
   const bathAdd    = get('Bath Add')
@@ -579,6 +581,31 @@ function RecommendedActionSection({ body }) {
       {/* Summary */}
       {summary && (
         <p className="text-[12px] text-[color:var(--color-text-muted)] leading-relaxed px-1 italic">{summary}</p>
+      )}
+
+      {/* Max reno budget cards (shown when reno was unknown at analysis time) */}
+      {(maxRenoBRRRR || maxRenoFlip) && (
+        <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
+          <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
+            <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">🔨 Max Reno Budget to Make Deal Work</span>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
+            {maxRenoBRRRR && (
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">BRRRR (cash left in &lt;$30K)</div>
+                <div className="text-[13px] font-bold text-[color:var(--color-accent-text)]">{maxRenoBRRRR.split('—')[0].trim()}</div>
+                {maxRenoBRRRR.includes('—') && <p className="text-[10px] opacity-70 text-[color:var(--color-accent-text)] mt-0.5">{maxRenoBRRRR.split('—').slice(1).join('—').trim()}</p>}
+              </div>
+            )}
+            {maxRenoFlip && (
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">Flip (net profit &gt;$25K)</div>
+                <div className="text-[13px] font-bold text-[color:var(--color-accent-text)]">{maxRenoFlip.split('—')[0].trim()}</div>
+                {maxRenoFlip.includes('—') && <p className="text-[10px] opacity-70 text-[color:var(--color-accent-text)] mt-0.5">{maxRenoFlip.split('—').slice(1).join('—').trim()}</p>}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Inspection Play strategy (conditional) */}
