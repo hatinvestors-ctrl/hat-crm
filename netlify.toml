@@ -16,7 +16,7 @@
   timeout = 50
 
 [functions."generate-negotiation-plan"]
-  timeout = 30
+  timeout = 60
 
 [functions."ask-deal-question"]
   timeout = 20
