@@ -1195,13 +1195,14 @@ const SECTION_META = {
   'COMMUNICATIONS':   { icon: '✉️', render: s => <CommunicationsSection  body={s} /> },
 }
 
-// Tab definitions — sections are matched by name prefix
+// Tab definitions — sections matched by name. Summary intentionally includes
+// RECOMMENDED ACTION so the tab always appears (it's always the first section generated).
 const TABS = [
-  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE/.test(n) },
-  { id: 'strategy', label: 'Strategy', icon: '🎯', match: n => /^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^CRM WORKFLOW/.test(n) },
+  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE|^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
   { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
   { id: 'negotiate', label: 'Negotiate', icon: '🤝', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n) },
+  { id: 'workflow', label: 'Workflow', icon: '⚙️', match: n => /^CRM WORKFLOW/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
@@ -1224,7 +1225,7 @@ function SectionCard({ name, body }) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function NotesRenderer({ notes, extraTabs = [], missingFields = [] }) {
-  const [activeTab, setActiveTab] = useState('strategy')
+  const [activeTab, setActiveTab] = useState('summary')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
   // Unstructured notes — plain scrollable text, no tabs
