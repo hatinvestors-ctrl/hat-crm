@@ -160,17 +160,9 @@ VOICEMAIL SCRIPT
 =====================================
 FOLLOW-UP SEQUENCE
 =====================================
-Day 3 — SMS:
-[New angle, not "just following up." Reference something from the deal — DOM ticking, market timing, your schedule. One sentence. Ends with a soft question.]
-
-Day 7 — Email:
-Subject: [Different angle from Touch 1]
----
-[100–150 words. New value-add: a comp, a market observation, a changed condition. Restate certainty of close. One calibrated question. Sign: Tomer]
----
-
-Day 14 — The Takeaway (SMS or short email):
-[Voss-style: soft withdrawal of interest — "I want to make sure I'm not bothering you — if the timing isn't right, I completely understand. We'll be in the market for the next deal when it makes sense." This triggers loss aversion and often re-opens dead conversations.]`
+Day 3 — SMS: [New angle — DOM, market timing, your schedule. 1 sentence + soft question.]
+Day 7 — Email subject + 2 sentences: [New value-add: comp, market shift, or changed condition. Calibrated question close.]
+Day 14 — Takeaway SMS: [Voss soft withdrawal — triggers loss aversion, reopens dead conversations.]`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
@@ -199,21 +191,30 @@ ${ai_notes ? ai_notes.slice(0, 3000) : 'No prior analysis available.'}
 
 Write the negotiation plan and all three communications (email, SMS, voicemail) now.`
 
+  const abortCtrl = new AbortController()
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
+
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2800,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    })
+    let resp
+    try {
+      resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1800,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        signal: abortCtrl.signal,
+      })
+    } finally {
+      clearTimeout(abortTimer)
+    }
 
     if (!resp.ok) {
       const err = await resp.text()
