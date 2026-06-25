@@ -496,6 +496,31 @@ export default function ScreenerPage() {
                   : 'Running full AI analysis (20–40 sec)…'}
               </div>
             )}
+            {/* Reno budget card — computed from AI-parsed ARV + MAO when user left reno blank */}
+            {displayNotes && !selectedDeal?.renovationCost && selectedDeal?.arv && selectedDeal?.mao && (() => {
+              const arv = selectedDeal.arv
+              const mao = selectedDeal.mao
+              const maxBRRRR = Math.round(arv * 0.70 - mao * 1.085 - 30000)
+              const maxFlip  = Math.round(arv * 0.92 - mao - 25000)
+              const fmt = n => n > 0 ? `$${n.toLocaleString()}` : 'Deal too tight'
+              return (
+                <div className="mb-3 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
+                  <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
+                    <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">🔨 Max Reno to Make Deal Work at MAO (${mao.toLocaleString()})</span>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
+                    <div className="px-3 py-2">
+                      <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">BRRRR (cash left in &lt;$30K)</div>
+                      <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{fmt(maxBRRRR)}</div>
+                    </div>
+                    <div className="px-3 py-2">
+                      <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">Flip (net profit &gt;$25K)</div>
+                      <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{fmt(maxFlip)}</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
             {displayNotes && (
               <NotesRenderer notes={displayNotes} />
             )}

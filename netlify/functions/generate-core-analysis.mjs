@@ -24,7 +24,6 @@ Adjustments: 2BR -$20K | 4BR +$15K | 1BA only -$20K | <1,000sqft -$15K
 Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
 BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
-When Reno=Unknown: compute max reno budgets at MAO — BRRRR: reno <= ARV*0.70 - MAO*1.085 - 30000 | Flip: reno <= ARV*0.92 - MAO - 25000. Output both in RECOMMENDED ACTION.
 
 Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immediately with the first ===== line.
 
@@ -62,8 +61,6 @@ Our ARV:        $[X]
 Starting Offer: $[X]
 Target Price:   $[X]
 Max Walk-Away:  $[X]
-Max Reno (BRRRR): $[X] — [only when Reno=Unknown: max reno to keep cash left in <$30K at MAO]
-Max Reno (Flip):  $[X] — [only when Reno=Unknown: max reno to keep net profit >$25K at MAO]
 Summary:        [2 sentences - deal viability at MAO and what must happen to close]
 
 =====================================
@@ -123,14 +120,8 @@ function buildPrompt(lead) {
     flipBlock = `\nFlip: All-in ${fmt(allIn)} | Net profit ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
   }
 
-  // When reno is unknown, ask AI to compute max reno budgets at MAO for BRRRR and flip
-  let renoUnknownBlock = ''
-  if (reno == null) {
-    renoUnknownBlock = '\nReno: UNKNOWN — compute and output Max Reno (BRRRR) and Max Reno (Flip) in RECOMMENDED ACTION using your ARV estimate and MAO.'
-  }
-
   return `${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}${renoUnknownBlock}
+Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}
 Notes: ${lead.notes || 'None'}
 
 Write all 6 sections now using the deal data above.`
