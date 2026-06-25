@@ -163,6 +163,9 @@ export default function ScreenerPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ lead, ai_notes: deal.aiNotes }),
       })
+      if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
+        throw new Error(`Server error ${resp.status} — function timed out. Try again.`)
+      }
       const data = await resp.json()
       if (!data.ok) throw new Error(data.error)
       updateDeal(dealId, { negoNotes: data.notes })

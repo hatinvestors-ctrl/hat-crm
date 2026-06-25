@@ -81,12 +81,7 @@ SMS
 VOICEMAIL
 ---
 [30 seconds. Name, company, address, timing angle, offer/intent, number once, reason to call back today.]
----
-
-FOLLOW-UP
-Day 3 SMS: [new angle, 1 sentence + soft question]
-Day 7 Email: [subject + 2 sentences, new value-add]
-Day 14 SMS: [Voss soft withdrawal — triggers loss aversion]`
+---`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
@@ -130,7 +125,7 @@ Write the negotiation plan and all three communications (email, SMS, voicemail) 
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1800,
+          max_tokens: 800,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userPrompt }],
         }),
