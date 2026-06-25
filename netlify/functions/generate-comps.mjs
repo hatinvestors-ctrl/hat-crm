@@ -140,7 +140,7 @@ Write the MARKET COMPS section (and CRM COMPS USED if historical data was provid
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 800,
+          max_tokens: 1100,
           system: SYSTEM_PROMPT,
           messages: [
             { role: 'user',      content: userPrompt },

@@ -1206,7 +1206,6 @@ const TABS = [
   { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
   { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
   { id: 'negotiate', label: 'Negotiate', icon: '🤝', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n) },
-  { id: 'workflow', label: 'Workflow', icon: '⚙️', match: n => /^CRM WORKFLOW/.test(n) },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
