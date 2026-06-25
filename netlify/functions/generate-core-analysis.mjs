@@ -1,5 +1,6 @@
 // Core deal analysis — HAT Investors
-// Generates: RECOMMENDED ACTION, DEAL SCORE, DEAL SNAPSHOT, PROS, CONS, CRM WORKFLOW
+// Generates: DEAL SCORE, DEAL SNAPSHOT, RECOMMENDED ACTION, PROS, CONS, CRM WORKFLOW
+// DEAL SCORE + DEAL SNAPSHOT come FIRST so Summary tab always appears even if truncated.
 // No comps fetch — fast, always completes within budget.
 //
 // POST /.netlify/functions/generate-core-analysis
@@ -16,66 +17,61 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor writing internal deal notes for HAT Investors. Audience: Tomer Carmelli (principal) and Kevin Bachman (acquisition broker). Be declarative, number-driven, opinionated. No hedging.
+const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor writing internal deal notes for HAT Investors. Be declarative, number-driven, opinionated. No hedging.
 
-JAX ARV (3/2 renovated): 32208/32219 $160–240K | 32210/32244/32221 $220–320K | 32205/32216 $230–380K | 32211 $155–200K | Clay Co $200–300K
-Adjustments: 2BR −$20K | 4BR +$15K | 1BA only −$20K | <1,000sqft −$15K | CBS/brick +$7K
+JAX ARV (3/2 renovated): 32208/32219 $160-240K | 32210/32244/32221 $220-320K | 32205/32216 $230-380K | 32211 $155-200K | Clay Co $200-300K
+Adjustments: 2BR -$20K | 4BR +$15K | 1BA only -$20K | <1,000sqft -$15K
 Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
-BRRRR: HML = 90% purchase + 100% reno @ 12%/yr | HML costs = 2% points + $1,500 fees + 12%/yr × 5.5mo avg | Refi = 70% ARV @ 6.875%/30yr | Cash left in <$30K great, $30–60K ok, >$60K fails
-Flip carry+close = 8% ARV. MAO = 0.75 × ARV − reno.
+BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
+Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
-Write EXACTLY these 6 sections in order. No markdown headers. No intro. Start immediately with the first ===== line.
-
-=====================================
-RECOMMENDED ACTION
-=====================================
-Verdict:        [EXACTLY one: BUY NOW / OFFER & NEGOTIATE / WATCH / DEAD LEAD]
-At Ask:         [WORKS / FAILS / MARGINAL] — [one line why]
-At MAO:         [WORKS / FAILS / MARGINAL] — [one line why]
-Gap:            $[X] off ask to reach MAO ([X]% reduction needed)
-Strategy:       [BRRRR / Flip / Rental Hold / INSPECTION PLAY / None]
-Our ARV:        $[X]
-Starting Offer: $[X]
-Target Price:   $[X]
-Max Walk-Away:  $[X]
-Summary:        [2 sentences — deal viability at MAO, what must be true to close]
-[INSPECTION PLAY — include ONLY when: ask is 5–15% above MAO AND property is older/as-is AND seller shows motivation. Skip entirely otherwise.]
-[Value-Add — include ONLY if genuinely applicable for THIS property. Omit any that don't apply.]
-[Include ONLY IF 1–2 BR: ] Bedroom Add:  YES — adds ~$[X] ARV, ~$[X] cost
-[Include ONLY IF 1 bath: ] Bath Add:     YES — master ensuite adds ~$[X] ARV, ~$[X] cost
-[Include ONLY IF genuinely applicable:] Other Upside: [specific opportunity] — adds ~$[X] ARV or rental value, ~$[X] cost
+Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immediately with the first ===== line.
 
 =====================================
 DEAL SCORE
 =====================================
-Total:              [X]/100
-Price Gap:          [X]/20 — [ask vs MAO: % above MAO. Scoring: ≤MAO=20, 1-10% above=16, 11-20%=10, 21-30%=5, >30%=1]
-Deal Math:          [X]/25 — [BRRRR cash left in $X OR flip net profit $X. BRRRR: <$20K=25, $20-35K=20, $35-50K=13, $50-70K=7, >$70K=2. Flip: >$50K=25, $35-50K=20, $20-35K=13, $10-20K=7, <$10K=2. No ARV→cap 7. No reno→cap 7.]
-Cash Flow:          [X]/10 — [monthly after PITIE at MAO. >$400=10, $250-400=8, $100-250=5, $0-100=2, neg=0. No rent+ARV→cap 2]
-ZIP Quality:        [X]/15 — [A(32205,32216)=15, B(32210,32244,32211,32218,32219)=10, C(32208,32254,32221)=6, unknown=5]
-Seller Motivation:  [X]/20 — [estate/probate/divorce/foreclosure=+7, price drop >15%=+6, as-is signals=+4, DOM>90=+5, DOM 60-90=+3, DOM 30-60=+1, new listing=0, institutional seller=-3. Cap 20. No signals→cap 6]
-ARV Confidence:     [X]/10 — [HIGH(3+ comps)=10, MEDIUM(2)=6, LOW(sparse)=2. No ARV provided→2]
-Verdict:            [EXCEPTIONAL ≥80 / STRONG 65–79 / WATCH 45–64 / MARGINAL 25–44 / DEAD <25]
+Total:             [X]/100
+Price Gap:         [X]/20 - [% above MAO. <=MAO=20, 1-10%=16, 11-20%=10, 21-30%=5, >30%=1]
+Deal Math:         [X]/25 - [BRRRR cash left in $X or flip net profit $X]
+Cash Flow:         [X]/10 - [monthly after PITIE. >$400=10, $250-400=8, $100-250=5, $0-100=2, neg=0]
+ZIP Quality:       [X]/15 - [A(32205,32216)=15, B(32210,32244,32211,32218,32219)=10, C(32208,32254,32221)=6]
+Seller Motivation: [X]/20 - [estate/probate=+7, price drop>15%=+6, as-is=+4, DOM>90=+5, DOM60-90=+3, DOM30-60=+1. Cap 20]
+ARV Confidence:    [X]/10 - [HIGH=10, MEDIUM=6, LOW=2]
+Verdict:           [EXCEPTIONAL >=80 / STRONG 65-79 / WATCH 45-64 / MARGINAL 25-44 / DEAD <25]
 
 =====================================
 DEAL SNAPSHOT
 =====================================
 Profile:    [X]BR/[X]BA | [sqft] sqft | ZIP [X] | [property type]
-Ask:        $[X] | $[X]/sqft ([below/at/above] ZIP investor floor ~$[X]/sqft)
-Condition:  [Light cosmetic / Medium / Heavy / Unknown] — [1 line reason]
+Ask:        $[X] | $[X]/sqft ([below/at/above] investor floor ~$[X]/sqft)
+Condition:  [Light cosmetic / Medium / Heavy / Unknown] - [1 line reason]
 DOM:        [X days / Unknown] | Price history: [drop of $X / no change / unknown]
 Motivation: [estate / price drop / as-is / tired landlord / unknown]
 HOA:        [None / $X/mo / Unknown]
 
 =====================================
-PROS — WHY THIS DEAL IS INTERESTING
+RECOMMENDED ACTION
 =====================================
-1. [market/zip signal with specific number]
-2. [seller motivation or price positioning signal]
-3. [property upside — construction, layout, lot, bedroom add potential]
+Verdict:        [BUY NOW / OFFER & NEGOTIATE / WATCH / DEAD LEAD]
+At Ask:         [WORKS / FAILS / MARGINAL] - [one line why]
+At MAO:         [WORKS / FAILS / MARGINAL] - [one line why]
+Gap:            $[X] off ask ([X]% reduction needed)
+Strategy:       [BRRRR / Flip / Rental Hold / None]
+Our ARV:        $[X]
+Starting Offer: $[X]
+Target Price:   $[X]
+Max Walk-Away:  $[X]
+Summary:        [2 sentences - deal viability at MAO and what must happen to close]
 
 =====================================
-CONS — RISKS AND RED FLAGS
+PROS - WHY THIS DEAL IS INTERESTING
+=====================================
+1. [market/zip signal with number]
+2. [seller motivation or pricing signal]
+3. [property upside or value-add potential]
+
+=====================================
+CONS - RISKS AND RED FLAGS
 =====================================
 1. [price or spread risk with numbers]
 2. [property or condition risk]
@@ -85,8 +81,8 @@ CONS — RISKS AND RED FLAGS
 CRM WORKFLOW
 =====================================
 Set Status: [new_lead / contacted / offer_sent / negotiating / dead_lead / follow_up]
-Make Offer: [YES — $[X] / NO / NOT YET]
-Priority:   [HIGH — act today / MEDIUM — this week / LOW — watch]`
+Make Offer: [YES - $[X] / NO / NOT YET]
+Priority:   [HIGH - act today / MEDIUM - this week / LOW - watch]`
 
 function buildPrompt(lead) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')
@@ -113,23 +109,22 @@ function buildPrompt(lead) {
     const rentEst     = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
     const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
     const cashflow    = rentEst - loanFactor - 208 - 100
-    brrrrBlock = `\nBRRRR: HML ${fmt(hml)} | HML costs ${fmt(hmlCosts)} (${fmt(hmlPoints)} pts + $1,500 fees + ${fmt(hmlInterest)} interest) | All-in ${fmt(allIn)} | Refi ${fmt(refi)} | Cash left in ${fmt(cashLeftIn)} (${cashLeftIn < 30000 ? 'GREAT' : cashLeftIn < 60000 ? 'OK' : 'FAILS'}) | Cash flow ~$${cashflow}/mo`
+    brrrrBlock = `\nBRRRR: HML ${fmt(hml)} | HML costs ${fmt(hmlCosts)} | All-in ${fmt(allIn)} | Refi ${fmt(refi)} | Cash left in ${fmt(cashLeftIn)} (${cashLeftIn < 30000 ? 'GREAT' : cashLeftIn < 60000 ? 'OK' : 'FAILS'}) | Cash flow ~$${cashflow}/mo`
   }
 
   let flipBlock = ''
   if (pp && arv && reno != null) {
-    const allIn      = pp + reno
-    const grossProfit = arv - allIn
-    const carryClose = arv * 0.08
-    const netProfit  = grossProfit - carryClose
+    const allIn       = pp + reno
+    const carryClose  = arv * 0.08
+    const netProfit   = arv - allIn - carryClose
     flipBlock = `\nFlip: All-in ${fmt(allIn)} | Net profit ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
   }
 
   return `${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | Rent est: ${fmt(rent)}${brrrrBlock}${flipBlock}
+Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}
 Notes: ${lead.notes || 'None'}
 
-Write all 6 sections using the deal data above.`
+Write all 6 sections now using the deal data above.`
 }
 
 export default async (req) => {
@@ -153,7 +148,7 @@ export default async (req) => {
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1200,
+          max_tokens: 1000,
           system: SYSTEM_PROMPT,
           messages: [
             { role: 'user',      content: buildPrompt(lead) },
@@ -173,7 +168,7 @@ export default async (req) => {
 
     const data = await resp.json()
     const raw = data.content?.[0]?.text?.trim() || ''
-    // Prepend the prefill separator we sent — Claude returns only what it added after it
+    // Prepend the prefill separator — Claude returns only what it added after it
     const notes = '=====================================\n' + raw
     return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
