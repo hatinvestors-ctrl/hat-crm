@@ -36,57 +36,47 @@ Write EXACTLY this structure. Start with first ===== line. No preamble.
 =====================================
 NEGOTIATION PLAN
 =====================================
-Seller Type:     [type] — [key signals]
-Motivation:      [HIGH/MEDIUM/LOW] — [specific evidence]
-Their Priority:  [Speed/Price/Certainty/Relationship]
-Their BATNA:     [what happens if they don't sell to us]
-Our Leverage:    [HIGH/MEDIUM/LOW] — [reason]
+Seller Type:    [Wholesaler / Listing Agent / Estate / Tired Landlord / Divorce / Foreclosure / Unknown] — [key signals]
+Motivation:     [HIGH / MEDIUM / LOW] — [specific evidence from deal]
+Their Priority: [Speed / Price / Certainty / Relationship] — [reason]
+Their BATNA:    [what happens if they don't sell to us]
+Leverage:       [HIGH / MEDIUM / LOW] — [reason]
 
 OPENING STRATEGY
 Opening Offer:  $[X] — [anchor rationale]
-Lead With:      [Klaff hook or Voss empathy opener — specific to this deal]
-Small Yes First: [commitment question before the number]
+Lead With:      [Klaff intrigue hook or Voss empathy opener — specific to this deal]
+First Move Tone: [Collaborative / Firm / Empathy-first]
+Small Yes First: [low-friction commitment question before the number]
 
 COUNTER PLAYBOOK
-At ask price → $[X] | "[exact Voss calibrated language]"
-At midpoint → $[Y] | "[exact language]"
-Hard pushback → "[accusation audit or pattern interrupt — exact words]"
-"I need to think about it" → "[Cardone next-step lock — exact words]"
-Silent 48hrs → [follow-up angle + exact opener]
-Gap >20% → [creative terms alternative]
-Walk-Away: $[X]
+If they counter at $[ask] → respond $[X] | Say: "[exact Voss calibrated language]"
+If they drop to $[midpoint] → respond $[Y] | Say: "[exact language]"
+If they push back hard → "[accusation audit or pattern interrupt — exact words]"
+If they say "I need to think about it" → Say: "[Cardone next-step lock — exact words]"
+If they go silent 48hrs → [follow-up angle + exact opener]
+Walk-Away Price: $[X] — [hard floor]
 
-OBJECTION HANDLERS
-"Too low" → "[objective criteria reframe]"
-"Other buyers" → "[Voss label + calibrated question]"
-"Need to think" → "[Hopkins alternative choice — exact words]"
-
-RELATIONSHIP PLAY
+RELATIONSHIP NOTE
 [1-2 sentences positioning HAT as their buyer for the next 10 deals]
 
 =====================================
 COMMUNICATIONS
 =====================================
 EMAIL
-Subject: [specific, curiosity-driving]
+Subject: [specific, curiosity-driving — never generic]
 ---
-[130–180 words. Observation-first opener. Their name early. Assumptive language. One calibrated question. Sign: Tomer | HAT Investors]
+[130–180 words. Observation-first opener, their name early, assumptive language, one calibrated question. Sign: Tomer | HAT Investors]
 ---
 
 SMS
 ---
-[2 sentences. Name + address + one clear ask. No exclamation marks.]
+[2 sentences max. Name + address + one clear ask. No exclamation marks.]
 ---
 
-VOICEMAIL
+VOICEMAIL SCRIPT
 ---
 [30 seconds. Name, company, address, timing angle, offer/intent, number once, reason to call back today.]
----
-
-FOLLOW-UP
-Day 3 SMS: [new angle, 1 sentence + soft question]
-Day 7 Email: [subject + 2 sentences, new value-add]
-Day 14 SMS: [Voss soft withdrawal — triggers loss aversion]`
+---`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
