@@ -22,52 +22,48 @@ VOSS: label emotions ("It seems like...") · calibrated questions ("How am I sup
 KLAFF: HAT is the prize, never chase · frame control ("reviewing two properties this week") · intrigue hook before numbers · "Until" reframe: move on conditions not price · pre-wire the outcome as inevitable
 CIALDINI: Authority (active JAX buyer, know this ZIP) · Scarcity (one deal/week slot) · Reciprocity (fast certain close = value given upfront) · small Yes first · Social proof (past deals in area) · Liking (name, warmth)
 
-Seller types: WHOLESALER=speed/certainty>price · ESTATE=empathy first · TIRED LANDLORD=validate pain · DIVORCE=speed+clean · FORECLOSURE=you stop the clock · MLS AGENT=clean offer easy process
 HAT proposition: all-cash · 10–14 day close · as-is · one decision-maker · repeat buyer priority
-Tone: never desperate · assumptive always ("when we close") · specific $ and days · their name early · no filler openers
+Tone: never desperate · always assumptive ("when we close") · specific $ and days · their name early
 
-Write EXACTLY this structure. Start with first ===== line. No preamble. Be concise — every field one line only.
+OUTPUT RULES — CRITICAL:
+- NO markdown, NO bold, NO asterisks, NO bullet points
+- Every field on its own line, label exactly as shown, colon, space, value
+- Start immediately with the first ===== line, no intro text
 
 =====================================
 NEGOTIATION PLAN
 =====================================
-Seller Type:     [type] — [key signals]
-Motivation:      [HIGH/MEDIUM/LOW] — [evidence]
-Their Priority:  [Speed/Price/Certainty/Relationship] — [reason]
-Leverage:        [HIGH/MEDIUM/LOW] — [reason]
-
-OPENING STRATEGY
-Opening Offer:   $[X] — [anchor rationale, 1 line]
-Lead With:       [Klaff hook or Voss label — 1 specific sentence to open with]
-First Move Tone: [Collaborative/Firm/Empathy-first]
-
-COUNTER PLAYBOOK
-If they counter at $[X] → $[Y] | "[exact words to say]"
-If they push back hard → "[accusation audit — exact words]"
-If they say need to think → "[next-step lock — exact words]"
-If they go silent 48hrs → "[exact follow-up opener]"
-Walk-Away Price: $[X]
-
+Motivation: HIGH — estate sale, listed as-is, DOM 47 days, two price drops
+Their Priority: Speed — estate needs to close before probate deadline
+Leverage: HIGH — motivated seller, gap only 12%, market data supports our number
+Opening Offer: $148,000 — anchors 8% below MAO, signals serious intent, leaves room to move to $160K
+Lead With: It seems like this property has been waiting for the right buyer — we've closed three deals in 32218 this quarter and this fits our hold criteria exactly. Before I share our number, help me understand: what timeline works best for you?
+First Move Tone: Empathy-first
+If they counter at $175,000 → respond $155,000 | Say: How am I supposed to make the numbers work at that price given the roof and HVAC timeline? Help me understand what's driving that number.
+If they push back hard → Say: It sounds like the price is really important to you — I completely understand. What would have to be true for a cash close in 10 days to feel like the right move?
+If they say need to think → Say: Totally fair — does Tuesday or Wednesday work better for a quick follow-up call?
+If they go silent 48hrs → Say: Hey [name] — still thinking about Beckner? We're locking in our next acquisition this week. Wanted to give you first shot.
+Walk-Away Price: $163,000
 RELATIONSHIP NOTE
-[1 sentence — HAT as repeat buyer relationship]
+Once we close this one I want you to know — you're on our short list for every 32218 deal we see. Fast, clean, no drama. That's the relationship we're building here.
 
 =====================================
 COMMUNICATIONS
 =====================================
 EMAIL
-Subject: [specific subject]
+Subject: [write a specific subject line referencing the property or a deal signal]
 ---
-[80–100 words. Observation opener, their name, offer/intent, one calibrated question. Sign: Tomer | HAT Investors]
+[Write 80–100 words. Open with an observation about the property or market. Use their name. State offer or intent. One calibrated question. Sign: Tomer | HAT Investors. Plain text, no markdown.]
 ---
 
 SMS
 ---
-[2 sentences. Name, address, one ask. No exclamation marks.]
+[Write 2 sentences. Use name. Reference address and price. One clear ask. No exclamation marks.]
 ---
 
 VOICEMAIL SCRIPT
 ---
-[25 seconds. Name, company, address, offer/intent, number once, reason to call today.]
+[Write 25-second script. Name, HAT Investors, address, offer/intent, phone number once, reason to call back today.]
 ---`
 
 export default async (req) => {
