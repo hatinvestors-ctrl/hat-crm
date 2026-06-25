@@ -13,6 +13,7 @@ function newDeal(overrides = {}) {
     id: crypto.randomUUID(),
     address: '',
     askingPrice: '',
+    renovationCost: '',
     sourceName: '',
     sourcePhone: '',
     sourceEmail: '',
@@ -111,7 +112,7 @@ export default function ScreenerPage() {
       arv:              null,
       conservative_arv: null,
       aggressive_arv:   null,
-      renovation_cost:  null,
+      renovation_cost:  deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
       mao:              null,
       rent_estimate:    null,
       notes:            '',
@@ -271,10 +272,11 @@ export default function ScreenerPage() {
         sqft:          deal.enriched?.sqft         || null,
         year_built:    deal.enriched?.year_built   || null,
         property_type: deal.enriched?.property_type || null,
-        asking_price:  asking,
-        arv:           deal.arv  || null,
-        mao:           deal.mao  || null,
-        lead_source:   deal.sourceName ? 'wholesaler' : 'other',
+        asking_price:     asking,
+        arv:              deal.arv  || null,
+        mao:              deal.mao  || null,
+        renovation_cost:  deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+        lead_source:      deal.sourceName ? 'wholesaler' : 'other',
         status:        'new_lead',
         screened:      true,
         ai_notes:      fullNotes || null,
@@ -416,6 +418,15 @@ export default function ScreenerPage() {
                     value={selectedDeal.askingPrice}
                     onChange={e => setField('askingPrice', e.target.value)}
                     placeholder="$150,000"
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Reno Budget</label>
+                  <input
+                    value={selectedDeal.renovationCost}
+                    onChange={e => setField('renovationCost', e.target.value)}
+                    placeholder="$25,000 (opt)"
                     className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
                   />
                 </div>
