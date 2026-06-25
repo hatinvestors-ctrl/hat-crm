@@ -26,45 +26,54 @@ HAT proposition: all-cash · 10–14 day close · as-is · one decision-maker ·
 Tone: never desperate · always assumptive ("when we close") · specific $ and days · their name early
 
 OUTPUT RULES — CRITICAL:
-- NO markdown, NO bold, NO asterisks, NO bullet points
-- Every field on its own line, label exactly as shown, colon, space, value
-- Start immediately with the first ===== line, no intro text
+- NO markdown, NO bold, NO asterisks — plain text only
+- Every field on its own line, label exactly as shown, colon, space, then your value
+- Use ONLY real data from the deal above — do NOT copy the example values
+- Start immediately with the first ===== line, no intro
 
+The format to follow is shown in <example> below. Replace ALL content with real deal-specific analysis.
+
+<example>
 =====================================
 NEGOTIATION PLAN
 =====================================
-Motivation: HIGH — estate sale, listed as-is, DOM 47 days, two price drops
-Their Priority: Speed — estate needs to close before probate deadline
-Leverage: HIGH — motivated seller, gap only 12%, market data supports our number
-Opening Offer: $148,000 — anchors 8% below MAO, signals serious intent, leaves room to move to $160K
-Lead With: It seems like this property has been waiting for the right buyer — we've closed three deals in 32218 this quarter and this fits our hold criteria exactly. Before I share our number, help me understand: what timeline works best for you?
+Motivation: HIGH — estate sale, as-is listing, DOM 47 days, two price drops
+Their Priority: Speed — probate deadline creates urgency
+Leverage: HIGH — motivated seller, gap closeable, comps support our number
+Opening Offer: $148,000 — anchors below MAO, signals serious intent, leaves room to move
+Lead With: It seems like this property has been waiting for the right buyer — we're active in this ZIP right now. Before I share our number, help me understand: what timeline works best for you?
 First Move Tone: Empathy-first
-If they counter at $175,000 → respond $155,000 | Say: How am I supposed to make the numbers work at that price given the roof and HVAC timeline? Help me understand what's driving that number.
-If they push back hard → Say: It sounds like the price is really important to you — I completely understand. What would have to be true for a cash close in 10 days to feel like the right move?
-If they say need to think → Say: Totally fair — does Tuesday or Wednesday work better for a quick follow-up call?
-If they go silent 48hrs → Say: Hey [name] — still thinking about Beckner? We're locking in our next acquisition this week. Wanted to give you first shot.
+If they counter at $175,000 → respond $155,000 | Say: How am I supposed to make the numbers work at that price? Help me understand what's driving it.
+If they push back hard → Say: It sounds like price is really important here. What would have to be true for a cash close in 10 days to feel like the right move?
+If they say need to think → Say: Totally fair — does Tuesday or Wednesday work better for a quick call?
+If they go silent 48hrs → Say: Hey — still thinking about this one? Locking in our next acquisition this week. Wanted to give you first shot.
 Walk-Away Price: $163,000
 RELATIONSHIP NOTE
-Once we close this one I want you to know — you're on our short list for every 32218 deal we see. Fast, clean, no drama. That's the relationship we're building here.
+Once we close this one you're on our short list for every deal we see in this ZIP. Fast, clean, no drama — that's the relationship we're building.
 
 =====================================
 COMMUNICATIONS
 =====================================
 EMAIL
-Subject: [write a specific subject line referencing the property or a deal signal]
+Subject: 1012 Beckner — cash offer, 10-day close
 ---
-[Write 80–100 words. Open with an observation about the property or market. Use their name. State offer or intent. One calibrated question. Sign: Tomer | HAT Investors. Plain text, no markdown.]
+[Name], I've been watching 32218 closely — your listing at Beckner caught our attention because it fits our hold criteria. We're prepared to move at $148,000 cash, as-is, close in 10 days from contract. No financing, no inspection re-trades. What does the seller's timeline look like?
+
+Tomer | HAT Investors
 ---
 
 SMS
 ---
-[Write 2 sentences. Use name. Reference address and price. One clear ask. No exclamation marks.]
+[Name] — saw 1012 Beckner, fits our buy box in 32218. Can do $148K cash, close in 10 days as-is. Worth a quick call?
 ---
 
 VOICEMAIL SCRIPT
 ---
-[Write 25-second script. Name, HAT Investors, address, offer/intent, phone number once, reason to call back today.]
----`
+Hey [name], this is Tomer with HAT Investors — calling about 1012 Beckner in Jacksonville. We're active buyers in 32218 right now and this property fits what we're looking for. We can do cash, as-is, close in 10 days. Give me a call at [number] — I want to move on this before we commit to another property this week.
+---
+</example>
+
+Now write the actual plan for the property and deal data provided above. Use the same field names and format. All numbers, analysis, and language must reflect the actual deal — not the example.``
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
@@ -108,7 +117,7 @@ Write the negotiation plan and all three communications (email, SMS, voicemail) 
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1400,
+          max_tokens: 1600,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userPrompt }],
         }),
