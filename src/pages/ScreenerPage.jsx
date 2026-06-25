@@ -226,6 +226,27 @@ export default function ScreenerPage() {
       const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
       const fullNotes = [deal.coreNotes, deal.compsNotes, deal.planNotes, deal.commsNotes].filter(Boolean).join('\n\n')
 
+      // Duplicate check — match on address (case-insensitive) within this workspace
+      const { data: existing } = await supabase.from('leads')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .ilike('address', deal.address.trim())
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.id) {
+        const overwrite = window.confirm(
+          `A lead for "${deal.address}" already exists in your CRM.\n\nUpdate its AI analysis with the screener results?`
+        )
+        if (!overwrite) { setSaving(false); return }
+        await supabase.from('leads')
+          .update({ ai_notes: fullNotes || null, screened: true, asking_price: asking })
+          .eq('id', existing.id)
+        updateDeal(dealId, { status: 'saved' })
+        setSaving(false)
+        return
+      }
+
       const { data: lead, error } = await supabase.from('leads').insert({
         workspace_id:  workspaceId,
         created_by:    userId,
