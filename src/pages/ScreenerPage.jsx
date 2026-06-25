@@ -18,8 +18,10 @@ function newDeal(overrides = {}) {
     sourceEmail: '',
     status: 'idle',   // idle | enriching | analyzing | done | passed | saved
     enriched: null,
-    aiNotes: null,
-    negoNotes: null,
+    coreNotes:  null,   // RECOMMENDED ACTION, DEAL SCORE, DEAL SNAPSHOT, PROS, CONS, CRM WORKFLOW
+    compsNotes: null,   // MARKET COMPS, CRM COMPS USED
+    planNotes:  null,   // NEGOTIATION PLAN
+    commsNotes: null,   // COMMUNICATIONS (EMAIL, SMS, VOICEMAIL)
     dupWarning: null,
     score: null,
     verdict: null,
@@ -112,25 +114,39 @@ export default function ScreenerPage() {
 
     updateDeal(dealId, { status: 'analyzing', enriched })
 
-    try {
-      const resp = await fetch('/.netlify/functions/generate-ai-notes', {
+    const postFn = async (fn, payload) => {
+      const resp = await fetch(`/.netlify/functions/${fn}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ lead, skip_save: true }),
+        body: JSON.stringify(payload),
       })
       if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
-        throw new Error(`Server error ${resp.status} — function may be timing out or not deployed. Try again.`)
+        throw new Error(`${fn} timed out (${resp.status})`)
       }
       const data = await resp.json()
-      if (!data.ok) throw new Error(data.error || 'Analysis failed')
+      if (!data.ok) throw new Error(data.error || `${fn} failed`)
+      return data.notes || ''
+    }
 
-      const aiNotes = data.notes || ''
+    try {
+      // Fire core analysis + comps in parallel
+      const [coreResult, compsResult] = await Promise.allSettled([
+        postFn('generate-core-analysis', { lead }),
+        postFn('generate-comps', { lead }),
+      ])
+
+      const coreNotes  = coreResult.status  === 'fulfilled' ? coreResult.value  : null
+      const compsNotes = compsResult.status === 'fulfilled' ? compsResult.value : null
+      const error = coreResult.status === 'rejected' ? coreResult.reason?.message : null
+
       updateDeal(dealId, {
-        status:  'done',
-        aiNotes,
-        score:   parseScore(aiNotes),
-        verdict: parseVerdict(aiNotes),
-        mao:     parseMao(aiNotes),
+        status: 'done',
+        coreNotes,
+        compsNotes,
+        score:   parseScore(coreNotes),
+        verdict: parseVerdict(coreNotes),
+        mao:     parseMao(coreNotes),
+        error,
       })
     } catch (e) {
       updateDeal(dealId, { status: 'done', error: e.message })
@@ -139,36 +155,59 @@ export default function ScreenerPage() {
 
   const getNegoPlan = async () => {
     const deal = deals.find(d => d.id === selectedId)
-    if (!deal?.aiNotes) return
+    if (!deal?.coreNotes) return
     const dealId = deal.id
     setGettingNego(true)
     try {
       const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
       const lead = {
-        address:         deal.address,
-        city:            deal.enriched?.city     || '',
-        state:           deal.enriched?.state    || 'FL',
-        zip_code:        deal.enriched?.zip_code || '',
-        bedrooms:        deal.enriched?.bedrooms || null,
-        bathrooms:       deal.enriched?.bathrooms || null,
-        sqft:            deal.enriched?.sqft     || null,
-        asking_price:    asking,
-        arv:             null,
-        renovation_cost: null,
-        mao:             deal.mao,
-        notes:           '',
+        address:              deal.address,
+        city:                 deal.enriched?.city          || '',
+        state:                deal.enriched?.state         || 'FL',
+        zip_code:             deal.enriched?.zip_code      || '',
+        bedrooms:             deal.enriched?.bedrooms      || null,
+        bathrooms:            deal.enriched?.bathrooms     || null,
+        sqft:                 deal.enriched?.sqft          || null,
+        asking_price:         asking,
+        arv:                  null,
+        renovation_cost:      null,
+        mao:                  deal.mao,
+        notes:                '',
+        listing_agent_name:   deal.sourceName || '',
+        sourceName:           deal.sourceName || '',
       }
-      const resp = await fetch('/.netlify/functions/generate-negotiation-plan', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ lead, ai_notes: deal.aiNotes }),
-      })
-      if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
-        throw new Error(`Server error ${resp.status} — function timed out. Try again.`)
+      const aiSummary = [deal.coreNotes, deal.compsNotes].filter(Boolean).join('\n\n')
+
+      // Fire negotiation plan + communications in parallel
+      const [planResult, commsResult] = await Promise.allSettled([
+        fetch('/.netlify/functions/generate-negotiation-plan', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ lead, ai_notes: aiSummary }),
+        }).then(async r => {
+          if (!r.ok && r.headers.get('content-type')?.includes('text/html')) throw new Error(`plan timed out (${r.status})`)
+          const d = await r.json()
+          if (!d.ok) throw new Error(d.error)
+          return d.notes || ''
+        }),
+        fetch('/.netlify/functions/generate-communications', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ lead, ai_notes: aiSummary }),
+        }).then(async r => {
+          if (!r.ok && r.headers.get('content-type')?.includes('text/html')) throw new Error(`comms timed out (${r.status})`)
+          const d = await r.json()
+          if (!d.ok) throw new Error(d.error)
+          return d.notes || ''
+        }),
+      ])
+
+      const planNotes  = planResult.status  === 'fulfilled' ? planResult.value  : null
+      const commsNotes = commsResult.status === 'fulfilled' ? commsResult.value : null
+
+      if (planResult.status === 'rejected' && commsResult.status === 'rejected') {
+        throw new Error(planResult.reason?.message || 'Both plan calls failed')
       }
-      const data = await resp.json()
-      if (!data.ok) throw new Error(data.error)
-      updateDeal(dealId, { negoNotes: data.notes })
+
+      updateDeal(dealId, { planNotes, commsNotes })
     } catch (e) {
       alert('Could not generate negotiation plan: ' + e.message)
     } finally {
@@ -185,7 +224,7 @@ export default function ScreenerPage() {
     setSaving(true)
     try {
       const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
-      const fullNotes = [deal.aiNotes, deal.negoNotes].filter(Boolean).join('\n\n')
+      const fullNotes = [deal.coreNotes, deal.compsNotes, deal.planNotes, deal.commsNotes].filter(Boolean).join('\n\n')
 
       const { data: lead, error } = await supabase.from('leads').insert({
         workspace_id:  workspaceId,
@@ -284,7 +323,7 @@ export default function ScreenerPage() {
     e.target.value = ''
   }
 
-  const displayNotes = [selectedDeal?.aiNotes, selectedDeal?.negoNotes].filter(Boolean).join('\n\n')
+  const displayNotes = [selectedDeal?.coreNotes, selectedDeal?.compsNotes, selectedDeal?.planNotes, selectedDeal?.commsNotes].filter(Boolean).join('\n\n')
 
   const addDeal = () => {
     const d = newDeal()

@@ -29,7 +29,7 @@ export default function DecisionStrip({
 
   const isPassed = deal.status === 'passed'
   const isSaved  = deal.status === 'saved'
-  const hasNego  = !!deal.negoNotes
+  const hasNego  = !!(deal.planNotes || deal.commsNotes)
   const dashUrl  = buildDashboardUrl(deal)
 
   if (isPassed || isSaved) {

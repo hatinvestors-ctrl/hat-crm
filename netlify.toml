@@ -15,8 +15,17 @@
 [functions."generate-ai-notes"]
   timeout = 50
 
+[functions."generate-core-analysis"]
+  timeout = 25
+
+[functions."generate-comps"]
+  timeout = 30
+
 [functions."generate-negotiation-plan"]
-  timeout = 60
+  timeout = 25
+
+[functions."generate-communications"]
+  timeout = 22
 
 [functions."ask-deal-question"]
   timeout = 20
