@@ -59,27 +59,6 @@ Inspection Play: YES — offer $[ask price or $X above ask] to secure contract. 
 [Include ONLY IF genuinely applicable — garage conversion, covered patio in strong rental ZIP, ADU potential, etc.:] Other Upside: [specific opportunity] — adds ~$[X] ARV or rental value, ~$[X] cost
 
 =====================================
-MARKET COMPS
-=====================================
-Conservative ARV: $[X] — [1 line: worst-case comp basis]
-Realistic ARV:    $[X] — [1 line: most likely outcome, used for deal math]
-Optimistic ARV:   $[X] — [1 line: upside if condition/timing favors]
-[Always include at least 2 real sold comps that justify the ARV. Use your JAX market knowledge. Format each as:]
-COMP: [street name or area, e.g. "Mango Ave, 32208"] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe, e.g. "sold 3 months ago"] | [condition: renovated / cosmetic / as-is]
-Why relevant: [1 sentence — how this comp supports or adjusts the ARV for THIS property]
-ARV Conclusion: [1–2 sentences — how the comps together land on the ARV used, what would push it higher or lower]
-
-=====================================
-CRM COMPS USED
-=====================================
-[ONLY include this section if CRM historical comps were provided above. Be specific and reference actual addresses and numbers from the CRM data.]
-[For each past deal directly relevant to ARV, reno, or offer strategy:]
-COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
-How used: [1-2 sentences — what this deal taught us and how it benchmarks the current property]
-ZIP Pattern: [2-3 sentences — ARV range patterns, reno costs, seller behavior, our offer success rate in this ZIP]
-Confidence Impact: [1 sentence — does CRM history increase or decrease confidence in the ARV and offer price?]
-
-=====================================
 DEAL SCORE
 =====================================
 Total:              [X]/100
@@ -114,6 +93,27 @@ CONS — RISKS AND RED FLAGS
 1. [price or spread risk with numbers]
 2. [property or condition risk]
 3. [market or exit risk]
+
+=====================================
+MARKET COMPS
+=====================================
+Conservative ARV: $[X] — [1 line: worst-case comp basis]
+Realistic ARV:    $[X] — [1 line: most likely outcome, used for deal math]
+Optimistic ARV:   $[X] — [1 line: upside if condition/timing favors]
+[Always include at least 2 real sold comps that justify the ARV. Use your JAX market knowledge. Format each as:]
+COMP: [street name or area, e.g. "Mango Ave, 32208"] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe, e.g. "sold 3 months ago"] | [condition: renovated / cosmetic / as-is]
+Why relevant: [1 sentence — how this comp supports or adjusts the ARV for THIS property]
+ARV Conclusion: [1–2 sentences — how the comps together land on the ARV used, what would push it higher or lower]
+
+=====================================
+CRM COMPS USED
+=====================================
+[ONLY include this section if CRM historical comps were provided above. Be specific and reference actual addresses and numbers from the CRM data.]
+[For each past deal directly relevant to ARV, reno, or offer strategy:]
+COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
+How used: [1-2 sentences — what this deal taught us and how it benchmarks the current property]
+ZIP Pattern: [2-3 sentences — ARV range patterns, reno costs, seller behavior, our offer success rate in this ZIP]
+Confidence Impact: [1 sentence — does CRM history increase or decrease confidence in the ARV and offer price?]
 
 =====================================
 CRM WORKFLOW
@@ -371,7 +371,7 @@ export default async (req) => {
     // Screener mode: skip CRM comps, use short prompt, fewer tokens — targets <10s response
     const comps = screener_mode ? [] : await fetchComparableLeads(lead).catch(() => [])
     const systemPrompt = screener_mode ? SCREENER_SYSTEM_PROMPT : SYSTEM_PROMPT
-    const maxTokens    = screener_mode ? 600 : 1800
+    const maxTokens    = screener_mode ? 600 : 2200
     const userPrompt   = buildUserPrompt(lead) + (screener_mode ? '' : buildCompsBlock(comps, lead))
 
     const abortCtrl = new AbortController()
