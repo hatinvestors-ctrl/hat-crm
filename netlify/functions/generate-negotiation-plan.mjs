@@ -52,7 +52,7 @@ RELATIONSHIP NOTE
 Once we close this one you're on our short list for every deal we see in this ZIP. Fast, clean, no drama — that's the relationship we're building.
 </example>
 
-Write the NEGOTIATION PLAN section only. Use real deal data. Replace all example values.``
+Write the NEGOTIATION PLAN section only. Use real deal data. Replace all example values.`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
