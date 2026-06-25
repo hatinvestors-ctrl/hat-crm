@@ -87,26 +87,29 @@ function PlainText({ body }) {
 function DealScoreSection({ body }) {
   const missingFields = useContext(MissingFieldsContext)
   const lines = body.split('\n').filter(Boolean)
-  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
-    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+  // Strip leading bullets/dashes/spaces before matching field names
+  const get = prefix => {
+    const line = lines.find(l => new RegExp(`^[-•*\\s]*${prefix}:`, 'i').test(l.trim()))
+    return line?.replace(new RegExp(`^[-•*\\s]*${prefix}:\\s*`, 'i'), '').trim()
+  }
 
   const totalRaw = get('Total')
   const verdict  = get('Verdict')
   const total    = totalRaw ? parseInt(totalRaw) : null
 
   const subScores = [
-    { key: 'Price Gap',          max: 25 },
+    { key: 'Price Gap',          max: 20 },
     { key: 'Deal Math',          max: 25 },
-    { key: 'Cash Flow',          max: 15 },
+    { key: 'Cash Flow',          max: 10 },
     { key: 'ZIP Quality',        max: 15 },
-    { key: 'Seller Motivation',  max: 10 },
+    { key: 'Seller Motivation',  max: 20 },
     { key: 'ARV Confidence',     max: 10 },
   ].map(({ key, max }) => {
     const raw = get(key)
     if (!raw) return null
     const scoreMatch = raw.match(/^(\d+)\/\d+/)
     const score = scoreMatch ? parseInt(scoreMatch[1]) : null
-    const detail = raw.replace(/^\d+\/\d+\s*[—-]\s*/, '').trim()
+    const detail = raw.replace(/^\d+\/\d+\s*[—\-–]\s*/, '').trim()
     return { key, max, score, detail }
   }).filter(Boolean)
 
@@ -155,7 +158,8 @@ function DealScoreSection({ body }) {
         </div>
       )}
 
-      {/* Sub-scores */}
+      {/* Sub-scores — fallback to raw text if parsing produced nothing */}
+      {subScores.length === 0 && total == null && <PlainText body={body} />}
       <div className="space-y-2">
         {subScores.map(({ key, max, score, detail }) => (
           <div key={key} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
