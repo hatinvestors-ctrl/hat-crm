@@ -143,7 +143,7 @@ export default async (req) => {
   if (!lead.asking_price) return new Response(JSON.stringify({ ok: false, error: 'NO_ASKING_PRICE' }), { status: 400, headers: HEADERS })
 
   const abortCtrl = new AbortController()
-  const abortTimer = setTimeout(() => abortCtrl.abort(), 18000)
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
 
   try {
     let resp
@@ -153,7 +153,7 @@ export default async (req) => {
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 900,
+          max_tokens: 1200,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: buildPrompt(lead) }],
         }),
