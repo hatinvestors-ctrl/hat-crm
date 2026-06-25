@@ -46,6 +46,11 @@ function parseMao(notes) {
   return m ? parseInt(m[1].replace(/,/g, '')) : null
 }
 
+function parseArv(notes) {
+  const m = notes?.match(/Our ARV:\s*\$([0-9,]+)/i)
+  return m ? parseInt(m[1].replace(/,/g, '')) : null
+}
+
 function createInitialState() {
   const first = newDeal()
   return { deals: [first], selectedId: first.id }
@@ -146,6 +151,7 @@ export default function ScreenerPage() {
         score:   parseScore(coreNotes),
         verdict: parseVerdict(coreNotes),
         mao:     parseMao(coreNotes),
+        arv:     parseArv(coreNotes),
         error,
       })
     } catch (e) {
@@ -240,7 +246,13 @@ export default function ScreenerPage() {
         )
         if (!overwrite) { setSaving(false); return }
         await supabase.from('leads')
-          .update({ ai_notes: fullNotes || null, screened: true, asking_price: asking })
+          .update({
+            ai_notes:     fullNotes || null,
+            screened:     true,
+            asking_price: asking,
+            arv:          deal.arv  || null,
+            mao:          deal.mao  || null,
+          })
           .eq('id', existing.id)
         updateDeal(dealId, { status: 'saved' })
         setSaving(false)
@@ -260,6 +272,8 @@ export default function ScreenerPage() {
         year_built:    deal.enriched?.year_built   || null,
         property_type: deal.enriched?.property_type || null,
         asking_price:  asking,
+        arv:           deal.arv  || null,
+        mao:           deal.mao  || null,
         lead_source:   deal.sourceName ? 'wholesaler' : 'other',
         status:        'new_lead',
         screened:      true,
