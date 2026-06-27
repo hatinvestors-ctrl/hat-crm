@@ -3,14 +3,30 @@ import Card from '../ui/Card'
 import NotesRenderer from './NotesRenderer'
 import WhatIfPanel from './WhatIfPanel'
 import DealQA from './DealQA'
+import { supabase } from '../../lib/supabase'
+
+// Calls one of the 4 analysis Netlify functions and returns notes string
+async function callFn(name, body) {
+  const res = await fetch(`/.netlify/functions/${name}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const ct = res.headers.get('content-type') || ''
+  if (!ct.includes('application/json')) throw new Error(`${name} timed out`)
+  const data = await res.json()
+  if (!data.ok) throw new Error(data.error || `${name} failed`)
+  return data.notes || ''
+}
 
 export default function AINotesSection({ lead, canEdit, onUpdated }) {
-  const [localNotes,  setLocalNotes] = useState(lead.ai_notes || '')
-  const [generating,  setGenerating] = useState(false)
-  const [genError,    setGenError]   = useState(null)
-  const [confirm,     setConfirm]    = useState(false)
-  const [collapsed,   setCollapsed]  = useState(false)
-  const cancelRef = useRef(null)
+  const [localNotes, setLocalNotes] = useState(lead.ai_notes || '')
+  const [generating, setGenerating] = useState(false)
+  const [phase,      setPhase]      = useState(null)   // 'analysis' | 'negotiation'
+  const [genError,   setGenError]   = useState(null)
+  const [confirm,    setConfirm]    = useState(false)
+  const [collapsed,  setCollapsed]  = useState(false)
+  const cancelledRef = useRef(false)
 
   useEffect(() => {
     setLocalNotes(lead.ai_notes || '')
@@ -20,53 +36,105 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
     setConfirm(false)
     setGenerating(true)
     setGenError(null)
-    let cancelled = false
-    cancelRef.current = () => { cancelled = true }
+    cancelledRef.current = false
 
     try {
-      const res = await fetch('/.netlify/functions/generate-ai-notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id, lead }),
-      })
+      if (!lead.asking_price) throw new Error('NO_ASKING_PRICE')
 
-      if (cancelled) return
+      // Phase 1 — core analysis + comps in parallel (same as screener)
+      setPhase('analysis')
+      const [coreResult, compsResult] = await Promise.allSettled([
+        callFn('generate-core-analysis', { lead }),
+        callFn('generate-comps',         { lead }),
+      ])
+      if (cancelledRef.current) return
 
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
-        throw new Error(`Server error (${res.status}). Try again.`)
+      const coreNotes  = coreResult.status  === 'fulfilled' ? coreResult.value  : null
+      const compsNotes = compsResult.status === 'fulfilled' ? compsResult.value : null
+      if (!coreNotes) throw new Error(coreResult.reason?.message || 'Core analysis failed')
+
+      // Phase 2 — negotiation plan + communications in parallel
+      setPhase('negotiation')
+      const aiSummary = coreNotes.slice(0, 3000)
+      const [planResult, commsResult] = await Promise.allSettled([
+        callFn('generate-negotiation-plan', { lead, ai_notes: aiSummary }),
+        callFn('generate-communications',   { lead, ai_notes: aiSummary }),
+      ])
+      if (cancelledRef.current) return
+
+      const planNotes  = planResult.status  === 'fulfilled' ? planResult.value  : null
+      const commsNotes = commsResult.status === 'fulfilled' ? commsResult.value : null
+
+      const fullNotes = [coreNotes, compsNotes, planNotes, commsNotes].filter(Boolean).join('\n\n')
+
+      // Save to Supabase (new functions don't save internally)
+      if (lead.id) {
+        await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
       }
 
-      const data = await res.json()
-      if (!res.ok || !data.ok) {
-        if (data.error === 'NO_ASKING_PRICE') throw new Error("Please fill in the Seller's Asking Price before generating AI analysis — the analysis is based on what the seller is asking.")
-        throw new Error(data.error || `Generation failed (${res.status}).`)
-      }
-
-      setLocalNotes(data.notes)
-      setGenerating(false)
-      onUpdated?.({ ...lead, ai_notes: data.notes })
+      setLocalNotes(fullNotes)
+      onUpdated?.({ ...lead, ai_notes: fullNotes })
     } catch (err) {
-      if (!cancelled) {
-        setGenError(err.message || 'Something went wrong.')
+      if (!cancelledRef.current) {
+        setGenError(
+          err.message === 'NO_ASKING_PRICE'
+            ? "Please fill in the Seller's Asking Price before generating AI analysis."
+            : err.message || 'Something went wrong.'
+        )
+      }
+    } finally {
+      if (!cancelledRef.current) {
         setGenerating(false)
+        setPhase(null)
       }
     }
   }
 
   const cancelGenerate = () => {
-    cancelRef.current?.()
+    cancelledRef.current = true
     setGenerating(false)
+    setPhase(null)
     setGenError(null)
   }
 
   const handleGenerate = () => {
-    if (localNotes) {
-      setConfirm(true)
-    } else {
-      runGenerate()
-    }
+    if (localNotes) setConfirm(true)
+    else runGenerate()
   }
+
+  // Reno budget: computed from lead fields when renovation_cost is unknown
+  const renoBudgetCard = !lead.renovation_cost && lead.arv && lead.mao ? (() => {
+    const arv = Number(lead.arv)
+    const mao = Number(lead.mao)
+    const maxBRRRR = Math.round(arv * 0.70 - mao * 1.085 - 30000)
+    const maxFlip  = Math.round(arv * 0.92 - mao - 25000)
+    const fmt = n => n > 0 ? `$${n.toLocaleString()}` : 'Deal too tight'
+    return (
+      <div className="mb-3 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
+          <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">
+            🔨 Max Reno to Make Deal Work at MAO (${mao.toLocaleString()})
+          </span>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
+          <div className="px-3 py-2">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">BRRRR (cash left in &lt;$30K)</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{fmt(maxBRRRR)}</div>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">Flip (net profit &gt;$25K)</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{fmt(maxFlip)}</div>
+          </div>
+        </div>
+      </div>
+    )
+  })() : null
+
+  const phaseLabel = phase === 'analysis'
+    ? 'Running deal analysis… (phase 1 of 2)'
+    : phase === 'negotiation'
+    ? 'Generating negotiation plan… (phase 2 of 2)'
+    : 'Generating…'
 
   return (
     <Card
@@ -81,7 +149,7 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                   </svg>
-                  Generating…
+                  {phaseLabel}
                   <button
                     onClick={cancelGenerate}
                     className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
@@ -142,8 +210,14 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       )}
 
       {localNotes ? (<>
+        {renoBudgetCard}
         <NotesRenderer
           notes={localNotes}
+          missingFields={[
+            !lead.arv             && 'ARV',
+            !lead.renovation_cost && 'Reno Cost',
+            !lead.rent_estimate   && 'Rent Estimate',
+          ].filter(Boolean)}
           extraTabs={[{
             id: 'askai',
             label: 'Ask AI',
@@ -157,12 +231,12 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
           }]}
         />
       </>) : generating ? (
-        <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">Generating AI analysis… this takes 20–40 seconds.</p>
+        <p className="text-[12.5px] text-[color:var(--color-text-dim)] italic">{phaseLabel} This takes 30–50 seconds.</p>
       ) : (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <p className="text-[13px] text-[color:var(--color-text-dim)]">No AI analysis yet.</p>
           {canEdit && (
-            <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Generate AI Analysis</strong> above to run a full investor analysis at the seller's asking price.</p>
+            <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Generate AI Analysis</strong> above to run a full investor analysis.</p>
           )}
         </div>
       )}
