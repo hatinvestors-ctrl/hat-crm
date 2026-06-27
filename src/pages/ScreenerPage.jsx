@@ -52,6 +52,12 @@ function parseArv(notes) {
   return m ? parseInt(m[1].replace(/,/g, '')) : null
 }
 
+// Comps analysis gives a more accurate ARV than the quick core estimate
+function parseCompsArv(notes) {
+  const m = notes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
+  return m ? parseInt(m[1].replace(/,/g, '')) : null
+}
+
 function createInitialState() {
   const first = newDeal()
   return { deals: [first], selectedId: first.id }
@@ -152,7 +158,7 @@ export default function ScreenerPage() {
         score:   parseScore(coreNotes),
         verdict: parseVerdict(coreNotes),
         mao:     parseMao(coreNotes),
-        arv:     parseArv(coreNotes),
+        arv:     parseCompsArv(compsNotes) || parseArv(coreNotes),
         error,
       })
     } catch (e) {

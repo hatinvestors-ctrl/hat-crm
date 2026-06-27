@@ -67,9 +67,16 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
 
       const fullNotes = [coreNotes, compsNotes, planNotes, commsNotes].filter(Boolean).join('\n\n')
 
+      // Prefer comps Realistic ARV over core quick estimate; update lead field if it changed
+      const compsArv = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
+      const resolvedArv = compsArv ? parseInt(compsArv[1].replace(/,/g, '')) : null
+
       // Save to Supabase (new functions don't save internally)
       if (lead.id) {
-        await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
+        await supabase.from('leads').update({
+          ai_notes: fullNotes,
+          ...(resolvedArv ? { arv: resolvedArv } : {}),
+        }).eq('id', lead.id)
       }
 
       setLocalNotes(fullNotes)
