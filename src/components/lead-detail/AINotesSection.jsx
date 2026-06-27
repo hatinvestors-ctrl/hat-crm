@@ -41,17 +41,18 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
     try {
       if (!lead.asking_price) throw new Error('NO_ASKING_PRICE')
 
-      // Phase 1 — core analysis + comps in parallel (same as screener)
+      // Phase 1a — comps first to get reliable ARV from actual comparable sales
       setPhase('analysis')
-      const [coreResult, compsResult] = await Promise.allSettled([
-        callFn('generate-core-analysis', { lead }),
-        callFn('generate-comps',         { lead }),
-      ])
+      const compsNotes = await callFn('generate-comps', { lead }).catch(() => null)
       if (cancelledRef.current) return
 
-      const coreNotes  = coreResult.status  === 'fulfilled' ? coreResult.value  : null
-      const compsNotes = compsResult.status === 'fulfilled' ? compsResult.value : null
-      if (!coreNotes) throw new Error(coreResult.reason?.message || 'Core analysis failed')
+      // Phase 1b — core analysis with comps ARV injected so all numbers agree
+      const compsArv = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
+      const resolvedArv = compsArv ? parseInt(compsArv[1].replace(/,/g, '')) : null
+      const leadWithArv = resolvedArv ? { ...lead, arv: resolvedArv } : lead
+      const coreNotes = await callFn('generate-core-analysis', { lead: leadWithArv })
+      if (cancelledRef.current) return
+      if (!coreNotes) throw new Error('Core analysis failed')
 
       // Phase 2 — negotiation plan + communications in parallel
       setPhase('negotiation')
@@ -66,10 +67,6 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       const commsNotes = commsResult.status === 'fulfilled' ? commsResult.value : null
 
       const fullNotes = [coreNotes, compsNotes, planNotes, commsNotes].filter(Boolean).join('\n\n')
-
-      // Prefer comps Realistic ARV over core quick estimate; update lead field if it changed
-      const compsArv = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
-      const resolvedArv = compsArv ? parseInt(compsArv[1].replace(/,/g, '')) : null
 
       // Save to Supabase (new functions don't save internally)
       if (lead.id) {
@@ -138,9 +135,9 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   })() : null
 
   const phaseLabel = phase === 'analysis'
-    ? 'Running deal analysis… (phase 1 of 2)'
+    ? 'Fetching comps & running deal analysis…'
     : phase === 'negotiation'
-    ? 'Generating negotiation plan… (phase 2 of 2)'
+    ? 'Generating negotiation plan…'
     : 'Generating…'
 
   return (

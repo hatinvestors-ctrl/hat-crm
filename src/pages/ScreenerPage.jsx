@@ -141,15 +141,14 @@ export default function ScreenerPage() {
     }
 
     try {
-      // Fire core analysis + comps in parallel
-      const [coreResult, compsResult] = await Promise.allSettled([
-        postFn('generate-core-analysis', { lead }),
-        postFn('generate-comps', { lead }),
-      ])
+      // Step 1: comps first — gives us a reliable ARV from actual comparable sales
+      const compsNotes = await postFn('generate-comps', { lead }).catch(() => null)
+      const compsArv = parseCompsArv(compsNotes)
 
-      const coreNotes  = coreResult.status  === 'fulfilled' ? coreResult.value  : null
-      const compsNotes = compsResult.status === 'fulfilled' ? compsResult.value : null
-      const error = coreResult.status === 'rejected' ? coreResult.reason?.message : null
+      // Step 2: core analysis with the comps ARV injected so all numbers agree
+      const leadWithArv = compsArv ? { ...lead, arv: compsArv } : lead
+      const coreNotes = await postFn('generate-core-analysis', { lead: leadWithArv }).catch(e => { throw e })
+      const error = null
 
       updateDeal(dealId, {
         status: 'done',
@@ -499,7 +498,7 @@ export default function ScreenerPage() {
                 <span className="animate-spin inline-block">&#x23F3;</span>
                 {selectedDeal.status === 'enriching'
                   ? 'Looking up property details…'
-                  : 'Running full AI analysis (20–40 sec)…'}
+                  : 'Fetching comps, then running deal analysis (30–50 sec)…'}
               </div>
             )}
             {/* Reno budget card — computed from AI-parsed ARV + MAO when user left reno blank */}
