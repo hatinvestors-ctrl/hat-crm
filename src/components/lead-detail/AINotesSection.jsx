@@ -26,6 +26,9 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const [genError,   setGenError]   = useState(null)
   const [confirm,    setConfirm]    = useState(false)
   const [collapsed,  setCollapsed]  = useState(false)
+  const [aiCompsArv, setAiCompsArv] = useState(null)   // ARV extracted from comps during last generation
+  const [arvOverride, setArvOverride] = useState('')    // user-typed ARV override
+  const [lastArv,    setLastArv]    = useState(null)    // ARV used in last core run
   const cancelledRef = useRef(false)
 
   useEffect(() => {
@@ -47,9 +50,12 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       if (cancelledRef.current) return
 
       // Phase 1b — core analysis with comps ARV injected so all numbers agree
-      const compsArv = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
-      const resolvedArv = compsArv ? parseInt(compsArv[1].replace(/,/g, '')) : null
-      const leadWithArv = resolvedArv ? { ...lead, arv: resolvedArv } : lead
+      const compsArvMatch = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
+      const resolvedArv = compsArvMatch ? parseInt(compsArvMatch[1].replace(/,/g, '')) : null
+      if (resolvedArv) setAiCompsArv(resolvedArv)
+      const arvForCore = resolvedArv || (lead.arv ? Number(lead.arv) : null)
+      const leadWithArv = arvForCore ? { ...lead, arv: arvForCore } : lead
+      setLastArv(arvForCore)
       const coreNotes = await callFn('generate-core-analysis', { lead: leadWithArv })
       if (cancelledRef.current) return
       if (!coreNotes) throw new Error('Core analysis failed')
@@ -72,7 +78,7 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       if (lead.id) {
         await supabase.from('leads').update({
           ai_notes: fullNotes,
-          ...(resolvedArv ? { arv: resolvedArv } : {}),
+          ...(arvForCore ? { arv: arvForCore } : {}),
         }).eq('id', lead.id)
       }
 
@@ -104,6 +110,38 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const handleGenerate = () => {
     if (localNotes) setConfirm(true)
     else runGenerate()
+  }
+
+  // Re-run only core analysis with a custom ARV — skips comps (fast ~8s)
+  const reRunWithArv = async () => {
+    const arv = parseFloat(arvOverride.replace(/[^0-9.]/g, ''))
+    if (!arv) return
+    setGenerating(true)
+    setGenError(null)
+    setPhase('analysis')
+    cancelledRef.current = false
+    try {
+      const coreNotes = await callFn('generate-core-analysis', { lead: { ...lead, arv } })
+      if (cancelledRef.current) return
+      setLastArv(arv)
+      const planNotes  = null // keep existing plan/comms; only core updates
+      const compsNotes = localNotes.match(/={5,}\s*\n(MARKET COMPS|CRM COMPS)/i)
+        ? localNotes // preserve if already in notes
+        : null
+      // Replace just the core portion — rebuild full notes
+      const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
+      const nonCoreParts  = existingParts.slice(1).join('')
+      const fullNotes     = coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
+      if (lead.id) {
+        await supabase.from('leads').update({ ai_notes: fullNotes, arv }).eq('id', lead.id)
+      }
+      setLocalNotes(fullNotes)
+      onUpdated?.({ ...lead, ai_notes: fullNotes, arv })
+    } catch (err) {
+      if (!cancelledRef.current) setGenError(err.message || 'Re-run failed.')
+    } finally {
+      if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
+    }
   }
 
   // Reno budget: computed from lead fields when renovation_cost is unknown
@@ -186,6 +224,33 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       }
     >
       {collapsed ? null : (<>
+
+      {/* ARV override row — shown after analysis is available */}
+      {localNotes && !generating && (
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          {aiCompsArv && (
+            <span className="text-[11px] text-[color:var(--color-text-dim)]">
+              AI Comps ARV: <strong className="text-[color:var(--color-accent-text)]">${Number(aiCompsArv).toLocaleString()}</strong>
+            </span>
+          )}
+          <span className="text-[11px] text-[color:var(--color-text-faint)]">·</span>
+          <span className="text-[11px] text-[color:var(--color-text-dim)]">Override ARV:</span>
+          <input
+            value={arvOverride}
+            onChange={e => setArvOverride(e.target.value)}
+            placeholder={aiCompsArv ? `$${Number(aiCompsArv).toLocaleString()}` : 'e.g. $215,000'}
+            className="w-32 h-6 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+          />
+          {arvOverride && parseFloat(arvOverride.replace(/[^0-9.]/g,'')) !== lastArv && (
+            <button
+              onClick={reRunWithArv}
+              className="h-6 px-2.5 rounded text-[11px] font-semibold border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)] transition-colors"
+            >
+              ↻ Re-run with this ARV
+            </button>
+          )}
+        </div>
+      )}
 
       {confirm && (
         <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">

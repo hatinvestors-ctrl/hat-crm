@@ -14,6 +14,9 @@ function newDeal(overrides = {}) {
     address: '',
     askingPrice: '',
     renovationCost: '',
+    arv: '',            // user-editable ARV override (empty = let AI decide)
+    aiCompsArv: null,   // ARV extracted from AI comps (read-only badge)
+    lastAnalyzedArv: null, // ARV used in the most recent core analysis run
     sourceName: '',
     sourcePhone: '',
     sourceEmail: '',
@@ -79,6 +82,20 @@ export default function ScreenerPage() {
   const [tab, setTab]                 = useState('single') // 'single' | 'bulk'
   const [csvError, setCsvError]       = useState(null)
 
+  const postFn = async (fn, payload) => {
+    const resp = await fetch(`/.netlify/functions/${fn}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
+      throw new Error(`${fn} timed out (${resp.status})`)
+    }
+    const data = await resp.json()
+    if (!data.ok) throw new Error(data.error || `${fn} failed`)
+    return data.notes || ''
+  }
+
   const selectedDeal = deals.find(d => d.id === selectedId) || deals[0]
 
   const updateDeal = useCallback((id, patch) => {
@@ -104,6 +121,8 @@ export default function ScreenerPage() {
 
     const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
 
+    const userArv = deal.arv ? parseFloat(String(deal.arv).replace(/[^0-9.]/g, '')) || null : null
+
     const lead = {
       address:          deal.address,
       city:             enriched?.city          || '',
@@ -115,7 +134,7 @@ export default function ScreenerPage() {
       year_built:       enriched?.year_built    || null,
       property_type:    enriched?.property_type || null,
       asking_price:     asking,
-      arv:              null,
+      arv:              userArv,
       conservative_arv: null,
       aggressive_arv:   null,
       renovation_cost:  deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
@@ -126,39 +145,68 @@ export default function ScreenerPage() {
 
     updateDeal(dealId, { status: 'analyzing', enriched })
 
-    const postFn = async (fn, payload) => {
-      const resp = await fetch(`/.netlify/functions/${fn}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!resp.ok && resp.headers.get('content-type')?.includes('text/html')) {
-        throw new Error(`${fn} timed out (${resp.status})`)
-      }
-      const data = await resp.json()
-      if (!data.ok) throw new Error(data.error || `${fn} failed`)
-      return data.notes || ''
-    }
-
     try {
       // Step 1: comps first — gives us a reliable ARV from actual comparable sales
       const compsNotes = await postFn('generate-comps', { lead }).catch(() => null)
       const compsArv = parseCompsArv(compsNotes)
 
-      // Step 2: core analysis with the comps ARV injected so all numbers agree
-      const leadWithArv = compsArv ? { ...lead, arv: compsArv } : lead
+      // Step 2: core analysis — user ARV takes priority, then comps ARV
+      const arvForCore = userArv || compsArv
+      const leadWithArv = arvForCore ? { ...lead, arv: arvForCore } : lead
       const coreNotes = await postFn('generate-core-analysis', { lead: leadWithArv }).catch(e => { throw e })
-      const error = null
 
       updateDeal(dealId, {
         status: 'done',
         coreNotes,
         compsNotes,
-        score:   parseScore(coreNotes),
-        verdict: parseVerdict(coreNotes),
-        mao:     parseMao(coreNotes),
-        arv:     parseCompsArv(compsNotes) || parseArv(coreNotes),
-        error,
+        score:           parseScore(coreNotes),
+        verdict:         parseVerdict(coreNotes),
+        mao:             parseMao(coreNotes),
+        aiCompsArv:      compsArv,
+        arv:             userArv || compsArv || parseArv(coreNotes) || '',
+        lastAnalyzedArv: arvForCore || parseArv(coreNotes),
+        error: null,
+      })
+    } catch (e) {
+      updateDeal(dealId, { status: 'done', error: e.message })
+    }
+  }
+
+  // Re-run only core analysis with the current ARV value (skips comps — fast ~8s)
+  const reRunWithArv = async () => {
+    const deal = deals.find(d => d.id === selectedId)
+    if (!deal?.coreNotes) return
+    const dealId = deal.id
+    const arvOverride = parseFloat(String(deal.arv).replace(/[^0-9.]/g, ''))
+    if (!arvOverride) return
+
+    updateDeal(dealId, { status: 'analyzing', error: null })
+
+    const asking = parseFloat(String(deal.askingPrice).replace(/[^0-9.]/g, '')) || null
+    const lead = {
+      address:       deal.address,
+      city:          deal.enriched?.city     || '',
+      state:         deal.enriched?.state    || 'FL',
+      zip_code:      deal.enriched?.zip_code || '',
+      bedrooms:      deal.enriched?.bedrooms  || null,
+      bathrooms:     deal.enriched?.bathrooms || null,
+      sqft:          deal.enriched?.sqft      || null,
+      asking_price:  asking,
+      arv:           arvOverride,
+      renovation_cost: deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+      mao: null, rent_estimate: null, notes: '',
+    }
+
+    try {
+      const coreNotes = await postFn('generate-core-analysis', { lead })
+      updateDeal(dealId, {
+        status: 'done',
+        coreNotes,
+        score:           parseScore(coreNotes),
+        verdict:         parseVerdict(coreNotes),
+        mao:             parseMao(coreNotes),
+        lastAnalyzedArv: arvOverride,
+        error: null,
       })
     } catch (e) {
       updateDeal(dealId, { status: 'done', error: e.message })
@@ -435,6 +483,22 @@ export default function ScreenerPage() {
                     className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
                   />
                 </div>
+                <div className="w-28">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">
+                    My ARV
+                    {selectedDeal.aiCompsArv && (
+                      <span className="ml-1 text-[color:var(--color-accent-text)] font-normal normal-case tracking-normal">
+                        · AI: ${Number(selectedDeal.aiCompsArv).toLocaleString()}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    value={selectedDeal.arv}
+                    onChange={e => setField('arv', e.target.value)}
+                    placeholder="AI auto-detects"
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
                 <div className="w-36">
                   <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Source Name</label>
                   <input
@@ -461,6 +525,16 @@ export default function ScreenerPage() {
                   {selectedDeal.status === 'enriching' ? 'Looking up…' :
                    selectedDeal.status === 'analyzing' ? 'Analyzing…' : 'Analyze'}
                 </button>
+                {selectedDeal.status === 'done' &&
+                 selectedDeal.arv &&
+                 parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g,'')) !== selectedDeal.lastAnalyzedArv && (
+                  <button
+                    onClick={reRunWithArv}
+                    className="h-8 px-3 rounded-md text-[12px] font-semibold border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)] transition-colors"
+                  >
+                    ↻ Re-run with ${Number(parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g,''))).toLocaleString()} ARV
+                  </button>
+                )}
               </div>
             )}
 
