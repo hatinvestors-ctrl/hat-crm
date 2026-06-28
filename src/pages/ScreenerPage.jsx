@@ -81,6 +81,47 @@ export default function ScreenerPage() {
   const [gettingNego, setGettingNego] = useState(false)
   const [tab, setTab]                 = useState('single') // 'single' | 'bulk'
   const [csvError, setCsvError]       = useState(null)
+  const [leftTab, setLeftTab]         = useState('queue') // 'queue' | 'saved'
+  const [viewingSaved, setViewingSaved] = useState(null)  // saved analysis being viewed
+
+  const savesKey = `hatcrm_screener_saves_${workspaceId}`
+  const loadSaves = () => {
+    try { return JSON.parse(localStorage.getItem(savesKey) || '[]') } catch { return [] }
+  }
+  const [savedAnalyses, setSavedAnalyses] = useState(loadSaves)
+
+  const saveAnalysis = () => {
+    const deal = deals.find(d => d.id === selectedId)
+    if (!deal?.coreNotes) return
+    const entry = {
+      id:          crypto.randomUUID(),
+      savedAt:     new Date().toISOString(),
+      address:     deal.address,
+      askingPrice: deal.askingPrice,
+      arv:         deal.arv,
+      aiCompsArv:  deal.aiCompsArv,
+      mao:         deal.mao,
+      score:       deal.score,
+      verdict:     deal.verdict,
+      renovationCost: deal.renovationCost,
+      enriched:    deal.enriched,
+      coreNotes:   deal.coreNotes,
+      compsNotes:  deal.compsNotes,
+      planNotes:   deal.planNotes,
+      commsNotes:  deal.commsNotes,
+    }
+    const updated = [entry, ...loadSaves()]
+    localStorage.setItem(savesKey, JSON.stringify(updated))
+    setSavedAnalyses(updated)
+    updateDeal(deal.id, { analysisSaved: true })
+  }
+
+  const deleteSave = (id) => {
+    const updated = loadSaves().filter(s => s.id !== id)
+    localStorage.setItem(savesKey, JSON.stringify(updated))
+    setSavedAnalyses(updated)
+    if (viewingSaved?.id === id) setViewingSaved(null)
+  }
 
   const postFn = async (fn, payload) => {
     const resp = await fetch(`/.netlify/functions/${fn}`, {
@@ -413,7 +454,9 @@ export default function ScreenerPage() {
     e.target.value = ''
   }
 
-  const displayNotes = [selectedDeal?.coreNotes, selectedDeal?.compsNotes, selectedDeal?.planNotes, selectedDeal?.commsNotes].filter(Boolean).join('\n\n')
+  const displayNotes = viewingSaved
+    ? [viewingSaved.coreNotes, viewingSaved.compsNotes, viewingSaved.planNotes, viewingSaved.commsNotes].filter(Boolean).join('\n\n')
+    : [selectedDeal?.coreNotes, selectedDeal?.compsNotes, selectedDeal?.planNotes, selectedDeal?.commsNotes].filter(Boolean).join('\n\n')
 
   const addDeal = () => {
     const d = newDeal()
@@ -426,14 +469,91 @@ export default function ScreenerPage() {
       <Topbar title="Deal Screener" />
 
       <div className="flex flex-1 min-h-0">
-        {/* Left: Deal Queue */}
+        {/* Left: Deal Queue / Saved Analyses */}
         <div className="w-56 shrink-0 flex flex-col min-h-0">
+          {/* Tab switcher */}
+          <div className="flex border-b border-[color:var(--color-line)] shrink-0">
+            {[['queue','Queue'], ['saved','Saved']].map(([key, label]) => (
+              <button key={key} onClick={() => { setLeftTab(key); if (key === 'queue') setViewingSaved(null) }}
+                className="flex-1 py-2 text-[11px] font-semibold transition-colors"
+                style={{
+                  background: leftTab === key ? 'var(--color-accent-soft)' : 'transparent',
+                  color: leftTab === key ? 'var(--color-accent-text)' : 'var(--color-text-muted)',
+                  borderBottom: leftTab === key ? '2px solid var(--color-accent)' : '2px solid transparent',
+                }}>
+                {label}{key === 'saved' && savedAnalyses.length > 0 && ` (${savedAnalyses.length})`}
+              </button>
+            ))}
+          </div>
+
+          {leftTab === 'queue' && (
           <DealQueue
             deals={deals}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={id => { setSelectedId(id); setViewingSaved(null) }}
             onAdd={addDeal}
           />
+          )}
+
+          {leftTab === 'saved' && (
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+              {savedAnalyses.length === 0 ? (
+                <p className="text-[12px] text-[color:var(--color-text-dim)] text-center mt-8 px-4 leading-relaxed">
+                  No saved analyses yet.<br/>Click "💾 Save Analysis" after running a deal.
+                </p>
+              ) : savedAnalyses.map(s => {
+                const isViewing = viewingSaved?.id === s.id
+                const verdictColor = v => {
+                  if (!v) return 'var(--color-text-muted)'
+                  const u = v.toUpperCase()
+                  if (u.includes('BUY'))   return 'var(--color-success-text)'
+                  if (u.includes('OFFER')) return 'var(--color-accent-text)'
+                  if (u.includes('WATCH')) return 'var(--color-warn-text)'
+                  return 'var(--color-danger-text)'
+                }
+                return (
+                  <div key={s.id}
+                    className="border-b border-[color:var(--color-line)] px-3 py-2.5 cursor-pointer transition-colors"
+                    style={{ background: isViewing ? 'var(--color-accent-soft)' : 'transparent' }}
+                    onClick={() => setViewingSaved(s)}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-[11.5px] font-semibold text-[color:var(--color-text)] truncate leading-snug">
+                        {s.address || '—'}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {s.score != null && (
+                          <span className="text-[11px] font-bold" style={{ color: verdictColor(s.verdict) }}>
+                            {s.score}/100
+                          </span>
+                        )}
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteSave(s.id) }}
+                          className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-danger-text)] transition-colors ml-1"
+                          title="Delete"
+                        >✕</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {s.verdict && (
+                        <span className="text-[10px] font-semibold" style={{ color: verdictColor(s.verdict) }}>
+                          {s.verdict}
+                        </span>
+                      )}
+                      {s.arv && (
+                        <span className="text-[10px] text-[color:var(--color-text-dim)]">
+                          ARV ${Number(s.arv).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[9.5px] text-[color:var(--color-text-faint)] mt-0.5">
+                      {new Date(s.savedAt).toLocaleDateString()} {new Date(s.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right: Analysis Panel */}
@@ -560,9 +680,24 @@ export default function ScreenerPage() {
             )}
           </div>
 
+          {/* Saved analysis banner */}
+          {viewingSaved && (
+            <div className="px-4 py-2 border-b border-[color:var(--color-line)] bg-[color:var(--color-accent-soft)] flex items-center justify-between shrink-0">
+              <span className="text-[11.5px] text-[color:var(--color-accent-text)] font-semibold">
+                📂 Viewing saved: {viewingSaved.address}
+              </span>
+              <button
+                onClick={() => setViewingSaved(null)}
+                className="text-[11px] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors"
+              >
+                ✕ Close
+              </button>
+            </div>
+          )}
+
           {/* Analysis output */}
           <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0" style={{ scrollbarWidth: 'thin' }}>
-            {selectedDeal?.error && (
+            {!viewingSaved && selectedDeal?.error && (
               <div className="p-3 rounded-lg bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger)] text-[12px] text-[color:var(--color-danger-text)]">
                 Analysis failed: {selectedDeal.error}
               </div>
@@ -603,7 +738,7 @@ export default function ScreenerPage() {
             {displayNotes && (
               <NotesRenderer notes={displayNotes} />
             )}
-            {!displayNotes && selectedDeal?.status === 'idle' && !selectedDeal?.error && (
+            {!displayNotes && !viewingSaved && selectedDeal?.status === 'idle' && !selectedDeal?.error && (
               <div className="text-center mt-12">
                 <p className="text-[40px] mb-3">&#x1F50D;</p>
                 <p className="text-[13px] text-[color:var(--color-text-dim)]">
@@ -613,15 +748,17 @@ export default function ScreenerPage() {
             )}
           </div>
 
-          {/* Decision strip */}
-          <DecisionStrip
+          {/* Decision strip — hidden when viewing saved analysis */}
+          {!viewingSaved && <DecisionStrip
             deal={selectedDeal}
             onPass={passDeal}
             onSave={saveToCRM}
+            onSaveAnalysis={saveAnalysis}
             onGetNegoPlan={getNegoPlan}
             saving={saving}
             gettingNego={gettingNego}
-          />
+            analysisSaved={selectedDeal?.analysisSaved}
+          />}
         </div>
       </div>
     </div>

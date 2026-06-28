@@ -19,9 +19,11 @@ export default function DecisionStrip({
   deal,
   onPass,
   onSave,
+  onSaveAnalysis,
   onGetNegoPlan,
   saving,
   gettingNego,
+  analysisSaved,
 }) {
   if (!deal || deal.status === 'idle' || deal.status === 'enriching' || deal.status === 'analyzing') {
     return null
@@ -82,6 +84,17 @@ export default function DecisionStrip({
       )}
       {hasNego && (
         <span className="text-[11px] text-[color:var(--color-success-text)]">✓ Plan ready</span>
+      )}
+
+      {analysisSaved ? (
+        <span className="text-[11px] text-[color:var(--color-success-text)]">✓ Analysis saved</span>
+      ) : (
+        <button
+          onClick={onSaveAnalysis}
+          className="px-3 h-8 rounded-md text-[12px] font-semibold border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+        >
+          💾 Save Analysis
+        </button>
       )}
 
       <button
