@@ -263,7 +263,8 @@
   .btn-pdf:hover { opacity: 0.85; }
   .btn-pdf svg { flex-shrink: 0; }
 
-  /* Print / PDF styles */
+  /* Print-only key inputs bar */
+  .print-inputs { display: none; }
   @media print {
     @page { size: A4 landscape; margin: 12mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -275,6 +276,11 @@
     .right-panel { gap: 12px !important; }
     .card { background: #1a1f2e !important; border: 1px solid #2d3748 !important; break-inside: avoid; }
     .cta-row button, .cta-row a { display: none !important; }
+    .print-inputs { display: flex !important; gap: 0; border-bottom: 1px solid #2d3748; background: #1a1f2e; padding: 10px 32px; }
+    .print-input-item { display: flex; flex-direction: column; padding: 0 28px 0 0; margin-right: 28px; border-right: 1px solid #2d3748; }
+    .print-input-item:last-child { border-right: none; }
+    .print-input-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; color: #718096; margin-bottom: 3px; }
+    .print-input-value { font-size: 17px; font-weight: 700; color: #f6ad55; }
   }
 </style>
 </head>
@@ -297,13 +303,37 @@
     <button class="tab" onclick="setStrategy('flip')">Flip</button>
     <button class="tab" onclick="setStrategy('brrrr')">BRRRR</button>
   </div>
-  <button class="btn-pdf" onclick="window.print()">
+  <button class="btn-pdf" onclick="exportPDF()">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
       <line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
     </svg>
     Export PDF
   </button>
+</div>
+
+<!-- Print-only key inputs bar (hidden on screen) -->
+<div class="print-inputs">
+  <div class="print-input-item">
+    <div class="print-input-label">Purchase Price</div>
+    <div class="print-input-value" id="print-pp">—</div>
+  </div>
+  <div class="print-input-item">
+    <div class="print-input-label">Renovation Cost</div>
+    <div class="print-input-value" id="print-reno">—</div>
+  </div>
+  <div class="print-input-item">
+    <div class="print-input-label">After Repair Value (ARV)</div>
+    <div class="print-input-value" id="print-arv">—</div>
+  </div>
+  <div class="print-input-item">
+    <div class="print-input-label">Monthly Rent</div>
+    <div class="print-input-value" id="print-rent">—</div>
+  </div>
+  <div class="print-input-item">
+    <div class="print-input-label">Offer Price (MAO)</div>
+    <div class="print-input-value" id="print-mao">—</div>
+  </div>
 </div>
 
 <!-- Main -->
@@ -863,6 +893,25 @@
 <div class="footer">HAT Investors · Deal Analyzer · Jacksonville, FL · All calculations use Rob @ 3 Shacks Capital defaults</div>
 
 <script>
+function exportPDF() {
+  const fmtVal = id => {
+    const el = document.getElementById(id);
+    if (!el) return '—';
+    const v = parseFloat(el.value);
+    return isNaN(v) ? '—' : '$' + v.toLocaleString();
+  };
+  const fmtText = id => {
+    const el = document.getElementById(id);
+    return el ? (el.textContent.trim() || '—') : '—';
+  };
+  document.getElementById('print-pp').textContent   = fmtVal('pp');
+  document.getElementById('print-reno').textContent = fmtVal('reno');
+  document.getElementById('print-arv').textContent  = fmtVal('arv');
+  document.getElementById('print-rent').textContent = fmtVal('rent');
+  document.getElementById('print-mao').textContent  = fmtText('mao-30');
+  window.print();
+}
+
 // Collapsible card toggle
 function toggleCollapse(headerEl) {
   headerEl.classList.toggle('collapsed');
