@@ -25,7 +25,7 @@ Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
 BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
-CRITICAL: When ARV is provided in the deal data, use it exactly as given for ALL calculations — do not substitute your own estimate or question it. The investor has their own data source.
+CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate MAO, cash-left-in, or net profit — the numbers are already computed for you. Your job is to score and narrate them, not recalculate.
 
 Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immediately with the first ===== line.
 
@@ -33,8 +33,8 @@ Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immed
 DEAL SCORE
 =====================================
 Total:             [X]/100
-Price Gap:         [X]/20 - [% above MAO. <=MAO=20, 1-10%=16, 11-20%=10, 21-30%=5, >30%=1]
-Deal Math:         [X]/25 - [BRRRR cash left in $X or flip net profit $X]
+Price Gap:         [X]/20 - [use pre-computed price gap %. <=0%=20, 1-10%=16, 11-20%=10, 21-30%=5, >30%=1]
+Deal Math:         [X]/25 - [use pre-computed BRRRR cash left in or flip net profit]
 Cash Flow:         [X]/10 - [monthly after PITIE. >$400=10, $250-400=8, $100-250=5, $0-100=2, neg=0]
 ZIP Quality:       [X]/15 - [A(32205,32216)=15, B(32210,32244,32211,32218,32219)=10, C(32208,32254,32221)=6]
 Seller Motivation: [X]/20 - [estate/probate=+7, price drop>15%=+6, as-is=+4, DOM>90=+5, DOM60-90=+3, DOM30-60=+1. Cap 20]
@@ -98,7 +98,14 @@ function buildPrompt(lead) {
   const mao  = num(lead.mao)
   const sqft = num(lead.sqft)
 
-  let brrrrBlock = ''
+  // Pre-compute MAO so the AI never has to estimate it
+  const renoForMao  = reno != null ? reno : 0
+  const computedMao = arv ? Math.round(arv * 0.75 - renoForMao - 2450) : mao
+
+  let computedBlock = ''
+  let brrrrResult = null
+  let flipResult  = null
+
   if (pp && arv && reno != null) {
     const hml         = pp * 0.90 + reno
     const hmlPoints   = Math.round(hml * 0.02)
@@ -111,24 +118,28 @@ function buildPrompt(lead) {
     const rentEst     = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
     const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
     const cashflow    = rentEst - loanFactor - 208 - 100
-    brrrrBlock = `\nBRRRR: HML ${fmt(hml)} | HML costs ${fmt(hmlCosts)} | All-in ${fmt(allIn)} | Refi ${fmt(refi)} | Cash left in ${fmt(cashLeftIn)} (${cashLeftIn < 30000 ? 'GREAT' : cashLeftIn < 60000 ? 'OK' : 'FAILS'}) | Cash flow ~$${cashflow}/mo`
-  }
+    brrrrResult = { allIn, refi, cashLeftIn, cashflow, label: cashLeftIn < 30000 ? 'GREAT' : cashLeftIn < 60000 ? 'OK' : 'FAILS' }
 
-  let flipBlock = ''
-  if (pp && arv && reno != null) {
-    const allIn       = pp + reno
+    const flipAllIn   = pp + reno
     const carryClose  = arv * 0.08
-    const netProfit   = arv - allIn - carryClose
-    flipBlock = `\nFlip: All-in ${fmt(allIn)} | Net profit ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
+    const netProfit   = arv - flipAllIn - carryClose
+    flipResult = { allIn: flipAllIn, netProfit, label: netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS' }
+
+    computedBlock = `
+PRE-COMPUTED DEAL MATH (use these exact numbers — do not recalculate):
+MAO (75%×ARV−Reno−closing): ${fmt(computedMao)}
+Price gap: Ask ${fmt(pp)} vs MAO ${fmt(computedMao)} = ${computedMao ? (((pp - computedMao) / computedMao) * 100).toFixed(1) : '?'}% ${pp <= computedMao ? 'AT/BELOW MAO ✓' : 'ABOVE MAO ✗'}
+BRRRR: All-in ${fmt(brrrrResult.allIn)} | Refi ${fmt(brrrrResult.refi)} | Cash left in ${fmt(brrrrResult.cashLeftIn)} → ${brrrrResult.label} | Cash flow ~$${cashflow}/mo
+Flip:  All-in ${fmt(flipResult.allIn)} | Net profit ${fmt(flipResult.netProfit)} → ${flipResult.label}`
   }
 
-  const arvLabel = arv != null ? `ARV: ${fmt(arv)} [INVESTOR-PROVIDED — use as-is for all math]` : 'ARV: Unknown'
+  const arvLabel = arv != null ? `ARV: ${fmt(arv)} [INVESTOR-PROVIDED]` : 'ARV: Unknown'
 
   return `${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ${arvLabel} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}
+Ask: ${fmt(pp)} | ${arvLabel} | Reno: ${fmt(reno != null ? reno : null)} | Rent: ${fmt(rent)}${computedBlock}
 Notes: ${lead.notes || 'None'}
 
-Write all 6 sections now using the deal data above.`
+Write all 6 sections now using the deal data above. For DEAL SCORE use the PRE-COMPUTED values above exactly.`
 }
 
 export default async (req) => {
