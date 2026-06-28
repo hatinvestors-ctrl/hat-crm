@@ -25,6 +25,8 @@ Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
 BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
+CRITICAL: When ARV is provided in the deal data, use it exactly as given for ALL calculations — do not substitute your own estimate or question it. The investor has their own data source.
+
 Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immediately with the first ===== line.
 
 =====================================
@@ -120,8 +122,10 @@ function buildPrompt(lead) {
     flipBlock = `\nFlip: All-in ${fmt(allIn)} | Net profit ${fmt(netProfit)} (${netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS'})`
   }
 
+  const arvLabel = arv != null ? `ARV: ${fmt(arv)} [INVESTOR-PROVIDED — use as-is for all math]` : 'ARV: Unknown'
+
   return `${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ARV: ${fmt(arv)} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}
+Ask: ${fmt(pp)} | MAO: ${fmt(mao)} | ${arvLabel} | Reno: ${fmt(reno)} | Rent: ${fmt(rent)}${brrrrBlock}${flipBlock}
 Notes: ${lead.notes || 'None'}
 
 Write all 6 sections now using the deal data above.`
