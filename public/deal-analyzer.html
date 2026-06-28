@@ -257,6 +257,25 @@
     .brrrr-grid { grid-template-columns: 1fr; }
     .cta-row { grid-template-columns: 1fr; }
   }
+
+  /* PDF Export button */
+  .btn-pdf { display: flex; align-items: center; gap: 7px; background: #f6ad55; color: #1a1f2e; border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+  .btn-pdf:hover { opacity: 0.85; }
+  .btn-pdf svg { flex-shrink: 0; }
+
+  /* Print / PDF styles */
+  @media print {
+    @page { size: A4 landscape; margin: 12mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #0f1117 !important; color: #e2e8f0 !important; }
+    .header { background: linear-gradient(135deg, #1a1f2e 0%, #252d3d 100%) !important; border-bottom: 1px solid #2d3748 !important; }
+    .address-input, .strategy-tabs, .btn-pdf { display: none !important; }
+    .inputs-panel { display: none !important; }
+    .main { grid-template-columns: 1fr !important; padding: 0 !important; }
+    .right-panel { gap: 12px !important; }
+    .card { background: #1a1f2e !important; border: 1px solid #2d3748 !important; break-inside: avoid; }
+    .cta-row button, .cta-row a { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -278,6 +297,13 @@
     <button class="tab" onclick="setStrategy('flip')">Flip</button>
     <button class="tab" onclick="setStrategy('brrrr')">BRRRR</button>
   </div>
+  <button class="btn-pdf" onclick="window.print()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      <line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
+    </svg>
+    Export PDF
+  </button>
 </div>
 
 <!-- Main -->
