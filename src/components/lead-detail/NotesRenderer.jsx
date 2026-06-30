@@ -477,18 +477,18 @@ function RecommendedActionSection({ body }) {
   const isDead      = /^DEAD/i.test(verdict || '')
 
   const verdictMeta = isBuyNow
-    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW' }
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW',          desc: 'Deal works at or below asking price. Move fast — send offer today.' }
     : isMakeOffer
-    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '📨', label: 'MAKE OFFER' }
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '📨', label: 'MAKE OFFER',        desc: 'Deal works at MAO. Gap from ask is small enough to bridge with a direct offer — send it now and start the conversation.' }
     : (isOffer || isNegotiate)
-    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: isNegotiate ? 'NEGOTIATE' : 'OFFER & NEGOTIATE' }
+    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: isNegotiate ? 'NEGOTIATE' : 'OFFER & NEGOTIATE', desc: 'Deal works at MAO but the gap from asking is significant. Seller needs motivation to move — use DOM, condition, and follow-up pressure to get there.' }
     : isLongShot
-    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '🎯', label: 'LONG SHOT' }
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '🎯', label: 'LONG SHOT',        desc: 'Deal works at MAO but requires a very large price cut. Only realistic if seller is distressed, property has been sitting, or you have a strong relationship. Low offer, long follow-up.' }
     : isWatch
-    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH' }
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH',            desc: 'Deal barely works at MAO — thin margins or uncertain ARV. Monitor for a price drop or motivated seller signal before making a move.' }
     : isDead
-    ? { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',  icon: '🚫', label: 'DEAD LEAD' }
-    : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—' }
+    ? { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',  icon: '🚫', label: 'DEAD LEAD',        desc: 'Math does not work even at our MAO. No profitable exit exists at any reasonable offer. Move on — do not waste follow-up time here.' }
+    : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—',     desc: '' }
 
   // Strip verdict keyword from the full verdict string to get the explanation
   const verdictDetail = (verdict || '').replace(/^(BUY NOW|MAKE OFFER|OFFER & NEGOTIATE|NEGOTIATE|LONG SHOT|WATCH|DEAD LEAD)\s*[—-]\s*/i, '')
@@ -518,8 +518,11 @@ function RecommendedActionSection({ body }) {
           <span className="text-[22px] shrink-0 mt-0.5">{verdictMeta.icon}</span>
           <div className="flex-1 min-w-0">
             <div className="text-[14px] font-black leading-tight" style={{ color: verdictMeta.txt }}>{verdictMeta.label}</div>
-            {verdictDetail && (
-              <p className="text-[11.5px] mt-0.5 leading-snug" style={{ color: verdictMeta.txt }}>{verdictDetail}</p>
+            {verdictMeta.desc && (
+              <p className="text-[11px] mt-1 leading-snug opacity-85" style={{ color: verdictMeta.txt }}>{verdictMeta.desc}</p>
+            )}
+            {verdictDetail && verdictDetail !== verdictMeta.label && (
+              <p className="text-[11px] mt-1 leading-snug opacity-70 italic" style={{ color: verdictMeta.txt }}>{verdictDetail}</p>
             )}
             {strategy && (
               <div className="text-[10.5px] mt-1 opacity-75" style={{ color: verdictMeta.txt }}>Strategy: {strategy}</div>
