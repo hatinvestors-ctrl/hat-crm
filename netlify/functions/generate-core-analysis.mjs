@@ -25,7 +25,20 @@ Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
 BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
-CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate MAO, cash-left-in, or net profit — the numbers are already computed for you. Your job is to score and narrate them, not recalculate.
+CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate MAO, cash-left-in, or net profit.
+
+VERDICT PHILOSOPHY — VERY IMPORTANT:
+We NEVER pay asking price. We always make an offer at or below MAO. Therefore:
+- DEAD LEAD means the deal math FAILS EVEN AT MAO (cash-left-in too high AND flip profit negative) OR the ZIP/property has no realistic exit. Asking price above MAO alone is NEVER a reason for DEAD LEAD.
+- When deal WORKS AT MAO but ask > MAO: the job is to get the price down. Use MAKE OFFER, NEGOTIATE, or WATCH depending on the gap and seller signals.
+- Verdict is about whether a profitable deal is ACHIEVABLE — not whether the seller is asking too much today.
+
+Verdict rules (base on deal math AT MAO):
+MAKE OFFER:  deal works at MAO, gap <25% off ask — send offer now
+NEGOTIATE:   deal works at MAO, gap 25-45% off ask — motivated seller or long DOM needed
+LONG SHOT:   deal works at MAO, gap >45% off ask — only works if seller is distressed
+WATCH:       deal barely works at MAO (marginal math), monitor for price drops
+DEAD LEAD:   deal FAILS at MAO (math broken even at our price) OR no viable exit strategy
 
 Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immediately with the first ===== line.
 
@@ -33,13 +46,13 @@ Write EXACTLY these 6 sections in this order. No markdown. No intro. Start immed
 DEAL SCORE
 =====================================
 Total:             [X]/100
-Price Gap:         [X]/20 - [use pre-computed price gap %. <=0%=20, 1-10%=16, 11-20%=10, 21-30%=5, >30%=1]
-Deal Math:         [X]/25 - [use pre-computed BRRRR cash left in or flip net profit]
-Cash Flow:         [X]/10 - [monthly after PITIE. >$400=10, $250-400=8, $100-250=5, $0-100=2, neg=0]
+Price Gap:         [X]/20 - [gap from ask to MAO. <=0%=20, 1-15%=16, 16-25%=12, 26-35%=8, 36-45%=4, >45%=1]
+Deal Math:         [X]/25 - [BRRRR/flip math AT MAO. Strong=25, OK=18, Marginal=10, Fails=0]
+Cash Flow:         [X]/10 - [monthly after PITIE at refi. >$400=10, $250-400=8, $100-250=5, $0-100=2, neg=0]
 ZIP Quality:       [X]/15 - [A(32205,32216)=15, B(32210,32244,32211,32218,32219)=10, C(32208,32254,32221)=6]
 Seller Motivation: [X]/20 - [estate/probate=+7, price drop>15%=+6, as-is=+4, DOM>90=+5, DOM60-90=+3, DOM30-60=+1. Cap 20]
 ARV Confidence:    [X]/10 - [HIGH=10, MEDIUM=6, LOW=2]
-Verdict:           [EXCEPTIONAL >=80 / STRONG 65-79 / WATCH 45-64 / MARGINAL 25-44 / DEAD <25]
+Verdict:           [MAKE OFFER / NEGOTIATE / LONG SHOT / WATCH / DEAD LEAD]
 
 =====================================
 DEAL SNAPSHOT
@@ -54,16 +67,17 @@ HOA:        [None / $X/mo / Unknown]
 =====================================
 RECOMMENDED ACTION
 =====================================
-Verdict:        [BUY NOW / OFFER & NEGOTIATE / WATCH / DEAD LEAD]
-At Ask:         [WORKS / FAILS / MARGINAL] - [one line why]
-At MAO:         [WORKS / FAILS / MARGINAL] - [one line why]
-Gap:            $[X] off ask ([X]% reduction needed)
-Strategy:       [BRRRR / Flip / Rental Hold / None]
-Our ARV:        $[X]
-Starting Offer: $[X]
-Target Price:   $[X]
-Max Walk-Away:  $[X]
-Summary:        [2 sentences - deal viability at MAO and what must happen to close]
+Verdict:           [MAKE OFFER / NEGOTIATE / LONG SHOT / WATCH / DEAD LEAD]
+At Ask:            [WORKS / FAILS / MARGINAL] - [one line why]
+At MAO:            [WORKS / FAILS / MARGINAL] - [one line why]
+Gap to Close:      $[X] off ask ([X]% reduction needed from seller)
+Strategy:          [BRRRR / Flip / Rental Hold / None]
+Our ARV:           $[X]
+Our MAO:           $[X]
+Starting Offer:    $[X] (anchor below MAO to leave room to negotiate up)
+Target Price:      $[X]
+Max Walk-Away:     $[X]
+How to Get There:  [2-3 sentences: what negotiation angle to use, what seller signals to look for, what follow-up cadence to run to move seller from ask to our price]
 
 =====================================
 PROS - WHY THIS DEAL IS INTERESTING

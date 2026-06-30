@@ -41,7 +41,7 @@ function parseScore(notes) {
 }
 
 function parseVerdict(notes) {
-  const m = notes?.match(/Verdict:\s*(BUY NOW|OFFER & NEGOTIATE|OFFER|WATCH|DEAD LEAD)/i)
+  const m = notes?.match(/Verdict:\s*(BUY NOW|MAKE OFFER|OFFER & NEGOTIATE|NEGOTIATE|LONG SHOT|WATCH|DEAD LEAD)/i)
   return m ? m[1] : null
 }
 

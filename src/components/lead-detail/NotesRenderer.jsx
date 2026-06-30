@@ -151,7 +151,7 @@ function DealScoreSection({ body }) {
           </div>
           <div>
             <div className="text-[15px] font-black" style={{ color: totalColor.txt }}>
-              {total >= 80 ? 'EXCEPTIONAL' : total >= 65 ? 'STRONG' : total >= 45 ? 'WATCH' : total >= 25 ? 'MARGINAL' : 'DEAD LEAD'}
+              {total >= 80 ? 'EXCEPTIONAL' : total >= 65 ? 'STRONG' : total >= 45 ? 'NEGOTIATE' : total >= 25 ? 'WATCH' : 'DEAD LEAD'}
             </div>
             {verdict && <p className="text-[11px] mt-0.5" style={{ color: totalColor.txt }}>{verdict.replace(/^(STRONG|SOLID|MARGINAL|WEAK)[^—–-]*/i, '')}</p>}
           </div>
@@ -450,12 +450,14 @@ function RecommendedActionSection({ body }) {
   const verdict    = get('Verdict')
   const atAsk      = get('At Ask')
   const atMao      = get('At MAO')
-  const gap        = get('Gap')
+  const gap        = get('Gap') || get('Gap to Close')
   const strategy   = get('Strategy')
   const arv        = get('Our ARV')
+  const ourMao     = get('Our MAO')
   const starting   = get('Starting Offer')
   const target     = get('Target Price')
   const maxWalk    = get('Max Walk-Away')
+  const howToGet   = get('How to Get There')
   const summary    = get('Summary')
 
   // Value-add lines (optional)
@@ -466,23 +468,30 @@ function RecommendedActionSection({ body }) {
   const bathAdd    = get('Bath Add')
   const otherUp    = get('Other Upside')
 
-  const isBuyNow   = /^BUY NOW/i.test(verdict || '')
-  const isOffer    = /^OFFER/i.test(verdict || '')
-  const isWatch    = /^WATCH/i.test(verdict || '')
-  const isDead     = /^DEAD/i.test(verdict || '')
+  const isBuyNow    = /^BUY NOW/i.test(verdict || '')
+  const isMakeOffer = /^MAKE OFFER/i.test(verdict || '')
+  const isOffer     = /^OFFER/i.test(verdict || '') // legacy
+  const isNegotiate = /^NEGOTIATE/i.test(verdict || '')
+  const isLongShot  = /^LONG SHOT/i.test(verdict || '')
+  const isWatch     = /^WATCH/i.test(verdict || '')
+  const isDead      = /^DEAD/i.test(verdict || '')
 
   const verdictMeta = isBuyNow
     ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW' }
-    : isOffer
-    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: 'OFFER & NEGOTIATE' }
+    : isMakeOffer
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '📨', label: 'MAKE OFFER' }
+    : (isOffer || isNegotiate)
+    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: isNegotiate ? 'NEGOTIATE' : 'OFFER & NEGOTIATE' }
+    : isLongShot
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '🎯', label: 'LONG SHOT' }
     : isWatch
     ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH' }
     : isDead
-    ? { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '🚫', label: 'DEAD LEAD' }
+    ? { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',  icon: '🚫', label: 'DEAD LEAD' }
     : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—' }
 
   // Strip verdict keyword from the full verdict string to get the explanation
-  const verdictDetail = (verdict || '').replace(/^(BUY NOW|OFFER & NEGOTIATE|WATCH|DEAD LEAD)\s*[—-]\s*/i, '')
+  const verdictDetail = (verdict || '').replace(/^(BUY NOW|MAKE OFFER|OFFER & NEGOTIATE|NEGOTIATE|LONG SHOT|WATCH|DEAD LEAD)\s*[—-]\s*/i, '')
 
   // Parse At Ask / At MAO status
   const parseStatus = (val) => {
@@ -558,16 +567,16 @@ function RecommendedActionSection({ body }) {
             <div className="text-[14px] font-bold text-[color:var(--color-text)]">{arv.split('←')[0].trim()}</div>
           </div>
         )}
-        {starting && (
-          <div className="p-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
-            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Starting Offer</div>
-            <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{starting.split('←')[0].trim()}</div>
+        {(ourMao || target) && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">Our MAO</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-success-text)]">{(ourMao || target).split('←')[0].trim()}</div>
           </div>
         )}
-        {target && (
-          <div className="p-2.5 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
-            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">Target Price (MAO)</div>
-            <div className="text-[14px] font-bold text-[color:var(--color-success-text)]">{target.split('←')[0].trim()}</div>
+        {starting && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">Starting Offer (anchor low)</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{starting.split('←')[0].trim()}</div>
           </div>
         )}
         {maxWalk && (
@@ -578,8 +587,16 @@ function RecommendedActionSection({ body }) {
         )}
       </div>
 
-      {/* Summary */}
-      {summary && (
+      {/* How to Get There — negotiation strategy */}
+      {howToGet && (
+        <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3">
+          <div className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)] mb-1.5">🎯 How to Get There</div>
+          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-relaxed">{howToGet}</p>
+        </div>
+      )}
+
+      {/* Summary (legacy) */}
+      {summary && !howToGet && (
         <p className="text-[12px] text-[color:var(--color-text-muted)] leading-relaxed px-1 italic">{summary}</p>
       )}
 
