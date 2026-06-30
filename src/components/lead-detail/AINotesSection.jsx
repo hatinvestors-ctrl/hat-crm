@@ -26,9 +26,11 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const [genError,   setGenError]   = useState(null)
   const [confirm,    setConfirm]    = useState(false)
   const [collapsed,  setCollapsed]  = useState(false)
-  const [aiCompsArv, setAiCompsArv] = useState(null)   // ARV extracted from comps during last generation
-  const [arvOverride, setArvOverride] = useState('')    // user-typed ARV override
-  const [lastArv,    setLastArv]    = useState(null)    // ARV used in last core run
+  const [aiCompsArv,   setAiCompsArv]   = useState(null)  // ARV extracted from comps during last generation
+  const [arvOverride,  setArvOverride]  = useState('')    // user-typed ARV override
+  const [renoOverride, setRenoOverride] = useState('')    // user-typed reno cost override
+  const [lastArv,      setLastArv]      = useState(null)  // ARV used in last core run
+  const [lastReno,     setLastReno]     = useState(null)  // Reno used in last core run
   const cancelledRef = useRef(false)
 
   useEffect(() => {
@@ -112,37 +114,47 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
     else runGenerate()
   }
 
-  // Re-run only core analysis with a custom ARV — skips comps (fast ~8s)
-  const reRunWithArv = async () => {
-    const arv = parseFloat(arvOverride.replace(/[^0-9.]/g, ''))
-    if (!arv) return
+  // Re-run only core analysis with ARV and/or reno overrides — skips comps (fast ~8s)
+  const reRunWithOverrides = async () => {
+    const arv  = arvOverride  ? parseFloat(arvOverride.replace(/[^0-9.]/g, ''))  || null : null
+    const reno = renoOverride ? parseFloat(renoOverride.replace(/[^0-9.]/g, '')) || null : null
+    if (!arv && !reno) return
     setGenerating(true)
     setGenError(null)
     setPhase('analysis')
     cancelledRef.current = false
     try {
-      const coreNotes = await callFn('generate-core-analysis', { lead: { ...lead, arv } })
+      const overrideLead = {
+        ...lead,
+        ...(arv  != null ? { arv }              : {}),
+        ...(reno != null ? { renovation_cost: reno } : {}),
+      }
+      const coreNotes = await callFn('generate-core-analysis', { lead: overrideLead })
       if (cancelledRef.current) return
-      setLastArv(arv)
-      const planNotes  = null // keep existing plan/comms; only core updates
-      const compsNotes = localNotes.match(/={5,}\s*\n(MARKET COMPS|CRM COMPS)/i)
-        ? localNotes // preserve if already in notes
-        : null
-      // Replace just the core portion — rebuild full notes
+      if (arv)  setLastArv(arv)
+      if (reno) setLastReno(reno)
+      // Replace just the core portion — preserve comps/plan/comms
       const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
       const nonCoreParts  = existingParts.slice(1).join('')
       const fullNotes     = coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
-      if (lead.id) {
-        await supabase.from('leads').update({ ai_notes: fullNotes, arv }).eq('id', lead.id)
+      const supabaseUpdate = {
+        ai_notes: fullNotes,
+        ...(arv  != null ? { arv }              : {}),
+        ...(reno != null ? { renovation_cost: reno } : {}),
       }
+      if (lead.id) await supabase.from('leads').update(supabaseUpdate).eq('id', lead.id)
       setLocalNotes(fullNotes)
-      onUpdated?.({ ...lead, ai_notes: fullNotes, arv })
+      onUpdated?.({ ...lead, ai_notes: fullNotes, ...supabaseUpdate })
     } catch (err) {
       if (!cancelledRef.current) setGenError(err.message || 'Re-run failed.')
     } finally {
       if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
     }
   }
+
+  const overrideChanged =
+    (arvOverride  && parseFloat(arvOverride.replace(/[^0-9.]/g,''))  !== lastArv)  ||
+    (renoOverride && parseFloat(renoOverride.replace(/[^0-9.]/g,'')) !== lastReno)
 
   // Reno budget: computed from lead fields when renovation_cost is unknown
   const renoBudgetCard = !lead.renovation_cost && lead.arv && lead.mao ? (() => {
@@ -225,30 +237,46 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
     >
       {collapsed ? null : (<>
 
-      {/* ARV override row — shown after analysis is available */}
+      {/* Override inputs — shown after analysis is available */}
       {localNotes && !generating && (
-        <div className="mb-3 flex items-center gap-2 flex-wrap">
-          {aiCompsArv && (
-            <span className="text-[11px] text-[color:var(--color-text-dim)]">
-              AI Comps ARV: <strong className="text-[color:var(--color-accent-text)]">${Number(aiCompsArv).toLocaleString()}</strong>
-            </span>
-          )}
-          <span className="text-[11px] text-[color:var(--color-text-faint)]">·</span>
-          <span className="text-[11px] text-[color:var(--color-text-dim)]">Override ARV:</span>
-          <input
-            value={arvOverride}
-            onChange={e => setArvOverride(e.target.value)}
-            placeholder={aiCompsArv ? `$${Number(aiCompsArv).toLocaleString()}` : 'e.g. $215,000'}
-            className="w-32 h-6 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
-          />
-          {arvOverride && parseFloat(arvOverride.replace(/[^0-9.]/g,'')) !== lastArv && (
-            <button
-              onClick={reRunWithArv}
-              className="h-6 px-2.5 rounded text-[11px] font-semibold border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)] transition-colors"
-            >
-              ↻ Re-run with this ARV
-            </button>
-          )}
+        <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold mb-2">
+            Override Inputs → Re-run Analysis
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
+                ARV {aiCompsArv && <span className="normal-case font-normal tracking-normal text-[color:var(--color-accent-text)]">· AI estimate: ${Number(aiCompsArv).toLocaleString()}</span>}
+              </label>
+              <input
+                value={arvOverride}
+                onChange={e => setArvOverride(e.target.value)}
+                placeholder={lead.arv ? `$${Number(lead.arv).toLocaleString()} (current)` : 'e.g. $215,000'}
+                className="w-36 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
+                Reno Cost {!lead.renovation_cost && <span className="normal-case font-normal tracking-normal text-[color:var(--color-warn-text)]">· unknown</span>}
+              </label>
+              <input
+                value={renoOverride}
+                onChange={e => setRenoOverride(e.target.value)}
+                placeholder={lead.renovation_cost ? `$${Number(lead.renovation_cost).toLocaleString()} (current)` : 'e.g. $35,000'}
+                className="w-36 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+            {overrideChanged && (
+              <div className="flex flex-col gap-0.5 mt-3.5">
+                <button
+                  onClick={reRunWithOverrides}
+                  className="h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+                >
+                  ↻ Re-run analysis
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -26,6 +26,7 @@ BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
 CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate MAO, cash-left-in, or net profit.
+When reno is UNKNOWN: score Deal Math based on how realistic the max reno budget is for the property condition. If the max reno budget is generous (>$40K for medium condition), score well. If it's very tight (<$15K) for a heavy reno, score low. The "How to Get There" must include: get a contractor walk before committing, confirm reno is under the max budget shown.
 
 VERDICT PHILOSOPHY — VERY IMPORTANT:
 We NEVER pay asking price. We always make an offer at or below MAO. Therefore:
@@ -121,6 +122,7 @@ function buildPrompt(lead) {
   let flipResult  = null
 
   if (pp && arv && reno != null) {
+    // Reno is known — full deal math
     const hml         = pp * 0.90 + reno
     const hmlPoints   = Math.round(hml * 0.02)
     const hmlFees     = 1500
@@ -145,6 +147,29 @@ MAO (75%×ARV−Reno−closing): ${fmt(computedMao)}
 Price gap: Ask ${fmt(pp)} vs MAO ${fmt(computedMao)} = ${computedMao ? (((pp - computedMao) / computedMao) * 100).toFixed(1) : '?'}% ${pp <= computedMao ? 'AT/BELOW MAO ✓' : 'ABOVE MAO ✗'}
 BRRRR: All-in ${fmt(brrrrResult.allIn)} | Refi ${fmt(brrrrResult.refi)} | Cash left in ${fmt(brrrrResult.cashLeftIn)} → ${brrrrResult.label} | Cash flow ~$${cashflow}/mo
 Flip:  All-in ${fmt(flipResult.allIn)} | Net profit ${fmt(flipResult.netProfit)} → ${flipResult.label}`
+
+  } else if (pp && arv && reno == null) {
+    // Reno unknown — compute MAX reno budget that makes each strategy work
+    const refi        = arv * 0.70
+    const rentEst     = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
+    const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
+    const cashflow    = rentEst - loanFactor - 208 - 100
+
+    // Max reno for BRRRR: solve allIn = refi - 30000 → pp*0.9 + reno + hmlCosts(reno) ≈ refi - 30000
+    // Simplified: maxRenoBRRRR ≈ (refi - 30000 - pp*0.9*1.085 - 1500) / (1 + 1.085)
+    const hmlBaseNoreno = pp * 0.90
+    const maxRenoBRRRR  = Math.round((refi - 30000 - hmlBaseNoreno * 1.085 - 1500) / 2.085)
+    // Max reno for Flip: ARV - pp - reno - ARV*0.08 = 25000 → reno = ARV*0.92 - pp - 25000
+    const maxRenoFlip   = Math.round(arv * 0.92 - pp - 25000)
+
+    computedBlock = `
+RENO UNKNOWN — MAX RENO BUDGET TO MAKE THIS DEAL WORK (pre-computed — do not recalculate):
+MAO at zero reno (75%×ARV−closing): ${fmt(computedMao)}
+Max reno for BRRRR (cash left in <$30K at MAO): ${maxRenoBRRRR > 0 ? fmt(maxRenoBRRRR) : 'IMPOSSIBLE — ask too high'}
+Max reno for Flip (net profit >$25K at ask price): ${maxRenoFlip > 0 ? fmt(maxRenoFlip) : 'IMPOSSIBLE — ask too high'}
+Refi at 70% ARV: ${fmt(refi)} | Est. cash flow if reno ≤ budget: ~$${cashflow}/mo
+KEY QUESTION: Can we renovate this property for under ${maxRenoBRRRR > 0 ? fmt(maxRenoBRRRR) : fmt(maxRenoFlip)} based on condition? That is the go/no-go number.
+Score Deal Math based on how realistic the max reno budget is for the property condition described.`
   }
 
   const arvLabel = arv != null ? `ARV: ${fmt(arv)} [INVESTOR-PROVIDED]` : 'ARV: Unknown'
