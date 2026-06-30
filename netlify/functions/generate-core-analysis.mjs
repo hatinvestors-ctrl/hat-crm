@@ -25,8 +25,9 @@ Rent: 2BR $1,200 | 3/2 $1,550 | 4/2 $2,000/mo
 BRRRR: Refi = 70% ARV @ 6.875%/30yr. Cash left in <$30K great, $30-60K ok, >$60K fails.
 Flip: carry+close = 8% ARV. MAO = 0.75 x ARV - reno.
 
-CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate MAO, cash-left-in, or net profit.
-When reno is UNKNOWN: score Deal Math based on how realistic the max reno budget is for the property condition. If the max reno budget is generous (>$40K for medium condition), score well. If it's very tight (<$15K) for a heavy reno, score low. The "How to Get There" must include: get a contractor walk before committing, confirm reno is under the max budget shown.
+CRITICAL: Use the PRE-COMPUTED DEAL MATH values provided in the prompt exactly as given. Do not recalculate anything.
+CRITICAL: Deal Math score and verdict are based on the AT MAO numbers — not the AT ASK numbers. We never pay asking price. The AT ASK block is reference only to explain why we need a discount.
+When reno is UNKNOWN: score Deal Math based on how realistic the max reno budget is for the property condition. If the max reno budget is generous (>$40K for medium condition), score well. If it's very tight (<$15K) for a heavy reno, score low. "How to Get There" must include: get a contractor walk to confirm reno is under the max budget shown.
 
 VERDICT PHILOSOPHY — VERY IMPORTANT:
 We NEVER pay asking price. We always make an offer at or below MAO. Therefore:
@@ -122,31 +123,44 @@ function buildPrompt(lead) {
   let flipResult  = null
 
   if (pp && arv && reno != null) {
-    // Reno is known — full deal math
-    const hml         = pp * 0.90 + reno
-    const hmlPoints   = Math.round(hml * 0.02)
-    const hmlFees     = 1500
-    const hmlInterest = Math.round(hml * 0.12 * (5.5 / 12))
-    const hmlCosts    = hmlPoints + hmlFees + hmlInterest
-    const allIn       = pp + reno + hmlCosts
-    const refi        = arv * 0.70
-    const cashLeftIn  = allIn - refi
-    const rentEst     = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
-    const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
-    const cashflow    = rentEst - loanFactor - 208 - 100
-    brrrrResult = { allIn, refi, cashLeftIn, cashflow, label: cashLeftIn < 30000 ? 'GREAT' : cashLeftIn < 60000 ? 'OK' : 'FAILS' }
+    // Reno is known — compute deal math at BOTH asking price AND MAO
+    // We never buy at asking — verdict is based on MAO math
+    const buyPrice = computedMao && computedMao > 0 ? computedMao : pp
+    const refi     = arv * 0.70
+    const rentEst  = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
+    const loanFactor = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
 
-    const flipAllIn   = pp + reno
-    const carryClose  = arv * 0.08
-    const netProfit   = arv - flipAllIn - carryClose
-    flipResult = { allIn: flipAllIn, netProfit, label: netProfit >= 40000 ? 'STRONG' : netProfit >= 25000 ? 'THIN' : 'FAILS' }
+    // Math AT MAO (what we actually pay)
+    const hmlMao        = buyPrice * 0.90 + reno
+    const hmlMaoCosts   = Math.round(hmlMao * 0.02) + 1500 + Math.round(hmlMao * 0.12 * (5.5 / 12))
+    const allInMao      = buyPrice + reno + hmlMaoCosts
+    const cashLeftInMao = allInMao - refi
+    const cashflow      = rentEst - loanFactor - 208 - 100
+    const flipNetMao    = arv - (buyPrice + reno) - arv * 0.08
+    brrrrResult = { allIn: allInMao, refi, cashLeftIn: cashLeftInMao, cashflow, label: cashLeftInMao < 30000 ? 'GREAT' : cashLeftInMao < 60000 ? 'OK' : 'FAILS' }
+    flipResult  = { allIn: buyPrice + reno, netProfit: flipNetMao, label: flipNetMao >= 40000 ? 'STRONG' : flipNetMao >= 25000 ? 'THIN' : 'FAILS' }
+
+    // Math AT ASK (reference only — shows why we can't pay full price)
+    const hmlAsk      = pp * 0.90 + reno
+    const hmlAskCosts = Math.round(hmlAsk * 0.02) + 1500 + Math.round(hmlAsk * 0.12 * (5.5 / 12))
+    const allInAsk    = pp + reno + hmlAskCosts
+    const cashLeftAsk = allInAsk - refi
+    const flipNetAsk  = arv - (pp + reno) - arv * 0.08
+
+    const pctAboveMao = computedMao ? (((pp - computedMao) / Math.abs(computedMao)) * 100).toFixed(1) : '?'
 
     computedBlock = `
-PRE-COMPUTED DEAL MATH (use these exact numbers — do not recalculate):
+PRE-COMPUTED DEAL MATH — use these exact numbers, do not recalculate:
 MAO (75%×ARV−Reno−closing): ${fmt(computedMao)}
-Price gap: Ask ${fmt(pp)} vs MAO ${fmt(computedMao)} = ${computedMao ? (((pp - computedMao) / computedMao) * 100).toFixed(1) : '?'}% ${pp <= computedMao ? 'AT/BELOW MAO ✓' : 'ABOVE MAO ✗'}
-BRRRR: All-in ${fmt(brrrrResult.allIn)} | Refi ${fmt(brrrrResult.refi)} | Cash left in ${fmt(brrrrResult.cashLeftIn)} → ${brrrrResult.label} | Cash flow ~$${cashflow}/mo
-Flip:  All-in ${fmt(flipResult.allIn)} | Net profit ${fmt(flipResult.netProfit)} → ${flipResult.label}`
+Price gap: Ask ${fmt(pp)} vs MAO ${fmt(computedMao)} = ${pctAboveMao}% ${pp <= computedMao ? 'AT/BELOW MAO ✓' : 'ABOVE MAO — need price reduction'}
+
+AT MAO ${fmt(buyPrice)} [THIS IS WHAT WE OFFER — base verdict on these numbers]:
+  BRRRR: All-in ${fmt(allInMao)} | Refi ${fmt(refi)} | Cash left in ${fmt(cashLeftInMao)} → ${brrrrResult.label} | Cash flow ~$${cashflow}/mo
+  Flip:  All-in ${fmt(buyPrice + reno)} | Net profit ${fmt(flipNetMao)} → ${flipResult.label}
+
+AT ASK ${fmt(pp)} [reference only — shows why full price doesn't work]:
+  BRRRR: All-in ${fmt(allInAsk)} | Cash left in ${fmt(cashLeftAsk)} → ${cashLeftAsk < 30000 ? 'GREAT' : cashLeftAsk < 60000 ? 'OK' : 'FAILS'}
+  Flip:  Net profit ${fmt(flipNetAsk)} → ${flipNetAsk >= 40000 ? 'STRONG' : flipNetAsk >= 25000 ? 'THIN' : 'FAILS'}`
 
   } else if (pp && arv && reno == null) {
     // Reno unknown — compute MAX reno budget that makes each strategy work
