@@ -29,8 +29,10 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const [aiCompsArv,   setAiCompsArv]   = useState(null)  // ARV extracted from comps during last generation
   const [arvOverride,  setArvOverride]  = useState('')    // user-typed ARV override
   const [renoOverride, setRenoOverride] = useState('')    // user-typed reno cost override
-  const [lastArv,      setLastArv]      = useState(null)  // ARV used in last core run
-  const [lastReno,     setLastReno]     = useState(null)  // Reno used in last core run
+  const [lastArv,      setLastArv]      = useState(null)   // ARV used in last core run
+  const [lastReno,     setLastReno]     = useState(null)   // Reno used in last core run
+  const [negoStale,    setNegoStale]    = useState(false)  // nego plan out of sync with current core inputs
+  const [updatingNego, setUpdatingNego] = useState(false)
   const cancelledRef = useRef(false)
 
   useEffect(() => {
@@ -137,6 +139,9 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
       const nonCoreParts  = existingParts.slice(1).join('')
       const fullNotes     = coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
+      // Flag nego plan as stale if it exists and inputs changed
+      const hasNego = /NEGOTIATION PLAN/i.test(localNotes)
+      if (hasNego) setNegoStale(true)
       const supabaseUpdate = {
         ai_notes: fullNotes,
         ...(arv  != null ? { arv }              : {}),
@@ -149,6 +154,38 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       if (!cancelledRef.current) setGenError(err.message || 'Re-run failed.')
     } finally {
       if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
+    }
+  }
+
+  // Re-run negotiation plan + communications with the updated core analysis numbers
+  const updateNegoPlan = async () => {
+    setUpdatingNego(true)
+    setGenError(null)
+    try {
+      // Pull the current core notes (first section before MARKET COMPS / NEGOTIATION PLAN)
+      const corePart   = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)[0]
+      const compsPart  = localNotes.match(/(={5,}\s*\nMARKET COMPS[\s\S]*?)(?=={5,}\s*\n(?:NEGOTIATION PLAN|COMMUNICATIONS)|$)/i)?.[1] || ''
+      const aiSummary  = corePart.slice(0, 3000)
+      const overrideLead = {
+        ...lead,
+        ...(lastArv  ? { arv: lastArv }                    : {}),
+        ...(lastReno ? { renovation_cost: lastReno }        : {}),
+      }
+      const [planResult, commsResult] = await Promise.allSettled([
+        callFn('generate-negotiation-plan', { lead: overrideLead, ai_notes: aiSummary }),
+        callFn('generate-communications',   { lead: overrideLead, ai_notes: aiSummary }),
+      ])
+      const planNotes  = planResult.status  === 'fulfilled' ? planResult.value  : null
+      const commsNotes = commsResult.status === 'fulfilled' ? commsResult.value : null
+      const fullNotes  = [corePart.trim(), compsPart.trim(), planNotes, commsNotes].filter(Boolean).join('\n\n')
+      if (lead.id) await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
+      setLocalNotes(fullNotes)
+      onUpdated?.({ ...lead, ai_notes: fullNotes })
+      setNegoStale(false)
+    } catch (err) {
+      setGenError(err.message || 'Failed to update negotiation plan.')
+    } finally {
+      setUpdatingNego(false)
     }
   }
 
@@ -277,6 +314,31 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Stale nego plan notice */}
+      {negoStale && !generating && !updatingNego && (
+        <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <div>
+            <div className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ Negotiation plan is based on old numbers</div>
+            <div className="text-[10.5px] text-[color:var(--color-warn-text)] opacity-80 mt-0.5">You changed ARV or Reno — the plan and scripts still reflect the previous analysis.</div>
+          </div>
+          <button
+            onClick={updateNegoPlan}
+            className="shrink-0 h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-warn)] text-white hover:opacity-90 transition-opacity"
+          >
+            ↻ Update Plan
+          </button>
+        </div>
+      )}
+      {updatingNego && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)] text-[11.5px] text-[color:var(--color-warn-text)]">
+          <svg className="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          Updating negotiation plan with new numbers…
         </div>
       )}
 
