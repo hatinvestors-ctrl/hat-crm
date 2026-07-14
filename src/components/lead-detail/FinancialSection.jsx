@@ -9,6 +9,16 @@ import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { fireLeadNotification } from '../../lib/leadNotifications'
 
+function verdictStyle(verdict) {
+  if (!verdict) return null
+  const v = verdict.toUpperCase()
+  if (v.includes('MAKE OFFER'))  return { bg: 'var(--color-success-soft)', border: 'var(--color-success)', text: 'var(--color-success-text)' }
+  if (v.includes('NEGOTIATE'))   return { bg: 'var(--color-warn-soft)',    border: 'var(--color-warn)',    text: 'var(--color-warn-text)' }
+  if (v.includes('LONG SHOT'))   return { bg: 'var(--color-warn-soft)',    border: 'var(--color-warn)',    text: 'var(--color-warn-text)' }
+  if (v.includes('WATCH'))       return { bg: 'var(--color-bg-elev-2)',    border: 'var(--color-line)',    text: 'var(--color-text-muted)' }
+  return { bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' }
+}
+
 export default function FinancialSection({ lead, userId, members, canEdit, onUpdated }) {
   const { workspaceId } = useOutletContext()
   const update = useLeadUpdate(lead, userId, members, onUpdated)
@@ -59,17 +69,48 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
     }
   }
 
+  const verdict = lead.deal_analysis?.verdict || null
+  const vStyle  = verdictStyle(verdict)
+
   return (
-    <Card title="Financials">
+    <Card title="Financials" subtitle="MAO · ARV · Reno — quick deal verdict">
+
+      {/* ── Hero MAO row ── */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start gap-2">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
+                MAO · Our Offer
+              </span>
+              <span
+                title="MAO auto-calculates as 75% × ARV − Renovation. Edit to override."
+                className="text-[11px] text-[color:var(--color-text-dim)] cursor-help select-none"
+              >ℹ</span>
+            </div>
+            <EditableField
+              label=""
+              type="currency"
+              value={lead.mao}
+              formatter={formatCurrency}
+              onSave={(v) => update({ mao: v })}
+              disabled={!canEdit}
+              displayClassName="text-2xl font-bold text-[color:var(--color-accent)]"
+            />
+          </div>
+        </div>
+        {vStyle && verdict && (
+          <span
+            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border"
+            style={{ background: vStyle.bg, borderColor: vStyle.border, color: vStyle.text }}
+          >
+            {verdict}
+          </span>
+        )}
+      </div>
+
+      {/* ── ARV + Reno grid ── */}
       <div className="grid grid-cols-2 gap-4">
-        <EditableField
-          label="MAO · Our Offer"
-          type="currency"
-          value={lead.mao}
-          formatter={formatCurrency}
-          onSave={(v) => update({ mao: v })}
-          disabled={!canEdit}
-        />
         <EditableField
           label="ARV"
           type="currency"
@@ -88,11 +129,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         />
       </div>
 
-      <p className="text-[11px] text-[color:var(--color-text-dim)] mt-3 leading-relaxed">
-        MAO auto-calculates as 75% × ARV − Renovation. Edit to override.
-      </p>
-
-      {/* Analyze trigger row */}
+      {/* ── Analyze trigger row ── */}
       <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {/* Strategy toggle */}
@@ -139,7 +176,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           loading={analyzing}
           disabled={!canEdit || analyzing}
         >
-          {analyzing ? 'Analyzing…' : hasAnalysis ? '↺ Re-analyze' : '✦ Analyze Deal'}
+          {analyzing ? 'Analyzing…' : hasAnalysis ? '↺ Re-check' : '✦ Quick Check'}
         </Button>
       </div>
 
@@ -151,7 +188,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
             disabled={!canEdit || analyzing}
             className="shrink-0 text-[11.5px] font-semibold px-2.5 py-1 rounded bg-[color:var(--color-warn)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            Re-analyze now
+            Re-check now
           </button>
         </div>
       )}

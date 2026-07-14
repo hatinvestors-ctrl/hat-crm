@@ -11,6 +11,7 @@ export default function EditableField({
   formatter,      // (value) => string for display
   placeholder = '—',
   disabled = false,
+  displayClassName,  // optional: override display button text classes
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value ?? '')
@@ -132,7 +133,7 @@ export default function EditableField({
         <button
           onClick={() => !disabled && setEditing(true)}
           disabled={disabled}
-          className={`mt-0.5 w-full text-left text-[13px] px-1 -mx-1 rounded transition-colors ${
+          className={`mt-0.5 w-full text-left px-1 -mx-1 rounded transition-colors ${displayClassName ?? 'text-[13px]'} ${
             disabled
               ? 'cursor-default'
               : 'cursor-text hover:bg-[color:var(--color-bg-elev-2)]'
