@@ -159,6 +159,13 @@ export default function LeadDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
+            <FinancialSection
+              lead={lead}
+              userId={user.id}
+              members={members}
+              canEdit={canEdit}
+              onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+            />
             <PropertyInfoSection
               lead={lead}
               userId={user.id}
@@ -184,13 +191,6 @@ export default function LeadDetailPage() {
               onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
             />
             <ListingAgentCard lead={lead} />
-            <FinancialSection
-              lead={lead}
-              userId={user.id}
-              members={members}
-              canEdit={canEdit}
-              onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
-            />
             <ScenariosFlat
               lead={lead}
               canEdit={canEdit}
