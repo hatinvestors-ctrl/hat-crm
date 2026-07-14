@@ -5,6 +5,24 @@ import WhatIfPanel from './WhatIfPanel'
 import DealQA from './DealQA'
 import { supabase } from '../../lib/supabase'
 
+// Fetch comment-type activities for a lead and format as context string
+async function fetchLeadContext(lead) {
+  if (!lead.id) return ''
+  const { data } = await supabase
+    .from('lead_activities')
+    .select('content, created_at, profiles:user_id(full_name)')
+    .eq('lead_id', lead.id)
+    .eq('type', 'comment')
+    .order('created_at', { ascending: true })
+    .limit(30)
+  if (!data?.length) return ''
+  return data.map(a => {
+    const who = a.profiles?.full_name || 'Team'
+    const when = new Date(a.created_at).toLocaleDateString()
+    return `[${when}] ${who}: ${a.content}`
+  }).join('\n')
+}
+
 // Calls one of the 4 analysis Netlify functions and returns notes string
 async function callFn(name, body) {
   const res = await fetch(`/.netlify/functions/${name}`, {
@@ -29,8 +47,15 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const [aiCompsArv,   setAiCompsArv]   = useState(null)  // ARV extracted from comps during last generation
   const [arvOverride,  setArvOverride]  = useState('')    // user-typed ARV override
   const [renoOverride, setRenoOverride] = useState('')    // user-typed reno cost override
+  const [domOverride,       setDomOverride]       = useState('')
+  const [rentOverride,      setRentOverride]      = useState('')
+  const [priceDropOverride, setPriceDropOverride] = useState('')
+  const [sellerNotesOverride, setSellerNotesOverride] = useState('')
+  const [aiRent,       setAiRent]       = useState(null)  // estimated rent from bedrooms
   const [lastArv,      setLastArv]      = useState(null)   // ARV used in last core run
   const [lastReno,     setLastReno]     = useState(null)   // Reno used in last core run
+  const [lastDom,      setLastDom]      = useState(null)   // DOM used in last core run
+  const [lastRent,     setLastRent]     = useState(null)   // Rent used in last core run
   const [negoStale,    setNegoStale]    = useState(false)  // nego plan out of sync with current core inputs
   const [updatingNego, setUpdatingNego] = useState(false)
   const cancelledRef = useRef(false)
@@ -50,7 +75,9 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
 
       // Phase 1a — comps first to get reliable ARV from actual comparable sales
       setPhase('analysis')
-      const compsNotes = await callFn('generate-comps', { lead }).catch(() => null)
+      const teamComments = await fetchLeadContext(lead)
+      const leadWithContext = teamComments ? { ...lead, team_comments: teamComments } : lead
+      const compsNotes = await callFn('generate-comps', { lead: leadWithContext }).catch(() => null)
       if (cancelledRef.current) return
 
       // Phase 1b — core analysis with comps ARV injected so all numbers agree
@@ -58,7 +85,9 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       const resolvedArv = compsArvMatch ? parseInt(compsArvMatch[1].replace(/,/g, '')) : null
       if (resolvedArv) setAiCompsArv(resolvedArv)
       const arvForCore = resolvedArv || (lead.arv ? Number(lead.arv) : null)
-      const leadWithArv = arvForCore ? { ...lead, arv: arvForCore } : lead
+      const estimatedRent = lead.rent_estimate || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
+      setAiRent(estimatedRent)
+      const leadWithArv = { ...leadWithContext, ...(arvForCore ? { arv: arvForCore } : {}) }
       setLastArv(arvForCore)
       const coreNotes = await callFn('generate-core-analysis', { lead: leadWithArv })
       if (cancelledRef.current) return
@@ -68,8 +97,8 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       setPhase('negotiation')
       const aiSummary = coreNotes.slice(0, 3000)
       const [planResult, commsResult] = await Promise.allSettled([
-        callFn('generate-negotiation-plan', { lead, ai_notes: aiSummary }),
-        callFn('generate-communications',   { lead, ai_notes: aiSummary }),
+        callFn('generate-negotiation-plan', { lead: leadWithArv, ai_notes: aiSummary }),
+        callFn('generate-communications',   { lead: leadWithArv, ai_notes: aiSummary }),
       ])
       if (cancelledRef.current) return
 
@@ -120,23 +149,35 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
   const reRunWithOverrides = async () => {
     const arv  = arvOverride  ? parseFloat(arvOverride.replace(/[^0-9.]/g, ''))  || null : null
     const reno = renoOverride ? parseFloat(renoOverride.replace(/[^0-9.]/g, '')) || null : null
-    if (!arv && !reno) return
+    const dom  = domOverride  ? parseInt(domOverride.replace(/[^0-9]/g, ''))     || null : null
+    const rent      = rentOverride      ? parseFloat(rentOverride.replace(/[^0-9.]/g, ''))      || null : null
+    const priceDrop = priceDropOverride ? parseFloat(priceDropOverride.replace(/[^0-9.]/g, '')) || null : null
+    const sellerNotes = sellerNotesOverride.trim() || null
+    if (!arv && !reno && dom == null && !rent && priceDrop == null && !sellerNotes) return
     setGenerating(true)
     setGenError(null)
     setPhase('analysis')
     cancelledRef.current = false
     try {
+      const teamComments = await fetchLeadContext(lead)
       const overrideLead = {
         ...lead,
-        ...(arv  != null ? { arv }              : {}),
-        ...(reno != null ? { renovation_cost: reno } : {}),
+        ...(arv  != null ? { arv }                    : {}),
+        ...(reno != null ? { renovation_cost: reno }   : {}),
+        ...(dom  != null ? { days_on_market: dom }     : {}),
+        ...(rent      != null ? { rent_estimate: rent }         : {}),
+        ...(priceDrop != null ? { price_drop_pct: priceDrop }  : {}),
+        ...(sellerNotes       ? { notes: sellerNotes }          : {}),
+        ...(teamComments      ? { team_comments: teamComments } : {}),
       }
       const coreNotes = await callFn('generate-core-analysis', { lead: overrideLead })
       if (cancelledRef.current) return
-      if (arv)  setLastArv(arv)
-      if (reno) setLastReno(reno)
+      if (arv)         setLastArv(arv)
+      if (reno)        setLastReno(reno)
+      if (dom != null) setLastDom(dom)
+      if (rent)        setLastRent(rent)
       // Replace just the core portion — preserve comps/plan/comms
-      const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
+      const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|RENTAL COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
       const nonCoreParts  = existingParts.slice(1).join('')
       const fullNotes     = coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
       // Flag nego plan as stale if it exists and inputs changed
@@ -166,10 +207,16 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
       const corePart   = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)[0]
       const compsPart  = localNotes.match(/(={5,}\s*\nMARKET COMPS[\s\S]*?)(?=={5,}\s*\n(?:NEGOTIATION PLAN|COMMUNICATIONS)|$)/i)?.[1] || ''
       const aiSummary  = corePart.slice(0, 3000)
+      const teamComments = await fetchLeadContext(lead)
       const overrideLead = {
         ...lead,
         ...(lastArv  ? { arv: lastArv }                    : {}),
         ...(lastReno ? { renovation_cost: lastReno }        : {}),
+        ...(lastDom  != null ? { days_on_market: lastDom } : {}),
+        ...(lastRent ? { rent_estimate: lastRent }          : {}),
+        ...(priceDropOverride ? { price_drop_pct: parseFloat(priceDropOverride) || null } : {}),
+        ...(sellerNotesOverride.trim() ? { notes: sellerNotesOverride.trim() } : {}),
+        ...(teamComments      ? { team_comments: teamComments } : {}),
       }
       const [planResult, commsResult] = await Promise.allSettled([
         callFn('generate-negotiation-plan', { lead: overrideLead, ai_notes: aiSummary }),
@@ -191,20 +238,28 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
 
   const overrideChanged =
     (arvOverride  && parseFloat(arvOverride.replace(/[^0-9.]/g,''))  !== lastArv)  ||
-    (renoOverride && parseFloat(renoOverride.replace(/[^0-9.]/g,'')) !== lastReno)
+    (renoOverride && parseFloat(renoOverride.replace(/[^0-9.]/g,'')) !== lastReno) ||
+    (domOverride  && parseInt(domOverride.replace(/[^0-9]/g,''))     !== lastDom)  ||
+    (rentOverride      && parseFloat(rentOverride.replace(/[^0-9.]/g,''))      !== lastRent) ||
+    !!priceDropOverride.trim() ||
+    !!sellerNotesOverride.trim()
 
   // Reno budget: computed from lead fields when renovation_cost is unknown
   const renoBudgetCard = !lead.renovation_cost && lead.arv && lead.mao ? (() => {
-    const arv = Number(lead.arv)
-    const mao = Number(lead.mao)
-    const maxBRRRR = Math.round(arv * 0.70 - mao * 1.085 - 30000)
-    const maxFlip  = Math.round(arv * 0.92 - mao - 25000)
+    const arv    = Number(lead.arv)
+    const mao    = Number(lead.mao)
+    const asking = Number(lead.asking_price || 0) || mao
+    const pp     = Math.min(asking, mao)  // effective purchase price — never overpay above MAO
+    const refi_  = arv * 0.70
+    const maxBRRRR = Math.round((refi_ - 30000 - pp * 0.90 * 1.085 - 1500) / 2.085)
+    const maxFlip  = Math.round(arv * 0.92 - pp - 25000)
     const fmt = n => n > 0 ? `$${n.toLocaleString()}` : 'Deal too tight'
+    const ppLabel = pp < mao ? `Ask $${pp.toLocaleString()}` : `MAO $${mao.toLocaleString()}`
     return (
       <div className="mb-3 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
         <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
           <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">
-            🔨 Max Reno to Make Deal Work at MAO (${mao.toLocaleString()})
+            🔨 Max Reno to Make Deal Work at {ppLabel}
           </span>
         </div>
         <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
@@ -253,7 +308,7 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
                   onClick={handleGenerate}
                   className="flex items-center gap-1 text-[12px] text-[color:var(--color-accent-text)] hover:opacity-80 transition-opacity"
                 >
-                  ✦ {localNotes ? 'Regenerate' : 'Generate AI Analysis'}
+                  ✦ {localNotes ? 'Re-run Full Analysis' : 'Full AI Analysis'}
                 </button>
               )}
             </>
@@ -303,13 +358,53 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
                 className="w-36 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
               />
             </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
+                DOM {lead.days_on_market != null && <span className="normal-case font-normal tracking-normal text-[color:var(--color-text-dim)]">· MLS: {lead.days_on_market}d</span>}
+              </label>
+              <input
+                value={domOverride}
+                onChange={e => setDomOverride(e.target.value)}
+                placeholder={lead.days_on_market != null ? `${lead.days_on_market} days (MLS)` : 'e.g. 45'}
+                className="w-28 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
+                Rent/mo {aiRent && <span className="normal-case font-normal tracking-normal text-[color:var(--color-accent-text)]">· est: ${aiRent.toLocaleString()}</span>}
+              </label>
+              <input
+                value={rentOverride}
+                onChange={e => setRentOverride(e.target.value)}
+                placeholder={aiRent ? `$${aiRent.toLocaleString()} (est)` : 'e.g. $1,500'}
+                className="w-28 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Price Drop %</label>
+              <input
+                value={priceDropOverride}
+                onChange={e => setPriceDropOverride(e.target.value)}
+                placeholder="e.g. 18"
+                className="w-20 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5 flex-1 min-w-[180px]">
+              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Seller Notes</label>
+              <input
+                value={sellerNotesOverride}
+                onChange={e => setSellerNotesOverride(e.target.value)}
+                placeholder="Estate sale, as-is, motivated, quick close…"
+                className="w-full h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
             {overrideChanged && (
               <div className="flex flex-col gap-0.5 mt-3.5">
                 <button
                   onClick={reRunWithOverrides}
                   className="h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity"
                 >
-                  ↻ Re-run analysis
+                  ↻ Re-run Full Analysis
                 </button>
               </div>
             )}
@@ -372,6 +467,7 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
         {renoBudgetCard}
         <NotesRenderer
           notes={localNotes}
+          lead={lead}
           missingFields={[
             !lead.arv             && 'ARV',
             !lead.renovation_cost && 'Reno Cost',
@@ -395,7 +491,7 @@ export default function AINotesSection({ lead, canEdit, onUpdated }) {
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <p className="text-[13px] text-[color:var(--color-text-dim)]">No AI analysis yet.</p>
           {canEdit && (
-            <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Generate AI Analysis</strong> above to run a full investor analysis.</p>
+            <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Full AI Analysis</strong> above to run a full investor analysis including comps, negotiation plan, and communications.</p>
           )}
         </div>
       )}
