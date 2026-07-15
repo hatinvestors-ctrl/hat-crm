@@ -671,15 +671,22 @@ function HmlExpandedRow({ financials: f, calc, items, colSpan, leadId, navigate,
           <Stat label="Purchase Loan" value={fmtUSD(purchaseLoan)} />
           <Stat label="Reno Loan" value={fmtUSD(renoLoan)} sub={f.renovation_lender_pct ? `${Math.round((f.renovation_lender_pct||1)*100)}% lender` : undefined} />
 
-          {/* Monthly burn */}
-          <Stat label="Monthly Interest" value={fmtUSD(monthlyInt)} sub="per month carrying cost" />
+          {/* Monthly payment */}
+          <Stat label="Monthly Payment" value={fmtUSD(monthlyInt)} sub={`${(rate*100).toFixed(1)}% annual rate`} />
 
-          {/* Interest accrued */}
+          {/* Monthly payments made */}
           {interestPaid != null
-            ? <Stat label="Interest Accrued" value={fmtUSD(interestPaid)} sub={`${monthsElapsed} mo × ${fmtUSD(monthlyInt)}/mo`} />
+            ? <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Payments Made</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[20px] font-bold text-[color:var(--color-text)]">{monthsElapsed}</span>
+                  <span className="text-[11px] text-[color:var(--color-text-dim)]">payments</span>
+                </div>
+                <span className="text-[10px] text-[color:var(--color-text-dim)]">{monthsElapsed} × {fmtUSD(monthlyInt)} = {fmtUSD(interestPaid)}</span>
+              </div>
             : <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Interest Accrued</span>
-                <span className="text-[11px] text-[color:var(--color-text-dim)] italic">No purchase date set</span>
+                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Payments Made</span>
+                <span className="text-[11px] text-[color:var(--color-text-dim)] italic">Set purchase date to track</span>
               </div>
           }
 
