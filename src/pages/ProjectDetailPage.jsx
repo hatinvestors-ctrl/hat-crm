@@ -1145,12 +1145,20 @@ export default function ProjectDetailPage() {
                       placeholder="e.g. 47000"
                     />
                   </Field>
-                  <Field label="Lender Covers %" tip="What % of the renovation does the lender finance? (typically 85–100%)">
+                  <Field label="Lender Covers ($)" tip="Exact dollar amount the lender finances for renovation">
                     <NumInput
-                      value={financials.renovation_lender_pct != null ? financials.renovation_lender_pct * 100 : 100}
-                      onChange={n => setFinancials(prev => prev ? {...prev, renovation_lender_pct: n / 100} : prev)}
-                      onBlur={v => save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / 100 })}
-                      disabled={!canEdit} placeholder="100"
+                      value={financials.renovation_lender_pct != null && financials.renovation_lender_amount
+                        ? Math.round(financials.renovation_lender_pct * financials.renovation_lender_amount)
+                        : ''}
+                      onChange={n => {
+                        const budget = financials.renovation_lender_amount || 1
+                        setFinancials(prev => prev ? {...prev, renovation_lender_pct: Number(n) / budget} : prev)
+                      }}
+                      onBlur={v => {
+                        const budget = financials.renovation_lender_amount || 1
+                        save({ renovation_lender_pct: v === '' ? 1.0 : Number(v) / budget })
+                      }}
+                      disabled={!canEdit} placeholder={fmtUSD(financials.renovation_lender_amount || 0)}
                     />
                   </Field>
                   <Field label="Interest Rate (Annual %)" tip="Hard money lender's annual rate. Typical: 10–14%">
