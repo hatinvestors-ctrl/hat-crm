@@ -333,16 +333,19 @@ function LiveBRRRRPanel({ bc }) {
   return (
     <div className="space-y-5 text-[11.5px]">
 
-      {/* ── Phase 1: Cash at Close ── */}
+      {/* ── Phase 1: Cash at Close + Reno Gap ── */}
       <div>
-        <SectionHeader title="Phase 1 — Cash at Close" />
+        <SectionHeader title="Phase 1 — Cash Out of Pocket" />
         <Row label="Down Payment"           value={fmtUSD(bc.downPayment)} />
         <Row label="+ Lender Fees"          value={fmtUSD(bc.hmlClosing)} />
         {bc.pointsCost > 0 && <Row label="  Points" value={fmtUSD(bc.pointsCost)} indent={1} />}
         <Row label="+ Purchase Closing"     value={fmtUSD(bc.purchaseClosing)} />
-        {bc.renovGap > 0 && <Row label="+ Reno Cash Gap" value={fmtUSD(bc.renovGap)} />}
         {bc.sellerCredits > 0 && <Row label="− Seller Credits" value={`− ${fmtUSD(bc.sellerCredits)}`} positive />}
         <Row label="= Cash at Close"        value={fmtUSD(bc.cashAtClose)} total positive={bc.cashAtClose >= 0} />
+        {bc.renovGap > 0 && <>
+          <Row label="+ Reno Cash Gap (paid during reno)" value={fmtUSD(bc.renovGap)} />
+          <Row label="= Total Cash Out of Pocket" value={fmtUSD(bc.cashAtClose + bc.renovGap)} total positive />
+        </>}
       </div>
 
       {/* ── Phase 2: Carrying Costs ── */}
@@ -354,7 +357,7 @@ function LiveBRRRRPanel({ bc }) {
         )}
         <Row label="= Total Carrying"       value={fmtUSD(bc.totalCarrying)} total />
         <div className="mt-2 pt-2 border-t border-dashed border-[color:var(--color-line)] flex justify-between font-bold text-[12px]">
-          <span className="text-[color:var(--color-text)]">Total Cash In (phases 1+2)</span>
+          <span className="text-[color:var(--color-text)]">Total Cash In (close + reno + carrying)</span>
           <span className="text-[color:var(--color-text)]">{fmtUSD(bc.totalCashIn)}</span>
         </div>
       </div>
@@ -395,9 +398,6 @@ function LiveBRRRRPanel({ bc }) {
         <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)}, 30yr)`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
         <Row label="− Property Taxes"                                value={`− ${fmtUSD(bc.monthlyTax)}`} />
         <Row label="− Insurance"                                     value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
-        <Row label={`− Vacancy (${fmtPct(bc.vacancyPct)})`}         value={`− ${fmtUSD(bc.monthlyVacancy)}`} />
-        <Row label={`− Mgmt (${fmtPct(bc.mgmtPct)})`}               value={`− ${fmtUSD(bc.monthlyMgmt)}`} />
-        <Row label="− Maintenance"                                   value={`− ${fmtUSD(bc.maintenanceMonthly)}`} />
         <Row
           label="= Monthly Cash Flow"
           value={fmtUSD(bc.monthlyCashFlow)}
@@ -449,7 +449,9 @@ export default function ProjectDetailPage() {
   const [loading, setLoading]       = useState(true)
   const [importOpen, setImportOpen] = useState(false)
   const [pendingRenovCost, setPendingRenovCost] = useState(null)
-  const [hmlFeesOpen, setHmlFeesOpen] = useState(false) // live update while typing new reno item
+  const [hmlFeesOpen, setHmlFeesOpen] = useState(false)
+  const [brrrScenarioOpen, setBrrrScenarioOpen] = useState(false)
+  const [brrrArvOverride, setBrrrArvOverride] = useState(null) // null = use financials.expected_sell_price
   const [markSoldOpen, setMarkSoldOpen] = useState(false)
   const [soldPrice, setSoldPrice]   = useState('')
   const [soldDate, setSoldDate]     = useState('')
@@ -557,7 +559,34 @@ export default function ProjectDetailPage() {
   const isBRRRR = financials?.project_strategy === 'brrrr'
   const calc  = !isBRRRR && financials ? calcDeal(financials, calcItems) : null
   const bCalc = isBRRRR  && financials ? calcBRRRR(financials) : null
-  const isSold = lead.status === 'flip_sold' || lead.status === 'sold'
+  // Plan B: always compute BRRRR scenario for flip deals too
+  // brrrArvOverride lets the user set a separate ARV for the refi calc (independent of flip ARV)
+  const brrrFinancials = (!isBRRRR && financials && brrrArvOverride != null)
+    ? { ...financials, expected_sell_price: brrrArvOverride }
+    : financials
+  const bCalcScenario = !isBRRRR && financials ? calcBRRRR(brrrFinancials) : null
+  const isSold   = lead.status === 'flip_sold' || lead.status === 'sold'
+  const isRented = lead.status === 'rented'
+
+  const PROJECT_STATUS_OPTIONS = isBRRRR
+    ? [
+        { value: 'working_project', label: 'In Rehab',    color: 'accent'   },
+        { value: 'rented',          label: 'Rented 🏠',   color: 'teal'     },
+        { value: 'sold',            label: 'Sold ✓',      color: 'success'  },
+      ]
+    : [
+        { value: 'working_project', label: 'Active',      color: 'accent'   },
+        { value: 'rented',          label: 'Rented 🏠',   color: 'teal'     },
+        { value: 'flip_sold',       label: 'Flip Sold ✓', color: 'success'  },
+        { value: 'sold',            label: 'Sold ✓',      color: 'success'  },
+      ]
+
+  const handleStatusChange = async (newStatus) => {
+    if (newStatus === lead.status || !canEdit) return
+    const { data: updatedLead } = await supabase
+      .from('leads').update({ status: newStatus }).eq('id', leadId).select().single()
+    if (updatedLead) setLead(updatedLead)
+  }
   const ratingKey = calc?.dealRating?.charAt(0)
   const ratingInfo = DEAL_RATING_INFO[ratingKey]
 
@@ -572,17 +601,9 @@ export default function ProjectDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            {canEdit && !isSold && !isBRRRR && financials && (
-              <button
-                onClick={() => setMarkSoldOpen(true)}
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)] hover:brightness-95 transition"
-              >
-                ✓ Mark as Sold
-              </button>
-            )}
             {isBRRRR && (
               <span className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                🏠 BRRRR Strategy
+                🏠 BRRRR
               </span>
             )}
             <Link
@@ -634,13 +655,30 @@ export default function ProjectDetailPage() {
 
         {/* Status + editable address */}
         <div className="mb-4 flex items-center gap-3 flex-wrap">
-          <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${
-            isSold
-              ? 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
-              : 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]'
-          }`}>
-            {lead.status === 'flip_sold' ? '✓ Flip Sold' : lead.status === 'sold' ? '✓ Sold' : 'Active Project'}
-          </span>
+          {/* Inline project status selector */}
+          <div className="flex items-center gap-1 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-0.5">
+            {PROJECT_STATUS_OPTIONS.map(opt => {
+              const active = lead.status === opt.value
+              const tealActive   = 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+              const accentActive = 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]'
+              const successActive= 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]'
+              const activeCls = opt.color === 'teal' ? tealActive : opt.color === 'success' ? successActive : accentActive
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => handleStatusChange(opt.value)}
+                  disabled={!canEdit}
+                  className={`h-6 px-2.5 rounded-md text-[11px] font-semibold transition-all disabled:cursor-default ${
+                    active
+                      ? activeCls
+                      : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
           {financials?.purchase_date && (
             <span className="text-[11.5px] text-[color:var(--color-text-dim)]">
               Purchased <strong className="text-[color:var(--color-text-muted)]">{financials.purchase_date}</strong>
@@ -836,6 +874,110 @@ export default function ProjectDetailPage() {
             ⚠ {w}
           </div>
         ))}
+
+        {/* ── Active HML Loan Card ── */}
+        {financials && !isSold && financials.purchase_loan_amount > 0 && (() => {
+          const loanCalc  = isBRRRR ? bCalc : calc
+          if (!loanCalc) return null
+          const totalLoan    = isBRRRR ? loanCalc.totalLoan     : loanCalc.totalLoan
+          const purchLoan    = isBRRRR ? loanCalc.purchaseLoan  : loanCalc.purchaseLoan
+          const renovLoan    = isBRRRR ? loanCalc.renovLoan     : loanCalc.renovationLoan
+          const rate         = financials.interest_rate_annual ?? 0.12
+          const dailyRate    = totalLoan * rate / 365
+          const monthlyInt   = loanCalc.monthlyInterest
+          const pointsCost   = loanCalc.pointsCost ?? 0
+          const purchDate    = financials.purchase_date ? new Date(financials.purchase_date) : null
+          const daysActive   = purchDate ? Math.floor((Date.now() - purchDate.getTime()) / (1000 * 60 * 60 * 24)) : null
+          const accrued      = daysActive != null ? dailyRate * daysActive : null
+          const renovPct     = financials.renovation_lender_pct ?? 1.0
+          const renovBudget  = financials.renovation_lender_amount ?? 0
+
+          return (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/15 dark:border-amber-700 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">HML Loan — Active</span>
+                  {daysActive != null && (
+                    <span className="text-[10.5px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium">
+                      Day {daysActive} · {fmtUSD(dailyRate)}/day burning
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">{(rate * 100).toFixed(1)}% annual</span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Total Note</div>
+                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(totalLoan)}</div>
+                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{(rate * 100).toFixed(1)}% · {fmtUSD(monthlyInt)}/mo</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Purchase Advance</div>
+                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(purchLoan)}</div>
+                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{fmtUSD(financials.purchase_price_actual - purchLoan)} down</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Reno Escrow</div>
+                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(renovLoan)}</div>
+                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">
+                    {fmtUSD(renovBudget)} budget · {renovPct < 1 ? `${Math.round(renovPct * 100)}% lender-funded` : '100% lender'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">
+                    {accrued != null ? 'Interest Accrued' : 'Points Paid'}
+                  </div>
+                  <div className={`text-[14px] font-bold ${accrued != null && accrued > monthlyInt * 3 ? 'text-amber-600 dark:text-amber-400' : 'text-[color:var(--color-text)]'}`}>
+                    {accrued != null ? fmtUSD(accrued) : fmtUSD(pointsCost)}
+                  </div>
+                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">
+                    {accrued != null ? `since ${financials.purchase_date}` : `${((loanCalc.pointsCost / totalLoan) * 100).toFixed(1)}% of note`}
+                  </div>
+                </div>
+              </div>
+
+              {daysActive != null && (() => {
+                const monthsPaid = Math.floor(daysActive / 30.44)
+                const interestPaid = monthsPaid * monthlyInt
+                const totalPaid = pointsCost + interestPaid
+                return (
+                  <div className="pt-2 border-t border-amber-200 dark:border-amber-800 space-y-2">
+                    {/* Monthly payments row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Monthly Payments Made</div>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-[22px] font-bold text-[color:var(--color-text)]">{monthsPaid}</span>
+                            <span className="text-[11px] text-[color:var(--color-text-dim)]">payments × {fmtUSD(monthlyInt)}/mo</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Interest Paid Out</div>
+                        <div className="text-[16px] font-bold text-amber-700 dark:text-amber-400 mt-0.5">{fmtUSD(interestPaid)}</div>
+                      </div>
+                    </div>
+                    {/* Total paid to date */}
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400">
+                        Total paid to lender to date
+                        <span className="ml-1 text-[color:var(--color-text-dim)]">({fmtUSD(pointsCost)} pts + {fmtUSD(interestPaid)} interest)</span>
+                      </div>
+                      <div className="text-[15px] font-bold text-amber-800 dark:text-amber-300">{fmtUSD(totalPaid)}</div>
+                    </div>
+                    {/* Points line */}
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[color:var(--color-text-dim)]">Points paid at closing</span>
+                      <span className="font-semibold text-[color:var(--color-text)]">{fmtUSD(pointsCost)} ({(financials.points_pct * 100).toFixed(1)}%)</span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )
+        })()}
 
         {/* Property Summary */}
         <Card title="Property Summary">
@@ -1235,25 +1377,6 @@ export default function ProjectDetailPage() {
                   <Field label="Monthly Rent" tip="Expected monthly rent once stabilized">
                     <NumInput value={financials.monthly_rent} onChange={handleLive('monthly_rent')} onBlur={handleBlur('monthly_rent')} disabled={!canEdit} placeholder="1600" />
                   </Field>
-                  <Field label="Vacancy Rate %" tip="Estimated vacancy. Default 5%">
-                    <NumInput
-                      value={financials.vacancy_rate_pct != null ? financials.vacancy_rate_pct * 100 : 5}
-                      onChange={v => setFinancials(prev => prev ? { ...prev, vacancy_rate_pct: v / 100 } : prev)}
-                      onBlur={v => save({ vacancy_rate_pct: v === '' ? 0.05 : Number(v) / 100 })}
-                      disabled={!canEdit} placeholder="5"
-                    />
-                  </Field>
-                  <Field label="Mgmt Fee %" tip="Property management fee as % of rent. Default 10%">
-                    <NumInput
-                      value={financials.property_mgmt_pct != null ? financials.property_mgmt_pct * 100 : 10}
-                      onChange={v => setFinancials(prev => prev ? { ...prev, property_mgmt_pct: v / 100 } : prev)}
-                      onBlur={v => save({ property_mgmt_pct: v === '' ? 0.10 : Number(v) / 100 })}
-                      disabled={!canEdit} placeholder="10"
-                    />
-                  </Field>
-                  <Field label="Maintenance (Monthly)" tip="Monthly maintenance reserve. Defaults to 5% of rent if blank">
-                    <NumInput value={financials.maintenance_monthly} onChange={handleLive('maintenance_monthly')} onBlur={handleBlur('maintenance_monthly')} disabled={!canEdit} placeholder="auto (5%)" />
-                  </Field>
                 </div>
 
                 {bCalc && bCalc.monthlyRent > 0 && (
@@ -1382,6 +1505,415 @@ export default function ProjectDetailPage() {
             </Card>
             )}
 
+            {/* ── Plan B: BRRRR Scenario (flip deals only) ── */}
+            {!isBRRRR && financials && (
+              <div className="rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-[color:var(--color-bg-elev)] overflow-hidden">
+                {/* Toggle header */}
+                <button
+                  onClick={() => setBrrrScenarioOpen(p => !p)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-blue-500 text-[18px]">🏠</span>
+                    <div className="text-left">
+                      <div className="text-[13px] font-bold text-[color:var(--color-text)]">Plan B: BRRRR Strategy</div>
+                      <div className="text-[11px] text-[color:var(--color-text-dim)]">What if you rent &amp; refinance instead of selling? See the full deal story.</div>
+                    </div>
+                    {/* Quick verdict pill — always visible */}
+                    {bCalcScenario?.monthlyRent > 0 && bCalcScenario?.refiLoan > 0 && (() => {
+                      const bc = bCalcScenario
+                      const isPerfect  = bc.netCashInDeal <= 0 && bc.monthlyCashFlow > 0
+                      const isGood     = bc.netCashInDeal <= 30000 && bc.monthlyCashFlow > 0
+                      const isStretch  = bc.netCashInDeal <= 40000 && bc.monthlyCashFlow > 0
+                      const label = isPerfect ? '✓ Perfect BRRRR' : isGood ? '✓ Works Well' : isStretch ? '⚠ Stretch — Up to $40K' : '✗ Doesn\'t Work'
+                      const cls   = isPerfect || isGood ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : isStretch ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      return <span className={`ml-3 shrink-0 inline-flex items-center h-6 px-3 rounded-full text-[11px] font-bold ${cls}`}>{label}</span>
+                    })()}
+                  </div>
+                  <span className="text-[color:var(--color-text-dim)] text-[13px] ml-4">{brrrScenarioOpen ? '▲' : '▼'}</span>
+                </button>
+
+                {brrrScenarioOpen && (
+                  <div className="border-t border-blue-200 dark:border-blue-800 px-5 pt-5 pb-6 space-y-6">
+
+                    {/* ── INPUTS — two grouped rows ── */}
+                    <div className="space-y-3">
+
+                      {/* Row 1: Refi assumptions */}
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-500 dark:text-blue-400 mb-2">Refinance Assumptions</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <Field label="ARV — Plan B Refi" tip="ARV for the BRRRR refi scenario. Independent from the Flip ARV above — adjust here without affecting your flip numbers.">
+                            <div className="space-y-1">
+                              <NumInput
+                                value={brrrArvOverride ?? financials.expected_sell_price ?? ''}
+                                onChange={v => setBrrrArvOverride(v)}
+                                onBlur={() => {}}
+                                disabled={!canEdit} placeholder={financials.expected_sell_price ?? '195,000'}
+                              />
+                              {brrrArvOverride != null && brrrArvOverride !== financials.expected_sell_price && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9.5px] text-blue-500">Flip ARV: {fmtUSD(financials.expected_sell_price)}</span>
+                                  <button
+                                    onClick={() => setBrrrArvOverride(null)}
+                                    className="text-[9.5px] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] underline"
+                                  >reset</button>
+                                </div>
+                              )}
+                            </div>
+                          </Field>
+                          <Field label="Refi LTV %" tip="Loan-to-value on permanent refi. Typical: 70–75%">
+                            <NumInput
+                              value={financials.refi_ltv_pct != null ? financials.refi_ltv_pct * 100 : 70}
+                              onChange={v => setFinancials(prev => prev ? { ...prev, refi_ltv_pct: v / 100 } : prev)}
+                              onBlur={v => save({ refi_ltv_pct: v === '' ? 0.70 : Number(v) / 100 })}
+                              disabled={!canEdit} placeholder="70"
+                            />
+                          </Field>
+                          <Field label="Refi Rate %" tip="Interest rate on the new permanent loan">
+                            <NumInput
+                              value={financials.refi_interest_rate != null ? financials.refi_interest_rate * 100 : ''}
+                              onChange={v => setFinancials(prev => prev ? { ...prev, refi_interest_rate: v / 100 } : prev)}
+                              onBlur={v => save({ refi_interest_rate: v === '' ? null : Number(v) / 100 })}
+                              disabled={!canEdit} placeholder="7.0"
+                            />
+                          </Field>
+                          <Field label="Refi Closing Costs" tip="One-time cost to close the permanent loan">
+                            <NumInput
+                              value={financials.refi_closing_costs != null ? financials.refi_closing_costs : 2000}
+                              onChange={v => setFinancials(prev => prev ? { ...prev, refi_closing_costs: v } : prev)}
+                              onBlur={v => save({ refi_closing_costs: v === '' ? 2000 : Number(v) })}
+                              disabled={!canEdit} placeholder="2,000"
+                            />
+                          </Field>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Rental income & monthly expenses */}
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-500 dark:text-blue-400 mb-2">Rental Income &amp; Monthly Expenses</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <Field label="Monthly Rent" tip="Expected rent once stabilized">
+                            <NumInput value={financials.monthly_rent} onChange={handleLive('monthly_rent')} onBlur={handleBlur('monthly_rent')} disabled={!canEdit} placeholder="1,500" />
+                          </Field>
+                          <Field label="Property Taxes (Mo)" tip="Monthly taxes — updates all holding cost calculations">
+                            <NumInput value={financials.taxes_monthly} onChange={handleLive('taxes_monthly')} onBlur={handleBlur('taxes_monthly')} disabled={!canEdit} placeholder="200" />
+                          </Field>
+                          <Field label="Insurance (Mo)" tip="Monthly insurance — updates all holding cost calculations">
+                            <NumInput value={financials.insurance_monthly} onChange={handleLive('insurance_monthly')} onBlur={handleBlur('insurance_monthly')} disabled={!canEdit} placeholder="136" />
+                          </Field>
+                          <Field label="HOA (Mo)" tip="Monthly HOA if applicable">
+                            <NumInput value={financials.hoa_monthly} onChange={handleLive('hoa_monthly')} onBlur={handleBlur('hoa_monthly')} disabled={!canEdit} placeholder="0" />
+                          </Field>
+                          <Field label="Utilities (Mo)" tip="Monthly utilities if landlord-paid">
+                            <NumInput value={financials.utilities_monthly} onChange={handleLive('utilities_monthly')} onBlur={handleBlur('utilities_monthly')} disabled={!canEdit} placeholder="0" />
+                          </Field>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* ── STORY: only renders when we have enough inputs ── */}
+                    {!bCalcScenario?.refiLoan ? (
+                      <div className="text-center py-8 text-[13px] text-[color:var(--color-text-dim)]">
+                        Enter ARV — Plan B Refi and Monthly Rent to see the BRRRR analysis.
+                      </div>
+                    ) : (() => {
+                      const bc = bCalcScenario
+                      // Verdict
+                      const isPerfect = bc.netCashInDeal <= 0 && bc.monthlyCashFlow > 0
+                      const isGood    = bc.netCashInDeal <= 30000 && bc.monthlyCashFlow > 0
+                      const isStretch = bc.netCashInDeal <= 40000 && bc.monthlyCashFlow > 0
+                      const isNeg     = bc.monthlyCashFlow < -50
+                      const verdictBg    = isPerfect || isGood ? 'bg-green-50 border-green-300 dark:bg-green-950/20 dark:border-green-700' : isStretch ? 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950/20 dark:border-yellow-700' : 'bg-red-50 border-red-300 dark:bg-red-950/20 dark:border-red-700'
+                      const verdictText  = isPerfect || isGood ? 'text-green-700 dark:text-green-300' : isStretch ? 'text-yellow-700 dark:text-yellow-300' : 'text-red-700 dark:text-red-300'
+                      const verdictLabel = isPerfect ? '✓ Perfect BRRRR — full capital recycled' : isGood ? '✓ Good BRRRR — under $30K left in deal' : isStretch ? '⚠ Stretch BRRRR — $30K–$40K left, good zip/condition required' : isNeg ? '✗ Cash Flow Problem — negative after refi' : '✗ Doesn\'t Work — too much capital trapped'
+                      const verdictSub   = isPerfect
+                        ? `You pull ${fmtUSD(Math.abs(bc.netCashInDeal))} extra cash out AND keep the property earning ${fmtUSD(bc.monthlyCashFlow)}/mo`
+                        : isGood
+                          ? `${fmtUSD(bc.netCashInDeal)} left in deal (under $30K threshold) — earns ${fmtUSD(bc.monthlyCashFlow)}/mo cash flow`
+                          : isStretch
+                            ? `${fmtUSD(bc.netCashInDeal)} left in deal — only do this if the zip is strong and house is fully renovated`
+                            : isNeg
+                              ? `Monthly cash flow is ${fmtUSD(bc.monthlyCashFlow)} — refi mortgage too high for this rent`
+                              : `${fmtUSD(bc.netCashInDeal)} stuck in deal — exceeds the $40K ceiling to make BRRRR worthwhile`
+
+                      const Phase = ({ num, title, color, children }) => (
+                        <div className={`rounded-xl border ${color} p-4`}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold text-white ${color.includes('blue') ? 'bg-blue-500' : color.includes('purple') ? 'bg-purple-500' : color.includes('green') ? 'bg-green-500' : 'bg-orange-500'}`}>{num}</span>
+                            <span className="text-[12px] font-bold text-[color:var(--color-text)] uppercase tracking-wide">{title}</span>
+                          </div>
+                          {children}
+                        </div>
+                      )
+
+                      const Line = ({ label, value, indent = false, isTotal = false, positive = false, negative = false, muted = false }) => (
+                        <div className={`flex justify-between items-baseline py-1 text-[11.5px] ${isTotal ? 'border-t border-[color:var(--color-line)] mt-1 pt-2 font-bold' : ''}`} style={{ paddingLeft: indent ? 16 : 0 }}>
+                          <span className={isTotal ? 'text-[color:var(--color-text)]' : muted ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-text-muted)]'}>{label}</span>
+                          <span className={`tabular-nums ${positive ? 'text-[color:var(--color-success-text)] font-semibold' : negative ? 'text-[color:var(--color-danger-text)] font-semibold' : isTotal ? 'text-[color:var(--color-text)]' : 'text-[color:var(--color-text-muted)]'}`}>{value}</span>
+                        </div>
+                      )
+
+                      return (
+                        <div className="space-y-4">
+
+                          {/* Verdict banner */}
+                          <div className={`rounded-xl border-2 p-4 ${verdictBg}`}>
+                            <div className={`text-[14px] font-bold mb-1 ${verdictText}`}>{verdictLabel}</div>
+                            <div className={`text-[12px] ${verdictText} opacity-80`}>{verdictSub}</div>
+                          </div>
+
+                          {/* Hero KPIs */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            {[
+                              { label: 'Cash Left In Deal', value: bc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bc.netCashInDeal))} out` : fmtUSD(bc.netCashInDeal), sub: bc.netCashInDeal <= 0 ? '100%+ recaptured' : `${Math.round(bc.cashRecapturedPct * 100)}% recaptured`, green: bc.netCashInDeal <= 0, yellow: bc.netCashInDeal > 0 && bc.netCashInDeal <= bc.totalCashIn * 0.4 },
+                              { label: 'Monthly Cash Flow', value: fmtUSD(bc.monthlyCashFlow), sub: `${fmtUSD(bc.annualCashFlow)}/yr`, green: bc.monthlyCashFlow > 0, red: bc.monthlyCashFlow < 0 },
+                              { label: 'Equity at Refi', value: fmtUSD(bc.equityAtRefi), sub: `${fmtPct(bc.refiLtvPct)} LTV refi`, green: true },
+                              { label: 'Cap Rate', value: fmtPct(bc.capRate), sub: `GRM ${bc.grm > 0 ? bc.grm.toFixed(1) : '—'}x`, green: bc.capRate >= 0.07, yellow: bc.capRate >= 0.05 && bc.capRate < 0.07 },
+                            ].map(({ label, value, sub, green, yellow, red }) => (
+                              <div key={label} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] px-3 py-2.5 text-center">
+                                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">{label}</div>
+                                <div className={`text-[15px] font-bold ${green ? 'text-[color:var(--color-success-text)]' : red ? 'text-[color:var(--color-danger-text)]' : yellow ? 'text-yellow-600 dark:text-yellow-400' : 'text-[color:var(--color-text)]'}`}>{value}</div>
+                                {sub && <div className="text-[9.5px] text-[color:var(--color-text-dim)] mt-0.5">{sub}</div>}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* 4-phase story */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                            {/* Phase 1 */}
+                            <Phase num="1" title="Cash Out of Pocket" color="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/10">
+                              <Line label="Down payment" value={fmtUSD(bc.downPayment)} />
+                              <Line label="+ HML fees at closing" value={fmtUSD(bc.hmlClosing)} indent />
+                              {bc.pointsCost > 0 && <Line label="Points" value={fmtUSD(bc.pointsCost)} indent muted />}
+                              <Line label="+ Title &amp; closing" value={fmtUSD(bc.purchaseClosing)} />
+                              {bc.sellerCredits > 0 && <Line label="− Seller credits" value={`− ${fmtUSD(bc.sellerCredits)}`} positive />}
+                              <Line label="= Cash at close" value={fmtUSD(bc.cashAtClose)} isTotal positive={bc.cashAtClose >= 0} />
+                              {bc.renovGap > 0 && <>
+                                <Line label="+ Reno gap (paid during reno)" value={fmtUSD(bc.renovGap)} />
+                                <Line label="= Total out of pocket" value={fmtUSD(bc.cashAtClose + bc.renovGap)} isTotal positive />
+                              </>}
+                            </Phase>
+
+                            {/* Phase 2 */}
+                            <Phase num="2" title={`Carrying (${Math.round(bc.holdMonths)}mo reno)`} color="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/10">
+                              <Line label={`HML interest (${Math.round(bc.holdMonths)}mo × ${fmtUSD(bc.monthlyInterest)}/mo)`} value={fmtUSD(bc.totalInterest)} />
+                              {bc.monthlyHoldCosts > 0 && <Line label={`Taxes / Ins / other (${Math.round(bc.holdMonths)}mo)`} value={fmtUSD(bc.totalHoldingCosts)} />}
+                              <Line label="= Total carrying" value={fmtUSD(bc.totalCarrying)} isTotal />
+                              <div className="mt-3 pt-2 border-t-2 border-purple-300 dark:border-purple-700 flex justify-between text-[12px] font-bold">
+                                <span className="text-[color:var(--color-text)]">Total Cash In (close + reno + carrying)</span>
+                                <span className="text-[color:var(--color-text)]">{fmtUSD(bc.totalCashIn)}</span>
+                              </div>
+                            </Phase>
+
+                            {/* Phase 3 */}
+                            <Phase num="3" title={`Refinance (${fmtPct(bc.refiLtvPct)} LTV)`} color={bc.refiCashOut >= 0 ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/10' : 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/10'}>
+                              <Line label={`New loan (${fmtPct(bc.refiLtvPct)} × ${fmtUSD(brrrArvOverride ?? financials.expected_sell_price)} ARV)`} value={fmtUSD(bc.refiLoan)} positive />
+                              <Line label="− Payoff HML" value={`− ${fmtUSD(bc.loanPayoff)}`} negative />
+                              <Line label="− Refi closing costs" value={`− ${fmtUSD(bc.refiClosingCosts)}`} />
+                              <Line label="= Cash out at refi" value={bc.refiCashOut >= 0 ? `+ ${fmtUSD(bc.refiCashOut)}` : fmtUSD(bc.refiCashOut)} isTotal positive={bc.refiCashOut >= 0} negative={bc.refiCashOut < 0} />
+                              <div className={`mt-3 pt-2 border-t-2 ${bc.netCashInDeal <= 0 ? 'border-green-400' : 'border-orange-300 dark:border-orange-700'} flex justify-between text-[12px] font-bold`}>
+                                <span className={bc.netCashInDeal <= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text)]'}>
+                                  {bc.netCashInDeal <= 0 ? 'Cash back in pocket' : 'Cash still in deal'}
+                                </span>
+                                <span className={bc.netCashInDeal <= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text)]'}>
+                                  {fmtUSD(Math.abs(bc.netCashInDeal))}
+                                </span>
+                              </div>
+                            </Phase>
+
+                            {/* Phase 4 */}
+                            <Phase num="4" title="Monthly Cash Flow (forever)" color={bc.monthlyCashFlow >= 0 ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/10' : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/10'}>
+                              <Line label="Gross rent" value={fmtUSD(bc.monthlyRent)} positive={bc.monthlyRent > 0} />
+                              <Line label={`− Mortgage P&I (${fmtPct(bc.refiRate)}, 30yr)`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
+                              <Line label="− Property taxes" value={`− ${fmtUSD(bc.monthlyTax)}`} />
+                              <Line label="− Insurance" value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
+                              <Line label="= Monthly cash flow" value={fmtUSD(bc.monthlyCashFlow)} isTotal positive={bc.monthlyCashFlow >= 0} negative={bc.monthlyCashFlow < 0} />
+                              <div className="mt-2 grid grid-cols-2 gap-2 pt-2 border-t border-[color:var(--color-line)]">
+                                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Annual: <span className={`font-semibold ${bc.annualCashFlow >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>{fmtUSD(bc.annualCashFlow)}</span></div>
+                                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">CoC: <span className="font-semibold text-[color:var(--color-text-muted)]">{bc.cashOnCash != null ? fmtPct(bc.cashOnCash) : '∞'}</span></div>
+                                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">NOI/yr: <span className="font-semibold text-[color:var(--color-text-muted)]">{fmtUSD(bc.annualNOI)}</span></div>
+                                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Refi P&amp;I: <span className="font-semibold text-[color:var(--color-text-muted)]">{fmtUSD(bc.refiMonthlyPI)}/mo</span></div>
+                              </div>
+                            </Phase>
+
+                          </div>
+
+                          {/* BRRRR vs Flip comparison */}
+                          {calc?.expected && (
+                            <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg)] p-4">
+                              <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-3">BRRRR vs Flip — Which is Better?</div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <div className="text-[11px] font-bold text-[color:var(--color-text)] mb-2 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" /> Flip Strategy</div>
+                                  <div className="space-y-1.5 text-[11.5px]">
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Net Profit</span><span className={`font-semibold ${calc.expected.netProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>{fmtUSD(calc.expected.netProfit)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">ROI</span><span className="font-semibold text-[color:var(--color-text-muted)]">{fmtPct(calc.expected.roi)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Annualized</span><span className="font-semibold text-[color:var(--color-text-muted)]">{fmtPct(calc.expected.annualizedRoi)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Ongoing income</span><span className="text-[color:var(--color-text-muted)]">$0 after sale</span></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] font-bold text-[color:var(--color-text)] mb-2 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> BRRRR Strategy</div>
+                                  <div className="space-y-1.5 text-[11.5px]">
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Capital recycled</span><span className={`font-semibold ${bc.cashRecapturedPct >= 0.8 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text-muted)]'}`}>{Math.round(bc.cashRecapturedPct * 100)}%</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Cash left in deal</span><span className={`font-semibold ${bc.netCashInDeal <= 0 ? 'text-[color:var(--color-success-text)]' : bc.netCashInDeal <= 30000 ? 'text-[color:var(--color-success-text)]' : bc.netCashInDeal <= 40000 ? 'text-yellow-600 dark:text-yellow-400' : 'text-[color:var(--color-danger-text)]'}`}>{bc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bc.netCashInDeal))} out` : fmtUSD(bc.netCashInDeal)}</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Monthly income</span><span className={`font-semibold ${bc.monthlyCashFlow >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>{fmtUSD(bc.monthlyCashFlow)}/mo forever</span></div>
+                                    <div className="flex justify-between"><span className="text-[color:var(--color-text-dim)]">Equity built</span><span className="font-semibold text-[color:var(--color-success-text)]">{fmtUSD(bc.equityAtRefi)}</span></div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* ── AI-style Recommendation ── */}
+                              {(() => {
+                                const flipProfit   = calc.expected.netProfit
+                                const flipRoi      = calc.expected.roi
+                                const flipAnn      = calc.expected.annualizedRoi
+                                const recycled     = bc.cashRecapturedPct
+                                const leftIn       = bc.netCashInDeal
+                                const cashFlow     = bc.monthlyCashFlow
+                                const equity       = bc.equityAtRefi
+                                const annualIncome = bc.annualCashFlow
+                                const holdMo       = Math.round(bc.holdMonths) || 6
+
+                                // Score each strategy
+                                const flipStrong  = flipProfit >= 30000 && flipAnn >= 1.5   // annualized ≥150%
+                                const flipDecent  = flipProfit >= 15000 && flipAnn >= 0.6
+                                const brrrStrong  = leftIn <= 0 && cashFlow >= 150           // full recycle + solid cash flow
+                                const brrrGood    = leftIn <= 30000 && cashFlow > 0           // under $30K threshold
+                                const brrrStretch = leftIn <= 40000 && cashFlow > 0           // stretch zone: only good zip/renovated
+                                const brrrDecent  = brrrGood || brrrStretch
+                                const brrrBad     = cashFlow < -50 || leftIn > 40000
+
+                                // How many months until BRRRR income "pays back" the flip profit?
+                                const breakEvenMonths = cashFlow > 0 ? Math.ceil(flipProfit / cashFlow) : null
+                                const breakEvenYrs    = breakEvenMonths ? (breakEvenMonths / 12).toFixed(1) : null
+
+                                // Equity vs profit comparison
+                                const equityPremium = equity - flipProfit  // extra wealth in BRRRR vs flip
+
+                                // Build verdict
+                                let verdict, verdictCls, icon
+                                if (brrrBad) {
+                                  verdict    = 'Flip This Deal'
+                                  verdictCls = 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-950/30 dark:border-orange-700 dark:text-orange-300'
+                                  icon       = '🔨'
+                                } else if (flipStrong && !brrrStrong && !brrrGood) {
+                                  verdict    = 'Flip Is the Clear Winner Here'
+                                  verdictCls = 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-950/30 dark:border-orange-700 dark:text-orange-300'
+                                  icon       = '🔨'
+                                } else if ((brrrStrong || brrrGood) && !flipStrong) {
+                                  verdict    = 'BRRRR Is the Better Move'
+                                  verdictCls = 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-950/30 dark:border-blue-700 dark:text-blue-300'
+                                  icon       = '🏠'
+                                } else if (flipStrong && (brrrStrong || brrrGood)) {
+                                  verdict    = 'Both Work — Strong Deal Either Way'
+                                  verdictCls = 'bg-green-100 border-green-300 text-green-800 dark:bg-green-950/30 dark:border-green-700 dark:text-green-300'
+                                  icon       = '✓'
+                                } else if (brrrStretch) {
+                                  verdict    = 'Stretch BRRRR — Only If Zip & Condition Are Strong'
+                                  verdictCls = 'bg-yellow-50 border-yellow-300 text-yellow-800 dark:bg-yellow-950/20 dark:border-yellow-700 dark:text-yellow-300'
+                                  icon       = '⚠'
+                                } else if (flipDecent && brrrDecent) {
+                                  verdict    = 'Decent Either Way — Depends on Your Goals'
+                                  verdictCls = 'bg-yellow-50 border-yellow-300 text-yellow-800 dark:bg-yellow-950/20 dark:border-yellow-700 dark:text-yellow-300'
+                                  icon       = '⚖'
+                                } else {
+                                  verdict    = 'Lean Toward Flip'
+                                  verdictCls = 'bg-orange-50 border-orange-300 text-orange-800 dark:bg-orange-950/20 dark:border-orange-700 dark:text-orange-300'
+                                  icon       = '🔨'
+                                }
+
+                                // Build analysis bullets
+                                const bullets = []
+
+                                // Flip assessment
+                                if (flipStrong)
+                                  bullets.push(`The flip numbers are excellent — ${fmtUSD(flipProfit)} profit on a ${holdMo}-month hold at ${fmtPct(flipAnn)} annualized ROI. Hard to beat for a short-term play.`)
+                                else if (flipDecent)
+                                  bullets.push(`The flip produces a solid ${fmtUSD(flipProfit)} profit (${fmtPct(flipRoi)} ROI). Respectable but not exceptional — worth comparing to the long game.`)
+                                else
+                                  bullets.push(`Flip profit of ${fmtUSD(flipProfit)} is modest. If the BRRRR numbers work, holding may create more total value.`)
+
+                                // BRRRR assessment
+                                if (brrrBad) {
+                                  if (cashFlow < -50)
+                                    bullets.push(`BRRRR doesn't work here — the refi mortgage eats more than the rent brings in (${fmtUSD(cashFlow)}/mo cash flow). You'd be subsidizing the property every month.`)
+                                  else
+                                    bullets.push(`${fmtUSD(leftIn)} stays locked in the deal after refi — over the $40K ceiling. Too much capital trapped with limited return.`)
+                                } else if (brrrStrong) {
+                                  bullets.push(`BRRRR is perfect: full capital recycled at refi, you keep ${fmtUSD(equity)} in equity, and the property cash-flows ${fmtUSD(cashFlow)}/mo indefinitely.`)
+                                } else if (brrrGood) {
+                                  bullets.push(`BRRRR is good: only ${fmtUSD(leftIn)} left in the deal (under $30K threshold), cash-flows ${fmtUSD(cashFlow)}/mo, and you own ${fmtUSD(equity)} in equity.`)
+                                } else if (brrrStretch) {
+                                  bullets.push(`BRRRR is a stretch: ${fmtUSD(leftIn)} stays in the deal ($30K–$40K zone). Acceptable only if the zip code is strong and the house is fully renovated — the asset quality has to justify the trapped capital.`)
+                                }
+
+                                // Break-even comparison
+                                if (breakEvenMonths && !brrrBad) {
+                                  if (breakEvenMonths <= 24)
+                                    bullets.push(`BRRRR income (${fmtUSD(cashFlow)}/mo) catches up to the flip profit in just ${breakEvenYrs} years — after that, BRRRR puts you ahead financially.`)
+                                  else if (breakEvenMonths <= 60)
+                                    bullets.push(`At ${fmtUSD(cashFlow)}/mo, it takes ${breakEvenYrs} years for BRRRR income to match the flip profit. Reasonable if you plan to hold long-term.`)
+                                  else
+                                    bullets.push(`At ${fmtUSD(cashFlow)}/mo cash flow, it takes ${breakEvenYrs} years for rental income to equal the flip profit — a long payback period favoring the flip.`)
+                                }
+
+                                // Equity premium
+                                if (!brrrBad && equityPremium > 10000)
+                                  bullets.push(`BRRRR also gives you ${fmtUSD(equity)} in equity vs ${fmtUSD(flipProfit)} cash from the flip — ${fmtUSD(equityPremium)} more total wealth, though it's illiquid until you sell or refi again.`)
+
+                                // Final recommendation sentence
+                                if (brrrBad)
+                                  bullets.push(`Recommendation: Flip this one. Take the profit, recycle the capital into a deal that works better for BRRRR.`)
+                                else if (flipStrong && (brrrStrong || brrrGood))
+                                  bullets.push(`Bottom line: Both strategies win here. Flip if you need liquidity or have another deal lined up. BRRRR if you want to keep building your rental portfolio.`)
+                                else if (brrrStrong || brrrGood)
+                                  bullets.push(`Recommendation: Lean BRRRR. The flip money is good, but the long-term compounding — equity + cash flow — creates more total wealth if you can stay patient.`)
+                                else if (brrrStretch)
+                                  bullets.push(`Recommendation: This deal sits in the stretch zone ($30K–$40K left). Do it as BRRRR only if this is a good zip code with a fully renovated, rent-ready house. Otherwise, flip and redeploy.`)
+                                else
+                                  bullets.push(`Recommendation: Let your capital position decide. If you have reserves and another deal ready, flip and redeploy. If not, holding this as a rental is a safe, income-producing fallback.`)
+
+                                return (
+                                  <div className="mt-4 pt-4 border-t border-[color:var(--color-line)]">
+                                    <div className={`rounded-xl border-2 p-4 space-y-3 ${verdictCls}`}>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[18px]">{icon}</span>
+                                        <span className="text-[13px] font-bold">{verdict}</span>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {bullets.map((b, i) => (
+                                          <div key={i} className="flex gap-2 text-[12px] leading-relaxed opacity-90">
+                                            <span className="shrink-0 mt-0.5">›</span>
+                                            <span>{b}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          )}
+
+                          {/* Warnings */}
+                          {bc.warnings?.map((w, i) => (
+                            <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-50 border border-yellow-300 dark:bg-yellow-950/20 dark:border-yellow-700 text-[12px] text-yellow-700 dark:text-yellow-300">
+                              ⚠ {w}
+                            </div>
+                          ))}
+
+                        </div>
+                      )
+                    })()}
+
+                  </div>
+                )}
+              </div>
+            )}
+
           </>
         )}
 
@@ -1391,11 +1923,14 @@ export default function ProjectDetailPage() {
         <div className="w-[300px] shrink-0 sticky top-4 self-start">
           <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
             <div className="text-[11px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-3 flex items-center gap-1.5">
-              <span>📊</span> {isBRRRR ? 'BRRRR Analysis' : 'Live Calculation'}
+              <span>📊</span>{' '}
+              {isBRRRR ? 'BRRRR Analysis' : brrrScenarioOpen ? 'Plan B: BRRRR' : 'Live Calculation'}
             </div>
             {isBRRRR
               ? <LiveBRRRRPanel bc={bCalc} />
-              : <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
+              : brrrScenarioOpen
+                ? <LiveBRRRRPanel bc={bCalcScenario} />
+                : <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
             }
           </div>
         </div>
