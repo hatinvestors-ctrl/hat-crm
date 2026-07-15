@@ -1235,6 +1235,50 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
+              {/* ── Loan Activity — months active + interest paid to date ── */}
+              {financials?.purchase_date && (() => {
+                const loanCalc     = isBRRRR ? bCalc : calc
+                if (!loanCalc) return null
+                const monthlyInt   = loanCalc.monthlyInterest ?? 0
+                const pointsCost   = loanCalc.pointsCost ?? 0
+                const totalLoan    = loanCalc.totalLoan ?? 0
+                const ms           = Date.now() - new Date(financials.purchase_date).getTime()
+                const monthsPaid   = Math.floor(ms / (1000 * 60 * 60 * 24 * 30.44))
+                const interestPaid = monthsPaid * monthlyInt
+                const totalPaid    = pointsCost + interestPaid
+                return (
+                  <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/15 p-3">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-400 mb-2">
+                      Loan Activity Since Purchase ({financials.purchase_date})
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Monthly Payment</div>
+                        <div className="text-[16px] font-bold text-[color:var(--color-text)] mt-0.5">{fmtUSD(monthlyInt)}</div>
+                        <div className="text-[10px] text-[color:var(--color-text-dim)]">interest-only</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Payments Made</div>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-[22px] font-bold text-[color:var(--color-text)]">{monthsPaid}</span>
+                          <span className="text-[11px] text-[color:var(--color-text-dim)]">months</span>
+                        </div>
+                        <div className="text-[10px] text-[color:var(--color-text-dim)]">{monthsPaid} × {fmtUSD(monthlyInt)} = {fmtUSD(interestPaid)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Total Paid to Lender</div>
+                        <div className="text-[16px] font-bold text-amber-700 dark:text-amber-400 mt-0.5">{fmtUSD(totalPaid)}</div>
+                        <div className="text-[10px] text-[color:var(--color-text-dim)]">{fmtUSD(pointsCost)} pts + {fmtUSD(interestPaid)} interest</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800 flex justify-between text-[11px]">
+                      <span className="text-[color:var(--color-text-dim)]">Loan balance at payoff</span>
+                      <span className="font-semibold text-[color:var(--color-text)]">{fmtUSD(totalLoan)} (interest-only — principal unchanged)</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* ── Section 3: Florida Closing Fees (collapsible defaults) ── */}
               <div className="border-t border-[color:var(--color-line)] pt-3">
                 <button
