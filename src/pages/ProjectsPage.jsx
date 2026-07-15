@@ -195,12 +195,14 @@ const TYPE_BADGE = {
   BRRRR:    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 }
 
-const isSoldStatus = s => s === 'flip_sold' || s === 'sold'
-const STATUS_LABELS = { working_project: 'Active', flip_sold: 'Flip Sold ✓', sold: 'Sold' }
+const isSoldStatus   = s => s === 'flip_sold' || s === 'sold'
+const isRentedStatus = s => s === 'rented'
+const STATUS_LABELS = { working_project: 'Active', flip_sold: 'Flip Sold ✓', sold: 'Sold', rented: 'Rented 🏠' }
 const STATUS_CLS    = {
   working_project: 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]',
   flip_sold:       'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
   sold:            'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
+  rented:          'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 }
 
 const SORT_OPTIONS = [
@@ -237,7 +239,7 @@ export default function ProjectsPage() {
 
       if (!fins?.length) { setRows([]); setLoading(false); return }
 
-      const projectFins = fins.filter(f => ['working_project', 'sold', 'flip_sold'].includes(f.leads?.status))
+      const projectFins = fins.filter(f => ['working_project', 'rented', 'sold', 'flip_sold'].includes(f.leads?.status))
       if (!projectFins.length) { setRows([]); setLoading(false); return }
 
       const leadIds = projectFins.map(f => f.lead_id)
@@ -362,7 +364,8 @@ export default function ProjectsPage() {
   // ── Filtered + sorted rows ────────────────────────────────────────────────
   const displayRows = useMemo(() => {
     let r = [...rows]
-    if (statusFilter === 'Active') r = r.filter(x => !isSoldStatus(x.lead?.status))
+    if (statusFilter === 'Active') r = r.filter(x => !isSoldStatus(x.lead?.status) && !isRentedStatus(x.lead?.status))
+    if (statusFilter === 'Rented') r = r.filter(x => isRentedStatus(x.lead?.status))
     if (statusFilter === 'Sold')   r = r.filter(x => isSoldStatus(x.lead?.status))
     if (typeFilter === 'Cash')  r = r.filter(x => !x.financials.is_jv && !x.isBRRRR && x.financials.renovation_financing === 'Cash')
     if (typeFilter === 'HML')   r = r.filter(x => !x.financials.is_jv && !x.isBRRRR && x.financials.renovation_financing !== 'Cash')
@@ -383,8 +386,9 @@ export default function ProjectsPage() {
     return r
   }, [rows, statusFilter, typeFilter, ratingFilter, sortBy, sortDir])
 
-  const activeRows = displayRows.filter(r => !isSoldStatus(r.lead?.status))
-  const soldRows   = displayRows.filter(r => isSoldStatus(r.lead?.status))
+  const activeRows  = displayRows.filter(r => !isSoldStatus(r.lead?.status) && !isRentedStatus(r.lead?.status))
+  const rentedRows  = displayRows.filter(r => isRentedStatus(r.lead?.status))
+  const soldRows    = displayRows.filter(r => isSoldStatus(r.lead?.status))
 
   const toggleSort = (col) => {
     if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
@@ -528,6 +532,7 @@ export default function ProjectsPage() {
           <FilterGroup label="Status" options={[
             { value: 'All',    label: 'All Deals' },
             { value: 'Active', label: 'Active' },
+            { value: 'Rented', label: 'Rented 🏠' },
             { value: 'Sold',   label: 'Sold' },
           ]} value={statusFilter} onChange={setStatusFilter} />
 
@@ -578,6 +583,16 @@ export default function ProjectsPage() {
                   />
                 )}
 
+                {/* ── RENTED DEALS TABLE ── */}
+                {rentedRows.length > 0 && (
+                  <ProjectTable
+                    rows={rentedRows} title={`Rented — Holding (${rentedRows.length})`}
+                    workspaceId={workspaceId} navigate={navigate}
+                    sortBy={sortBy} toggleSort={toggleSort} sortIcon={sortIcon}
+                    showActual={false}
+                  />
+                )}
+
                 {/* ── SOLD DEALS TABLE ── */}
                 {soldRows.length > 0 && (
                   <ProjectTable
@@ -599,8 +614,94 @@ export default function ProjectsPage() {
   )
 }
 
+// ─── HML expanded row panel ──────────────────────────────────────────────────
+function HmlExpandedRow({ financials: f, calc, items, colSpan, leadId, navigate, workspaceId }) {
+  const purchaseLoan  = calc?.purchaseLoan  ?? 0
+  const renoLoan      = calc?.renovationLoan ?? 0
+  const totalLoan     = calc?.totalLoan     ?? 0
+  const monthlyInt    = calc?.monthlyInterest ?? 0
+  const rate          = f.interest_rate_annual ?? 0
+  const points        = calc?.pointsCost    ?? 0
+
+  // Months elapsed since purchase
+  const monthsElapsed = (() => {
+    if (!f.purchase_date) return null
+    const ms = Date.now() - new Date(f.purchase_date).getTime()
+    return Math.floor(ms / (1000 * 60 * 60 * 24 * 30.44))
+  })()
+  const interestPaid = monthsElapsed != null ? monthsElapsed * monthlyInt : null
+
+  // Renovation draw status from line items
+  const renoTotal    = items.reduce((s, i) => s + (Number(i.estimated_cost) || 0), 0)
+  const renoDone     = items.filter(i => i.status === 'complete').reduce((s, i) => s + (Number(i.actual_cost) || Number(i.estimated_cost) || 0), 0)
+  const renoDrawPct  = renoTotal > 0 ? renoDone / renoTotal : 0
+  const renoRemain   = Math.max(0, renoLoan - renoDone)
+
+  const Stat = ({ label, value, sub, highlight }) => (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">{label}</span>
+      <span className={`text-[13px] font-semibold ${highlight ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text)]'}`}>{value}</span>
+      {sub && <span className="text-[10px] text-[color:var(--color-text-dim)]">{sub}</span>}
+    </div>
+  )
+
+  return (
+    <tr className="bg-[color:var(--color-bg-elev)] border-t border-[color:var(--color-line)]">
+      <td colSpan={colSpan} className="px-4 py-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-3 items-start">
+
+          {/* Loan breakdown */}
+          <Stat label="Total Loan" value={fmtUSD(totalLoan)} highlight sub={`${(rate*100).toFixed(1)}% · ${fmtUSD(points)} pts`} />
+          <Stat label="Purchase Loan" value={fmtUSD(purchaseLoan)} />
+          <Stat label="Reno Loan" value={fmtUSD(renoLoan)} sub={f.renovation_lender_pct ? `${Math.round((f.renovation_lender_pct||1)*100)}% lender` : undefined} />
+
+          {/* Monthly burn */}
+          <Stat label="Monthly Interest" value={fmtUSD(monthlyInt)} sub="per month carrying cost" />
+
+          {/* Interest accrued */}
+          {interestPaid != null
+            ? <Stat label="Interest Paid" value={fmtUSD(interestPaid)} sub={`${monthsElapsed} mo since purchase`} />
+            : <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Interest Paid</span>
+                <span className="text-[11px] text-[color:var(--color-text-dim)] italic">No purchase date set</span>
+              </div>
+          }
+
+          {/* Reno draw progress */}
+          {renoLoan > 0 && (
+            <div className="flex flex-col gap-1 lg:col-span-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Reno Draws</span>
+                <span className="text-[10px] text-[color:var(--color-text-dim)]">{fmtUSD(renoDone)} of {fmtUSD(renoLoan)} · {fmtUSD(renoRemain)} remaining</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[color:var(--color-bg)] border border-[color:var(--color-line)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[color:var(--color-accent)] transition-all"
+                  style={{ width: `${Math.min(100, renoDrawPct * 100).toFixed(1)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-[color:var(--color-text-dim)]">{Math.round(renoDrawPct * 100)}% of completed work vs reno loan</span>
+            </div>
+          )}
+
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate(`/w/${workspaceId}/projects/${leadId}`) }}
+            className="text-[11px] text-[color:var(--color-accent)] hover:underline font-medium"
+          >
+            Open project →
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 // ─── Reusable table component ────────────────────────────────────────────────
 function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, sortIcon, showActual }) {
+  const [expandedId, setExpandedId] = useState(null)
+
   const TH = ({ col, label }) => (
     <th
       onClick={col ? () => toggleSort(col) : undefined}
@@ -632,7 +733,7 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ financials: f, lead, calc, bCalc, isBRRRR: isB }) => {
+            {rows.map(({ financials: f, lead, calc, bCalc, isBRRRR: isB, items = [] }) => {
               const expectedProfit = isB ? (bCalc?.annualCashFlow || 0) : calc?.expected?.netProfit
               const actualProfit   = !isB ? calc?.actual?.netProfit : null
               const displayProfit  = showActual && actualProfit != null ? actualProfit : expectedProfit
@@ -655,15 +756,28 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
               if (!isB && (annRoi || 0) < 0.20 && (annRoi || 0) > -999) flags.push({ label: 'Low ROI', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' })
               if (isB && (bCalc?.monthlyCashFlow || 0) < 0) flags.push({ label: 'Neg CF', cls: 'bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-text)]' })
 
+              const isHml = !isJV && !isB && !isCash
+              const isExpanded = expandedId === f.id
+              const totalCols = showActual ? 13 : 12
+
               return (
+                <>
                 <tr
                   key={f.id}
-                  onClick={() => navigate(`/w/${workspaceId}/projects/${lead.id}`)}
-                  className="border-t border-[color:var(--color-line)] hover:bg-[color:var(--color-bg-elev)] cursor-pointer transition-colors"
+                  onClick={(e) => {
+                    if (isHml) { e.stopPropagation(); setExpandedId(id => id === f.id ? null : f.id) }
+                    else navigate(`/w/${workspaceId}/projects/${lead.id}`)
+                  }}
+                  className={`border-t border-[color:var(--color-line)] cursor-pointer transition-colors ${isExpanded ? 'bg-[color:var(--color-accent-soft)]' : 'hover:bg-[color:var(--color-bg-elev)]'}`}
                 >
                   <td className="px-3 py-2.5 font-medium text-[color:var(--color-text)] max-w-[150px]">
-                    <div className="truncate" title={lead?.address}>{shortAddr}</div>
-                    <div className="text-[10px] text-[color:var(--color-text-dim)] truncate">{(lead?.address || '').replace(shortAddr, '').replace(/^,\s*/, '')}</div>
+                    <div className="flex items-center gap-1.5">
+                      {isHml && <span className={`text-[10px] transition-transform ${isExpanded ? 'rotate-90' : ''} text-[color:var(--color-text-dim)]`}>▶</span>}
+                      <div>
+                        <div className="truncate" title={lead?.address}>{shortAddr}</div>
+                        <div className="text-[10px] text-[color:var(--color-text-dim)] truncate">{(lead?.address || '').replace(shortAddr, '').replace(/^,\s*/, '')}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isB ? TYPE_BADGE.BRRRR : isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>
@@ -718,6 +832,18 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                     </div>
                   </td>
                 </tr>
+                {isHml && isExpanded && (
+                  <HmlExpandedRow
+                    financials={f}
+                    calc={calc}
+                    items={items}
+                    colSpan={totalCols}
+                    leadId={lead.id}
+                    navigate={navigate}
+                    workspaceId={workspaceId}
+                  />
+                )}
+                </>
               )
             })}
           </tbody>
