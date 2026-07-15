@@ -637,10 +637,12 @@ function HmlExpandedRow({ financials: f, calc, items, colSpan, leadId, navigate,
   const renoDrawPct  = renoTotal > 0 ? renoDone / renoTotal : 0
   const renoRemain   = Math.max(0, renoLoan - renoDone)
 
-  const Stat = ({ label, value, sub, highlight }) => (
+  const totalPaidToDate = interestPaid != null ? points + interestPaid : null
+
+  const Stat = ({ label, value, sub, highlight, warn }) => (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">{label}</span>
-      <span className={`text-[13px] font-semibold ${highlight ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text)]'}`}>{value}</span>
+      <span className={`text-[13px] font-semibold ${highlight ? 'text-[color:var(--color-accent)]' : warn ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-text)]'}`}>{value}</span>
       {sub && <span className="text-[10px] text-[color:var(--color-text-dim)]">{sub}</span>}
     </div>
   )
@@ -648,6 +650,20 @@ function HmlExpandedRow({ financials: f, calc, items, colSpan, leadId, navigate,
   return (
     <tr className="bg-[color:var(--color-bg-elev)] border-t border-[color:var(--color-line)]">
       <td colSpan={colSpan} className="px-4 py-3">
+
+        {/* Total paid to date — prominent banner */}
+        {totalPaidToDate != null && (
+          <div className="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-[color:var(--color-bg)] border border-[color:var(--color-line)]">
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Total Paid to Date</span>
+              <span className="text-[18px] font-bold text-[color:var(--color-danger-text)]">{fmtUSD(totalPaidToDate)}</span>
+            </div>
+            <div className="text-[10px] text-[color:var(--color-text-dim)] leading-relaxed">
+              Points {fmtUSD(points)} + {monthsElapsed} mo interest {fmtUSD(interestPaid)}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-3 items-start">
 
           {/* Loan breakdown */}
@@ -660,9 +676,9 @@ function HmlExpandedRow({ financials: f, calc, items, colSpan, leadId, navigate,
 
           {/* Interest accrued */}
           {interestPaid != null
-            ? <Stat label="Interest Paid" value={fmtUSD(interestPaid)} sub={`${monthsElapsed} mo since purchase`} />
+            ? <Stat label="Interest Accrued" value={fmtUSD(interestPaid)} sub={`${monthsElapsed} mo × ${fmtUSD(monthlyInt)}/mo`} />
             : <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Interest Paid</span>
+                <span className="text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)]">Interest Accrued</span>
                 <span className="text-[11px] text-[color:var(--color-text-dim)] italic">No purchase date set</span>
               </div>
           }
