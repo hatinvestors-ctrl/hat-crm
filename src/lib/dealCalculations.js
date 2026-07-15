@@ -54,6 +54,13 @@ export function calcDeal(f, items = []) {
     ? agentCommissionPct + buyerAgentPct + sellingClosingPct + sellingOtherPct
     : (n(f.selling_cost_pct) || 0.07)
 
+  // --- Hold months: use stored value if set; otherwise compute elapsed months from purchase_date to today ---
+  const effectiveHoldMonths = (f.hold_months != null && n(f.hold_months) > 0)
+    ? n(f.hold_months)
+    : f.purchase_date
+      ? Math.max(0, (Date.now() - new Date(f.purchase_date).getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+      : 0
+
   // --- Renovation (must come before loan so renovationLoan can use totalRenovationCost) ---
   // renovation_lender_amount doubles as a "renovation budget" fallback when no line items exist yet
   const renovationBudget      = n(f.renovation_lender_amount)
@@ -74,7 +81,7 @@ export function calcDeal(f, items = []) {
   const pointsBase       = f.points_charged_on === 'Purchase Only' ? purchaseLoan : totalLoan
   const pointsCost       = pointsBase * n(f.points_pct)
   const monthlyInterest  = totalLoan * (n(f.interest_rate_annual) / 12)
-  const totalInterest    = monthlyInterest * n(f.hold_months)
+  const totalInterest    = monthlyInterest * effectiveHoldMonths
 
   // --- HML Closing Costs (paid at closing) ---
   const hmlClosingCosts  = pointsCost
@@ -94,9 +101,9 @@ export function calcDeal(f, items = []) {
   const monthlyHoldCosts  = n(f.insurance_monthly) + n(f.utilities_monthly) + n(f.taxes_monthly) + n(f.hoa_monthly) + n(f.misc_holding_monthly)
 
   // --- JV: interest on partner loan (we pay this, it's our cost) ---
-  const jvPartnerInterest = isJV ? jvPartnerLoan * jvPartnerRate * (n(f.hold_months) / 12) : 0
+  const jvPartnerInterest = isJV ? jvPartnerLoan * jvPartnerRate * (effectiveHoldMonths / 12) : 0
 
-  const totalHoldingCosts = monthlyHoldCosts * n(f.hold_months) + totalInterest + jvPartnerInterest
+  const totalHoldingCosts = monthlyHoldCosts * effectiveHoldMonths + totalInterest + jvPartnerInterest
 
   // --- All-In Cost (total deal spend, including partner's purchase for JV) ---
   const totalAllInCost   = (isJV ? jvPartnerPurch : purchasePrice)
@@ -106,7 +113,7 @@ export function calcDeal(f, items = []) {
   // JV: we invest only our reno gap + interest we owe partner (partner funds the purchase + their loan portion)
   // Standard: down payment + closing fees + reno gap + carrying costs
   const ourCashInvested  = isJV
-    ? renovationGap + jvPartnerInterest + (monthlyHoldCosts * n(f.hold_months))
+    ? renovationGap + jvPartnerInterest + (monthlyHoldCosts * effectiveHoldMonths)
     : downPayment + hmlClosingCosts + purchaseClosing + renovationGap + totalHoldingCosts
   const totalCashInvested = ourCashInvested
 
@@ -115,7 +122,7 @@ export function calcDeal(f, items = []) {
   const allInVsARV       = n(f.expected_sell_price) > 0 ? totalAllInCost / n(f.expected_sell_price) : 0
 
   // --- Scenario helper ---
-  const holdMonthsN = n(f.hold_months) || 1
+  const holdMonthsN = effectiveHoldMonths || 1
   const scenario = (sellPrice) => {
     if (!sellPrice) return null
     const sp              = n(sellPrice)
@@ -125,7 +132,10 @@ export function calcDeal(f, items = []) {
     const netProfit       = isJV ? totalDealProfit * jvSplitPct : totalDealProfit
     const roi             = ourCashInvested > 0 ? netProfit / ourCashInvested : 0
     const annualizedRoi   = roi * (12 / holdMonthsN)
-    return { sellPrice: sp, sellingCosts, netProfit, totalDealProfit, roi, annualizedRoi }
+    // Cash that actually lands in bank at closing: sale proceeds minus loan payoff
+    // = Sale Price - Selling Costs - Total Loan  (equivalently: Cash Invested + Net Profit)
+    const cashInBank      = sp - sellingCosts - totalLoan
+    return { sellPrice: sp, sellingCosts, netProfit, totalDealProfit, roi, annualizedRoi, cashInBank }
   }
 
   const conservative = scenario(f.conservative_sell_price)
@@ -167,7 +177,7 @@ export function calcDeal(f, items = []) {
     conservative, expected, optimistic, actual,
     // Rating
     dealRating, warnings,
-    holdMonths: n(f.hold_months),
+    holdMonths: effectiveHoldMonths,
     sellingCostPct,
   }
 }
@@ -184,7 +194,11 @@ export function calcBRRRR(f) {
   const purchasePrice = n(f.purchase_price_actual)
   const renovBudget   = n(f.renovation_lender_amount)
   const arv           = n(f.expected_sell_price)
-  const holdMonths    = n(f.hold_months) || 6
+  const holdMonths    = (f.hold_months != null && n(f.hold_months) > 0)
+    ? n(f.hold_months)
+    : f.purchase_date
+      ? Math.max(0, (Date.now() - new Date(f.purchase_date).getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+      : 6
 
   // ── Phase 1: Acquisition Loans (same structure as calcDeal) ──
   const ltvPct       = f.loan_to_purchase_pct != null ? n(f.loan_to_purchase_pct) : 0.90
@@ -211,8 +225,8 @@ export function calcBRRRR(f) {
   const purchaseClosing = n(f.title_closing_costs) + n(f.purchase_closing_costs_other)
   const sellerCredits   = n(f.seller_credits)
 
-  // Cash we pay at closing (out of pocket on day 1)
-  const cashAtClose = downPayment + hmlClosing + purchaseClosing + renovGap - sellerCredits
+  // Cash we pay at closing (out of pocket on day 1) — reno gap excluded (paid incrementally during reno, not at closing table)
+  const cashAtClose = downPayment + hmlClosing + purchaseClosing - sellerCredits
 
   // ── Phase 2: Carrying Costs During Renovation ──
   const monthlyHoldCosts  = n(f.insurance_monthly) + n(f.utilities_monthly) +
@@ -220,8 +234,8 @@ export function calcBRRRR(f) {
   const totalHoldingCosts = monthlyHoldCosts * holdMonths
   const totalCarrying     = totalInterest + totalHoldingCosts   // paid during reno
 
-  // Total cash we have put in before refinance
-  const totalCashIn = cashAtClose + totalCarrying
+  // Total cash we have put in before refinance (closing + reno gap + carrying)
+  const totalCashIn = cashAtClose + renovGap + totalCarrying
 
   // Total all-in project cost
   const totalAllIn  = purchasePrice + renovBudget + hmlClosing + purchaseClosing + totalCarrying

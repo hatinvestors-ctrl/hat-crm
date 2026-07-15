@@ -279,6 +279,32 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
               {fmtPct(profitResult.annualizedRoi)}
             </span>
           </div>
+
+          {/* Cash in Bank at Sale */}
+          {profitResult.cashInBank != null && (
+            <div className="mt-3 pt-3 border-t-2 border-[color:var(--color-line)] rounded-lg bg-[color:var(--color-bg-elev)] p-3 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">
+                💰 Cash in Bank After Sale
+              </div>
+              <div className={`text-[22px] font-bold ${profitResult.cashInBank >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                {fmtUSD(profitResult.cashInBank)}
+              </div>
+              <div className="text-[10.5px] text-[color:var(--color-text-dim)] leading-relaxed space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Net profit</span>
+                  <span className="font-medium text-[color:var(--color-text)]">{fmtUSD(profitResult.netProfit)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>+ Cash you put in (returned)</span>
+                  <span className="font-medium text-[color:var(--color-text)]">{fmtUSD(calc.totalCashInvested)}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-[color:var(--color-line)] font-semibold text-[color:var(--color-text)]">
+                  <span>= Total cash in hand</span>
+                  <span>{fmtUSD(profitResult.cashInBank)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

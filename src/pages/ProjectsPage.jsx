@@ -748,6 +748,7 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
               <TH col="allInVsARV" label="All-In/ARV" />
               <TH col="cashIn"  label="Cash In" />
               <TH col="profit"  label={showActual ? 'Actual Profit' : 'Exp. Profit'} />
+              <TH label="Cash in Bank" />
               {showActual && <TH label="vs Expected" />}
               <TH col="annRoi" label="Ann. ROI" />
               <TH col="hold"   label="Hold" />
@@ -781,7 +782,7 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
 
               const isHml = !isJV && !isB && !isCash
               const isExpanded = expandedId === f.id
-              const totalCols = showActual ? 13 : 12
+              const totalCols = showActual ? 14 : 13
 
               return (
                 <>
@@ -820,6 +821,18 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                       <span className={`font-semibold ${isB ? (displayProfit >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]') : displayProfit >= 30000 ? 'text-[color:var(--color-success-text)]' : displayProfit >= 0 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-danger-text)]'}`}>
                         {fmtUSD(displayProfit)}{isB && <span className="text-[9px] text-[color:var(--color-text-dim)] ml-0.5">/yr CF</span>}
                       </span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {!isB && calc?.expected?.cashInBank != null ? (
+                      <div>
+                        <div className={`font-semibold ${calc.expected.cashInBank >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                          {fmtUSD(calc.expected.cashInBank)}
+                        </div>
+                        <div className="text-[9.5px] text-[color:var(--color-text-dim)] leading-tight mt-0.5">
+                          profit {fmtUSD(calc.expected.netProfit)} + cash {fmtUSD(calc.totalCashInvested)}
+                        </div>
+                      </div>
                     ) : '—'}
                   </td>
                   {showActual && (
