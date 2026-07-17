@@ -197,6 +197,25 @@ const TYPE_BADGE = {
 
 const isSoldStatus   = s => s === 'flip_sold' || s === 'sold'
 const isRentedStatus = s => s === 'rented'
+
+// All deal stages — used in both ProjectsPage (display) and ProjectDetailPage (selector)
+export const STAGE_CONFIG = {
+  // ── BRRRR stages ──
+  working_project:  { label: 'In Renovation',     color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',       dot: '🔨' },
+  ready_to_rent:    { label: 'Ready to Rent',      color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',       dot: '✅' },
+  finding_tenant:   { label: 'Finding Tenant',     color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', dot: '🔍' },
+  rented:           { label: 'Rented',             color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',   dot: '🏠' },
+  ready_to_refi:    { label: 'Ready to Refi',      color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300', dot: '📋' },
+  refinanced:       { label: 'Refinanced',         color: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]', dot: '✓' },
+  // ── Flip stages ──
+  in_renovation:    { label: 'In Renovation',      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',       dot: '🔨' },
+  ready_to_list:    { label: 'Ready to List',      color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',       dot: '✅' },
+  listed:           { label: 'Listed for Sale',    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', dot: '🏷' },
+  under_contract:   { label: 'Under Contract',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', dot: '📝' },
+  flip_sold:        { label: 'Sold',               color: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]', dot: '✓' },
+  sold:             { label: 'Sold',               color: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]', dot: '✓' },
+}
+
 const STATUS_LABELS = { working_project: 'Active', flip_sold: 'Flip Sold ✓', sold: 'Sold', rented: 'Rented 🏠' }
 const STATUS_CLS    = {
   working_project: 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]',
@@ -742,6 +761,7 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
           <thead>
             <tr className="border-b border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)]">
               <TH label="Property" />
+              <TH label="Stage" />
               <TH label="Type" />
               <TH label="Purchase" />
               <TH label="All-In" />
@@ -782,7 +802,7 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
 
               const isHml = !isJV && !isB && !isCash
               const isExpanded = expandedId === f.id
-              const totalCols = showActual ? 14 : 13
+              const totalCols = showActual ? 15 : 14
 
               return (
                 <>
@@ -802,6 +822,16 @@ function ProjectTable({ rows, title, workspaceId, navigate, sortBy, toggleSort, 
                         <div className="text-[10px] text-[color:var(--color-text-dim)] truncate">{(lead?.address || '').replace(shortAddr, '').replace(/^,\s*/, '')}</div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {(() => {
+                      const stage = STAGE_CONFIG[lead?.status]
+                      return stage
+                        ? <span className={`inline-flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${stage.color}`}>
+                            <span>{stage.dot}</span>{stage.label}
+                          </span>
+                        : <span className="text-[10.5px] text-[color:var(--color-text-dim)]">—</span>
+                    })()}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isB ? TYPE_BADGE.BRRRR : isJV ? TYPE_BADGE.JV : isCash ? TYPE_BADGE.Cash : TYPE_BADGE.Financed}`}>

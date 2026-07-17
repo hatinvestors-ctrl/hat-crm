@@ -674,15 +674,20 @@ export default function ProjectDetailPage() {
 
   const PROJECT_STATUS_OPTIONS = isBRRRR
     ? [
-        { value: 'working_project', label: 'In Rehab',    color: 'accent'   },
-        { value: 'rented',          label: 'Rented 🏠',   color: 'teal'     },
-        { value: 'sold',            label: 'Sold ✓',      color: 'success'  },
+        { value: 'working_project', label: '🔨 In Renovation'  },
+        { value: 'ready_to_rent',   label: '✅ Ready to Rent'   },
+        { value: 'finding_tenant',  label: '🔍 Finding Tenant'  },
+        { value: 'rented',          label: '🏠 Rented'          },
+        { value: 'ready_to_refi',   label: '📋 Ready to Refi'  },
+        { value: 'refinanced',      label: '✓ Refinanced'       },
+        { value: 'sold',            label: '✓ Sold'             },
       ]
     : [
-        { value: 'working_project', label: 'Active',      color: 'accent'   },
-        { value: 'rented',          label: 'Rented 🏠',   color: 'teal'     },
-        { value: 'flip_sold',       label: 'Flip Sold ✓', color: 'success'  },
-        { value: 'sold',            label: 'Sold ✓',      color: 'success'  },
+        { value: 'working_project', label: '🔨 In Renovation'  },
+        { value: 'ready_to_list',   label: '✅ Ready to List'   },
+        { value: 'listed',          label: '🏷 Listed for Sale' },
+        { value: 'under_contract',  label: '📝 Under Contract'  },
+        { value: 'flip_sold',       label: '✓ Sold'             },
       ]
 
   const handleStatusChange = async (newStatus) => {
