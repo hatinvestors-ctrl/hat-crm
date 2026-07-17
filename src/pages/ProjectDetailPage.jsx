@@ -901,109 +901,6 @@ export default function ProjectDetailPage() {
           </div>
         ))}
 
-        {/* ── Active HML Loan Card ── */}
-        {financials && !isSold && financials.purchase_loan_amount > 0 && (() => {
-          const loanCalc  = isBRRRR ? bCalc : calc
-          if (!loanCalc) return null
-          const totalLoan    = isBRRRR ? loanCalc.totalLoan     : loanCalc.totalLoan
-          const purchLoan    = isBRRRR ? loanCalc.purchaseLoan  : loanCalc.purchaseLoan
-          const renovLoan    = isBRRRR ? loanCalc.renovLoan     : loanCalc.renovationLoan
-          const rate         = financials.interest_rate_annual ?? 0.12
-          const dailyRate    = totalLoan * rate / 365
-          const monthlyInt   = loanCalc.monthlyInterest
-          const pointsCost   = loanCalc.pointsCost ?? 0
-          const purchDate    = financials.purchase_date ? new Date(financials.purchase_date) : null
-          const daysActive   = purchDate ? Math.floor((Date.now() - purchDate.getTime()) / (1000 * 60 * 60 * 24)) : null
-          const accrued      = daysActive != null ? dailyRate * daysActive : null
-          const renovPct     = financials.renovation_lender_pct ?? 1.0
-          const renovBudget  = financials.renovation_lender_amount ?? 0
-
-          return (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/15 dark:border-amber-700 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">HML Loan — Active</span>
-                  {daysActive != null && (
-                    <span className="text-[10.5px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium">
-                      Day {daysActive} · {fmtUSD(dailyRate)}/day burning
-                    </span>
-                  )}
-                </div>
-                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">{(rate * 100).toFixed(1)}% annual</span>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Total Note</div>
-                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(totalLoan)}</div>
-                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{(rate * 100).toFixed(1)}% · {fmtUSD(monthlyInt)}/mo</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Purchase Advance</div>
-                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(purchLoan)}</div>
-                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{fmtUSD(financials.purchase_price_actual - purchLoan)} down</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Reno Escrow</div>
-                  <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(renovLoan)}</div>
-                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">
-                    {fmtUSD(renovBudget)} budget · {renovPct < 1 ? `${Math.round(renovPct * 100)}% lender-funded` : '100% lender'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">
-                    {accrued != null ? 'Interest Accrued' : 'Points Paid'}
-                  </div>
-                  <div className={`text-[14px] font-bold ${accrued != null && accrued > monthlyInt * 3 ? 'text-amber-600 dark:text-amber-400' : 'text-[color:var(--color-text)]'}`}>
-                    {accrued != null ? fmtUSD(accrued) : fmtUSD(pointsCost)}
-                  </div>
-                  <div className="text-[10.5px] text-[color:var(--color-text-dim)]">
-                    {accrued != null ? `since ${financials.purchase_date}` : `${((loanCalc.pointsCost / totalLoan) * 100).toFixed(1)}% of note`}
-                  </div>
-                </div>
-              </div>
-
-              {daysActive != null && (() => {
-                const monthsPaid = Math.floor(daysActive / 30.44)
-                const interestPaid = monthsPaid * monthlyInt
-                const totalPaid = pointsCost + interestPaid
-                return (
-                  <div className="pt-2 border-t border-amber-200 dark:border-amber-800 space-y-2">
-                    {/* Monthly payments row */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Monthly Payments Made</div>
-                          <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className="text-[22px] font-bold text-[color:var(--color-text)]">{monthsPaid}</span>
-                            <span className="text-[11px] text-[color:var(--color-text-dim)]">payments × {fmtUSD(monthlyInt)}/mo</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Interest Paid Out</div>
-                        <div className="text-[16px] font-bold text-amber-700 dark:text-amber-400 mt-0.5">{fmtUSD(interestPaid)}</div>
-                      </div>
-                    </div>
-                    {/* Total paid to date */}
-                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                      <div className="text-[11px] text-amber-700 dark:text-amber-400">
-                        Total paid to lender to date
-                        <span className="ml-1 text-[color:var(--color-text-dim)]">({fmtUSD(pointsCost)} pts + {fmtUSD(interestPaid)} interest)</span>
-                      </div>
-                      <div className="text-[15px] font-bold text-amber-800 dark:text-amber-300">{fmtUSD(totalPaid)}</div>
-                    </div>
-                    {/* Points line */}
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[color:var(--color-text-dim)]">Points paid at closing</span>
-                      <span className="font-semibold text-[color:var(--color-text)]">{fmtUSD(pointsCost)} ({(financials.points_pct * 100).toFixed(1)}%)</span>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-          )
-        })()}
 
         {/* Property Summary */}
         <Card title="Property Summary">
@@ -1243,46 +1140,88 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              {/* ── Loan Activity — months active + interest paid to date ── */}
-              {financials?.purchase_date && (() => {
-                const loanCalc     = isBRRRR ? bCalc : calc
-                if (!loanCalc) return null
-                const monthlyInt   = loanCalc.monthlyInterest ?? 0
-                const pointsCost   = loanCalc.pointsCost ?? 0
-                const totalLoan    = loanCalc.totalLoan ?? 0
-                const ms           = Date.now() - new Date(financials.purchase_date).getTime()
-                const monthsPaid   = Math.floor(ms / (1000 * 60 * 60 * 24 * 30.44))
-                const interestPaid = monthsPaid * monthlyInt
-                const totalPaid    = pointsCost + interestPaid
+              {/* ── Loan Activity — merged single section ── */}
+              {(() => {
+                const loanCalc   = isBRRRR ? bCalc : calc
+                if (!loanCalc || !loanCalc.totalLoan) return null
+                const totalLoan  = loanCalc.totalLoan
+                const purchLoan  = isBRRRR ? loanCalc.purchaseLoan : loanCalc.purchaseLoan
+                const renovLoan  = isBRRRR ? loanCalc.renovLoan    : loanCalc.renovationLoan
+                const monthlyInt = loanCalc.monthlyInterest
+                const pointsCost = loanCalc.pointsCost ?? 0
+                const rate       = financials.interest_rate_annual ?? 0.12
+                const dailyRate  = totalLoan * rate / 365
+                const purchDate  = financials.purchase_date ? new Date(financials.purchase_date) : null
+                const daysActive = purchDate ? Math.floor((Date.now() - purchDate.getTime()) / (1000 * 60 * 60 * 24)) : null
+                const monthsPaid = daysActive != null ? Math.floor(daysActive / 30.44) : null
+                const interestPaid = monthsPaid != null ? monthsPaid * monthlyInt : null
+                const totalPaid  = interestPaid != null ? pointsCost + interestPaid : null
                 return (
-                  <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/15 p-3">
-                    <div className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-400 mb-2">
-                      Loan Activity Since Purchase ({financials.purchase_date})
+                  <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/15 p-3 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">HML Loan Summary</span>
+                        {daysActive != null && (
+                          <span className="text-[10.5px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium">
+                            Day {daysActive} · {fmtUSD(dailyRate)}/day
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">{(rate * 100).toFixed(1)}% annual</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+
+                    {/* Loan breakdown */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Monthly Payment</div>
-                        <div className="text-[16px] font-bold text-[color:var(--color-text)] mt-0.5">{fmtUSD(monthlyInt)}</div>
-                        <div className="text-[10px] text-[color:var(--color-text-dim)]">interest-only</div>
+                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Total Loan</div>
+                        <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(totalLoan)}</div>
+                        <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{fmtUSD(monthlyInt)}/mo interest</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Payments Made</div>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="text-[22px] font-bold text-[color:var(--color-text)]">{monthsPaid}</span>
-                          <span className="text-[11px] text-[color:var(--color-text-dim)]">months</span>
+                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Purchase Loan</div>
+                        <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(purchLoan)}</div>
+                        <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{fmtUSD((financials.purchase_price_actual||0) - purchLoan)} down payment</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Renovation Loan</div>
+                        <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(renovLoan)}</div>
+                        <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{fmtUSD(financials.renovation_lender_amount||0)} budget</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-0.5">Points at Closing</div>
+                        <div className="text-[14px] font-bold text-[color:var(--color-text)]">{fmtUSD(pointsCost)}</div>
+                        <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{((financials.points_pct||0)*100).toFixed(1)}% of loan</div>
+                      </div>
+                    </div>
+
+                    {/* Payments — only when purchase date is set */}
+                    {monthsPaid != null ? (
+                      <div className="pt-3 border-t border-amber-200 dark:border-amber-800 grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Monthly Payment</div>
+                          <div className="text-[15px] font-bold text-[color:var(--color-text)] mt-0.5">{fmtUSD(monthlyInt)}</div>
+                          <div className="text-[10px] text-[color:var(--color-text-dim)]">interest-only</div>
                         </div>
-                        <div className="text-[10px] text-[color:var(--color-text-dim)]">{monthsPaid} × {fmtUSD(monthlyInt)} = {fmtUSD(interestPaid)}</div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Payments Made</div>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-[22px] font-bold text-[color:var(--color-text)]">{monthsPaid}</span>
+                            <span className="text-[11px] text-[color:var(--color-text-dim)]">months</span>
+                          </div>
+                          <div className="text-[10px] text-[color:var(--color-text-dim)]">{monthsPaid} × {fmtUSD(monthlyInt)} = {fmtUSD(interestPaid)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-500">Total Paid to Lender</div>
+                          <div className="text-[15px] font-bold text-amber-700 dark:text-amber-400 mt-0.5">{fmtUSD(totalPaid)}</div>
+                          <div className="text-[10px] text-[color:var(--color-text-dim)]">{fmtUSD(pointsCost)} pts + {fmtUSD(interestPaid)} interest</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider">Total Paid to Lender</div>
-                        <div className="text-[16px] font-bold text-amber-700 dark:text-amber-400 mt-0.5">{fmtUSD(totalPaid)}</div>
-                        <div className="text-[10px] text-[color:var(--color-text-dim)]">{fmtUSD(pointsCost)} pts + {fmtUSD(interestPaid)} interest</div>
+                    ) : (
+                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800 text-[11px] text-[color:var(--color-text-dim)] italic">
+                        Set purchase date in Deal Parameters to track payments made
                       </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800 flex justify-between text-[11px]">
-                      <span className="text-[color:var(--color-text-dim)]">Loan balance at payoff</span>
-                      <span className="font-semibold text-[color:var(--color-text)]">{fmtUSD(totalLoan)} (interest-only — principal unchanged)</span>
-                    </div>
+                    )}
                   </div>
                 )
               })()}
