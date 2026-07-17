@@ -452,6 +452,83 @@ function LiveBRRRRPanel({ bc }) {
   )
 }
 
+// Notes & Investor Analysis section
+function NotesSection({ lead, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState('')
+  const [saving, setSaving]   = useState(false)
+
+  if (!lead) return null
+
+  const text = lead.notes || ''
+
+  function startEdit() {
+    setDraft(text)
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    await onSave(draft)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--color-line)]">
+        <div>
+          <div className="text-[12px] font-semibold text-[color:var(--color-text)]">Notes & Investor Analysis</div>
+          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Deal notes, AI analysis, and investor commentary</div>
+        </div>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="text-[11px] px-2.5 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
+          >
+            {text ? 'Edit' : '+ Add Notes'}
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="p-4 space-y-3">
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            rows={20}
+            className="w-full px-3 py-2 text-[12px] font-mono leading-relaxed rounded bg-[color:var(--color-bg-input)] border border-[color:var(--color-line)] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-[11px] px-3 py-1.5 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-[11px] px-3 py-1.5 rounded bg-[color:var(--color-accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      ) : text ? (
+        <div className="p-4">
+          <pre className="text-[11.5px] leading-relaxed text-[color:var(--color-text-muted)] whitespace-pre-wrap font-mono">{text}</pre>
+        </div>
+      ) : (
+        <div className="px-4 py-8 text-center text-[12px] text-[color:var(--color-text-dim)]">
+          No notes yet. Click <strong>+ Add Notes</strong> to add investor analysis or deal commentary.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Hero stat box
 function StatBox({ label, value, sub, color }) {
   return (
@@ -1933,6 +2010,12 @@ export default function ProjectDetailPage() {
 
           </>
         )}
+
+        {/* ── Notes & Investor Analysis ── */}
+        <NotesSection lead={lead} onSave={async (text) => {
+          setLead(prev => ({ ...prev, notes: text }))
+          await supabase.from('leads').update({ notes: text }).eq('id', lead.id)
+        }} />
 
         </div>{/* end left column */}
 
