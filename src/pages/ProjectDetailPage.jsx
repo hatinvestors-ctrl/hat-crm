@@ -2084,83 +2084,86 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
 
-                  {/* vs BRRRR comparison */}
+                  {/* vs BRRRR deal scorecard */}
                   {bCalc && (() => {
-                    const cashInHandFlip  = exp?.cashInBank ?? 0
-                    const cashInHandBRRRR = bCalc.refiCashOut ?? 0
-                    const monthlyCF       = bCalc.monthlyCashFlow ?? 0
-                    const equity          = bCalc.equityAtRefi ?? 0
-                    const recapturePct    = Math.round((bCalc.cashRecapturedPct ?? 0) * 100)
-                    const cashStillIn     = bCalc.netCashInDeal ?? 0
-                    const annualCF        = monthlyCF * 12
-                    // Years to recoup the remaining capital via cash flow (if positive CF)
-                    const yearsToRecoup   = monthlyCF > 0 && cashStillIn > 0 ? (cashStillIn / annualCF).toFixed(1) : null
-                    // 5-yr total return from BRRRR (CF + equity paydown, no appreciation)
-                    const yr1Principal    = bCalc.refiMonthlyPI ? (bCalc.refiMonthlyPI * 12 - (bCalc.refiLoan ?? 0) * (bCalc.refiRate ?? 0)) : 0
-                    const brrrr5yrReturn  = annualCF * 5 + yr1Principal * 5  // rough
+                    const cashStillIn  = bCalc.netCashInDeal ?? 0
+                    const monthlyCF    = bCalc.monthlyCashFlow ?? 0
+                    const annualCF     = monthlyCF * 12
+                    const equity       = bCalc.equityAtRefi ?? 0
+                    const yr1Principal = bCalc.refiMonthlyPI
+                      ? (bCalc.refiMonthlyPI * 12 - (bCalc.refiLoan ?? 0) * (bCalc.refiRate ?? 0))
+                      : 0
+                    const totalAnnualReturn = annualCF + yr1Principal
+                    const roiOnCashIn = cashStillIn > 0 ? totalAnnualReturn / cashStillIn : null
+                    const flipProfit  = exp?.netProfit ?? 0
+                    const flipCashIn  = exp?.cashInBank ?? 0
+                    const flipROI     = fc.totalCashInvested > 0 ? flipProfit / fc.totalCashInvested : null
+
+                    // Verdict helpers
+                    const pass   = (txt) => <span className="text-[color:var(--color-success-text)] font-bold">✓ {txt}</span>
+                    const fail   = (txt) => <span className="text-[color:var(--color-danger-text)] font-bold">✗ {txt}</span>
+                    const warn   = (txt) => <span className="text-yellow-600 dark:text-yellow-400 font-bold">⚠ {txt}</span>
 
                     const rows = [
                       {
-                        label: 'Immediate cash in your bank',
-                        flipVal: fmtUSD(cashInHandFlip),
-                        brrrrVal: fmtUSD(cashInHandBRRRR) + ' at refi',
-                        flipNote: 'You walk away from closing with this — sale proceeds minus HML payoff and selling costs. Done.',
-                        brrrrNote: 'You pull out this much cash when you refinance — the rest of your investment stays working in the property.',
-                      },
-                      {
-                        label: 'Capital still tied up after exit',
+                        metric: 'Cash left in deal after exit',
                         flipVal: '$0',
-                        brrrrVal: fmtUSD(cashStillIn) + ' (' + (100 - recapturePct) + '% not recovered)',
-                        flipNote: 'All capital returned at closing. Full exit — money is free for the next deal.',
-                        brrrrNote: 'This money stays inside the property. It\'s not lost — it\'s in equity — but you can\'t use it for another deal until you sell or do a cash-out refi.',
+                        flipVerdict: pass('None — full exit'),
+                        brrrrVal: fmtUSD(cashStillIn),
+                        brrrrVerdict: cashStillIn <= 30000 ? pass('Under $30K — within tolerance') : cashStillIn <= 50000 ? warn('Above $30K target') : fail('Too much capital locked up'),
                       },
                       {
-                        label: 'Monthly income / cost after exit',
-                        flipVal: '$0 — deal is closed',
-                        brrrrVal: fmtUSD(monthlyCF) + '/mo cash flow',
-                        flipNote: 'Nothing to manage. No tenants, no repairs, no monthly obligations.',
-                        brrrrNote: monthlyCF >= 0
-                          ? 'Tenant pays you ' + fmtUSD(monthlyCF) + ' every month after P&I, taxes, and insurance. That\'s ' + fmtUSD(Math.round(annualCF)) + '/yr passive income.'
-                          : 'You pay ' + fmtUSD(Math.abs(monthlyCF)) + '/mo out of pocket above what rent covers. Monitor carefully.',
+                        metric: 'Monthly cash flow',
+                        flipVal: 'N/A — one-time profit',
+                        flipVerdict: null,
+                        brrrrVal: fmtUSD(monthlyCF) + '/mo',
+                        brrrrVerdict: monthlyCF > 0 ? pass('Positive — ' + fmtUSD(Math.round(annualCF)) + '/yr') : monthlyCF === 0 ? warn('Break-even') : fail('Negative — costs you ' + fmtUSD(Math.abs(monthlyCF)) + '/mo'),
                       },
                       {
-                        label: 'Equity / wealth building',
-                        flipVal: 'None after closing',
-                        brrrrVal: fmtUSD(equity) + ' locked in at refi',
-                        flipNote: 'All profit is taken at sale. No ongoing wealth build — but you have cash to redeploy.',
-                        brrrrNote: 'Your tenant pays down the mortgage every month. On a 30yr loan at this rate, the loan drops ~' + fmtUSD(Math.round(yr1Principal)) + '/yr in Year 1 — that equity is yours.',
+                        metric: 'Net profit / annual return',
+                        flipVal: fmtUSD(flipProfit) + (flipROI != null ? ' (' + (flipROI * 100).toFixed(0) + '% ROI)' : ''),
+                        flipVerdict: flipProfit >= 30000 ? pass('Strong') : flipProfit >= 20000 ? warn('Acceptable') : fail('Below $20K'),
+                        brrrrVal: fmtUSD(Math.round(totalAnnualReturn)) + '/yr (CF + mortgage paydown)',
+                        brrrrVerdict: roiOnCashIn != null ? (roiOnCashIn >= 0.10 ? pass((roiOnCashIn * 100).toFixed(0) + '% annual ROI on cash still in') : roiOnCashIn >= 0.05 ? warn((roiOnCashIn * 100).toFixed(0) + '% annual ROI — low') : fail((roiOnCashIn * 100).toFixed(0) + '% annual ROI')) : null,
                       },
                       {
-                        label: 'When does this make sense?',
-                        flipVal: 'Need cash now. Want to move capital to a better deal. Simpler — one transaction and done.',
-                        brrrrVal: yearsToRecoup
-                          ? 'Want long-term wealth. Can wait ~' + yearsToRecoup + ' yrs for CF to recoup the ' + fmtUSD(cashStillIn) + ' still in deal. Builds equity + passive income.'
-                          : 'Want long-term wealth + equity build of ' + fmtUSD(equity) + '. Accept that ' + fmtUSD(cashStillIn) + ' stays in the deal.',
-                        flipNote: null,
-                        brrrrNote: null,
+                        metric: 'Equity built',
+                        flipVal: fmtUSD(flipCashIn) + ' cash received',
+                        flipVerdict: null,
+                        brrrrVal: fmtUSD(equity) + ' at refi + ' + fmtUSD(Math.round(yr1Principal)) + '/yr paydown',
+                        brrrrVerdict: equity >= 50000 ? pass('Strong equity position') : equity >= 30000 ? warn('Moderate equity') : fail('Low equity'),
                       },
                     ]
 
                     return (
-                      <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] px-4 py-4 space-y-4">
-                        <div className="text-[10px] uppercase tracking-wider font-semibold text-orange-500 dark:text-orange-400">Flip vs BRRRR — What Each Strategy Actually Means</div>
-                        {rows.map(({ label, flipVal, brrrrVal, flipNote, brrrrNote }) => (
-                          <div key={label} className="border-t border-[color:var(--color-line)] pt-3 first:border-0 first:pt-0">
-                            <div className="text-[11px] font-semibold text-[color:var(--color-text)] mb-2">{label}</div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 p-2.5 space-y-1">
-                                <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wide">💰 Flip</div>
-                                <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{flipVal}</div>
-                                {flipNote && <div className="text-[10.5px] text-[color:var(--color-text-dim)] leading-relaxed">{flipNote}</div>}
-                              </div>
-                              <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-2.5 space-y-1">
-                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">🏠 BRRRR</div>
-                                <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{brrrrVal}</div>
-                                {brrrrNote && <div className="text-[10.5px] text-[color:var(--color-text-dim)] leading-relaxed">{brrrrNote}</div>}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] overflow-hidden">
+                        <div className="px-4 py-2.5 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+                          <span className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">Strategy Scorecard — This Deal</span>
+                        </div>
+                        <table className="w-full text-[11.5px]">
+                          <thead>
+                            <tr className="border-b border-[color:var(--color-line)]">
+                              <th className="text-left px-4 py-2 text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold w-[32%]">Metric</th>
+                              <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-orange-500 dark:text-orange-400 font-semibold w-[34%]">💰 Flip</th>
+                              <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold w-[34%]">🏠 BRRRR</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map(({ metric, flipVal, flipVerdict, brrrrVal, brrrrVerdict }) => (
+                              <tr key={metric} className="border-b border-[color:var(--color-line)] last:border-0">
+                                <td className="px-4 py-3 text-[color:var(--color-text-dim)] font-medium align-top">{metric}</td>
+                                <td className="px-3 py-3 align-top">
+                                  <div className="text-[color:var(--color-text)]">{flipVal}</div>
+                                  {flipVerdict && <div className="mt-0.5 text-[10.5px]">{flipVerdict}</div>}
+                                </td>
+                                <td className="px-3 py-3 align-top">
+                                  <div className="text-[color:var(--color-text)]">{brrrrVal}</div>
+                                  {brrrrVerdict && <div className="mt-0.5 text-[10.5px]">{brrrrVerdict}</div>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )
                   })()}
