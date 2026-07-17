@@ -680,14 +680,12 @@ export default function ProjectDetailPage() {
         { value: 'rented',          label: '🏠 Rented'          },
         { value: 'ready_to_refi',   label: '📋 Ready to Refi'  },
         { value: 'refinanced',      label: '✓ Refinanced'       },
-        { value: 'sold',            label: '✓ Sold'             },
       ]
     : [
         { value: 'working_project', label: '🔨 In Renovation'  },
         { value: 'ready_to_list',   label: '✅ Ready to List'   },
         { value: 'listed',          label: '🏷 Listed for Sale' },
         { value: 'under_contract',  label: '📝 Under Contract'  },
-        { value: 'flip_sold',       label: '✓ Sold'             },
       ]
 
   const handleStatusChange = async (newStatus) => {
