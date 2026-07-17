@@ -554,6 +554,7 @@ export default function ProjectDetailPage() {
   const [hmlFeesOpen, setHmlFeesOpen] = useState(false)
   const [brrrScenarioOpen, setBrrrScenarioOpen] = useState(false)
   const [brrrArvOverride, setBrrrArvOverride] = useState(null) // null = use financials.expected_sell_price
+  const [flipScenarioOpen, setFlipScenarioOpen] = useState(false)
   const [markSoldOpen, setMarkSoldOpen] = useState(false)
   const [soldPrice, setSoldPrice]   = useState('')
   const [soldDate, setSoldDate]     = useState('')
@@ -662,11 +663,12 @@ export default function ProjectDetailPage() {
   const calc  = !isBRRRR && financials ? calcDeal(financials, calcItems) : null
   const bCalc = isBRRRR  && financials ? calcBRRRR(financials) : null
   // Plan B: always compute BRRRR scenario for flip deals too
-  // brrrArvOverride lets the user set a separate ARV for the refi calc (independent of flip ARV)
   const brrrFinancials = (!isBRRRR && financials && brrrArvOverride != null)
     ? { ...financials, expected_sell_price: brrrArvOverride }
     : financials
   const bCalcScenario = !isBRRRR && financials ? calcBRRRR(brrrFinancials) : null
+  // Plan B: always compute flip scenario for BRRRR deals too
+  const flipCalcForBRRRR = isBRRRR && financials ? calcDeal(financials, calcItems) : null
   const isSold   = lead.status === 'flip_sold' || lead.status === 'sold'
   const isRented = lead.status === 'rented'
 
@@ -2009,6 +2011,105 @@ export default function ProjectDetailPage() {
 
           </>
         )}
+
+        {/* ── Plan B: Flip Scenario (BRRRR deals only) ── */}
+        {isBRRRR && flipCalcForBRRRR && (() => {
+          const fc = flipCalcForBRRRR
+          const exp = fc.expected   // sell at ARV
+          const profit = exp?.netProfit ?? 0
+          const flipLabel = profit >= 40000 ? '✓ Strong Flip' : profit >= 25000 ? '✓ Decent Flip' : profit >= 10000 ? '⚠ Thin Margin' : '✗ Doesn\'t Work'
+          const flipCls   = profit >= 25000 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : profit >= 10000 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+          return (
+            <div className="mt-4 rounded-xl border-2 border-orange-300 dark:border-orange-700 bg-[color:var(--color-bg-elev)] overflow-hidden">
+              <button
+                onClick={() => setFlipScenarioOpen(p => !p)}
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-orange-500 text-[18px]">💰</span>
+                  <div className="text-left">
+                    <div className="text-[13px] font-bold text-[color:var(--color-text)]">Plan B: Flip Strategy</div>
+                    <div className="text-[11px] text-[color:var(--color-text-dim)]">What if you sell instead of refinancing? See flip profit at ARV.</div>
+                  </div>
+                  <span className={`ml-3 shrink-0 inline-flex items-center h-6 px-3 rounded-full text-[11px] font-bold ${flipCls}`}>{flipLabel}</span>
+                </div>
+                <span className="text-[color:var(--color-text-dim)] text-[13px] ml-4">{flipScenarioOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {flipScenarioOpen && (
+                <div className="border-t border-orange-200 dark:border-orange-800 px-5 pt-5 pb-6 space-y-4">
+
+                  {/* Key numbers grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Sell Price (ARV)',  value: fmtUSD(exp?.sellPrice),    color: '' },
+                      { label: 'Selling Costs',     value: fmtUSD(exp?.sellingCosts), color: 'text-[color:var(--color-danger-text)]' },
+                      { label: 'Total All-In Cost', value: fmtUSD(fc.totalAllInCost), color: 'text-[color:var(--color-danger-text)]' },
+                      { label: 'Net Profit',        value: fmtUSD(profit),            color: profit >= 25000 ? 'text-[color:var(--color-success-text)]' : profit >= 10000 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-danger-text)]' },
+                      { label: 'Cash In Bank',      value: fmtUSD(exp?.cashInBank),   color: 'text-[color:var(--color-success-text)]', tip: 'Proceeds after paying off HML and selling costs' },
+                      { label: 'ROI',               value: exp?.roi != null ? (exp.roi * 100).toFixed(0) + '%' : '—', color: '' },
+                      { label: 'Cash Invested',     value: fmtUSD(fc.totalCashInvested), color: '' },
+                      { label: 'Deal Rating',       value: fc.dealRating?.split(' - ')[0] ?? '—', color: '' },
+                    ].map(({ label, value, color, tip }) => (
+                      <div key={label} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] px-3 py-2.5">
+                        <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1 flex items-center gap-1">
+                          {label}
+                          {tip && <span title={tip} className="cursor-help opacity-50 hover:opacity-100 normal-case tracking-normal">ⓘ</span>}
+                        </div>
+                        <div className={`text-[15px] font-bold ${color || 'text-[color:var(--color-text)]'}`}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Cost breakdown */}
+                  <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] px-4 py-3 space-y-1">
+                    <div className="text-[10px] uppercase tracking-wider font-semibold text-orange-500 dark:text-orange-400 mb-2">Profit Breakdown</div>
+                    {[
+                      { label: 'Sell Price',         value: fmtUSD(exp?.sellPrice) },
+                      { label: '− Selling Costs (' + (fc.sellingCostPct * 100).toFixed(0) + '%)', value: '− ' + fmtUSD(exp?.sellingCosts) },
+                      { label: '− Purchase Price',   value: '− ' + fmtUSD(financials.purchase_price_actual) },
+                      { label: '− Renovation',       value: '− ' + fmtUSD(fc.totalRenovationCost) },
+                      { label: '− HML Closing Fees', value: '− ' + fmtUSD(fc.hmlClosingCosts) },
+                      { label: '− Purchase Closing', value: '− ' + fmtUSD(fc.purchaseClosing) },
+                      { label: '− Interest + Hold (' + Math.round(fc.holdMonths) + 'mo)', value: '− ' + fmtUSD(fc.totalHoldingCosts) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between text-[11.5px]">
+                        <span className="text-[color:var(--color-text-dim)]">{label}</span>
+                        <span className="text-[color:var(--color-text-muted)] tabular-nums">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-[12px] font-bold border-t border-[color:var(--color-line)] pt-2 mt-1">
+                      <span className="text-[color:var(--color-text)]">= Net Profit</span>
+                      <span className={profit >= 25000 ? 'text-[color:var(--color-success-text)]' : profit >= 10000 ? 'text-orange-600 dark:text-orange-400' : 'text-[color:var(--color-danger-text)]'}>{fmtUSD(profit)}</span>
+                    </div>
+                  </div>
+
+                  {/* vs BRRRR comparison */}
+                  {bCalc && (
+                    <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg)] px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-orange-500 dark:text-orange-400 mb-2">Flip vs BRRRR Comparison</div>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                        {[
+                          { label: 'Cash in hand now',   flip: fmtUSD(exp?.cashInBank),        brrrr: fmtUSD(bCalc.refiCashOut) + ' at refi' },
+                          { label: 'Ongoing cost',       flip: 'None — deal closed',            brrrr: fmtUSD(bCalc.monthlyCashFlow) + '/mo CF' },
+                          { label: 'Equity locked in',   flip: 'None',                          brrrr: fmtUSD(bCalc.equityAtRefi) },
+                          { label: 'Capital freed',      flip: 'All — full exit',               brrrr: fmtUSD(bCalc.refiCashOut) + ' (' + Math.round((bCalc.cashRecapturedPct ?? 0) * 100) + '%)' },
+                        ].map(({ label, flip, brrrr }) => (
+                          <div key={label} className="contents text-[11px]">
+                            <div className="col-span-2 text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mt-2 first:mt-0">{label}</div>
+                            <div className="flex gap-1"><span className="text-orange-500">Flip:</span><span className="text-[color:var(--color-text-muted)]">{flip}</span></div>
+                            <div className="flex gap-1"><span className="text-blue-500">BRRRR:</span><span className="text-[color:var(--color-text-muted)]">{brrrr}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* ── AI Investor Analysis (BRRRR only) ── */}
         {isBRRRR && (
