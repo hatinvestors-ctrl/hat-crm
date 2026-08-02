@@ -4,15 +4,6 @@ import Input from '../ui/Input'
 import Button from '../ui/Button'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 
-// Action playbooks: keyed by current status.
-// Each playbook has:
-//   hint: 1-line suggested next step shown above the buttons
-//   actions: 1-4 action buttons. Each action has:
-//     label, emoji, variant ('primary'|'success'|'danger'|'secondary'|'ghost'),
-//     and either:
-//       patch: object to merge into the UPDATE payload
-//       OR
-//       requiresDate: 'follow_up_date'|'contract_signed_date' (opens a date prompt)
 const PLAYBOOKS = {
   triage: {
     hint: 'Auto-imported lead — decide whether to bring it into the pipeline.',
@@ -23,7 +14,7 @@ const PLAYBOOKS = {
     ],
   },
   new_lead: {
-    hint: 'Calculate MAO or schedule a follow-up call.',
+    hint: 'Enter renovation cost in Financials, then run AI Analysis to get MAO and a starting offer.',
     actions: [
       { label: 'Calculate MAO',         emoji: '🧮', variant: 'primary',   patch: { status: 'mao_calculated' } },
       { label: 'Schedule Follow-Up',    emoji: '📅', variant: 'secondary', patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
@@ -114,7 +105,6 @@ const PLAYBOOKS = {
   },
 }
 
-// Default playbook for statuses without an explicit one
 const DEFAULT_PLAYBOOK = {
   hint: 'Use the status grid below to move this lead forward.',
   actions: [
@@ -122,17 +112,105 @@ const DEFAULT_PLAYBOOK = {
   ],
 }
 
+const fmtK  = (n) => n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${Math.round(n)}`
+const fmtFull = (n) => `$${Math.round(n).toLocaleString()}`
+
+function computeProfit(lead) {
+  const arv  = Number(lead.arv || 0)
+  const reno = Number(lead.renovation_cost || 0)
+  const mao  = Number(lead.mao || 0)
+  const pp   = mao || Number(lead.asking_price || 0)
+  if (!arv || !pp) return null
+  const hml         = pp * 0.9 + reno
+  const cashToClose = pp * 0.10 + hml * 0.02 + 2450
+  const holding     = (hml * 0.01 + 208 + 100) * 3
+  return Math.round(arv * 0.93 - hml - holding - cashToClose)
+}
+
+// Determine accent color based on deal state
+function accentColor(lead) {
+  const verdict = lead.deal_analysis?.verdict
+  if (verdict === 'BUY') return 'green'
+  const gap = Number(lead.asking_price || 0) - Number(lead.mao || 0)
+  if (verdict === 'REJECT' || gap > 20000) return 'red'
+  if (verdict === 'CONDITIONAL' || (gap > 0 && gap <= 20000)) return 'amber'
+  return 'blue'
+}
+
+const ACCENT = {
+  green: { border: 'border-l-green-500',  bg: 'bg-green-500/5',  badge: 'bg-green-500/15 text-green-400 border-green-500/30' },
+  amber: { border: 'border-l-amber-500',  bg: 'bg-amber-500/5',  badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  red:   { border: 'border-l-red-500',    bg: 'bg-red-500/5',    badge: 'bg-red-500/15   text-red-400   border-red-500/30'   },
+  blue:  { border: 'border-l-blue-500',   bg: 'bg-blue-500/5',   badge: 'bg-blue-500/15  text-blue-400  border-blue-500/30'  },
+}
+
+function smartActions(lead, staticActions) {
+  if (lead.status !== 'new_lead') return staticActions
+
+  const hasArv      = !!lead.arv
+  const hasReno     = !!lead.renovation_cost
+  const hasAnalysis = !!lead.deal_analysis?.verdict
+  const gap         = Number(lead.asking_price || 0) - Number(lead.mao || 0)
+
+  // After analysis: primary action depends on gap
+  if (hasAnalysis && hasArv && hasReno) {
+    if (gap <= 0) {
+      return [
+        { label: 'Draft Offer',         emoji: '📝', variant: 'primary',   patch: { status: 'mao_calculated' } },
+        { label: 'Schedule Follow-Up',  emoji: '📅', variant: 'secondary', patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
+        { label: 'Not In Buy Box',      emoji: '📦', variant: 'ghost',     patch: { status: 'not_in_buy_box' } },
+        { label: 'Dismiss',             emoji: '✗',  variant: 'ghost',     patch: { status: 'dead_lead' } },
+      ]
+    }
+    return [
+      { label: 'Schedule Follow-Up',   emoji: '📅', variant: 'primary',   patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
+      { label: 'Start Negotiating',    emoji: '🤝', variant: 'secondary', patch: { status: 'negotiating' } },
+      { label: 'Not In Buy Box',       emoji: '📦', variant: 'ghost',     patch: { status: 'not_in_buy_box' } },
+      { label: 'Dismiss',              emoji: '✗',  variant: 'ghost',     patch: { status: 'dead_lead' } },
+    ]
+  }
+
+  return staticActions
+}
+
+function smartHint(lead, staticHint) {
+  if (lead.status !== 'new_lead') return staticHint
+  const hasArv      = !!lead.arv
+  const hasReno     = !!lead.renovation_cost
+  const hasAnalysis = !!lead.deal_analysis?.verdict
+
+  if (!hasArv && !hasReno) return 'Start by entering the ARV and renovation cost — those two numbers drive everything.'
+  if (!hasArv)             return 'Enter the After-Repair Value (ARV) so we can calculate MAO and check if this deal works.'
+  if (!hasReno)            return 'Add the estimated renovation cost, then run AI Analysis to get your MAO and starting offer.'
+  if (!hasAnalysis)        return "Numbers look ready — run AI Analysis to get the verdict, MAO, and Kevin's take on this deal."
+  const gap = Number(lead.asking_price || 0) - Number(lead.mao || 0)
+  if (gap > 0) return `Seller is ${fmtFull(gap)} above MAO. Decide: negotiate, schedule a follow-up, or move on.`
+  return 'Numbers check out — ready to draft an offer or schedule a follow-up call with the seller.'
+}
+
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
 export default function ActionZone({ lead, userId, members, canEdit, onUpdated }) {
   const update = useLeadUpdate(lead, userId, members, onUpdated)
-  const [dateModal, setDateModal] = useState(null) // { action }
+  const [dateModal, setDateModal] = useState(null)
   const [dateValue, setDateValue] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]       = useState(false)
 
   if (!canEdit) return null
 
   const playbook = PLAYBOOKS[lead.status] || DEFAULT_PLAYBOOK
+  const hint     = smartHint(lead, playbook.hint)
+  const actions  = smartActions(lead, playbook.actions)
+  const color    = accentColor(lead)
+  const accent   = ACCENT[color]
+  const verdict  = lead.deal_analysis?.verdict
+  const profit   = computeProfit(lead)
+
+  const arv    = Number(lead.arv || 0)
+  const reno   = Number(lead.renovation_cost || 0)
+  const mao    = Number(lead.mao || 0)
+  const asking = Number(lead.asking_price || 0)
+  const gap    = mao && asking ? asking - mao : null
 
   const runAction = async (action) => {
     if (action.requiresDate) {
@@ -143,11 +221,7 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
       return
     }
     setSaving(true)
-    try {
-      await update(action.patch)
-    } finally {
-      setSaving(false)
-    }
+    try { await update(action.patch) } finally { setSaving(false) }
   }
 
   const commitDate = async () => {
@@ -156,26 +230,70 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
     try {
       await update({ ...dateModal.action.patch, [dateModal.action.requiresDate]: dateValue })
       setDateModal(null)
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   return (
-    <div className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg p-4">
-      <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
-        <div>
-          <div className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">
-            What now?
-          </div>
-          <p className="text-[13px] text-[color:var(--color-text)] mt-0.5 leading-relaxed">
-            {playbook.hint}
-          </p>
-        </div>
+    <div className={`${accent.bg} border border-[color:var(--color-line)] border-l-4 ${accent.border} rounded-lg p-4`}>
+
+      {/* Header row: label + verdict badge */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">
+          What now?
+        </span>
+        {verdict && (
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${accent.badge}`}>
+            {verdict === 'BUY' ? '✓ BUY' : verdict === 'REJECT' ? '✗ REJECT' : '~ CONDITIONAL'}
+          </span>
+        )}
       </div>
 
+      {/* Deal snapshot — key numbers at a glance */}
+      {(arv || reno || mao || profit != null) && (
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-3 pb-3 border-b border-[color:var(--color-line)]">
+          {arv > 0 && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">ARV</span>
+              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(arv)}</span>
+            </div>
+          )}
+          {reno > 0 && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Reno</span>
+              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(reno)}</span>
+            </div>
+          )}
+          {mao > 0 && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">MAO</span>
+              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(mao)}</span>
+            </div>
+          )}
+          {gap !== null && gap > 0 && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Gap to drop</span>
+              <span className="text-[13px] font-semibold text-orange-400">{fmtK(gap)}</span>
+            </div>
+          )}
+          {profit != null && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Est. Profit</span>
+              <span className={`text-[13px] font-semibold ${profit >= 30000 ? 'text-green-400' : profit >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {profit >= 0 ? fmtK(profit) : `-${fmtK(Math.abs(profit))}`}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action hint — the key message, bigger and bolder */}
+      <p className="text-[14px] font-medium text-[color:var(--color-text)] mb-4 leading-snug">
+        {hint}
+      </p>
+
+      {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
-        {playbook.actions.map((action, idx) => (
+        {actions.map((action, idx) => (
           <Button
             key={idx}
             variant={action.variant}
@@ -202,16 +320,14 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
         }
       >
         {dateModal && (
-          <>
-            <Input
-              label={dateModal.action.requiresDate === 'contract_signed_date' ? 'When was the contract signed?' : 'When should you follow up?'}
-              type="date"
-              value={dateValue}
-              onChange={e => setDateValue(e.target.value)}
-              required
-              autoFocus
-            />
-          </>
+          <Input
+            label={dateModal.action.requiresDate === 'contract_signed_date' ? 'When was the contract signed?' : 'When should you follow up?'}
+            type="date"
+            value={dateValue}
+            onChange={e => setDateValue(e.target.value)}
+            required
+            autoFocus
+          />
         )}
       </Modal>
     </div>

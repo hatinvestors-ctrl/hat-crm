@@ -24,6 +24,7 @@ export default function ReportSection({ lead }) {
   const [generating, setGenerating] = useState(false)
   const [error,      setError]      = useState(null)
   const [copied,     setCopied]     = useState(false)
+  const [collapsed,  setCollapsed]  = useState(true)
 
   const hasReport = !!reportText
 
@@ -82,7 +83,23 @@ export default function ReportSection({ lead }) {
   }
 
   return (
-    <Card title="📄 Generate Report">
+    <Card
+      title="Generate Report"
+      subtitle="Lender · Agent · Seller — AI-drafted emails & PDFs"
+      action={
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="flex items-center justify-center w-6 h-6 rounded text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)] transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            className="w-3.5 h-3.5 transition-transform duration-200"
+            style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      }
+    >
+    {collapsed ? null : (<>
       {/* Recipient type tabs */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {TYPES.map(t => (
@@ -184,6 +201,7 @@ export default function ReportSection({ lead }) {
           </div>
         </div>
       )}
+    </>)}
     </Card>
   )
 }

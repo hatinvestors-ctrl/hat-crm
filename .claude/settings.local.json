@@ -19,7 +19,8 @@
       "Bash(git config *)",
       "Bash(git ls-tree *)",
       "Bash(git submodule *)",
-      "Bash(curl -s \"https://api.netlify.com/api/v1/sites/hat-crm.netlify.app/deploys\")"
+      "Bash(curl -s \"https://api.netlify.com/api/v1/sites/hat-crm.netlify.app/deploys\")",
+      "PowerShell(cd \"c:\\\\Users\\\\tomer\\\\Documents\\\\PrivateNew180425\\\\CloudeCode\\\\HatCRM\"; npx vite build 2>&1 | Select-Object -Last 4; $env:NETLIFY_AUTH_TOKEN=\"nfc_p2LdveCstNcaTRkzzzZ2QBiwvBZ3E8hW1352\"; $env:NETLIFY_SITE_ID=\"16abd856-a8b6-4736-a2a4-e8913ebfc8e8\"; npx netlify deploy --prod --dir dist --functions netlify/functions --skip-functions-cache 2>&1 | Select-Object -Last 8)"
     ]
   }
 }

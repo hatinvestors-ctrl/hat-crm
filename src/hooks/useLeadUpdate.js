@@ -7,8 +7,12 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
   return async function update(patch) {
     const next = { ...lead, ...patch }
 
-    // Auto-recalc MAO if ARV or renovation_cost changed and user didn't manually set MAO
-    if ('mao' in patch === false && ('arv' in patch || 'renovation_cost' in patch)) {
+    // Auto-recalc MAO if ARV or renovation_cost changed and user didn't manually set MAO.
+    // Exception: auto-imported leads (Redfin etc.) before their first AI analysis — their ARV is
+    // unvalidated until comps run, so we don't want a premature MAO showing. MAO gets set by the
+    // AI analysis (AINotesSection) once comps confirm the ARV.
+    const isPreAnalysisAutoImport = lead.auto_imported && !lead.deal_analysis
+    if ('mao' in patch === false && ('arv' in patch || 'renovation_cost' in patch) && !isPreAnalysisAutoImport) {
       const mao = calculateMAO(next.arv, next.renovation_cost)
       if (mao !== null) patch.mao = mao
     }

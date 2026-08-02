@@ -11,14 +11,15 @@ function calcBRRRR(pp, arv, reno, rent, bedrooms) {
   const hml         = pp * 0.90 + reno
   const hmlPoints   = hml * 0.02
   const hmlFees     = 1500
-  const hmlInterest = hml * 0.12 * (5.5 / 12)
+  const holdMo      = 6
+  const hmlInterest = hml * 0.12 * (holdMo / 12)
   const hmlCosts    = hmlPoints + hmlFees + hmlInterest
   const allIn       = pp + reno + hmlCosts
   const refi        = arv * 0.70
   const cashLeftIn  = allIn - refi
   const rentEst     = rent || (bedrooms >= 4 ? 2000 : bedrooms === 3 ? 1600 : 1300)
-  const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607)
-  const cashflow    = rentEst - loanFactor - 208 - 100
+  const loanFactor  = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1313 : refi <= 220000 ? 1445 : Math.round(refi * 0.006566)
+  const cashflow    = rentEst - loanFactor - 208 - 136
   const status      = cashLeftIn < 30000 ? 'EXCELLENT' : cashLeftIn < 60000 ? 'ACCEPTABLE' : 'FAILS'
   return { hml, hmlCosts, allIn, refi, cashLeftIn, loanFactor, cashflow, rentEst, status, works: cashLeftIn < 60000 && cashflow > 0 }
 }
@@ -33,8 +34,8 @@ function calcFlip(pp, arv, reno) {
 }
 
 export default function WhatIfPanel({ lead }) {
-  const [arvAdj,  setArvAdj]  = useState(0)   // percent: -20 to +20
-  const [renoAdj, setRenoAdj] = useState(0)   // percent: -30 to +50
+  const [arvAdj,  setArvAdj]  = useState(0)   // percent: -30 to +30
+  const [renoAdj, setRenoAdj] = useState(0)   // percent: -50 to +100
   const [open,    setOpen]    = useState(false)
 
   const pp   = Number(lead.asking_price) || null
@@ -86,13 +87,13 @@ export default function WhatIfPanel({ lead }) {
                     <span className="text-[10.5px] text-[color:var(--color-text-dim)]">→ {fmtK(adjArv)}</span>
                   </div>
                 </div>
-                <input type="range" min="-20" max="20" step="5" value={arvAdj}
+                <input type="range" min="-30" max="30" step="1" value={arvAdj}
                   onChange={e => setArvAdj(Number(e.target.value))}
                   className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
                   style={{ accentColor: 'var(--color-accent)' }}
                 />
                 <div className="flex justify-between text-[9px] text-[color:var(--color-text-dim)] mt-0.5 px-0.5">
-                  <span>−20%</span><span>0</span><span>+20%</span>
+                  <span>−30%</span><span>−15%</span><span>0</span><span>+15%</span><span>+30%</span>
                 </div>
               </div>
             )}
@@ -107,13 +108,13 @@ export default function WhatIfPanel({ lead }) {
                     <span className="text-[10.5px] text-[color:var(--color-text-dim)]">→ {fmtK(adjReno)}</span>
                   </div>
                 </div>
-                <input type="range" min="-30" max="50" step="5" value={renoAdj}
+                <input type="range" min="-50" max="100" step="1" value={renoAdj}
                   onChange={e => setRenoAdj(Number(e.target.value))}
                   className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
                   style={{ accentColor: 'var(--color-accent)' }}
                 />
                 <div className="flex justify-between text-[9px] text-[color:var(--color-text-dim)] mt-0.5 px-0.5">
-                  <span>−30%</span><span>0</span><span>+50%</span>
+                  <span>−50%</span><span>−25%</span><span>0</span><span>+50%</span><span>+100%</span>
                 </div>
               </div>
             )}

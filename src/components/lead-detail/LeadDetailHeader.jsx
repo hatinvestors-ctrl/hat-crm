@@ -113,13 +113,10 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
             href={zillowUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)] hover:brightness-110 transition"
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] hover:border-[color:var(--color-accent)] transition"
             title="Open this property on Zillow"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-            Zillow
+            Zillow ↗
           </a>
         )}
         {canEdit && <Button variant="secondary" size="sm" onClick={onEdit}>Edit lead</Button>}

@@ -17,13 +17,17 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor providing ARV comp analysis for HAT Investors.
+const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor providing ARV and rental comp analysis for HAT Investors.
 
 JAX ARV benchmarks (fully renovated 3/2):
 32208/32219: $160–240K | 32210/32244/32221: $220–320K | 32205/32216: $230–380K | 32211: $155–200K | Clay Co: $200–300K
 Adjustments: 2BR −$20K | 4BR +$15K | 1BA only −$20K | <1,000sqft −$15K | CBS/brick +$7K
 
-Write EXACTLY these sections. No intro. Start with the first ===== line.
+JAX Rental benchmarks (renovated):
+32208/32219: 3/2 $1,350–$1,550 | 32210/32244: 3/2 $1,450–$1,700 | 32205/32216: 3/2 $1,600–$2,000 | 32211: 3/2 $1,300–$1,500
+Adjustments: 1BA only −$150/mo | 4BR +$200/mo | <1,000sqft −$100/mo
+
+Write EXACTLY these sections in order. No intro. Start with the first ===== line.
 Include CRM COMPS USED only if historical CRM deals were provided — omit entirely if none.
 
 =====================================
@@ -37,6 +41,21 @@ Why relevant: [1 sentence]
 COMP: [street or area, ZIP] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe] | [condition]
 Why relevant: [1 sentence]
 ARV Conclusion: [1–2 sentences — how comps land on the ARV used, what pushes it higher or lower]
+
+=====================================
+RENTAL COMPS
+=====================================
+Conservative Rent: $[X]/mo — [1 line: low end basis, e.g. 1BA discount, below-avg condition]
+Realistic Rent:    $[X]/mo — [1 line: most likely rent for this bed/bath/ZIP post-reno]
+Optimistic Rent:   $[X]/mo — [1 line: upside if fully updated, premium finishes]
+RENTAL: [area description], ZIP [X] | [BR/BA] | [sqft] sqft | $[X]/mo | [condition/note]
+RENTAL: [area description], ZIP [X] | [BR/BA] | [sqft] sqft | $[X]/mo | [condition/note]
+1% Rule (rent ÷ all-in cost = purchase+reno, NOT purchase alone): [X]% at ask all-in | [X]% at MAO all-in
+Rent Verdict: [STRONG / MEETS THRESHOLD / BELOW THRESHOLD] — [1 sentence on whether rent validates BRRRR strategy]
+Cash Flow Range (use pre-computed mortgage from prompt):
+At conservative rent: ~$[X]/mo net
+At realistic rent:    ~$[X]/mo net
+At optimistic rent:   ~$[X]/mo net
 
 =====================================
 CRM COMPS USED
@@ -124,10 +143,40 @@ export default async (req) => {
   const comps = await fetchComps(lead)
   const compsBlock = buildCompsBlock(comps, lead)
 
-  const userPrompt = `Property: ${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(lead.asking_price)} | Our ARV: ${fmt(lead.arv)} | Reno: ${fmt(lead.renovation_cost)} | MAO: ${fmt(lead.mao)}${compsBlock}
+  // Pre-compute rental cash flow for AI to use (avoids AI math errors)
+  const pp   = lead.asking_price ? Number(lead.asking_price) : null
+  const arv  = lead.arv ? Number(lead.arv) : null
+  const mao  = lead.mao ? Number(lead.mao) : null
+  const refi = arv ? Math.round(arv * 0.70) : null
+  const loanFactor = refi
+    ? (refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1314 : refi <= 220000 ? 1445 : Math.round(refi * 0.006607))
+    : null
+  const fixedCosts = 208 + 100  // insurance + vacancy approx
+  const cfBase = loanFactor ? -(loanFactor + fixedCosts) : null  // rent - this = net cash flow
 
-Write the MARKET COMPS section (and CRM COMPS USED if historical data was provided above).`
+  const reno    = lead.renovation_cost ? Number(lead.renovation_cost) : null
+  const allInPP = pp && reno ? pp + reno : null  // total investment before refi
+  const allInMAO = mao && reno ? mao + reno : null
+
+  // 1% rule: CORRECT calculation is rent / total-all-in (purchase + reno), NOT just purchase price
+  // Using purchase-price-only overstates the yield on value-add deals
+  const oneRuleAsk = (pp && allInPP) ? ((1600 / allInPP) * 100).toFixed(2) : null  // placeholder, AI fills actual rent
+  const oneRuleMAO = (mao && allInMAO) ? ((1600 / allInMAO) * 100).toFixed(2) : null
+
+  const rentalMathBlock = (refi && loanFactor) ? `
+Pre-computed BRRRR mortgage (use for Cash Flow Range — do not recalculate):
+Refi at 70% ARV: ${fmt(refi)} | Monthly payment: $${loanFactor}/mo | Fixed costs (insurance+mgmt): $${fixedCosts}/mo
+Net cash flow = Monthly rent − $${loanFactor + fixedCosts}/mo
+
+1% Rule — CRITICAL: calculate as rent / (purchase + reno), NOT rent / purchase alone. Reno is real capital deployed.
+All-in at ask: ${fmt(pp)} ask + ${fmt(reno)} reno = ${fmt(allInPP)} total → 1% threshold rent = ${allInPP ? '$' + Math.round(allInPP * 0.01).toLocaleString() : '?'}/mo
+All-in at MAO: ${fmt(mao)} MAO + ${fmt(reno)} reno = ${fmt(allInMAO)} total → 1% threshold rent = ${allInMAO ? '$' + Math.round(allInMAO * 0.01).toLocaleString() : '?'}/mo
+Use realistic rent estimate to compute actual 1% rule result for both scenarios.` : ''
+
+  const userPrompt = `Property: ${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
+Ask: ${fmt(pp)} | Our ARV: ${fmt(arv)} | Reno: ${fmt(lead.renovation_cost)} | MAO: ${fmt(mao)}${rentalMathBlock}${compsBlock}
+
+Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS USED if historical data was provided above.`
 
   const abortCtrl = new AbortController()
   const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
@@ -140,7 +189,8 @@ Write the MARKET COMPS section (and CRM COMPS USED if historical data was provid
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1100,
+          max_tokens: 1600,
+          temperature: 0,
           system: SYSTEM_PROMPT,
           messages: [
             { role: 'user',      content: userPrompt },

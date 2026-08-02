@@ -14,6 +14,11 @@ function newDeal(overrides = {}) {
     address: '',
     askingPrice: '',
     renovationCost: '',
+    daysOnMarket: '',
+    priceDrop: '',      // % price drop from original list price
+    rentEstimate: '',   // user-editable rent override
+    aiRent: null,       // estimated rent based on bedrooms (set after analysis)
+    sellerNotes: '',    // motivation context: estate, as-is, tired landlord, etc.
     arv: '',            // user-editable ARV override (empty = let AI decide)
     aiCompsArv: null,   // ARV extracted from AI comps (read-only badge)
     lastAnalyzedArv: null, // ARV used in the most recent core analysis run
@@ -36,17 +41,38 @@ function newDeal(overrides = {}) {
 }
 
 function parseScore(notes) {
-  const m = notes?.match(/Total:\s*(\d+)\/100/)
+  if (!notes) return null
+  const lines = notes.split('\n')
+  const get = key => {
+    const line = lines.find(l => new RegExp(`^[-•*\\s]*${key}:`, 'i').test(l.trim()))
+    return line?.replace(new RegExp(`^[-•*\\s]*${key}:\\s*`, 'i'), '').trim()
+  }
+  const SUB_SCORES = ['Deal Return', 'Price Gap', 'Seller Signals', 'Market & Exit', 'Cash Flow', 'Data Quality']
+  const vals = SUB_SCORES.map(k => {
+    const raw = get(k)
+    const m = raw?.match(/^(\d+)\/\d+/)
+    return m ? parseInt(m[1]) : null
+  })
+  if (vals.every(v => v != null)) return vals.reduce((s, v) => s + v, 0)
+  const m = notes.match(/Total:\s*(\d+)\/100/)
   return m ? parseInt(m[1]) : null
 }
 
 function parseVerdict(notes) {
+  const score = parseScore(notes)
+  if (score != null) {
+    if (score >= 65) return 'MAKE OFFER'
+    if (score >= 45) return 'NEGOTIATE'
+    if (score >= 30) return 'LONG SHOT'
+    if (score >= 15) return 'WATCH'
+    return 'DEAD LEAD'
+  }
   const m = notes?.match(/Verdict:\s*(BUY NOW|MAKE OFFER|OFFER & NEGOTIATE|NEGOTIATE|LONG SHOT|WATCH|DEAD LEAD)/i)
   return m ? m[1] : null
 }
 
 function parseMao(notes) {
-  const m = notes?.match(/Target Price:\s*\$([0-9,]+)/i)
+  const m = notes?.match(/Our MAO:\s*\$([0-9,]+)/i)
   return m ? parseInt(m[1].replace(/,/g, '')) : null
 }
 
@@ -179,9 +205,11 @@ export default function ScreenerPage() {
       conservative_arv: null,
       aggressive_arv:   null,
       renovation_cost:  deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+      days_on_market:   deal.daysOnMarket   ? parseInt(String(deal.daysOnMarket).replace(/[^0-9]/g, ''))     || null : null,
+      rent_estimate:    deal.rentEstimate   ? parseFloat(String(deal.rentEstimate).replace(/[^0-9.]/g, ''))  || null : null,
+      price_drop_pct:   deal.priceDrop      ? parseFloat(String(deal.priceDrop).replace(/[^0-9.]/g, ''))    || null : null,
       mao:              null,
-      rent_estimate:    null,
-      notes:            '',
+      notes:            deal.sellerNotes || '',
     }
 
     updateDeal(dealId, { status: 'analyzing', enriched })
@@ -196,6 +224,8 @@ export default function ScreenerPage() {
       const leadWithArv = arvForCore ? { ...lead, arv: arvForCore } : lead
       const coreNotes = await postFn('generate-core-analysis', { lead: leadWithArv }).catch(e => { throw e })
 
+      const beds = enriched?.bedrooms
+      const aiRent = beds >= 4 ? 2000 : beds === 3 ? 1600 : 1300
       updateDeal(dealId, {
         status: 'done',
         coreNotes,
@@ -203,9 +233,11 @@ export default function ScreenerPage() {
         score:           parseScore(coreNotes),
         verdict:         parseVerdict(coreNotes),
         mao:             parseMao(coreNotes),
-        aiCompsArv:      compsArv,
-        arv:             userArv || compsArv || parseArv(coreNotes) || '',
+        aiCompsArv:      compsArv || parseArv(coreNotes) || null,
+        arv:             userArv || '',  // never auto-fill from AI — user field only
         lastAnalyzedArv: arvForCore || parseArv(coreNotes),
+        aiRent,
+        rentEstimate:    deal.rentEstimate || '',
         error: null,
       })
     } catch (e) {
@@ -218,8 +250,10 @@ export default function ScreenerPage() {
     const deal = deals.find(d => d.id === selectedId)
     if (!deal?.coreNotes) return
     const dealId = deal.id
-    const arvOverride = parseFloat(String(deal.arv).replace(/[^0-9.]/g, ''))
-    if (!arvOverride) return
+    // ARV priority: user-typed field → AI comps ARV → ARV from last run
+    const userArv = deal.arv ? parseFloat(String(deal.arv).replace(/[^0-9.]/g, '')) || null : null
+    const effectiveArv = userArv || deal.aiCompsArv || deal.lastAnalyzedArv || null
+    if (!effectiveArv) return
 
     updateDeal(dealId, { status: 'analyzing', error: null })
 
@@ -233,9 +267,12 @@ export default function ScreenerPage() {
       bathrooms:     deal.enriched?.bathrooms || null,
       sqft:          deal.enriched?.sqft      || null,
       asking_price:  asking,
-      arv:           arvOverride,
+      arv:           effectiveArv,
       renovation_cost: deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
-      mao: null, rent_estimate: null, notes: '',
+      days_on_market:  deal.daysOnMarket   ? parseInt(String(deal.daysOnMarket).replace(/[^0-9]/g, ''))     || null : null,
+      rent_estimate:   deal.rentEstimate   ? parseFloat(String(deal.rentEstimate).replace(/[^0-9.]/g, ''))  || null : null,
+      price_drop_pct:  deal.priceDrop      ? parseFloat(String(deal.priceDrop).replace(/[^0-9.]/g, ''))    || null : null,
+      mao: null, notes: deal.sellerNotes || '',
     }
 
     try {
@@ -246,7 +283,7 @@ export default function ScreenerPage() {
         score:           parseScore(coreNotes),
         verdict:         parseVerdict(coreNotes),
         mao:             parseMao(coreNotes),
-        lastAnalyzedArv: arvOverride,
+        lastAnalyzedArv: effectiveArv,
         error: null,
       })
     } catch (e) {
@@ -270,10 +307,13 @@ export default function ScreenerPage() {
         bathrooms:            deal.enriched?.bathrooms     || null,
         sqft:                 deal.enriched?.sqft          || null,
         asking_price:         asking,
-        arv:                  null,
-        renovation_cost:      null,
+        arv:                  deal.arv   ? parseFloat(String(deal.arv).replace(/[^0-9.]/g, ''))           || null : null,
+        renovation_cost:      deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+        days_on_market:       deal.daysOnMarket   ? parseInt(String(deal.daysOnMarket).replace(/[^0-9]/g, ''))     || null : null,
+        rent_estimate:        deal.rentEstimate   ? parseFloat(String(deal.rentEstimate).replace(/[^0-9.]/g, ''))  || null : null,
+        price_drop_pct:       deal.priceDrop      ? parseFloat(String(deal.priceDrop).replace(/[^0-9.]/g, ''))    || null : null,
         mao:                  deal.mao,
-        notes:                '',
+        notes:                deal.sellerNotes || '',
         listing_agent_name:   deal.sourceName || '',
         sourceName:           deal.sourceName || '',
       }
@@ -370,6 +410,8 @@ export default function ScreenerPage() {
         arv:              deal.arv  || null,
         mao:              deal.mao  || null,
         renovation_cost:  deal.renovationCost ? parseFloat(String(deal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+        rent_estimate:    deal.rentEstimate   ? parseFloat(String(deal.rentEstimate).replace(/[^0-9.]/g, ''))  || null : null,
+        days_on_market:   deal.daysOnMarket   ? parseInt(String(deal.daysOnMarket).replace(/[^0-9]/g, ''))     || null : null,
         lead_source:      deal.sourceName ? 'wholesaler' : 'other',
         status:        'new_lead',
         screened:      true,
@@ -603,6 +645,40 @@ export default function ScreenerPage() {
                     className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
                   />
                 </div>
+                <div className="w-20">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">DOM</label>
+                  <input
+                    value={selectedDeal.daysOnMarket || ''}
+                    onChange={e => setField('daysOnMarket', e.target.value)}
+                    placeholder="days (opt)"
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
+                <div className="w-16">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Drop %</label>
+                  <input
+                    value={selectedDeal.priceDrop || ''}
+                    onChange={e => setField('priceDrop', e.target.value)}
+                    placeholder="0"
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
+                <div className="w-24">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">
+                    Rent/mo
+                    {selectedDeal.aiRent && !selectedDeal.rentEstimate && (
+                      <span className="ml-1 text-[color:var(--color-accent-text)] font-normal normal-case tracking-normal">
+                        · est: ${selectedDeal.aiRent.toLocaleString()}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    value={selectedDeal.rentEstimate}
+                    onChange={e => setField('rentEstimate', e.target.value)}
+                    placeholder={selectedDeal.aiRent ? `$${selectedDeal.aiRent.toLocaleString()}` : 'e.g. $1,400'}
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
                 <div className="w-28">
                   <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">
                     My ARV
@@ -637,6 +713,17 @@ export default function ScreenerPage() {
                     className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
                   />
                 </div>
+                <div className="w-full">
+                  <label className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">
+                    Seller Notes <span className="normal-case font-normal tracking-normal text-[color:var(--color-text-dim)]">— estate, as-is, motivated, price drop reason…</span>
+                  </label>
+                  <input
+                    value={selectedDeal.sellerNotes || ''}
+                    onChange={e => setField('sellerNotes', e.target.value)}
+                    placeholder="e.g. Estate sale, executor out of state, needs quick close"
+                    className="w-full h-8 px-2.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] text-[12.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
                 <button
                   onClick={analyze}
                   disabled={!selectedDeal.address || !selectedDeal.askingPrice || selectedDeal.status === 'enriching' || selectedDeal.status === 'analyzing'}
@@ -645,16 +732,19 @@ export default function ScreenerPage() {
                   {selectedDeal.status === 'enriching' ? 'Looking up…' :
                    selectedDeal.status === 'analyzing' ? 'Analyzing…' : 'Analyze'}
                 </button>
-                {selectedDeal.status === 'done' &&
-                 selectedDeal.arv &&
-                 parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g,'')) !== selectedDeal.lastAnalyzedArv && (
-                  <button
-                    onClick={reRunWithArv}
-                    className="h-8 px-3 rounded-md text-[12px] font-semibold border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)] transition-colors"
-                  >
-                    ↻ Re-run with ${Number(parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g,''))).toLocaleString()} ARV
-                  </button>
-                )}
+                {selectedDeal.status === 'done' && (() => {
+                  const userArv = selectedDeal.arv ? parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g,'')) || null : null
+                  const effectiveArv = userArv || selectedDeal.aiCompsArv || selectedDeal.lastAnalyzedArv || null
+                  const arvChanged = userArv && userArv !== selectedDeal.lastAnalyzedArv
+                  return arvChanged && effectiveArv ? (
+                    <button
+                      onClick={reRunWithArv}
+                      className="h-8 px-3 rounded-md text-[12px] font-semibold border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)] transition-colors"
+                    >
+                      ↻ Re-run with ${Number(effectiveArv).toLocaleString()} ARV
+                    </button>
+                  ) : null
+                })()}
               </div>
             )}
 
@@ -712,15 +802,19 @@ export default function ScreenerPage() {
             )}
             {/* Reno budget card — computed from AI-parsed ARV + MAO when user left reno blank */}
             {displayNotes && !selectedDeal?.renovationCost && selectedDeal?.arv && selectedDeal?.mao && (() => {
-              const arv = selectedDeal.arv
-              const mao = selectedDeal.mao
-              const maxBRRRR = Math.round(arv * 0.70 - mao * 1.085 - 30000)
-              const maxFlip  = Math.round(arv * 0.92 - mao - 25000)
+              const arv    = Number(selectedDeal.arv)
+              const mao    = Number(selectedDeal.mao)
+              const asking = parseFloat(String(selectedDeal.askingPrice || '0').replace(/[^0-9.]/g, '')) || mao
+              const pp     = Math.min(asking, mao)  // effective purchase price — never overpay above MAO
+              const refi_  = arv * 0.70
+              const maxBRRRR = Math.round((refi_ - 30000 - pp * 0.90 * 1.085 - 1500) / 2.085)
+              const maxFlip  = Math.round(arv * 0.92 - pp - 25000)
               const fmt = n => n > 0 ? `$${n.toLocaleString()}` : 'Deal too tight'
+              const ppLabel = pp < mao ? `Ask $${pp.toLocaleString()}` : `MAO $${mao.toLocaleString()}`
               return (
                 <div className="mb-3 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
                   <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
-                    <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">🔨 Max Reno to Make Deal Work at MAO (${mao.toLocaleString()})</span>
+                    <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">🔨 Max Reno to Make Deal Work at {ppLabel}</span>
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
                     <div className="px-3 py-2">
@@ -736,7 +830,12 @@ export default function ScreenerPage() {
               )
             })()}
             {displayNotes && (
-              <NotesRenderer notes={displayNotes} />
+              <NotesRenderer notes={displayNotes} lead={{
+                renovation_cost: selectedDeal?.renovationCost ? parseFloat(String(selectedDeal.renovationCost).replace(/[^0-9.]/g, '')) || null : null,
+                asking_price: parseFloat(String(selectedDeal?.askingPrice || '0').replace(/[^0-9.]/g, '')) || null,
+                arv: selectedDeal?.arv ? parseFloat(String(selectedDeal.arv).replace(/[^0-9.]/g, '')) || null : null,
+                id: null,
+              }} />
             )}
             {!displayNotes && !viewingSaved && selectedDeal?.status === 'idle' && !selectedDeal?.error && (
               <div className="text-center mt-12">

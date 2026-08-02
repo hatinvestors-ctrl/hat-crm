@@ -82,6 +82,27 @@ body {
 /* tabular numbers everywhere a class isn't applied (helps tables) */
 :where(table, .tabular-nums) { font-variant-numeric: tabular-nums; }
 
+/* ── Cursor — every interactive element shows pointer ── */
+a,
+button,
+[role="button"],
+[role="tab"],
+[role="checkbox"],
+[role="switch"],
+label[for],
+select,
+summary,
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
+/* ── Hover — interactive elements get a visible lift ── */
+a:not([aria-disabled]):hover,
+button:not(:disabled):hover {
+  opacity: 0.88;
+  transition: opacity 120ms ease;
+}
+
 /* ── Focus rings ── */
 :focus { outline: none; }
 :focus-visible {

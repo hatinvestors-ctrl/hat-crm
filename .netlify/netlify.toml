@@ -34,7 +34,22 @@ timeout = 120.0
 timeout = 120.0
 
 [functions.generate-ai-notes]
-timeout = 26.0
+timeout = 50.0
+
+[functions.generate-core-analysis]
+timeout = 30.0
+
+[functions.generate-comps]
+timeout = 30.0
+
+[functions.generate-negotiation-plan]
+timeout = 25.0
+
+[functions.generate-communications]
+timeout = 22.0
+
+[functions.ask-deal-question]
+timeout = 20.0
 
 [functions.process-agent-sequences]
 schedule = "0 13 * * *"

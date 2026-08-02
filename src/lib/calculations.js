@@ -1,11 +1,14 @@
 const num = (v) => (v === null || v === undefined || v === '' ? 0 : Number(v))
 
-// Simplified MAO: 75% of ARV minus renovation cost.
+// MAO: 75% × ARV − Renovation − $2,450 fixed closing costs
+// (title $1,600 + lender insurance $500 + doc stamps $200 + intangible $150)
+// This matches the formula used in generate-core-analysis.mjs so FinancialSection
+// and the AI Summary always show the same number.
 // Extra args kept for backwards compatibility but ignored.
 export function calculateMAO(arv, renovationCost /*, closingCosts, targetProfit */) {
   const a = num(arv)
   if (!a) return null
-  return a * 0.75 - num(renovationCost)
+  return a * 0.75 - num(renovationCost) - 2450
 }
 
 export function calculateFlipNetProceeds(arv) {

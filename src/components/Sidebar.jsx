@@ -32,6 +32,7 @@ const ICONS = {
     </svg>
   ),
   projects: <Icon d={<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>} />,
+  book: <Icon d={<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>} />,
 }
 
 const navItemClasses = ({ isActive }) =>
@@ -221,6 +222,18 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
         )}
       </nav>
 
+      {/* CRM Guide */}
+      <div className="px-2 pb-1">
+        <a
+          href="/crm-guide.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] font-medium text-[color:var(--color-accent-text)] bg-[color:var(--color-accent-soft)] hover:opacity-90 transition-opacity"
+        >
+          {ICONS.book}
+          CRM Guide
+        </a>
+      </div>
       {/* Deal Screener nav link */}
       {userRole !== 'readonly' && (
         <div className="px-2 pb-1">

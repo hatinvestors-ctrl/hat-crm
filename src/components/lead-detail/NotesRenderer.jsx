@@ -1,6 +1,38 @@
 import { createContext, useContext, useMemo, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 
 const MissingFieldsContext = createContext([])
+const NotesContext = createContext('')
+const LeadContext = createContext(null)
+
+// ─── Shared score computation (used by DealScoreSection + RecommendedActionSection) ─
+
+const SUB_SCORE_KEYS = ['Deal Return', 'Price Gap', 'Seller Signals', 'Market & Exit', 'Cash Flow', 'Data Quality']
+
+function computeScoreFromText(text) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const get = key => {
+    const line = lines.find(l => new RegExp(`^[-•*\\s]*${key}:`, 'i').test(l.trim()))
+    return line?.replace(new RegExp(`^[-•*\\s]*${key}:\\s*`, 'i'), '').trim()
+  }
+  const vals = SUB_SCORE_KEYS.map(k => {
+    const raw = get(k)
+    const m = raw?.match(/^(\d+)\/\d+/)
+    return m ? parseInt(m[1]) : null
+  })
+  if (vals.every(v => v != null)) return vals.reduce((s, v) => s + v, 0)
+  return null
+}
+
+function scoreToVerdict(score) {
+  if (score == null) return null
+  if (score >= 65) return 'MAKE OFFER'
+  if (score >= 45) return 'NEGOTIATE'
+  if (score >= 30) return 'LONG SHOT'
+  if (score >= 15) return 'WATCH'
+  return 'DEAD LEAD'
+}
 
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 
@@ -93,17 +125,13 @@ function DealScoreSection({ body }) {
     return line?.replace(new RegExp(`^[-•*\\s]*${prefix}:\\s*`, 'i'), '').trim()
   }
 
-  const totalRaw = get('Total')
-  const verdict  = get('Verdict')
-  const total    = totalRaw ? parseInt(totalRaw) : null
-
   const subScores = [
-    { key: 'Price Gap',          max: 20 },
-    { key: 'Deal Math',          max: 25 },
-    { key: 'Cash Flow',          max: 10 },
-    { key: 'ZIP Quality',        max: 15 },
-    { key: 'Seller Motivation',  max: 20 },
-    { key: 'ARV Confidence',     max: 10 },
+    { key: 'Deal Return',    max: 30 },
+    { key: 'Price Gap',      max: 20 },
+    { key: 'Seller Signals', max: 15 },
+    { key: 'Market & Exit',  max: 15 },
+    { key: 'Cash Flow',      max: 10 },
+    { key: 'Data Quality',   max: 10 },
   ].map(({ key, max }) => {
     const raw = get(key)
     if (!raw) return null
@@ -113,15 +141,28 @@ function DealScoreSection({ body }) {
     return { key, max, score, detail }
   }).filter(Boolean)
 
+  // Compute total from sub-scores (don't trust AI's stated total — it inflates)
+  const computedTotal = subScores.length > 0 && subScores.every(s => s.score != null)
+    ? subScores.reduce((sum, s) => sum + s.score, 0)
+    : null
+  const total = computedTotal
+
   const scoreColor = (n, max) => {
     const pct = n / max
     return pct >= 0.75 ? 'var(--color-success)' : pct >= 0.5 ? 'var(--color-warn)' : 'var(--color-danger)'
   }
 
-  const totalColor = total >= 80 ? { txt: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)' }
-    : total >= 65 ? { txt: 'var(--color-accent-text)', bg: 'var(--color-accent-soft)', bdr: 'var(--color-accent)' }
-    : total >= 45 ? { txt: 'var(--color-warn-text)', bg: 'var(--color-warn-soft)', bdr: 'var(--color-warn)' }
-    : { txt: 'var(--color-text-muted)', bg: 'var(--color-bg-elev-2)', bdr: 'var(--color-line)' }
+  // What each factor means in plain English (shown as tooltip/sublabel)
+  const factorMeta = {
+    'Deal Return':    { icon: '💰', hint: 'How much money we make — profit on a flip or cash left in on a BRRRR' },
+    'Price Gap':      { icon: '↕️', hint: 'How far the asking price is from our offer — smaller gap = easier to close' },
+    'Seller Signals': { icon: '🤝', hint: 'Signs the seller is motivated to move quickly (estate, price drop, as-is listing, etc.)' },
+    'Market & Exit':  { icon: '📍', hint: 'How strong the ZIP code is and how confident we are in the ARV comps' },
+    'Cash Flow':      { icon: '🏦', hint: 'Monthly income after all expenses if we hold/rent — only matters for BRRRR' },
+    'Data Quality':   { icon: '📋', hint: 'How complete our info is — ARV, reno cost, rent estimate. Low score = re-run after getting better numbers' },
+  }
+
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   return (
     <div className="space-y-3">
@@ -134,49 +175,53 @@ function DealScoreSection({ body }) {
           </p>
         </div>
       )}
-      {/* Gauge */}
-      {total != null && (
-        <div className="flex items-center gap-4 p-3 rounded-lg border" style={{ background: totalColor.bg, borderColor: totalColor.bdr }}>
-          <div className="relative shrink-0 w-16 h-16">
-            <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--color-line)" strokeWidth="3" />
-              <circle cx="18" cy="18" r="15.9" fill="none"
-                stroke={totalColor.bdr} strokeWidth="3"
-                strokeDasharray={`${total} ${100 - total}`} strokeLinecap="round" />
+
+      {/* Sub-scores */}
+      {subScores.length === 0 && total == null && <PlainText body={body} />}
+      {subScores.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowBreakdown(s => !s)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] hover:opacity-80 transition-opacity"
+          >
+            <span className="text-[10px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">Score breakdown</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              className="w-3.5 h-3.5 text-[color:var(--color-text-dim)] transition-transform duration-200"
+              style={{ transform: showBreakdown ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+              <polyline points="6 9 12 15 18 9" />
             </svg>
-            <span className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[16px] font-black leading-none" style={{ color: totalColor.txt }}>{total}</span>
-              <span className="text-[9px]" style={{ color: totalColor.txt }}>/100</span>
-            </span>
-          </div>
-          <div>
-            <div className="text-[15px] font-black" style={{ color: totalColor.txt }}>
-              {total >= 80 ? 'EXCEPTIONAL' : total >= 65 ? 'STRONG' : total >= 45 ? 'NEGOTIATE' : total >= 25 ? 'WATCH' : 'DEAD LEAD'}
-            </div>
-            {verdict && <p className="text-[11px] mt-0.5" style={{ color: totalColor.txt }}>{verdict.replace(/^(STRONG|SOLID|MARGINAL|WEAK)[^—–-]*/i, '')}</p>}
-          </div>
+          </button>
+          {showBreakdown && subScores.map(({ key, max, score, detail }) => {
+            const meta = factorMeta[key] || { icon: '•', hint: '' }
+            const pct  = score != null ? score / max : 0
+            const clr  = pct >= 0.75 ? 'var(--color-success)' : pct >= 0.5 ? 'var(--color-warn)' : 'var(--color-danger)'
+            const tag  = pct >= 0.75 ? 'Strong' : pct >= 0.5 ? 'OK' : 'Weak'
+            const tagBg  = pct >= 0.75 ? 'var(--color-success-soft)' : pct >= 0.5 ? 'var(--color-warn-soft)' : 'var(--color-danger-soft)'
+            const tagTxt = pct >= 0.75 ? 'var(--color-success-text)' : pct >= 0.5 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+            return (
+              <div key={key} className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+                {/* Header row */}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[13px]">{meta.icon}</span>
+                  <span className="text-[12px] font-semibold text-[color:var(--color-text)] flex-1">{key}</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full" style={{ background: tagBg, color: tagTxt }}>{tag}</span>
+                  <span className="text-[11px] font-black" style={{ color: clr }}>{score ?? '?'}<span className="text-[9px] font-normal opacity-60">/{max}</span></span>
+                </div>
+                {/* Bar */}
+                <div className="h-1.5 rounded-full bg-[color:var(--color-line)] overflow-hidden mb-2">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct * 100}%`, backgroundColor: clr }} />
+                </div>
+                {/* What this factor means */}
+                <p className="text-[10px] text-[color:var(--color-text-dim)] leading-snug mb-1 italic">{meta.hint}</p>
+                {/* AI detail */}
+                {detail && <p className="text-[11px] text-[color:var(--color-text-muted)] leading-snug border-t border-[color:var(--color-line)] pt-1.5 mt-1">{detail}</p>}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Sub-scores — fallback to raw text if parsing produced nothing */}
-      {subScores.length === 0 && total == null && <PlainText body={body} />}
-      <div className="space-y-2">
-        {subScores.map(({ key, max, score, detail }) => (
-          <div key={key} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10.5px] font-semibold text-[color:var(--color-text-muted)]">{key}</span>
-              <span className="text-[11px] font-bold" style={{ color: score != null ? scoreColor(score, max) : 'var(--color-text-dim)' }}>
-                {score ?? '?'}/{max}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-[color:var(--color-line)] overflow-hidden mb-1.5">
-              <div className="h-full rounded-full transition-all duration-500"
-                style={{ width: score != null ? `${(score / max) * 100}%` : '0%', backgroundColor: score != null ? scoreColor(score, max) : 'transparent' }} />
-            </div>
-            {detail && <p className="text-[10.5px] text-[color:var(--color-text-dim)] leading-snug">{detail}</p>}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -442,12 +487,18 @@ function StrategySection({ body }) {
   )
 }
 
-function RecommendedActionSection({ body }) {
+function RecommendedActionSectionV1({ body }) {
+  const fullNotes = useContext(NotesContext)
+  const lead      = useContext(LeadContext)
+  const [logged, setLogged] = useState({})
+
   const lines = body.split('\n').filter(Boolean)
   const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
     ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
 
-  const verdict    = get('Verdict')
+  // Authoritative verdict from computed sub-scores
+  const computedScore = computeScoreFromText(fullNotes)
+  const verdict    = scoreToVerdict(computedScore) || get('Verdict')
   const atAsk      = get('At Ask')
   const atMao      = get('At MAO')
   const gap        = get('Gap') || get('Gap to Close')
@@ -460,40 +511,189 @@ function RecommendedActionSection({ body }) {
   const howToGet   = get('How to Get There')
   const summary    = get('Summary')
 
-  // Value-add lines (optional)
-  const maxRenoBRRRR = get('Max Reno (BRRRR)')
-  const maxRenoFlip  = get('Max Reno (Flip)')
+  const maxRenoBRRRR   = get('Max Reno (BRRRR)')
+  const maxRenoFlip    = get('Max Reno (Flip)')
   const inspectionPlay = get('Inspection Play')
-  const bedroomAdd = get('Bedroom Add')
-  const bathAdd    = get('Bath Add')
-  const otherUp    = get('Other Upside')
+  const bedroomAdd     = get('Bedroom Add')
+  const bathAdd        = get('Bath Add')
+  const otherUp        = get('Other Upside')
 
   const isBuyNow    = /^BUY NOW/i.test(verdict || '')
   const isMakeOffer = /^MAKE OFFER/i.test(verdict || '')
-  const isOffer     = /^OFFER/i.test(verdict || '') // legacy
+  const isOffer     = /^OFFER/i.test(verdict || '')
   const isNegotiate = /^NEGOTIATE/i.test(verdict || '')
   const isLongShot  = /^LONG SHOT/i.test(verdict || '')
   const isWatch     = /^WATCH/i.test(verdict || '')
   const isDead      = /^DEAD/i.test(verdict || '')
+  const isGo        = isBuyNow || isMakeOffer || isOffer || isNegotiate
 
+  // Derive seller odds from Seller Signals sub-score
+  const sellerSignalsScore = (() => {
+    if (!fullNotes) return null
+    const line = fullNotes.split('\n').find(l => /^[-•*\s]*Seller Signals:/i.test(l.trim()))
+    const raw  = line?.replace(/^[-•*\s]*Seller Signals:\s*/i, '').trim()
+    const m    = raw?.match(/^(\d+)\/15/)
+    return m ? parseInt(m[1]) : null
+  })()
+  const sellerOdds = sellerSignalsScore == null ? null
+    : sellerSignalsScore >= 10 ? { label: 'HIGH',   color: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)',  dot: '🟢', tip: 'Strong motivation signals — seller likely to negotiate.' }
+    : sellerSignalsScore >= 6  ? { label: 'MEDIUM', color: 'var(--color-warn-text)',    bg: 'var(--color-warn-soft)',    bdr: 'var(--color-warn)',     dot: '🟡', tip: 'Some signals present. Follow up consistently.' }
+    :                            { label: 'LOW',    color: 'var(--color-danger-text)',  bg: 'var(--color-danger-soft)', bdr: 'var(--color-danger)',   dot: '🔴', tip: 'No urgency signals yet. Seller may not be ready to move.' }
+
+  // Deal math signal — prefer "At Ask" when ask already works below MAO
+  const askWorks = /^WORKS/i.test(atAsk || '')
+  const maoWorks = /^WORKS/i.test(atMao || '')
+  const dealMath = (() => {
+    // If ask price works, that's the relevant signal — show it (not the MAO scenario)
+    if (askWorks)
+      return { label: 'WORKS AT ASK PRICE', color: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)', dot: '✅', note: 'Ask is already below MAO — deal works at current price.' }
+    if (maoWorks)
+      return { label: 'WORKS AT MAO', color: 'var(--color-success-text)', bg: 'var(--color-success-soft)', bdr: 'var(--color-success)', dot: '✅', note: null }
+    if (/^MARGINAL/i.test(atMao || ''))
+      return { label: 'MARGINAL AT MAO', color: 'var(--color-warn-text)', bg: 'var(--color-warn-soft)', bdr: 'var(--color-warn)', dot: '⚠️', note: null }
+    if (atMao || atAsk)
+      return { label: 'FAILS AT MAO', color: 'var(--color-danger-text)', bg: 'var(--color-danger-soft)', bdr: 'var(--color-danger)', dot: '❌', note: 'Deal math breaks at MAO — reno budget is the constraint.' }
+    return null
+  })()
+
+  // Primary offer amount — strip N/A values, fall back to ask-price context
+  const rawOffer = (starting || ourMao || target || '')
+  const offerAmt = /n\/a/i.test(rawOffer) ? '' : rawOffer.split('(')[0].split('←')[0].trim()
+
+  // Log an activity to the lead timeline
+  const logActivity = async (key, text) => {
+    if (!lead?.id || logged[key]) return
+    await supabase.from('lead_activities').insert({ lead_id: lead.id, type: 'comment', content: `[Action] ${text}` })
+    setLogged(prev => ({ ...prev, [key]: true }))
+  }
+
+  // When ask < MAO, the offer is at or below asking price
+  const askBelowMao = askWorks && !maoWorks
+  const offerLabel = offerAmt || (askBelowMao ? 'asking price or below' : 'MAO')
+  const offerLogLabel = offerAmt || (askBelowMao ? 'asking price' : 'MAO')
+
+  // Gap size drives urgency and approach
+  const gapNum = (() => {
+    const ask = lead?.asking_price ? Number(lead.asking_price) : null
+    const mao = lead?.mao          ? Number(lead.mao)          : null
+    if (!ask || !mao || ask <= mao) return 0
+    return ask - mao
+  })()
+  const gapPct      = lead?.asking_price ? Math.round((gapNum / Number(lead.asking_price)) * 100) : 0
+  const gapTiny     = gapPct <= 5                    // one round, close fast
+  const gapSmall    = gapPct > 5  && gapPct <= 15   // 1–2 rounds, 2–3 weeks
+  const gapMedium   = gapPct > 15 && gapPct <= 30   // 2–3 rounds, 4–8 weeks
+  const gapLarge    = gapPct > 30                    // long game, 60+ days
+
+  const sellerHot   = sellerSignalsScore != null && sellerSignalsScore >= 10
+  const sellerCold  = sellerSignalsScore != null && sellerSignalsScore < 6
+  const followUpDays = sellerHot ? 3 : gapTiny ? 5 : gapSmall ? 7 : gapMedium ? 14 : 30
+
+  // Kevin's plain-English read on this deal — synthesizes gap + score + seller motivation
+  const kevinsRead = (() => {
+    if (isBuyNow || (isMakeOffer && gapNum === 0))
+      return `The price is already right. Don't sit on this — send the offer today. Every day you wait is a day another investor might get there first.`
+
+    if (isMakeOffer && gapTiny)
+      return `This is a strong deal and the gap is tiny. One conversation should close it. ${sellerHot ? 'Seller signals are strong — they want to move. Strike now.' : 'Send the offer this week and follow up in 5 days.'}`
+
+    if (isMakeOffer && gapSmall)
+      return `Good deal with a manageable gap. I'd expect one round of counters — they'll come back, you inch up a little, done. Don't overthink it. ${sellerHot ? 'Seller looks motivated — push harder on the first offer.' : 'Send your offer and stay consistent with follow-ups.'}`
+
+    if ((isNegotiate || isOffer) && gapMedium)
+      return `Real deal, but it needs work. The gap is real — plan for 2 or 3 rounds of back and forth over the next 4–6 weeks. ${sellerHot ? 'Good news: seller motivation looks strong, which gives you leverage.' : sellerCold ? 'Seller signals are quiet — you may need to warm them up before price talk lands.' : 'Stay patient, stay consistent, and let the Negotiate tab scripts do the heavy lifting.'}`
+
+    if ((isNegotiate || isOffer || isLongShot) && gapLarge)
+      return `The gap is big — ${gapPct}% between their price and ours. This one isn't closing this week. The play is to plant a seed now, stay visible, and let time work for you. Sellers at an inflated price usually come around at 60–90 days on market when the reality sets in. ${sellerHot ? "That said, seller motivation looks high — worth pushing harder than usual." : 'Stay in the game monthly. Don\'t chase, but don\'t disappear either.'}`
+
+    if (isLongShot)
+      return `Low odds right now, but not zero. Send a low offer, be friendly, and follow up once a month. The deals that close at big discounts are almost always ones where the investor stayed in touch while everyone else gave up.`
+
+    if (isWatch)
+      return `Not the right time to engage. The numbers don't work yet at this price. Set a reminder and check back when the listing ages or the price drops. Don't make an offer just to be active — it anchors you high and kills your leverage later.`
+
+    if (isDead)
+      return `This one doesn't work. Numbers fail at any realistic purchase price. Move on and focus your energy on better opportunities — there's no path to profit here regardless of how you structure it.`
+
+    return null
+  })()
+
+  const renoIsEstimated = !!(lead?.deal_analysis?.reno_was_estimated || lead?.deal_analysis?.reno_unknown)
+
+  // Numbered next steps — driven by gap size + seller odds + score
+  const nextSteps = (() => {
+    if (renoIsEstimated) return [
+      { key: 'r0', icon: '🔨', text: 'Get a contractor walkthrough first', sub: 'Reno cost was estimated — real numbers change the MAO. Don\'t send an offer until you have an actual quote.', logText: 'Scheduled contractor walkthrough' },
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel} once reno is confirmed`, sub: 'Use the confirmed reno to verify MAO before committing.', logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `Follow up in ${followUpDays} days if seller is waiting`, sub: 'Keep the seller warm while you get the reno quote — 1 week max.', logText: `Set ${followUpDays}-day follow-up` },
+    ]
+
+    if (isBuyNow || (isMakeOffer && gapNum === 0)) return [
+      { key: 's1', icon: '📤', text: `Send the offer today at ${offerLabel}`,   sub: 'Price is right. Don\'t wait.', logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📞', text: 'Call or text to confirm they received it', sub: 'A quick call shows you\'re serious. Most sellers respond same day.', logText: 'Called seller to confirm offer received' },
+      { key: 's3', icon: '📅', text: 'Follow up in 3 days if no response',       sub: 'Motivated sellers move fast. If silence, call again — don\'t email.', logText: 'Set 3-day follow-up call' },
+    ]
+
+    if (isMakeOffer && gapTiny) return [
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel} this week`,   sub: `Gap is only ${gapPct}% — one conversation should close this.`, logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📞', text: sellerHot ? 'Call them — don\'t just email' : 'Follow up in 5 days if no response', sub: sellerHot ? 'Seller looks motivated. A phone call will get a faster yes.' : 'Short gap = low friction. Keep the momentum going.', logText: sellerHot ? 'Called seller directly' : 'Set 5-day follow-up' },
+      { key: 's3', icon: '📋', text: 'Have one counter ready',                  sub: 'They\'ll likely come back $5–10K higher. Know your walk-away before you send.', logText: null },
+    ]
+
+    if (isMakeOffer && gapSmall) return [
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel}`,             sub: `${gapPct}% gap is workable — plan for 1 or 2 rounds of counters.`, logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `Follow up in ${followUpDays} days`,       sub: sellerHot ? 'Motivation is high — follow up fast and be direct.' : 'Stay consistent. Sellers in this range usually respond within 1–2 weeks.', logText: `Set ${followUpDays}-day follow-up` },
+      { key: 's3', icon: '🤝', text: 'Check the Negotiate tab for counter scripts', sub: 'Pre-built responses for every counter they might throw.', logText: null },
+    ]
+
+    if ((isNegotiate || isOffer) && gapMedium) return [
+      { key: 's1', icon: '📤', text: `Send starting offer at ${offerLabel}`,    sub: `Go in firm. ${gapPct}% gap means you need room to move — don't start too high.`, logText: `Sent starting offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `First follow-up in ${followUpDays} days`, sub: sellerHot ? 'Seller looks motivated — follow up quickly and reference market comps.' : 'If no response, send a short note referencing the market. Keep it warm.', logText: `Set ${followUpDays}-day follow-up` },
+      { key: 's3', icon: '🔄', text: 'Expect 2–3 rounds over 4–6 weeks',        sub: 'Don\'t rush it. Each round you learn more about their real flexibility.', logText: null },
+      { key: 's4', icon: '🤝', text: 'Use negotiation scripts for every counter', sub: 'Counters, silence responses, and urgency plays are all in the Negotiate tab.', logText: null },
+    ]
+
+    if ((isNegotiate || isOffer || isLongShot) && gapLarge) return [
+      { key: 's1', icon: '📤', text: `Send a low offer at ${offerLabel} now`,   sub: `Big gap (${gapPct}%) — you're planting a seed, not closing today. That's fine.`, logText: `Sent low offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: 'Follow up once a month — no more',        sub: 'Monthly touch keeps you in their mind without being a pest. A quick "still interested" goes a long way.', logText: 'Set monthly follow-up cadence' },
+      { key: 's3', icon: '👀', text: 'Watch for DOM > 60 days or any price drop', sub: 'When a listing sits, sellers start listening. Re-analyze and get more aggressive the moment the price moves.', logText: 'Set price-drop and DOM alert' },
+    ]
+
+    if (isLongShot) return [
+      { key: 's1', icon: '📤', text: `Send a low offer at ${offerLabel}`,       sub: 'Low odds now, but offers create conversations. Worth the 5 minutes it takes.', logText: `Sent low offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: 'Follow up once a month',                  sub: 'Stay visible. The investors who close big discounts are the ones who stayed patient and consistent.', logText: 'Set monthly follow-up' },
+      { key: 's3', icon: '👀', text: 'Re-analyze if price drops or DOM > 60',   sub: 'That\'s usually when the seller\'s mindset changes.', logText: 'Watching for price drop / DOM growth' },
+    ]
+
+    if (isWatch) return [
+      { key: 's1', icon: '⛔', text: 'Don\'t make an offer yet',                sub: 'An offer now anchors you too high and kills your leverage later.', logText: null },
+      { key: 's2', icon: '📅', text: 'Set a 45-day check-in',                   sub: 'Come back when the price drops or the listing hits 60+ days on market.', logText: 'Set 45-day check-in' },
+      { key: 's3', icon: '📋', text: 'Note what would make this deal work',     sub: 'Price needs to drop, or ARV needs confirmation, or seller signals need to appear.', logText: 'Watching — noted conditions for re-engagement' },
+    ]
+
+    if (isDead) return [
+      { key: 's1', icon: '🚫', text: 'Close this lead',                         sub: 'Math fails at any realistic price. No point spending more time here.', logText: null },
+      { key: 's2', icon: '📋', text: 'Log why before you go',                   sub: 'One sentence on why it doesn\'t work — helps you avoid the same situation next time.', logText: 'Marked dead — logged reason' },
+    ]
+    return []
+  })()
+
+  // Verdict banner config
   const verdictMeta = isBuyNow
-    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW',          desc: 'Deal works at or below asking price. Move fast — send offer today.' }
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '✅', label: 'BUY NOW' }
     : isMakeOffer
-    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '📨', label: 'MAKE OFFER',        desc: 'Deal works at MAO. Gap from ask is small enough to bridge with a direct offer — send it now and start the conversation.' }
+    ? { bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)', icon: '📨', label: 'MAKE OFFER' }
     : (isOffer || isNegotiate)
-    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: isNegotiate ? 'NEGOTIATE' : 'OFFER & NEGOTIATE', desc: 'Deal works at MAO but the gap from asking is significant. Seller needs motivation to move — use DOM, condition, and follow-up pressure to get there.' }
+    ? { bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',  icon: '💬', label: isNegotiate ? 'NEGOTIATE' : 'OFFER & NEGOTIATE' }
     : isLongShot
-    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '🎯', label: 'LONG SHOT',        desc: 'Deal works at MAO but requires a very large price cut. Only realistic if seller is distressed, property has been sitting, or you have a strong relationship. Low offer, long follow-up.' }
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '🎯', label: 'LONG SHOT' }
     : isWatch
-    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH',            desc: 'Deal barely works at MAO — thin margins or uncertain ARV. Monitor for a price drop or motivated seller signal before making a move.' }
+    ? { bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',    icon: '👀', label: 'WATCH' }
     : isDead
-    ? { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',  icon: '🚫', label: 'DEAD LEAD',        desc: 'Math does not work even at our MAO. No profitable exit exists at any reasonable offer. Move on — do not waste follow-up time here.' }
-    : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—',     desc: '' }
+    ? { bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',  icon: '🚫', label: 'DEAD LEAD' }
+    : { bg: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)',   bdr: 'var(--color-line)',    icon: '📋', label: verdict || '—' }
 
-  // Strip verdict keyword from the full verdict string to get the explanation
-  const verdictDetail = (verdict || '').replace(/^(BUY NOW|MAKE OFFER|OFFER & NEGOTIATE|NEGOTIATE|LONG SHOT|WATCH|DEAD LEAD)\s*[—-]\s*/i, '')
-
-  // Parse At Ask / At MAO status
+  // Parse At Ask / At MAO blocks
   const parseStatus = (val) => {
     if (!val) return null
     const works    = /^WORKS/i.test(val)
@@ -511,25 +711,84 @@ function RecommendedActionSection({ body }) {
 
   return (
     <div className="space-y-2.5">
-      {/* Main verdict banner */}
+
+      {/* ── DECISION BANNER ─────────────────────────────── */}
       {verdict && (
-        <div className="flex items-start gap-3 p-3 rounded-lg border"
-          style={{ background: verdictMeta.bg, borderColor: verdictMeta.bdr }}>
-          <span className="text-[22px] shrink-0 mt-0.5">{verdictMeta.icon}</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-black leading-tight" style={{ color: verdictMeta.txt }}>{verdictMeta.label}</div>
-            {verdictMeta.desc && (
-              <p className="text-[11px] mt-1 leading-snug opacity-85" style={{ color: verdictMeta.txt }}>{verdictMeta.desc}</p>
+        <div className="rounded-xl border p-3.5" style={{ background: verdictMeta.bg, borderColor: verdictMeta.bdr }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[20px]">{verdictMeta.icon}</span>
+            <span className="text-[15px] font-black" style={{ color: verdictMeta.txt }}>{verdictMeta.label}</span>
+            {isGo && (offerAmt || askBelowMao) && (
+              <span className="ml-auto text-[13px] font-bold" style={{ color: verdictMeta.txt }}>
+                {offerAmt ? `Offer at ${offerAmt}` : 'Offer at or below ask'}
+              </span>
             )}
-            {verdictDetail && verdictDetail !== verdictMeta.label && (
-              <p className="text-[11px] mt-1 leading-snug opacity-70 italic" style={{ color: verdictMeta.txt }}>{verdictDetail}</p>
-            )}
-            {strategy && (
-              <div className="text-[10.5px] mt-1 opacity-75" style={{ color: verdictMeta.txt }}>Strategy: {strategy}</div>
-            )}
+          </div>
+          {strategy && (
+            <p className="text-[11px] leading-snug opacity-80 mt-0.5" style={{ color: verdictMeta.txt }}>{strategy}</p>
+          )}
+
+          {/* Two signals: Deal Math + Seller Odds */}
+          {(dealMath || sellerOdds) && (
+            <div className="flex gap-2 mt-2.5">
+              {dealMath && (
+                <div className="flex-1 rounded-lg px-2.5 py-1.5 border" style={{ background: 'rgba(0,0,0,0.15)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <div className="text-[8.5px] uppercase tracking-wider opacity-60 mb-0.5" style={{ color: verdictMeta.txt }}>Deal Math</div>
+                  <div className="text-[11px] font-bold" style={{ color: verdictMeta.txt }}>{dealMath.dot} {dealMath.label}</div>
+                  {dealMath.note && <div className="text-[9px] mt-0.5 opacity-70 leading-snug" style={{ color: verdictMeta.txt }}>{dealMath.note}</div>}
+                </div>
+              )}
+              {sellerOdds && (
+                <div className="flex-1 rounded-lg px-2.5 py-1.5 border" style={{ background: 'rgba(0,0,0,0.15)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <div className="text-[8.5px] uppercase tracking-wider opacity-60 mb-0.5" style={{ color: verdictMeta.txt }}>Seller Odds</div>
+                  <div className="text-[11px] font-bold" style={{ color: verdictMeta.txt }}>{sellerOdds.dot} {sellerOdds.label}</div>
+                  <div className="text-[9px] mt-0.5 opacity-70 leading-snug" style={{ color: verdictMeta.txt }}>{sellerOdds.tip}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── NEXT STEPS ──────────────────────────────────── */}
+      {nextSteps.length > 0 && (
+        <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Your Next Steps</span>
+          </div>
+          <div className="divide-y divide-[color:var(--color-line)]">
+            {nextSteps.map((step, i) => (
+              <div key={step.key} className="flex items-start gap-3 px-3 py-2.5 bg-[color:var(--color-bg)]">
+                <div className="w-5 h-5 rounded-full bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-[color:var(--color-text-muted)]">{i + 1}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px]">{step.icon}</span>
+                    <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{step.text}</span>
+                  </div>
+                  {step.sub && <p className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5 leading-snug">{step.sub}</p>}
+                </div>
+                {step.logText && lead?.id && (
+                  <button
+                    onClick={() => logActivity(step.key, step.logText)}
+                    disabled={!!logged[step.key]}
+                    className="shrink-0 text-[10px] px-2 py-1 rounded-md border transition-all"
+                    style={logged[step.key]
+                      ? { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)', color: 'var(--color-success-text)' }
+                      : { background: 'var(--color-bg-elev-2)', borderColor: 'var(--color-line)', color: 'var(--color-text-muted)' }
+                    }
+                  >
+                    {logged[step.key] ? '✓ Logged' : '📋 Log'}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
+
+      {/* ── DETAIL CARDS (existing) ──────────────────────── */}
 
       {/* At Ask vs At MAO comparison */}
       {(askStatus || maoStatus) && (
@@ -570,10 +829,16 @@ function RecommendedActionSection({ body }) {
             <div className="text-[14px] font-bold text-[color:var(--color-text)]">{arv.split('←')[0].trim()}</div>
           </div>
         )}
-        {(ourMao || target) && (
+        {(ourMao || target) && lead?.renovation_cost != null && (
           <div className="p-2.5 rounded-lg border border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]">
             <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-0.5">Our MAO</div>
             <div className="text-[14px] font-bold text-[color:var(--color-success-text)]">{(ourMao || target).split('←')[0].trim()}</div>
+          </div>
+        )}
+        {(ourMao || target) && lead?.renovation_cost == null && (
+          <div className="p-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-warn-text)] mb-0.5">Our MAO</div>
+            <div className="text-[12px] text-[color:var(--color-warn-text)]">Enter reno estimate to get exact MAO — see budget card below</div>
           </div>
         )}
         {starting && (
@@ -646,6 +911,480 @@ function RecommendedActionSection({ body }) {
         otherUp    && { icon: '💡', label: 'Other Upside', val: otherUp  },
       ].filter(Boolean).map(({ icon, label, val }) => (
         <div key={label} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
+          <span className="text-[13px] mt-0.5">{icon}</span>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">{label}</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{val}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RecommendedActionSection({ body }) {
+  const fullNotes = useContext(NotesContext)
+  const lead      = useContext(LeadContext)
+  const [logged, setLogged] = useState({})
+
+  const lines = body.split('\n').filter(Boolean)
+  const get = prefix => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+
+  const computedScore = computeScoreFromText(fullNotes)
+  const verdict    = scoreToVerdict(computedScore) || get('Verdict')
+  const atMao      = get('At MAO')
+  const gap        = get('Gap') || get('Gap to Close')
+  const strategy   = get('Strategy')
+  const arv        = get('Our ARV')
+  const ourMao     = get('Our MAO')
+  const starting   = get('Starting Offer')
+  const target     = get('Target Price')
+  const maxWalk    = get('Max Walk-Away')
+  const howToGet   = get('How to Get There')
+  const maxRenoBRRRR   = get('Max Reno (BRRRR)')
+  const maxRenoFlip    = get('Max Reno (Flip)')
+  const inspectionPlay = get('Inspection Play')
+  const bedroomAdd     = get('Bedroom Add')
+  const bathAdd        = get('Bath Add')
+  const otherUp        = get('Other Upside')
+
+  const isBuyNow    = /^BUY NOW/i.test(verdict || '')
+  const isMakeOffer = /^MAKE OFFER/i.test(verdict || '')
+  const isOffer     = /^OFFER/i.test(verdict || '')
+  const isNegotiate = /^NEGOTIATE/i.test(verdict || '')
+  const isLongShot  = /^LONG SHOT/i.test(verdict || '')
+  const isWatch     = /^WATCH/i.test(verdict || '')
+  const isDead      = /^DEAD/i.test(verdict || '')
+  const isGo        = isBuyNow || isMakeOffer || isOffer || isNegotiate
+
+  const sellerSignalsScore = (() => {
+    if (!fullNotes) return null
+    const line = fullNotes.split('\n').find(l => /^[-•*\s]*Seller Signals:/i.test(l.trim()))
+    const raw  = line?.replace(/^[-•*\s]*Seller Signals:\s*/i, '').trim()
+    const m    = raw?.match(/^(\d+)\/15/)
+    return m ? parseInt(m[1]) : null
+  })()
+  const sellerOdds = sellerSignalsScore == null ? null
+    : sellerSignalsScore >= 10 ? { label: 'HIGH',   dot: '🟢', tip: 'Strong motivation — seller likely to negotiate.' }
+    : sellerSignalsScore >= 6  ? { label: 'MEDIUM', dot: '🟡', tip: 'Some signals. Follow up consistently.' }
+    :                            { label: 'LOW',    dot: '🔴', tip: 'No urgency signals yet.' }
+
+  // "Works at MAO" is a tautology — MAO is by definition the price where the deal works.
+  // Only surface this chip when the deal is marginal or fails (the exceptions that matter).
+  const maoMarginal = /^MARGINAL/i.test(atMao || '')
+  const maoFails    = atMao && !/^WORKS/i.test(atMao)
+  const dealMathLabel = maoMarginal ? '⚠️ Tight at MAO' : maoFails ? '❌ Fails at MAO' : null
+
+  const rawOffer = (starting || ourMao || target || '')
+  const offerAmt = /n\/a/i.test(rawOffer) ? '' : rawOffer.split('(')[0].split('←')[0].trim()
+  const offerLabel = offerAmt || 'MAO'
+  const offerLogLabel = offerAmt || 'MAO'
+
+  const logActivity = async (key, text) => {
+    if (!lead?.id || logged[key]) return
+    await supabase.from('lead_activities').insert({ lead_id: lead.id, type: 'comment', content: `[Action] ${text}` })
+    setLogged(prev => ({ ...prev, [key]: true }))
+  }
+
+  // Gap between asking price and MAO — used in verdict text and next steps
+  const gapAmt = (() => {
+    const ask = lead?.asking_price ? Number(lead.asking_price) : null
+    const mao = lead?.mao          ? Number(lead.mao)          : null
+    if (!ask || !mao || ask <= mao) return null
+    return ask - mao
+  })()
+  const gapStr      = gapAmt ? `$${Math.round(gapAmt).toLocaleString()}` : null
+  const gapNum      = gapAmt ?? 0
+  const gapPct      = lead?.asking_price ? Math.round((gapNum / Number(lead.asking_price)) * 100) : 0
+  const gapTiny     = gapPct <= 5
+  const gapSmall    = gapPct > 5  && gapPct <= 15
+  const gapMedium   = gapPct > 15 && gapPct <= 30
+  const gapLarge    = gapPct > 30
+  const sellerHot   = sellerSignalsScore != null && sellerSignalsScore >= 10
+  const sellerCold  = sellerSignalsScore != null && sellerSignalsScore < 6
+  const followUpDays = sellerHot ? 3 : gapTiny ? 5 : gapSmall ? 7 : gapMedium ? 14 : 30
+
+  const kevinsRead = (() => {
+    if (isBuyNow || (isMakeOffer && gapNum === 0))
+      return `The price is already right. Don't sit on this — send the offer today. Every day you wait is a day another investor might get there first.`
+    if (isMakeOffer && gapTiny)
+      return `This is a strong deal and the gap is tiny. One conversation should close it. ${sellerHot ? 'Seller signals are strong — they want to move. Strike now.' : 'Send the offer this week and follow up in 5 days.'}`
+    if (isMakeOffer && gapSmall)
+      return `Good deal with a manageable gap. I'd expect one round of counters — they'll come back, you inch up a little, done. Don't overthink it. ${sellerHot ? 'Seller looks motivated — push harder on the first offer.' : 'Send your offer and stay consistent with follow-ups.'}`
+    if ((isNegotiate || isOffer) && gapMedium)
+      return `Real deal, but it needs work. The gap is real — plan for 2 or 3 rounds of back and forth over the next 4–6 weeks. ${sellerHot ? 'Good news: seller motivation looks strong, which gives you leverage.' : sellerCold ? 'Seller signals are quiet — you may need to warm them up before price talk lands.' : 'Stay patient, stay consistent, and let the Negotiate tab scripts do the heavy lifting.'}`
+    if ((isNegotiate || isOffer || isLongShot) && gapLarge)
+      return `The gap is big — ${gapPct}% between their price and ours. This one isn't closing this week. The play is to plant a seed now, stay visible, and let time work for you. Sellers at an inflated price usually come around at 60–90 days on market when the reality sets in. ${sellerHot ? "That said, seller motivation looks high — worth pushing harder than usual." : "Stay in the game monthly. Don't chase, but don't disappear either."}`
+    if (isLongShot)
+      return `Low odds right now, but not zero. Send a low offer, be friendly, and follow up once a month. The deals that close at big discounts are almost always ones where the investor stayed in touch while everyone else gave up.`
+    if (isWatch)
+      return `Not the right time to engage. The numbers don't work yet at this price. Set a reminder and check back when the listing ages or the price drops. Don't make an offer just to be active — it anchors you high and kills your leverage later.`
+    if (isDead)
+      return `This one doesn't work. Numbers fail at any realistic purchase price. Move on and focus your energy on better opportunities — there's no path to profit here regardless of how you structure it.`
+    return null
+  })()
+
+  const renoIsEstimated = !!(lead?.deal_analysis?.reno_was_estimated || lead?.deal_analysis?.reno_unknown)
+
+  const nextSteps = (() => {
+    if (renoIsEstimated) return [
+      { key: 'r0', icon: '🔨', text: 'Get a contractor walkthrough first', sub: 'Reno cost was estimated — real numbers change the MAO. Don\'t send an offer until you have an actual quote.', logText: 'Scheduled contractor walkthrough' },
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel} once reno is confirmed`, sub: 'Use the confirmed reno to verify MAO before committing.', logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `Follow up in ${followUpDays} days if seller is waiting`, sub: 'Keep the seller warm while you get the reno quote — 1 week max.', logText: `Set ${followUpDays}-day follow-up` },
+    ]
+
+    if (isBuyNow || (isMakeOffer && gapNum === 0)) return [
+      { key: 's1', icon: '📤', text: `Send the offer today at ${offerLabel}`,    sub: 'Price is right. Don\'t wait.', logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📞', text: 'Call or text to confirm they received it', sub: 'A quick call shows you\'re serious. Most sellers respond same day.', logText: 'Called seller to confirm offer received' },
+      { key: 's3', icon: '📅', text: 'Follow up in 3 days if no response',       sub: 'Motivated sellers move fast. If silence, call again — don\'t email.', logText: 'Set 3-day follow-up call' },
+    ]
+    if (isMakeOffer && gapTiny) return [
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel} this week`,    sub: `Gap is only ${gapPct}% — one conversation should close this.`, logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📞', text: sellerHot ? 'Call them — don\'t just email' : `Follow up in ${followUpDays} days`, sub: sellerHot ? 'Seller looks motivated. A phone call will get a faster yes.' : 'Short gap = low friction. Keep the momentum going.', logText: sellerHot ? 'Called seller directly' : `Set ${followUpDays}-day follow-up` },
+      { key: 's3', icon: '📋', text: 'Have one counter ready',                   sub: 'They\'ll likely come back $5–10K higher. Know your walk-away before you send.', logText: null },
+    ]
+    if (isMakeOffer && gapSmall) return [
+      { key: 's1', icon: '📤', text: `Send offer at ${offerLabel}`,              sub: `${gapPct}% gap is workable — plan for 1 or 2 rounds of counters.`, logText: `Sent offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `Follow up in ${followUpDays} days`,        sub: sellerHot ? 'Motivation is high — follow up fast and be direct.' : 'Stay consistent. Sellers in this range usually respond within 1–2 weeks.', logText: `Set ${followUpDays}-day follow-up` },
+      { key: 's3', icon: '🤝', text: 'Check the Negotiate tab for counter scripts', sub: 'Pre-built responses for every counter they might throw.', logText: null },
+    ]
+    if ((isNegotiate || isOffer) && gapMedium) return [
+      { key: 's1', icon: '📤', text: `Send starting offer at ${offerLabel}`,     sub: `Go in firm. ${gapPct}% gap means you need room to move — don't start too high.`, logText: `Sent starting offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: `First follow-up in ${followUpDays} days`,  sub: sellerHot ? 'Seller looks motivated — follow up quickly and reference market comps.' : 'If no response, send a short note referencing the market. Keep it warm.', logText: `Set ${followUpDays}-day follow-up` },
+      { key: 's3', icon: '🔄', text: 'Expect 2–3 rounds over 4–6 weeks',         sub: 'Don\'t rush it. Each round you learn more about their real flexibility.', logText: null },
+      { key: 's4', icon: '🤝', text: 'Use negotiation scripts for every counter', sub: 'Counters, silence responses, and urgency plays are all in the Negotiate tab.', logText: null },
+    ]
+    if ((isNegotiate || isOffer || isLongShot) && gapLarge) return [
+      { key: 's1', icon: '📤', text: `Send a low offer at ${offerLabel} now`,    sub: `Big gap (${gapPct}%) — you're planting a seed, not closing today. That's fine.`, logText: `Sent low offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: 'Follow up once a month — no more',         sub: 'Monthly touch keeps you in their mind without being a pest.', logText: 'Set monthly follow-up cadence' },
+      { key: 's3', icon: '👀', text: 'Watch for DOM > 60 days or any price drop', sub: 'When a listing sits, sellers start listening. Re-analyze the moment the price moves.', logText: 'Set price-drop and DOM alert' },
+    ]
+    if (isLongShot) return [
+      { key: 's1', icon: '📤', text: `Send a low offer at ${offerLabel}`,        sub: 'Low odds now, but offers create conversations.', logText: `Sent low offer at ${offerLogLabel}` },
+      { key: 's2', icon: '📅', text: 'Follow up once a month',                   sub: 'Stay visible. The investors who close big discounts stayed patient and consistent.', logText: 'Set monthly follow-up' },
+      { key: 's3', icon: '👀', text: 'Re-analyze if price drops or DOM > 60',    sub: 'That\'s usually when the seller\'s mindset changes.', logText: 'Watching for price drop / DOM growth' },
+    ]
+    if (isWatch) return [
+      { key: 's1', icon: '⛔', text: 'Don\'t make an offer yet',                 sub: 'An offer now anchors you too high and kills your leverage later.', logText: null },
+      { key: 's2', icon: '📅', text: 'Set a 45-day check-in',                    sub: 'Come back when the price drops or the listing hits 60+ days on market.', logText: 'Set 45-day check-in' },
+      { key: 's3', icon: '📋', text: 'Note what would make this deal work',      sub: 'Price needs to drop, ARV needs confirmation, or motivation signals need to appear.', logText: 'Watching — noted conditions for re-engagement' },
+    ]
+    if (isDead) return [
+      { key: 's1', icon: '🚫', text: 'Close this lead',                          sub: 'Math fails at any realistic price. No point spending more time here.', logText: null },
+      { key: 's2', icon: '📋', text: 'Log why before you go',                    sub: 'One sentence on why — helps you avoid the same situation next time.', logText: 'Marked dead — logged reason' },
+    ]
+    return []
+  })()
+
+  // Investor-friendly verdict config
+  // All verdicts except WATCH and PASS result in sending some kind of offer.
+  // The label tells Kevin HOW aggressively to move, not IF to move.
+  const vm = isBuyNow
+    ? {
+        bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)',
+        icon: '✅', label: 'Make the offer — price is right',
+        what: 'The asking price already works for us. No negotiation needed.',
+        action: 'Send the offer today. The longer you wait, the more likely someone else gets it.',
+        posture: null,
+      }
+    : isMakeOffer
+    ? (() => {
+        const askAmt = lead?.asking_price ? Number(lead.asking_price) : null
+        const maoAmt = lead?.mao          ? Number(lead.mao)          : null
+        const askBelowMao = askAmt && maoAmt && askAmt <= maoAmt
+        return {
+          bg: 'var(--color-success-soft)', txt: 'var(--color-success-text)', bdr: 'var(--color-success)',
+          icon: '📨', label: 'Make the offer — good deal',
+          what: askBelowMao
+            ? 'The asking price already works for us. No negotiation needed.'
+            : `Small gap${gapStr ? ` (${gapStr})` : ''} — the seller will likely move to close this.`,
+          action: askBelowMao
+            ? 'Send the offer at asking price. Move quickly — don\'t leave time for other buyers.'
+            : 'Send your offer now. Follow up in 7 days if no response. Don\'t let this one sit.',
+          posture: null,
+        }
+      })()
+    : (isOffer || isNegotiate)
+    ? {
+        bg: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)',  bdr: 'var(--color-accent)',
+        icon: '💬', label: 'Send an offer and negotiate',
+        what: `There's a gap${gapStr ? ` of ${gapStr}` : ''} between their price and ours. Your job is to start the conversation and move them down.`,
+        action: 'Send your starting offer. The seller will probably counter — that\'s normal. Keep going back and forth until you hit your number or decide to walk. Check the Negotiate tab for scripts.',
+        posture: null,
+      }
+    : isLongShot
+    ? {
+        bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',
+        icon: '🎯', label: 'Send a low offer and wait',
+        what: `The gap is large${gapStr ? ` (${gapStr})` : ''} — the price needs to come down a lot. But it costs nothing to make an offer.`,
+        action: 'Send a low offer to get on their radar. Most won\'t take it today, but they\'ll remember you when the listing sits. Follow up in 30 days or when the price drops.',
+        posture: null,
+      }
+    : isWatch
+    ? {
+        bg: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)',    bdr: 'var(--color-warn)',
+        icon: '👀', label: 'Don\'t offer yet — watch and wait',
+        what: `The gap is too wide${gapStr ? ` (${gapStr})` : ''} right now. An offer won\'t go anywhere at this price.`,
+        action: 'Set a reminder and check back if the price drops or the listing has been sitting for 60+ days. Sellers get more flexible over time.',
+        posture: null,
+      }
+    : isDead
+    ? {
+        bg: 'var(--color-danger-soft)',  txt: 'var(--color-danger-text)',  bdr: 'var(--color-danger)',
+        icon: '🚫', label: 'Pass — numbers don\'t work',
+        what: 'This deal doesn\'t pencil out at any realistic price. There\'s no path to profit here.',
+        action: 'Move on. Close this lead and put your energy into better opportunities.',
+        posture: null,
+      }
+    : { bg: 'var(--color-bg-elev-2)', txt: 'var(--color-text-muted)', bdr: 'var(--color-line)', icon: '📋', label: verdict || '—', what: null, action: null, posture: null }
+
+  const maoIsZeroRenoCeiling = /zero.reno ceiling/i.test(ourMao || '')
+  // MAO shown here must match FinancialSection. We read lead.mao which is always kept in sync
+  // with the formula (ARV × 0.75 − Reno − $2,450) by FinancialSection's auto-sync.
+  // Override the AI-text MAO with the stored lead.mao so both sections always agree.
+  const consistentMaoValue = lead?.mao
+    ? `$${Number(lead.mao).toLocaleString()}`
+    : ourMao?.split('←')[0].split('(')[0].trim()
+  const priceCards = [
+    arv      && { label: 'ARV (from comps)',  value: arv.split('←')[0].trim(),                       accent: false },
+    ourMao   && { label: maoIsZeroRenoCeiling ? 'MAO (zero-reno ceiling)' : 'MAO',
+                  value: consistentMaoValue,
+                  accent: maoIsZeroRenoCeiling ? 'warn' : 'green',
+                  sub: maoIsZeroRenoCeiling ? '⚠ actual MAO lower once reno is known' : null },
+    starting && { label: 'Starting Offer',    value: starting.split('←')[0].split('(')[0].trim(),   accent: 'blue' },
+    maxWalk  && { label: 'Walk-Away Max',     value: maxWalk.split('←')[0].split('(')[0].trim(),     accent: false },
+  ].filter(Boolean)
+
+  return (
+    <div className="space-y-2.5">
+
+      {/* ── VERDICT BANNER ─────────────────────────────── */}
+      {verdict && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: vm.bdr }}>
+
+          {/* Header row */}
+          <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2" style={{ background: vm.bg }}>
+            <div className="flex items-center gap-2">
+              <span className="text-[22px]">{vm.icon}</span>
+              <span className="text-[16px] font-black tracking-tight leading-tight" style={{ color: vm.txt }}>{vm.label}</span>
+            </div>
+            {computedScore != null && (
+              <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full shrink-0" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
+                {computedScore}/100
+              </span>
+            )}
+          </div>
+
+          {/* What this means */}
+          {vm.what && (
+            <div className="px-3.5 pb-2" style={{ background: vm.bg }}>
+              <p className="text-[11px] leading-snug" style={{ color: vm.txt, opacity: 0.8 }}>
+                <span className="font-semibold opacity-100">What this means: </span>{vm.what}
+              </p>
+            </div>
+          )}
+
+          {/* Signal chips */}
+          <div className="flex flex-wrap gap-1.5 px-3.5 pb-2.5" style={{ background: vm.bg }}>
+            {strategy && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
+                {strategy}
+              </span>
+            )}
+            {dealMathLabel && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
+                {dealMathLabel}
+              </span>
+            )}
+            {sellerOdds && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
+                {sellerOdds.dot} Seller: {sellerOdds.label}
+              </span>
+            )}
+            {gap && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
+                ↕ Gap: {gap.split('(')[0].trim()}
+              </span>
+            )}
+          </div>
+
+          {/* Action */}
+          {vm.action && (
+            <div className="px-3.5 py-2.5 border-t" style={{ background: 'var(--color-bg-elev-2)', borderColor: vm.bdr }}>
+              <p className="text-[12.5px] text-[color:var(--color-text)] leading-relaxed">{vm.action}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── KEY NUMBERS ────────────────────────────────── */}
+      {priceCards.length > 0 && (
+        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(priceCards.length, 2)}, 1fr)` }}>
+          {priceCards.map(({ label, value, accent, sub }) => (
+            <div key={label} className="p-3 rounded-xl border"
+              style={accent === 'green'
+                ? { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)' }
+                : accent === 'blue'
+                ? { background: 'var(--color-accent-soft)', borderColor: 'var(--color-accent)' }
+                : accent === 'warn'
+                ? { background: 'var(--color-warn-soft)', borderColor: 'var(--color-warn)' }
+                : { background: 'var(--color-bg-elev-2)', borderColor: 'var(--color-line)' }
+              }
+            >
+              <div className="text-[9px] uppercase tracking-widest mb-1"
+                style={{ color: accent === 'green' ? 'var(--color-success-text)' : accent === 'blue' ? 'var(--color-accent-text)' : accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text-dim)' }}>
+                {label}
+              </div>
+              <div className="text-[16px] font-black leading-none"
+                style={{ color: accent === 'green' ? 'var(--color-success-text)' : accent === 'blue' ? 'var(--color-accent-text)' : accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text)' }}>
+                {value}
+              </div>
+              {sub && (
+                <div className="text-[9px] mt-1 leading-tight"
+                  style={{ color: accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text-dim)', opacity: 0.8 }}>
+                  {sub}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── MAX RENO BUDGET (when reno unknown) ─────────── */}
+      {(maxRenoBRRRR || maxRenoFlip) && (
+        <div className="rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] overflow-hidden">
+          <div className="px-3 py-1.5 border-b border-[color:var(--color-accent)]">
+            <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)]">🔨 Max Reno Budget to Make Deal Work</span>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-[color:var(--color-accent)]">
+            {maxRenoBRRRR && (
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">BRRRR (cash left &lt;$30K)</div>
+                <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{maxRenoBRRRR.split('—')[0].trim()}</div>
+              </div>
+            )}
+            {maxRenoFlip && (
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] opacity-70 mb-0.5">Flip (profit &gt;$25K)</div>
+                <div className="text-[14px] font-bold text-[color:var(--color-accent-text)]">{maxRenoFlip.split('—')[0].trim()}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── HOW TO GET THERE ────────────────────────────── */}
+      {howToGet && (() => {
+        // Try structured labels first, then newlines, then sentence split
+        const labelPattern = /(?:^|\n)\s*(?:Opening|Probe for|Walk if)\s*:/gi
+        const hasLabels = labelPattern.test(howToGet)
+        let bullets
+        if (hasLabels) {
+          bullets = howToGet
+            .split(/\n?\s*(?=(?:Opening|Probe for|Walk if)\s*:)/i)
+            .map(l => l.trim()).filter(Boolean)
+        } else {
+          const byNewline = howToGet.split(/\n/).map(l => l.trim()).filter(Boolean)
+          bullets = byNewline.length >= 2
+            ? byNewline
+            : howToGet.split(/(?<=\.)\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean)
+        }
+        const icons = ['📞', '🔍', '🚪']
+        const labels = ['Opening', 'Probe for', 'Walk if']
+        return (
+          <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+            <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">🎯 Agent Brief — What to Do</span>
+            </div>
+            <div className="divide-y divide-[color:var(--color-line)]">
+              {bullets.map((line, i) => (
+                <div key={i} className="flex items-start gap-3 px-3 py-2.5 bg-[color:var(--color-bg)]">
+                  <div className="shrink-0 flex flex-col items-center gap-0.5 pt-0.5">
+                    <span className="text-[14px]">{icons[i] || '•'}</span>
+                    {i < labels.length && (
+                      <span className="text-[8px] uppercase tracking-wide text-[color:var(--color-text-dim)] whitespace-nowrap">{labels[i]}</span>
+                    )}
+                  </div>
+                  <p className="text-[12.5px] text-[color:var(--color-text)] leading-snug flex-1">{line.replace(/^[-•*]\s*/, '').replace(/^(?:Opening|Probe for|Walk if)\s*:\s*/i, '').replace(/^Line \d+:\s*/i, '')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── KEVIN'S READ ─────────────────────────────────── */}
+      {kevinsRead && (
+        <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <div className="shrink-0 w-7 h-7 rounded-full bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)] flex items-center justify-center text-[11px] font-black text-[color:var(--color-accent-text)]">K</div>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-1">Kevin's take</div>
+            {renoIsEstimated && (
+              <p className="text-[11px] text-[color:var(--color-warn-text)] bg-[color:var(--color-warn-soft)] rounded px-2 py-1 mb-1.5">
+                ⚠ Reno cost was estimated, not confirmed — these numbers will shift once a contractor walks the property.
+              </p>
+            )}
+            <p className="text-[12.5px] text-[color:var(--color-text)] leading-relaxed">{kevinsRead}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEXT STEPS ──────────────────────────────────── */}
+      {nextSteps.length > 0 && (
+        <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Your Next Steps</span>
+          </div>
+          <div className="divide-y divide-[color:var(--color-line)]">
+            {nextSteps.map((step, i) => (
+              <div key={step.key} className="flex items-start gap-3 px-3 py-2.5 bg-[color:var(--color-bg)]">
+                <div className="w-5 h-5 rounded-full bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)] flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-[color:var(--color-text-muted)]">{i + 1}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[13px]">{step.icon}</span>
+                    <span className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{step.text}</span>
+                  </div>
+                  {step.sub && <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5 leading-snug">{step.sub}</p>}
+                </div>
+                {step.logText && lead?.id && (
+                  <button
+                    onClick={() => logActivity(step.key, step.logText)}
+                    disabled={!!logged[step.key]}
+                    className="shrink-0 text-[10px] px-2 py-1 rounded-md border transition-all"
+                    style={logged[step.key]
+                      ? { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)', color: 'var(--color-success-text)' }
+                      : { background: 'var(--color-bg-elev-2)', borderColor: 'var(--color-line)', color: 'var(--color-text-muted)' }
+                    }
+                  >
+                    {logged[step.key] ? '✓ Logged' : '📋 Log'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── OPTIONAL ADD-ONS ──────────────────────────── */}
+      {inspectionPlay && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <span className="text-[14px] mt-0.5">🔍</span>
+          <div>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-warn-text)] mb-0.5">Inspection Play</div>
+            <div className="text-[12px] font-semibold text-[color:var(--color-warn-text)] leading-snug">{inspectionPlay}</div>
+          </div>
+        </div>
+      )}
+
+      {[
+        bedroomAdd && { icon: '🛏️', label: 'Bedroom Add', val: bedroomAdd },
+        bathAdd    && { icon: '🚿', label: 'Bath Add',    val: bathAdd    },
+        otherUp    && { icon: '💡', label: 'Other Upside', val: otherUp  },
+      ].filter(Boolean).map(({ icon, label, val }) => (
+        <div key={label} className="flex items-start gap-2 px-3 py-2 rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)]">
           <span className="text-[13px] mt-0.5">{icon}</span>
           <div>
             <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-0.5">{label}</div>
@@ -915,6 +1654,110 @@ function MarketCompsSection({ body }) {
   )
 }
 
+function RentalCompsSection({ body }) {
+  const lines = body.split('\n').filter(Boolean)
+  const get = (prefix) => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+
+  const consRent  = get('Conservative Rent')
+  const realRent  = get('Realistic Rent')
+  const optRent   = get('Optimistic Rent')
+  const oneRule   = get('1% Rule')
+  const verdict   = get('Rent Verdict')
+  const verdictOk = /^STRONG|^MEETS/i.test(verdict || '')
+  const verdictBad = /^BELOW/i.test(verdict || '')
+
+  const cfLines = lines.filter(l => /^At (conservative|realistic|optimistic) rent:/i.test(l.trim()))
+
+  const rentalComps = lines.filter(l => /^RENTAL:/i.test(l.trim()))
+
+  if (!consRent && !realRent && rentalComps.length === 0) return <PlainText body={body} />
+
+  return (
+    <div className="space-y-2.5">
+      {(consRent || realRent || optRent) && (
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5 space-y-1.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Rent Range</div>
+          {consRent && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Conservative</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-warn-text)]">{consRent}</span>
+            </div>
+          )}
+          {realRent && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Realistic</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{realRent}</span>
+            </div>
+          )}
+          {optRent && (
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Optimistic</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-success-text)]">{optRent}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {verdict && (
+        <div className={`px-3 py-2 rounded-lg border ${verdictOk ? 'border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]' : verdictBad ? 'border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]' : 'border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]'}`}>
+          <div className={`text-[9.5px] uppercase tracking-wider mb-0.5 ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>Rent Verdict</div>
+          <p className={`text-[12px] font-semibold ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>{verdict}</p>
+        </div>
+      )}
+
+      {oneRule && (
+        <div className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <span className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">1% Rule — </span>
+          <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{oneRule}</span>
+        </div>
+      )}
+
+      {cfLines.length > 0 && (
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Cash Flow Range (BRRRR)</div>
+          <div className="space-y-1">
+            {cfLines.map((l, i) => {
+              const [label, val] = l.replace(/^At /i, '').split(':').map(s => s.trim())
+              const isNeg = /−|\-/.test(val || '')
+              return (
+                <div key={i} className="flex justify-between text-[12px]">
+                  <span className="text-[color:var(--color-text-dim)] capitalize">{label}</span>
+                  <span className={`font-semibold ${isNeg ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-success-text)]'}`}>{val}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {rentalComps.length > 0 && (
+        <>
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Active Rentals Used</div>
+          {rentalComps.map((line, i) => {
+            const content = line.replace(/^RENTAL:\s*/i, '')
+            const parts   = content.split('|').map(s => s.trim())
+            const [area, profile, sqft, rent, note] = parts
+            return (
+              <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
+                <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
+                  <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{area}</span>
+                  {rent && <span className="shrink-0 text-[13px] font-bold text-[color:var(--color-accent-text)]">{rent}</span>}
+                </div>
+                <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
+                  {profile && <span>{profile}</span>}
+                  {sqft    && <span>{sqft}</span>}
+                  {note    && <span className="italic">{note}</span>}
+                </div>
+              </div>
+            )
+          })}
+        </>
+      )}
+    </div>
+  )
+}
+
 function CRMCompsUsedSection({ body }) {
   const lines = body.split('\n')
   const allLines = lines.filter(Boolean)
@@ -1168,54 +2011,93 @@ function CommunicationsSection({ body }) {
     })
   }
 
+  const SCRIPT_LABELS = ['TEXT WHEN SUBMITTING OFFER', 'CALL SCRIPT', 'FOLLOW-UP TEXT', 'OBJECTION HANDLER']
+
   const extractBlock = (label, text) => {
-    const re = new RegExp(`${label}\\s*\\n---\\n([\\s\\S]*?)\\n---`, 'i')
-    return text.match(re)?.[1]?.trim() || null
+    // Try strict ---\n wrapper
+    const strict = new RegExp(`${label}[^\\n]*\\n-{2,}\\n([\\s\\S]*?)\\n-{2,}`, 'i')
+    const m = text.match(strict)
+    if (m) return m[1].trim()
+    // Fallback: content from after this label until next known label or end
+    const upper = text.toUpperCase()
+    const idx = upper.indexOf(label.toUpperCase())
+    if (idx === -1) return null
+    const after = text.slice(idx + label.length)
+    const nextIdx = SCRIPT_LABELS
+      .filter(l => l !== label)
+      .map(l => after.toUpperCase().indexOf(l))
+      .filter(i => i > 0)
+      .sort((a, b) => a - b)[0]
+    const chunk = nextIdx != null ? after.slice(0, nextIdx) : after
+    return chunk.replace(/^[\s\-\n]+/, '').replace(/[\s\-\n]+$/, '').trim() || null
   }
 
-  const subjectLine = body.match(/^Subject:\s*(.+)$/im)?.[1]?.trim() || null
-  const email       = extractBlock('EMAIL', body)
-  const sms         = extractBlock('SMS', body)
-  const voicemail   = extractBlock('VOICEMAIL SCRIPT', body)
+  const submitText  = extractBlock('TEXT WHEN SUBMITTING OFFER', body)
+  const callScript  = extractBlock('CALL SCRIPT', body)
+  const followUp    = extractBlock('FOLLOW-UP TEXT', body)
+  const objHandler  = extractBlock('OBJECTION HANDLER', body)
 
-  const Block = ({ label, content, copyKey }) => (
-    <div className="rounded-lg border border-[color:var(--color-line)] overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">{label}</span>
-        <button
-          onClick={() => copy(content, copyKey)}
-          className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] transition-colors"
-        >
-          {copied === copyKey ? '✓ Copied' : 'Copy'}
-        </button>
-      </div>
-      <div className="p-3">
-        <p className="text-[12px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{content}</p>
-      </div>
-    </div>
-  )
+  // Fallback: old format
+  const sms         = !submitText ? extractBlock('SMS', body) : null
+  const voicemail   = !callScript ? extractBlock('VOICEMAIL SCRIPT', body) : null
+  const email       = extractBlock('EMAIL', body)
+  const subjectLine = body.match(/^Subject:\s*(.+)$/im)?.[1]?.trim() || null
+
+  const scripts = [
+    submitText  && { key: 'submit', icon: '📱', label: 'Text — When Submitting the Offer',    sub: 'Send this the moment the offer goes in',           content: submitText,  accent: 'green' },
+    callScript  && { key: 'call',   icon: '📞', label: 'Call Script — Advocate the Offer',    sub: 'Kevin calls the listing agent right after texting', content: callScript,  accent: 'blue'  },
+    followUp    && { key: 'fu',     icon: '⏰', label: 'Follow-Up Text — No Response in 24h', sub: 'Stay visible without being pushy',                  content: followUp,    accent: null    },
+    objHandler  && { key: 'obj',    icon: '🛡️', label: 'Objection Handler — "Price Too Low"', sub: "Agent says the seller wants more — Kevin's reply",  content: objHandler,  accent: 'warn'  },
+    // fallbacks for old format
+    sms     && { key: 'sms', icon: '📱', label: 'SMS / Text',       sub: null, content: sms,      accent: null },
+    voicemail && { key: 'vm',  icon: '📞', label: 'Voicemail Script', sub: null, content: voicemail, accent: null },
+    email   && { key: 'email',icon: '✉️', label: 'Email',            sub: subjectLine ? `Subject: ${subjectLine}` : null, content: email, accent: 'blue' },
+  ].filter(Boolean)
+
+  const accentStyles = {
+    green: { bg: 'var(--color-success-soft)', bdr: 'var(--color-success)', hdr: 'var(--color-success-soft)', txt: 'var(--color-success-text)' },
+    blue:  { bg: 'var(--color-accent-soft)',  bdr: 'var(--color-accent)',  hdr: 'var(--color-accent-soft)',  txt: 'var(--color-accent-text)'  },
+    warn:  { bg: 'var(--color-warn-soft)',    bdr: 'var(--color-warn)',    hdr: 'var(--color-warn-soft)',    txt: 'var(--color-warn-text)'    },
+    null:  { bg: 'var(--color-bg)',           bdr: 'var(--color-line)',    hdr: 'var(--color-bg-elev-2)',    txt: 'var(--color-text-muted)'   },
+  }
 
   return (
-    <div className="space-y-2.5">
-      {email && (
-        <div className="rounded-lg border border-[color:var(--color-accent)] overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 bg-[color:var(--color-accent-soft)] border-b border-[color:var(--color-accent)]">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-accent-text)]">Email</span>
-              {subjectLine && <p className="text-[11px] text-[color:var(--color-accent-text)] opacity-80 mt-0.5">Subject: {subjectLine}</p>}
+    <div className="space-y-3">
+      <div className="px-1 pb-1">
+        <p className="text-[10.5px] text-[color:var(--color-text-dim)] leading-snug">
+          Kevin uses these scripts when representing HAT's offer to the listing agent. Copy and use directly.
+        </p>
+      </div>
+      {scripts.map(({ key, icon, label, sub, content, accent }) => {
+        const st = accentStyles[accent] || accentStyles[null]
+        return (
+          <div key={key} className="rounded-xl border overflow-hidden" style={{ borderColor: st.bdr }}>
+            <div className="flex items-start justify-between px-3 py-2.5 border-b" style={{ background: st.hdr, borderColor: st.bdr }}>
+              <div className="flex items-center gap-2">
+                <span className="text-[15px]">{icon}</span>
+                <div>
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: st.txt }}>{label}</div>
+                  {sub && <p className="text-[9.5px] mt-0.5" style={{ color: st.txt, opacity: 0.7 }}>{sub}</p>}
+                </div>
+              </div>
+              <button
+                onClick={() => copy(content, key)}
+                className="shrink-0 text-[10px] px-2.5 py-1 rounded-lg border transition-all"
+                style={copied === key
+                  ? { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)', color: 'var(--color-success-text)' }
+                  : { background: 'var(--color-bg)', borderColor: st.bdr, color: st.txt }
+                }
+              >
+                {copied === key ? '✓ Copied' : 'Copy'}
+              </button>
             </div>
-            <button onClick={() => copy(email, 'email')}
-              className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-accent)] bg-transparent text-[color:var(--color-accent-text)] hover:opacity-70 transition-opacity">
-              {copied === 'email' ? '✓ Copied' : 'Copy'}
-            </button>
+            <div className="p-3.5 bg-[color:var(--color-bg)]">
+              <p className="text-[12.5px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{content}</p>
+            </div>
           </div>
-          <div className="p-3">
-            <p className="text-[12px] text-[color:var(--color-text)] whitespace-pre-wrap leading-relaxed">{email}</p>
-          </div>
-        </div>
-      )}
-      {sms       && <Block label="SMS / Text"       content={sms}       copyKey="sms" />}
-      {voicemail && <Block label="Voicemail Script" content={voicemail} copyKey="vm"  />}
+        )
+      })}
+      {scripts.length === 0 && <p className="text-[12px] text-[color:var(--color-text-dim)] px-1">No communication scripts generated yet.</p>}
     </div>
   )
 }
@@ -1239,6 +2121,7 @@ const SECTION_META = {
   'NEXT ACTION':                         { icon: '📞', render: s => <ActionSection      body={s} /> },
   'COMPARABLE SALES':                    { icon: '🏡', render: s => <ComparableSalesSection body={s} /> },
   'MARKET COMPS':                        { icon: '🏡', render: s => <MarketCompsSection      body={s} /> },
+  'RENTAL COMPS':                        { icon: '🏘️', render: s => <RentalCompsSection     body={s} /> },
   'CRM COMPS USED':                      { icon: '🏡', render: s => <CRMCompsUsedSection    body={s} /> },
   'BEDROOM ADD OPPORTUNITY':             { icon: '🛏️', render: s => <BedroomAddSection     body={s} /> },
   'CRM WORKFLOW':                        { icon: '⚙️', render: s => <CRMWorkflowSection    body={s} /> },
@@ -1249,32 +2132,42 @@ const SECTION_META = {
 // Tab definitions — sections matched by name. Summary intentionally includes
 // RECOMMENDED ACTION so the tab always appears (it's always the first section generated).
 const TABS = [
-  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE|^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION/.test(n) },
-  { id: 'analysis', label: 'Analysis', icon: '🔍', match: n => /^PROS|^CONS|^KEY INSIGHTS/.test(n) },
-  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
-  { id: 'negotiate', label: 'Negotiate', icon: '🤝', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n) },
+  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE|^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^PROS|^CONS|^KEY INSIGHTS/.test(n) },
+  { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^RENTAL COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
+  { id: 'strategy', label: 'Strategy', icon: '🎯', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n), alwaysShow: true },
 ]
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
 
-function SectionCard({ name, body }) {
+function SectionCard({ name, body, defaultCollapsed = false }) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const meta = SECTION_META[name] || { icon: '📝', render: s => <PlainText body={s} /> }
   return (
     <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center gap-2 px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)] hover:opacity-80 transition-opacity text-left"
+      >
         <span className="text-[13px]">{meta.icon}</span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">{name}</span>
-      </div>
-      <div className="p-3 bg-[color:var(--color-bg)]">
-        {meta.render(body)}
-      </div>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)] flex-1">{name}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          className="w-3 h-3 text-[color:var(--color-text-dim)] shrink-0 transition-transform duration-200"
+          style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {!collapsed && (
+        <div className="p-3 bg-[color:var(--color-bg)]">
+          {meta.render(body)}
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export default function NotesRenderer({ notes, extraTabs = [], missingFields = [] }) {
+export default function NotesRenderer({ notes, extraTabs = [], missingFields = [], lead = null, onGenerateScripts, generatingScripts, onRefreshComps, refreshingComps }) {
   const [activeTab, setActiveTab] = useState('summary')
   const sections = useMemo(() => parseNotes(notes), [notes])
 
@@ -1288,13 +2181,13 @@ export default function NotesRenderer({ notes, extraTabs = [], missingFields = [
     )
   }
 
-  // Build tabs, skip any that have no matching sections; append extraTabs at end
+  // Build tabs — always include alwaysShow tabs (Scripts); skip others with no matching sections
   const tabSections = [
     ...TABS.map(tab => ({
       ...tab,
       items: sections.filter(s => tab.match(s.name)),
       content: null,
-    })).filter(tab => tab.items.length > 0),
+    })).filter(tab => tab.alwaysShow || tab.items.length > 0),
     ...extraTabs.map(t => ({ ...t, items: [], content: t.content })),
   ]
 
@@ -1303,18 +2196,22 @@ export default function NotesRenderer({ notes, extraTabs = [], missingFields = [
   const currentTab = tabSections.find(t => t.id === validTab)
 
   return (
+    <LeadContext.Provider value={lead}>
     <MissingFieldsContext.Provider value={missingFields}>
+    <NotesContext.Provider value={notes || ''}>
     <div>
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-3 p-1 rounded-lg bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
+      {/* Tab bar — wraps to 2 rows if >5 tabs */}
+      <div className="flex flex-wrap gap-1 mb-3 p-1 rounded-lg bg-[color:var(--color-bg-elev-2)] border border-[color:var(--color-line)]">
         {tabSections.map(tab => {
           const isActive = tab.id === validTab
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold transition-all"
+              className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[10.5px] font-semibold transition-all"
               style={{
+                flexGrow: 1,
+                minWidth: '70px',
                 background: isActive ? 'var(--color-accent)' : 'transparent',
                 color: isActive ? '#fff' : 'var(--color-text-muted)',
               }}
@@ -1337,12 +2234,75 @@ export default function NotesRenderer({ notes, extraTabs = [], missingFields = [
       >
         {currentTab?.content
           ? currentTab.content
-          : (currentTab?.items || []).map(({ name, body }) => (
-              <SectionCard key={name} name={name} body={body} />
-            ))
+          : <>
+              {(currentTab?.id === 'summary'
+                ? [...(currentTab.items || [])].sort((a, b) => {
+                    const ORDER = ['RECOMMENDED ACTION', 'DEAL SCORE', 'DEAL SNAPSHOT', 'PROS', 'CONS', 'KEY INSIGHTS']
+                    const ai = ORDER.findIndex(o => a.name.toUpperCase().startsWith(o))
+                    const bi = ORDER.findIndex(o => b.name.toUpperCase().startsWith(o))
+                    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+                  })
+                : currentTab?.items || []
+              ).map(({ name, body }) => (
+                <SectionCard
+                  key={name}
+                  name={name}
+                  body={body}
+                  defaultCollapsed={/^PROS|^CONS|^KEY INSIGHTS/i.test(name)}
+                />
+              ))}
+              {currentTab?.id === 'comps' && onRefreshComps && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+                  <span className="text-[11px] text-[color:var(--color-text-dim)]">Comps are based on recently sold homes nearby. Refresh to pull new data.</span>
+                  <button
+                    onClick={onRefreshComps}
+                    disabled={refreshingComps}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-60 shrink-0 ml-3"
+                  >
+                    {refreshingComps ? (
+                      <>
+                        <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                        </svg>
+                        Fetching comps…
+                      </>
+                    ) : '↺ Refresh Comps'}
+                  </button>
+                </div>
+              )}
+              {currentTab?.id === 'strategy' && !currentTab.items.some(i => /^COMMUNICATIONS/i.test(i.name)) && (
+                <div className="mt-2 flex flex-col items-center gap-3 py-8 text-center rounded-xl border border-dashed border-[color:var(--color-line)]">
+                  <div className="text-2xl">📱</div>
+                  <div>
+                    <div className="text-[12.5px] font-semibold text-[color:var(--color-text)] mb-0.5">Kevin's Scripts</div>
+                    <div className="text-[11px] text-[color:var(--color-text-dim)]">Word-for-word texts and call scripts for the listing agent.</div>
+                  </div>
+                  {onGenerateScripts && (
+                    <button
+                      onClick={onGenerateScripts}
+                      disabled={generatingScripts}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-60"
+                    >
+                      {generatingScripts ? (
+                        <>
+                          <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                          Generating scripts…
+                        </>
+                      ) : '📱 Generate Kevin\'s Scripts'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
         }
       </div>
     </div>
+    </NotesContext.Provider>
     </MissingFieldsContext.Provider>
+    </LeadContext.Provider>
   )
 }

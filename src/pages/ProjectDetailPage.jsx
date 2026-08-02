@@ -7,6 +7,10 @@ import Card from '../components/ui/Card'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import DealRenovationItems from '../components/lead-detail/DealRenovationItems'
 import DealImportModal from '../components/lead-detail/DealImportModal'
+import LoanProfileCard from '../components/project/LoanProfileCard'
+import ContractorPaymentsCard from '../components/project/ContractorPaymentsCard'
+import LenderDrawsCard from '../components/project/LenderDrawsCard'
+import DrawReconciliationCard from '../components/project/DrawReconciliationCard'
 
 const labelCls = 'text-[10px] uppercase tracking-wider font-medium text-[color:var(--color-text-dim)] block mb-0.5'
 const inputCls = 'w-full h-8 px-2 text-[12px] rounded bg-[color:var(--color-bg-input)] text-[color:var(--color-text)] border border-[color:var(--color-line)] focus:outline-none focus:border-[color:var(--color-accent)] disabled:opacity-50'
@@ -420,18 +424,30 @@ function LiveBRRRRPanel({ bc }) {
       {/* ── Phase 4: Rental Cash Flow ── */}
       <div className="border-t border-[color:var(--color-line)] pt-4">
         <SectionHeader title="Phase 4 — Monthly Cash Flow (post-refi)" />
-        <Row label="Gross Rent"                                     value={fmtUSD(bc.monthlyRent)} />
-        <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)}, 30yr)`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
-        <Row label="− Property Taxes"                                value={`− ${fmtUSD(bc.monthlyTax)}`} />
-        <Row label="− Insurance"                                     value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
-        <Row
-          label="= Monthly Cash Flow"
-          value={fmtUSD(bc.monthlyCashFlow)}
-          total
-          positive={bc.monthlyCashFlow >= 0}
-          negative={bc.monthlyCashFlow < 0}
-        />
-        <Row label="Annual Cash Flow" value={fmtUSD(bc.annualCashFlow)} positive={bc.annualCashFlow >= 0} />
+        {bc.monthlyRent === 0 ? (
+          <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-700 text-[11px] text-yellow-700 dark:text-yellow-300 mt-1">
+            <span className="shrink-0 text-[13px]">⚠</span>
+            <div>
+              <div className="font-semibold">Monthly rent not set</div>
+              <div className="mt-0.5 opacity-80">Fixed costs: {fmtUSD(bc.refiMonthlyPI)} P&I + {fmtUSD(bc.monthlyTax)} taxes + {fmtUSD(bc.monthlyInsurance)} insurance = {fmtUSD(bc.refiMonthlyPI + bc.monthlyTax + bc.monthlyInsurance)}/mo needed to break even. Enter rent in the Rental Income section to see cash flow.</div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Row label="Gross Rent"                                     value={fmtUSD(bc.monthlyRent)} />
+            <Row label={`− Mortgage P&I (${fmtPct(bc.refiRate)}, 30yr)`} value={`− ${fmtUSD(bc.refiMonthlyPI)}`} />
+            <Row label="− Property Taxes"                                value={`− ${fmtUSD(bc.monthlyTax)}`} />
+            <Row label="− Insurance"                                     value={`− ${fmtUSD(bc.monthlyInsurance)}`} />
+            <Row
+              label="= Monthly Cash Flow"
+              value={fmtUSD(bc.monthlyCashFlow)}
+              total
+              positive={bc.monthlyCashFlow >= 0}
+              negative={bc.monthlyCashFlow < 0}
+            />
+            <Row label="Annual Cash Flow" value={fmtUSD(bc.annualCashFlow)} positive={bc.annualCashFlow >= 0} />
+          </>
+        )}
       </div>
 
       {/* Returns */}
@@ -563,17 +579,27 @@ export default function ProjectDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [editingAddress, setEditingAddress] = useState(false)
   const [addressDraft, setAddressDraft] = useState('')
+  const [activeTab, setActiveTab] = useState('deal')
+  const [loan, setLoan]           = useState(null)
+  const [draws, setDraws]         = useState([])
+  const [payments, setPayments]   = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: l }, { data: fin }, { data: reno }] = await Promise.all([
+    const [{ data: l }, { data: fin }, { data: reno }, { data: loanData }, { data: drawData }, { data: payData }] = await Promise.all([
       supabase.from('leads').select('*').eq('id', leadId).single(),
       supabase.from('deal_financials').select('*').eq('lead_id', leadId).maybeSingle(),
       supabase.from('deal_renovation_items').select('*').eq('lead_id', leadId).order('sort_order'),
+      supabase.from('project_loans').select('*').eq('lead_id', leadId).order('created_at').limit(1).maybeSingle(),
+      supabase.from('lender_draws').select('*').eq('lead_id', leadId).order('draw_number'),
+      supabase.from('contractor_payments').select('*').eq('lead_id', leadId).order('payment_date'),
     ])
     setLead(l || null)
     setFinancials(fin || null)
     setItems(reno || [])
+    setLoan(loanData || null)
+    setDraws(drawData || [])
+    setPayments(payData || [])
     setLoading(false)
   }, [leadId])
 
@@ -583,6 +609,17 @@ export default function ProjectDetailPage() {
     const { data: reno } = await supabase
       .from('deal_renovation_items').select('*').eq('lead_id', leadId).order('sort_order')
     setItems(reno || [])
+  }, [leadId])
+
+  const reloadDrawData = useCallback(async () => {
+    const [{ data: loanData }, { data: drawData }, { data: payData }] = await Promise.all([
+      supabase.from('project_loans').select('*').eq('lead_id', leadId).order('created_at').limit(1).maybeSingle(),
+      supabase.from('lender_draws').select('*').eq('lead_id', leadId).order('draw_number'),
+      supabase.from('contractor_payments').select('*').eq('lead_id', leadId).order('payment_date'),
+    ])
+    setLoan(loanData || null)
+    setDraws(drawData || [])
+    setPayments(payData || [])
   }, [leadId])
 
   // Keep a ref to financials.id so save() never goes stale
@@ -874,44 +911,118 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        {/* Tab navigation */}
+        <div className="flex items-center gap-1 mb-4 rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-1 w-fit">
+          {[
+            { id: 'deal',  label: '📊 Deal',  title: 'Acquisition & financials' },
+            { id: 'rehab', label: '🔨 Rehab', title: 'Loan, scope & draws' },
+            { id: 'exit',  label: isBRRRR ? '🏠 Hold / Refi' : '🏷 Sale / Exit', title: isBRRRR ? 'Refinance & rental' : 'Selling price & profit' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              title={tab.title}
+              className={`h-7 px-4 rounded-lg text-[12px] font-semibold transition-all ${
+                activeTab === tab.id
+                  ? 'bg-[color:var(--color-accent)] text-white shadow-sm'
+                  : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Two-column layout: forms left, live calc panel right */}
         <div className="flex gap-5 items-start">
         {/* ── Left column: forms ── */}
         <div className="flex-1 min-w-0 space-y-4">
 
-        {/* ── BRRRR Hero summary strip ── */}
-        {isBRRRR && bCalc && (
-          <div className="flex gap-3 flex-wrap">
-            <StatBox label="Our Cash In" value={fmtUSD(bCalc.ourCashInvested)} sub="at closing" />
-            <StatBox
-              label="Cash Recaptured at Refi"
-              value={fmtUSD(bCalc.cashRecaptured)}
-              sub={`${Math.round(bCalc.cashRecapturedPct * 100)}% recaptured`}
-              color={bCalc.cashRecaptured > 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}
-            />
-            <StatBox
-              label="Net Cash In Deal"
-              value={bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} out` : fmtUSD(bCalc.netCashInDeal)}
-              sub={bCalc.netCashInDeal <= 0 ? '✓ Perfect BRRRR!' : 'still in deal'}
-              color={bCalc.netCashInDeal <= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text)]'}
-            />
-            <StatBox
-              label="Monthly Cash Flow"
-              value={fmtUSD(bCalc.monthlyCashFlow)}
-              sub={`${fmtUSD(bCalc.annualCashFlow)}/yr`}
-              color={bCalc.monthlyCashFlow >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}
-            />
-            <StatBox label="Cap Rate" value={fmtPct(bCalc.capRate)} sub={`GRM ${bCalc.grm > 0 ? bCalc.grm.toFixed(1) : '—'}x`} color="text-[color:var(--color-text)]" />
-            <StatBox label="Equity at Refi" value={fmtUSD(bCalc.equityAtRefi)} sub={`${fmtUSD(bCalc.refiLoan)} new loan`} color="text-[color:var(--color-success-text)]" />
-          </div>
-        )}
+        {/* ══ DEAL TAB ══ */}
+        {activeTab === 'deal' && (<>
 
-        {/* BRRRR warnings */}
-        {isBRRRR && bCalc?.warnings?.map((w, i) => (
-          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[oklch(0.97_0.04_80)] border border-[oklch(0.85_0.08_80)] text-[12px] text-[oklch(0.45_0.12_80)]">
-            ⚠ {w}
-          </div>
-        ))}
+        {/* ── BRRRR Scorecard ── */}
+        {isBRRRR && bCalc && (() => {
+          const noRent = !bCalc.monthlyRent || bCalc.monthlyRent === 0
+          const arv    = bCalc.totalAllIn > 0 && bCalc.allInVsARV > 0 ? bCalc.totalAllIn / bCalc.allInVsARV : 0
+          const pass   = txt => <span className="text-[color:var(--color-success-text)] font-bold">✓ {txt}</span>
+          const warn   = txt => <span className="text-yellow-600 dark:text-yellow-400 font-bold">⚠ {txt}</span>
+          const fail   = txt => <span className="text-[color:var(--color-danger-text)] font-bold">✗ {txt}</span>
+
+          return (
+            <div className="space-y-3">
+              {noRent && (
+                <div className="flex items-start gap-3 px-4 py-3 rounded-xl border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-600">
+                  <span className="text-[18px] shrink-0">⚠</span>
+                  <div>
+                    <div className="text-[12px] font-bold text-yellow-700 dark:text-yellow-300">Monthly rent not entered</div>
+                    <div className="text-[11px] text-yellow-600 dark:text-yellow-400 mt-0.5">Cash flow, cap rate, and cash-on-cash all require rent. Set <strong>Monthly Rent</strong> in the Rental Income section below to see complete numbers.</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+                <div className="px-4 py-2.5 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)] flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">BRRRR Scorecard — {lead?.address?.split(',')[0]}</span>
+                  <span className="text-[10px] text-[color:var(--color-text-dim)]">Your tolerance: ≤$30K in deal · positive CF</span>
+                </div>
+                <table className="w-full text-[11.5px]">
+                  <thead>
+                    <tr className="border-b border-[color:var(--color-line)]">
+                      <th className="text-left px-4 py-2 text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold w-[30%]">Metric</th>
+                      <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold w-[25%]">Value</th>
+                      <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold w-[45%]">Verdict</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      {
+                        metric: 'Cash left in deal',
+                        sub: 'After refi — how much of your money stays in the property',
+                        value: bCalc.netCashInDeal <= 0 ? `${fmtUSD(Math.abs(bCalc.netCashInDeal))} back` : fmtUSD(bCalc.netCashInDeal),
+                        detail: `${Math.round(bCalc.cashRecapturedPct * 100)}% of ${fmtUSD(bCalc.totalCashIn)} invested recaptured`,
+                        verdict: bCalc.netCashInDeal <= 0 ? pass('Perfect — all capital recycled + more') : bCalc.netCashInDeal <= 30000 ? pass('Under $30K — within your tolerance') : bCalc.netCashInDeal <= 50000 ? warn('Above $30K — borderline') : fail('Too much capital locked up'),
+                      },
+                      {
+                        metric: 'Monthly cash flow',
+                        sub: 'Rent minus mortgage P&I, taxes, and insurance',
+                        value: noRent ? '—' : fmtUSD(bCalc.monthlyCashFlow) + '/mo',
+                        detail: noRent ? 'Enter rent to calculate' : `${fmtUSD(bCalc.annualCashFlow)}/yr · P&I ${fmtUSD(bCalc.refiMonthlyPI)}/mo`,
+                        verdict: noRent ? warn('Set rent first') : bCalc.monthlyCashFlow > 100 ? pass('Positive — tenant covers all costs') : bCalc.monthlyCashFlow >= 0 ? warn('Break-even — very tight') : fail(`Negative — rent ${fmtUSD(bCalc.monthlyRent)} can't cover ${fmtUSD(bCalc.refiMonthlyPI)} P&I + expenses`),
+                      },
+                      {
+                        metric: 'Equity at refi',
+                        sub: 'Property value above new loan — your immediate net worth gain',
+                        value: fmtUSD(bCalc.equityAtRefi),
+                        detail: `${fmtUSD(bCalc.refiLoan)} new loan · ${fmtPct(bCalc.refiLtvPct)} LTV on ${arv > 0 ? fmtUSD(arv) : '?'} ARV`,
+                        verdict: bCalc.equityAtRefi >= 50000 ? pass('Strong position') : bCalc.equityAtRefi >= 30000 ? warn('Moderate') : fail('Low equity'),
+                      },
+                      {
+                        metric: 'All-in cost vs ARV',
+                        sub: 'Total money spent divided by ARV — must stay under 80%',
+                        value: fmtPct(bCalc.allInVsARV),
+                        detail: `${fmtUSD(bCalc.totalAllIn)} all-in on ${arv > 0 ? fmtUSD(arv) : '?'} ARV`,
+                        verdict: bCalc.allInVsARV <= 0.70 ? pass('Under 70% — strong') : bCalc.allInVsARV <= 0.80 ? warn('Under 80% — acceptable') : fail('Over 80% — too tight'),
+                      },
+                    ].map(({ metric, sub, value, detail, verdict }) => (
+                      <tr key={metric} className="border-b border-[color:var(--color-line)] last:border-0">
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-medium text-[color:var(--color-text)]">{metric}</div>
+                          <div className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5 leading-snug">{sub}</div>
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <div className="font-bold text-[14px] text-[color:var(--color-text)]">{value}</div>
+                          <div className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5">{detail}</div>
+                        </td>
+                        <td className="px-3 py-3 align-top text-[11px]">{verdict}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Flip Hero summary strip ── */}
         {!isBRRRR && calc && (
@@ -1401,8 +1512,36 @@ export default function ProjectDetailPage() {
               </div>
             </Card>
 
-            {/* Renovation Items — wrapped in Card */}
-            <Card title="Renovation Items">
+        </>)} {/* ══ END DEAL TAB ══ */}
+
+        {/* ══ REHAB TAB ══ */}
+        {activeTab === 'rehab' && (<>
+
+            {/* Loan Profile — extended HML details */}
+            <Card title="Loan Profile">
+              <LoanProfileCard
+                loan={loan}
+                onLoanChanged={reloadDrawData}
+                leadId={leadId}
+                workspaceId={workspaceId}
+                financials={financials}
+                calc={calc || bCalc}
+                lead={lead}
+              />
+            </Card>
+
+            {/* Draw Reconciliation Dashboard */}
+            {loan && (
+              <DrawReconciliationCard
+                loan={loan}
+                draws={draws}
+                payments={payments}
+                scopeItems={items}
+              />
+            )}
+
+            {/* Scope of Work */}
+            <Card title="Scope of Work">
               <DealRenovationItems
                 leadId={leadId}
                 workspaceId={workspaceId}
@@ -1413,6 +1552,34 @@ export default function ProjectDetailPage() {
                 onPendingChange={setPendingRenovCost}
               />
             </Card>
+
+            {/* Contractor Payments */}
+            <Card title="Contractor Payments">
+              <ContractorPaymentsCard
+                leadId={leadId}
+                workspaceId={workspaceId}
+                payments={payments}
+                draws={draws}
+                onChanged={reloadDrawData}
+              />
+            </Card>
+
+            {/* Lender Draw Schedule */}
+            <Card title="Lender Draw Schedule">
+              <LenderDrawsCard
+                leadId={leadId}
+                workspaceId={workspaceId}
+                loan={loan}
+                draws={draws}
+                payments={payments}
+                onChanged={reloadDrawData}
+              />
+            </Card>
+
+        </>)} {/* ══ END REHAB TAB ══ */}
+
+        {/* ══ EXIT TAB ══ */}
+        {activeTab === 'exit' && (<>
 
             {/* BRRRR Strategy — Refinance & Rental (shown only for BRRRR projects) */}
             {isBRRRR && (
@@ -1602,6 +1769,11 @@ export default function ProjectDetailPage() {
               </div>
             </Card>
             )}
+
+        </>)} {/* ══ END EXIT TAB ══ */}
+
+        {/* ══ DEAL TAB (continued) — Plan B & AI ══ */}
+        {activeTab === 'deal' && (<>
 
             {/* ── Plan B: BRRRR Scenario (flip deals only) ── */}
             {!isBRRRR && financials && (
@@ -2188,6 +2360,8 @@ export default function ProjectDetailPage() {
             }}
           />
         )}
+
+        </>)} {/* ══ END DEAL TAB (continued) ══ */}
 
         </div>{/* end left column */}
 

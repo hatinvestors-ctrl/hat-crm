@@ -386,6 +386,7 @@ function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthl
   const rv   = Number(arv)
   const reno = Number(renovation_cost || 0)
   const rent = Number(monthly_rent || 0)
+  const renoUnknown = renovation_cost == null || renovation_cost === '' || renovation_cost === 0
   const strategyLabel = strategy === 'brrrr' ? 'BRRRR' : 'flip'
 
   let computedBlock = ''
@@ -433,14 +434,18 @@ PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
     jsonDefaults = { verdict, score, profit: Math.round(m.annualCF ?? 0), roi: Math.round((m.coc ?? 0) * 10) / 10, annualized_roi: Math.round((m.coc ?? 0) * 10) / 10, total_cash_needed: Math.round(m.totalCashInvested) }
   }
 
+  const renoWarning = renoUnknown
+    ? '\n⚠ RENOVATION COST UNKNOWN — analysis assumes $0 reno. Score and profit are INFLATED. The recommendation MUST explicitly warn that a contractor estimate is needed before any decision.\n'
+    : ''
+
   return `Analyze this ${strategyLabel} deal for ${address || 'the property below'}.
 
 INPUTS:
 - Purchase Price: ${fmt(pp)}
-- Renovation Cost: ${fmt(reno)}
+- Renovation Cost: ${renoUnknown ? 'UNKNOWN (assumed $0 — see warning below)' : fmt(reno)}
 - ARV: ${fmt(rv)}${rent > 0 ? `\n- Monthly Rent: ${fmt(rent)}` : ''}
 - Strategy: ${strategyLabel}
-${computedBlock}
+${renoWarning}${computedBlock}
 The numbers above are correct. Do NOT recompute them. Write 2-3 sentences of qualitative commentary on the deal quality, market risk, and what needs to be confirmed. Then output the JSON block below with the exact computed values filled in.
 
 \`\`\`json
@@ -458,7 +463,7 @@ The numbers above are correct. Do NOT recompute them. Write 2-3 sentences of qua
 }
 
 function parseJsonBlock(text) {
-  const match = text.match(/```json\s*([\s\S]*?)```\s*$/)
+  const match = text.match(/```json\s*([\s\S]*?)```/)
   if (!match) return null
   try { return JSON.parse(match[1].trim()) } catch { return null }
 }
@@ -495,7 +500,7 @@ export default async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const { lead_id, address, purchase_price, arv, renovation_cost, monthly_rent = null, strategy = 'flip', skip_save = false } = body
+    const { lead_id, address, purchase_price, arv, renovation_cost, monthly_rent = null, strategy = 'flip', skip_save = false, reno_was_estimated = false } = body
 
     if (!purchase_price) return new Response(JSON.stringify({ ok: false, error: 'purchase_price is required.' }), { status: 400, headers: HEADERS })
     if (!arv)            return new Response(JSON.stringify({ ok: false, error: 'arv is required.' }), { status: 400, headers: HEADERS })
@@ -537,10 +542,12 @@ export default async (req) => {
       key_risks:         summary.key_risks         || [],
       markdown,
       analyzed_at:       new Date().toISOString(),
+      reno_unknown: !renovation_cost && !reno_was_estimated,
       inputs: {
-        purchase_price: Number(purchase_price),
-        arv:            Number(arv),
-        renovation_cost: Number(renovation_cost || 0),
+        purchase_price:   Number(purchase_price),
+        arv:              Number(arv),
+        renovation_cost:  renovation_cost != null ? Number(renovation_cost) : null,
+        reno_was_estimated,
       },
     }
 

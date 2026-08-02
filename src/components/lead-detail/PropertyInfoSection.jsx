@@ -84,45 +84,19 @@ export default function PropertyInfoSection({ lead, userId, members, canEdit, on
         />
       </div>
 
-      <div className="mt-4 pt-4 border-t border-[color:var(--color-line)] space-y-2">
-        {/* Enrich button — status pill itself is shown in the banner at the top of the page */}
-        {canEdit && (
-          <div>
-            <button
-              type="button"
-              onClick={async () => {
-                setRefreshing(true); setMlsErr(null)
-                try {
-                  const r = await enrichLead(lead.id, { force: true })
-                  if (!r.ok) setMlsErr(r.error || 'Enrichment failed.')
-                  else if (r.lead) onUpdated?.(r.lead)
-                } catch (e) { setMlsErr(e.message) }
-                finally { setRefreshing(false) }
-              }}
-              disabled={refreshing}
-              className="text-[11.5px] px-3 h-7 rounded bg-[color:var(--color-accent-soft)] hover:bg-[color:var(--color-accent)] hover:text-white text-[color:var(--color-accent-text)] border border-[color:var(--color-accent)] disabled:opacity-50 transition-colors"
-              title="Pull property data, MLS status, and listing agent from RentCast"
-            >
-              {refreshing ? 'Enriching…' : (lead.mls_last_checked ? '✨ Re-enrich from MLS' : '✨ Enrich from MLS')}
-            </button>
-            {mlsErr && <div className="mt-1 text-[11px] text-[color:var(--color-danger-text)]">{mlsErr}</div>}
+      {/* External links — MLS refresh is in the banner at the top */}
+      {links.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-[color:var(--color-line)]">
+          <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">External links</div>
+          <div className="flex flex-wrap gap-1.5">
+            {links.map(l => (
+              <a key={l.label} href={l.url} target="_blank" rel="noreferrer" className="text-[12px] px-2 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors">
+                {l.label} ↗
+              </a>
+            ))}
           </div>
-        )}
-
-        {/* External links */}
-        {links.length > 0 && (
-          <div>
-            <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">External links</div>
-            <div className="flex flex-wrap gap-1.5">
-              {links.map(l => (
-                <a key={l.label} href={l.url} target="_blank" rel="noreferrer" className="text-[12px] px-2 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors">
-                  {l.label} ↗
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </Card>
   )
 }

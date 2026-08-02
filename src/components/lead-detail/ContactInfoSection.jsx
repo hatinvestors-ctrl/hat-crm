@@ -71,7 +71,7 @@ export default function ContactInfoSection({ lead, userId, members, canEdit, onU
               onClick={() => setComposeOpen(true)}
               className="text-[12px] px-2 py-1 bg-[color:var(--color-bg-elev-2)] hover:bg-[color:var(--color-accent-soft)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] rounded transition-colors"
             >
-              📧 Generate Agent Email
+              📧 Generate Email
             </button>
           )}
         </div>

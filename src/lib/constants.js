@@ -31,6 +31,7 @@ export const LEAD_STATUSES = [
   { value: 'move_to_sequence',           label: 'MoveToSequence',        category: 'Process',   tone: 'neutral' },
   { value: 'sequence_completed',         label: 'Sequence Completed',    category: 'Process',   tone: 'neutral' },
   { value: 'working_project',            label: 'Working Project',       category: 'Process',   tone: 'accent'  },
+  { value: 'rented',                     label: 'Rented 🏠',             category: 'Project Result', tone: 'success' },
   { value: 'automated_offers',           label: 'AutomatedOffers',       category: 'Process',   tone: 'accent'  },
 
   // ── Source / classification ─────────────────────────────────────
@@ -179,7 +180,7 @@ export const TASK_PRIORITIES = [
 export const TASK_PRIORITY_MAP = Object.fromEntries(TASK_PRIORITIES.map(p => [p.value, p]))
 
 // Statuses that mean a lead is a real "project" — used as project options for tasks.
-export const PROJECT_STATUSES = ['sold', 'flip_sold', 'working_project', 'offer_accepted']
+export const PROJECT_STATUSES = ['sold', 'flip_sold', 'working_project', 'rented', 'offer_accepted']
 
 export const ACTIVITY_TRACKED_FIELDS = [
   'status',

@@ -11,7 +11,6 @@ import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
-import ScenariosFlat from '../components/lead-detail/ScenariosFlat'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -22,6 +21,17 @@ import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { supabase } from '../lib/supabase'
 import { enrichLead } from '../lib/enrichment'
+
+function GroupDivider({ label }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="text-[9px] font-bold uppercase tracking-widest text-[color:var(--color-text-dim)] shrink-0">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-[color:var(--color-line)]" />
+    </div>
+  )
+}
 
 export default function LeadDetailPage() {
   const { workspace, workspaceId, members, user, userRole } = useOutletContext()
@@ -158,45 +168,57 @@ export default function LeadDetailPage() {
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <FinancialSection
-              lead={lead}
-              userId={user.id}
-              members={members}
-              canEdit={canEdit}
-              onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
-            />
-            <PropertyInfoSection
-              lead={lead}
-              userId={user.id}
-              members={members}
-              canEdit={canEdit}
-              onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
-            />
-            <NotesSection
-              lead={lead}
-              canEdit={canEdit}
-              onUpdated={(updated) => setLead(updated)}
-            />
-            <AINotesSection
-              lead={lead}
-              canEdit={canEdit}
-              onUpdated={(updated) => setLead(updated)}
-            />
-            <ContactInfoSection
-              lead={lead}
-              userId={user.id}
-              members={members}
-              canEdit={canEdit}
-              onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
-            />
-            <ListingAgentCard lead={lead} />
-            <ScenariosFlat
-              lead={lead}
-              canEdit={canEdit}
-              onUpdated={(updated) => setLead(updated)}
-            />
-            <ReportSection lead={lead} />
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* ── Group 1: Evaluate ─────────────────────── */}
+            <div className="space-y-4">
+              <PropertyInfoSection
+                lead={lead}
+                userId={user.id}
+                members={members}
+                canEdit={canEdit}
+                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+              />
+              <FinancialSection
+                lead={lead}
+                userId={user.id}
+                members={members}
+                canEdit={canEdit}
+                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+              />
+            </div>
+
+            <GroupDivider label="Analysis & Notes" />
+
+            {/* ── Group 2: Understand ───────────────────── */}
+            <div className="space-y-4">
+              <AINotesSection
+                lead={lead}
+                canEdit={canEdit}
+                onUpdated={(updated) => setLead(updated)}
+              />
+              <NotesSection
+                lead={lead}
+                canEdit={canEdit}
+                onUpdated={(updated) => setLead(updated)}
+              />
+            </div>
+
+            <GroupDivider label="Contacts & Reports" />
+
+            {/* ── Group 3: Admin ────────────────────────── */}
+            <div className="space-y-4">
+              <ContactInfoSection
+                lead={lead}
+                userId={user.id}
+                members={members}
+                canEdit={canEdit}
+                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+              />
+              <ListingAgentCard lead={lead} />
+              <ReportSection lead={lead} />
+            </div>
+
           </div>
 
           <div className="space-y-4">

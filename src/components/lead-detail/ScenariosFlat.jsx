@@ -84,7 +84,7 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
   }
 
   return (
-    <Card title="Scenarios" action={
+    <Card title="Scenarios" subtitle="Conservative · Realistic · Aggressive — adjust ARV & Reno per scenario" action={
       canEdit && dirty && (
         <Button size="sm" onClick={save} loading={saving}>Save changes</Button>
       )
@@ -126,6 +126,19 @@ export default function ScenariosFlat({ lead, canEdit, onUpdated }) {
                         <div className={`text-[14px] font-bold tabular-nums text-center ${color}`}>
                           {formatCurrency(profitVal)}
                         </div>
+                      </td>
+                    )
+                  }
+
+                  // Realistic ARV & Reno come from Financials — show read-only to avoid duplicates
+                  if (col.key === 'realistic' && (row.key === 'arv' || row.key === 'reno')) {
+                    const val = draft[dbField]
+                    return (
+                      <td key={col.key} className="py-1.5 px-1.5">
+                        <div className="text-center text-[13px] font-semibold text-[color:var(--color-text)] tabular-nums">
+                          {val ? formatCurrency(val) : <span className="text-[color:var(--color-text-dim)] text-[11px]">—</span>}
+                        </div>
+                        <div className="text-center text-[9px] text-[color:var(--color-text-dim)] mt-0.5">from Financials ↑</div>
                       </td>
                     )
                   }

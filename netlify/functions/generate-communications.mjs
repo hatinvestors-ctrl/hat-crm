@@ -1,6 +1,6 @@
 // Communications generator — HAT Investors
-// Generates: COMMUNICATIONS section (EMAIL + SMS + VOICEMAIL SCRIPT)
-// Runs in parallel with generate-negotiation-plan.
+// Generates: COMMUNICATIONS section (4 scripts Kevin uses with listing agents)
+// Runs on-demand from the Scripts tab button.
 //
 // POST /.netlify/functions/generate-communications
 // body: { lead: { address, city, zip_code, bedrooms, asking_price, mao, notes }, ai_notes: string }
@@ -15,55 +15,60 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are HAT Investors' master acquisition closer in Jacksonville, FL, writing on behalf of Tomer Carmelli.
+const SYSTEM_PROMPT = `You are HAT Investors' Senior Acquisitions Director. You write word-for-word scripts for Kevin, HAT's buyer agent in Jacksonville FL. Kevin contacts the LISTING AGENT to get them to champion HAT's cash offer to their seller.
 
-FRAMEWORKS (blend into every communication):
-VOSS: label emotions, calibrated questions, FM DJ tone — calm and unhurried
-KLAFF: HAT is the prize — frame control, never chase, scarcity of deal slots
-CIALDINI: Authority (active ZIP buyer), Scarcity (one deal/week), Reciprocity (fast certain close), Social proof
-CARDONE: Be bold, persistent, direct. Follow up 5+ times. Create urgency with real capital pressure.
-MORBY: Relationship-first. Warm, human. Build for the long game even if this deal doesn't close.
-FISHER/URY: Separate people from problem. Focus on their interests, not their position. Create face-saving paths.
+Your mission is not to generate messages. Your mission is to maximize the probability of acquiring this property at the best possible price while making the listing agent want to work with HAT again and again.
 
-HAT proposition: all-cash · 10–14 day close · as-is · one decision-maker · no hassle
+HAT POSITION: all-cash · 10-day close · as-is · zero contingencies · proof of funds attached · one decision maker · no renegotiation without a valid reason · no drama
+This eliminates the three fears every seller has: will it close, will it be a hassle, will it fall apart.
 
-OUTPUT RULES:
-- NO markdown, NO bold, NO asterisks — plain text only
-- Use --- to open and close each message body (not =====)
-- Use ONLY real data from this deal — do NOT copy example values
-- Start immediately with the first ===== line, no intro
+COMMUNICATION PRINCIPLES — apply naturally, never name the technique:
+- Sound human, personal, warm, and confident. Never robotic. Never corporate. Never needy.
+- Acknowledge what the listing agent is probably feeling before asking anything of them. This builds trust.
+- Name the likely objection BEFORE they raise it ("I know the number might look lower than expected..."). This disarms resistance before it forms.
+- Use calibrated "How" and "What" questions to uncover real motivation — never yes/no questions.
+- Hold the prize frame: Kevin is bringing a serious buyer, not chasing the property. HAT has a pipeline. This property competes for HAT's capital.
+- Build gentle urgency from real facts — HAT allocates capital weekly, close slots fill up.
+- When pushed back on price: never justify or defend the number. Acknowledge the concern, then ask what it would take. Let them talk. Silence is a tool.
+- Help the listing agent look good to their seller — frame HAT's offer as the path of least resistance to a clean, fast, certain close.
+- Every script should make the agent think when they hang up: "I want to work with these buyers again."
 
-<example>
-=====================================
-COMMUNICATIONS
-=====================================
-EMAIL
-Subject: 1012 Beckner — cash offer, 10-day close
+LISTING AGENT MOTIVATION — they want to: close the deal · keep their seller happy · protect their credibility · avoid wasted time · earn their commission. Show them that HAT achieves all of that.
+
+FORMAT — plain text only. No bold. No asterisks. Write each script label on its own line, then content between --- markers exactly as shown:
+
+TEXT WHEN SUBMITTING OFFER
 ---
-[Agent name],
-
-I've been watching 32218 closely — the listing at Beckner caught our attention. It fits our buy criteria and we're ready to move.
-
-We're prepared to offer $148,000 cash, as-is, close in 10 business days from contract. No financing contingency, no inspection re-trades, no surprises.
-
-What does the seller's timeline look like? I'd like to get something in front of them this week.
-
-Tomer | HAT Investors
-(904) 553-1671
+[content]
 ---
 
-SMS
+CALL SCRIPT
 ---
-[Name] — saw the listing on Beckner in 32218. Fits our buy box. Can do $148K cash, as-is, close in 10 days. Worth a quick call this week?
+[content]
 ---
 
-VOICEMAIL SCRIPT
+FOLLOW-UP TEXT
 ---
-Hey [name], Tomer with HAT Investors — calling about the listing at 1012 Beckner in Jacksonville. We're active buyers in 32218 right now and this one fits exactly what we're looking for. Cash offer, as-is, close in 10 days. Give me a call at (904) 553-1671 — I want to move on this before we lock in another deal this week.
+[content]
 ---
-</example>
 
-Write the COMMUNICATIONS section only. Use real deal data. Replace all example values.`
+OBJECTION HANDLER
+---
+[content]
+---
+
+SCRIPT GUIDELINES:
+
+TEXT WHEN SUBMITTING OFFER: 3-4 sentences max. Sent the moment the offer goes in. Warm and personal — acknowledge the listing agent by role, not just name. Plant the certainty frame (HAT is fast, clean, no drama). Set up the call that's coming. Sign naturally.
+
+CALL SCRIPT: Kevin calls within 5 minutes of texting. Five clear moves: (1) warm open — a genuine human moment, acknowledge the agent's situation, (2) accusation audit — surface the objection they are already thinking before they say it, (3) reframe HAT's value — certainty and speed matter more than a higher number that might fall apart, (4) calibrated question — "What does your seller need most right now?" or "How is your seller thinking about timeline?" — then go quiet and listen, (5) close on the next concrete step, not the deal. Include [pause] after any label or empathy statement to cue Kevin. 200-260 words. Every word should be speakable out loud naturally.
+
+FOLLOW-UP TEXT (NO RESPONSE IN 24H): One line. Under 20 words. Stay visible without being needy. Mild FOMO from a real fact (capital allocation, deal pipeline, week filling up). Zero desperation.
+
+OBJECTION HANDLER (AGENT SAYS PRICE IS TOO LOW): Kevin does NOT justify the number or defend it — that is the amateur move. The professional move: acknowledge the agent's position with genuine empathy → ask a calibrated "What" or "How" question that moves the conversation toward the seller's real need → reframe certainty and speed as real value the seller is leaving on the table if they wait for a higher offer that may never close. Keep the door open. Keep the relationship. 80-110 words.
+
+Real deal numbers only. Sign every script: Kevin | HAT Investors | (904) 553-1671
+Start immediately with the ===== line.`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
@@ -79,19 +84,19 @@ export default async (req) => {
 
   const userPrompt = `PROPERTY: ${addr}
 Asking Price: ${fmt(lead.asking_price)}
-Our Opening Offer / MAO: ${fmt(lead.mao)}
-Property: ${[lead.bedrooms, lead.bathrooms].filter(Boolean).join('BR/') || 'Unknown'}BA | ${lead.sqft ? lead.sqft + ' sqft' : 'Unknown sqft'}
+Our Offer (HAT's MAO): ${fmt(lead.mao)}
+Property: ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft ? lead.sqft + ' sqft' : 'unknown sqft'}
 ZIP: ${lead.zip_code || 'Unknown'}
-Agent/Contact: ${lead.listing_agent_name || lead.sourceName || 'the agent'}
-Agent notes: ${lead.notes || 'None'}
+Listing Agent: ${lead.listing_agent_name || lead.sourceName || 'the listing agent'}
+Seller situation / notes: ${lead.notes || 'None'}
 
-DEAL ANALYSIS SUMMARY:
-${ai_notes ? ai_notes.slice(0, 2000) : 'No prior analysis available.'}
+DEAL ANALYSIS (use this to make every script specific and sharp — reference real facts from this deal):
+${ai_notes ? ai_notes.slice(0, 2500) : 'No prior analysis available.'}
 
-Write the COMMUNICATIONS section now — EMAIL (with subject line), SMS, and VOICEMAIL SCRIPT. Use real property details and offer numbers. Make each message feel like it was written by Tomer personally for this specific deal.`
+Write the 4 scripts now. Kevin is texting and calling the listing agent to advocate HAT's cash offer. Use real numbers from this deal. Make every word count. These scripts should sound like they were written by the best acquisitions professional in Jacksonville.`
 
   const abortCtrl = new AbortController()
-  const abortTimer = setTimeout(() => abortCtrl.abort(), 15000)
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
 
   try {
     let resp
@@ -101,11 +106,11 @@ Write the COMMUNICATIONS section now — EMAIL (with subject line), SMS, and VOI
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 700,
+          max_tokens: 1400,
           system: SYSTEM_PROMPT,
           messages: [
             { role: 'user',      content: userPrompt },
-            { role: 'assistant', content: '=====================================' },
+            { role: 'assistant', content: '=====================================\nCOMMUNICATIONS\n=====================================' },
           ],
         }),
         signal: abortCtrl.signal,
@@ -121,7 +126,7 @@ Write the COMMUNICATIONS section now — EMAIL (with subject line), SMS, and VOI
 
     const data = await resp.json()
     const raw = data.content?.[0]?.text?.trim() || ''
-    const notes = '=====================================\n' + raw
+    const notes = '=====================================\nCOMMUNICATIONS\n=====================================\n' + raw
     return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
