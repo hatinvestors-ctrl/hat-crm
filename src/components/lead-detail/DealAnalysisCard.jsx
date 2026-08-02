@@ -5,7 +5,6 @@ import NotesRenderer from './NotesRenderer'
 import DealQA from './DealQA'
 import RenoTierPicker from './RenoTierPicker'
 import { supabase } from '../../lib/supabase'
-import { suggestRenoTier } from '../../lib/renoTierSuggest'
 import { formatCurrency } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
@@ -289,9 +288,9 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const hasAnalysis = !!lead.deal_analysis
   const renoMissing = lead.renovation_cost == null
 
+  // Note: ARV/Reno overrides have no input UI in this card (edited only in FinancialSection),
+  // so they are intentionally excluded from this check — see task-4 fix report.
   const overrideChanged =
-    (arvOverride  && parseFloat(arvOverride.replace(/[^0-9.]/g,''))  !== lastArv)  ||
-    (renoOverride && parseFloat(renoOverride.replace(/[^0-9.]/g,'')) !== lastReno) ||
     (domOverride  && parseInt(domOverride.replace(/[^0-9]/g,''))     !== lastDom)  ||
     (rentOverride      && parseFloat(rentOverride.replace(/[^0-9.]/g,''))      !== lastRent) ||
     !!priceDropOverride.trim() ||
@@ -451,11 +450,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
   // Re-run only core analysis with ARV and/or reno overrides — skips comps (fast ~8s)
   const reRunWithOverrides = async () => {
-    // ARV priority: user-typed → AI comps ARV from last run → lead.arv from DB
-    const arv  = arvOverride
-      ? parseFloat(arvOverride.replace(/[^0-9.]/g, '')) || null
-      : (aiCompsArv || (lead.arv ? Number(lead.arv) : null))
-    const reno = renoOverride ? parseFloat(renoOverride.replace(/[^0-9.]/g, '')) || null : null
+    // ARV/Reno have no override input UI here (edited only in FinancialSection) — always
+    // use the AI comps ARV from the last run / lead's DB values, never a stale override.
+    const arv  = aiCompsArv || (lead.arv ? Number(lead.arv) : null)
+    const reno = null
     const dom  = domOverride  ? parseInt(domOverride.replace(/[^0-9]/g, ''))     || null : null
     const rent      = rentOverride      ? parseFloat(rentOverride.replace(/[^0-9.]/g, ''))      || null : null
     const priceDrop = priceDropOverride ? parseFloat(priceDropOverride.replace(/[^0-9.]/g, '')) || null : null
@@ -630,7 +628,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                 onClick={() => {
                   if (s === strategy) return
                   setStrategy(s)
-                  if (hasAnalysis) runGenerate(false, s)
+                  if (hasAnalysis) {
+                    if (renoMissing) { setShowRenoPicker(true); return }
+                    runGenerate(false, s)
+                  }
                 }}
                 disabled={generating}
                 className={`px-3 py-1.5 transition-colors uppercase tracking-wide ${
