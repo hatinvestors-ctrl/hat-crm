@@ -8,6 +8,7 @@ import LeadFlowStepper from '../components/lead-detail/LeadFlowStepper'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
 import AINotesSection from '../components/lead-detail/AINotesSection'
+import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard' // TEMP Task 4 wiring — removed/replaced in Task 7
 import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
@@ -202,6 +203,13 @@ export default function LeadDetailPage() {
               />
               <NotesSection
                 lead={lead}
+                canEdit={canEdit}
+                onUpdated={(updated) => setLead(updated)}
+              />
+              {/* TEMP Task 4 wiring for build/manual verification — replaced by Task 7's real reorder */}
+              <DealAnalysisCard
+                lead={lead}
+                userId={user.id}
                 canEdit={canEdit}
                 onUpdated={(updated) => setLead(updated)}
               />
