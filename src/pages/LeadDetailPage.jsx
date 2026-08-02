@@ -4,6 +4,7 @@ import Topbar from '../components/Topbar'
 import LeadDetailHeader from '../components/lead-detail/LeadDetailHeader'
 import ActionZone from '../components/lead-detail/ActionZone'
 import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
+import LeadFlowStepper from '../components/lead-detail/LeadFlowStepper'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
 import AINotesSection from '../components/lead-detail/AINotesSection'
@@ -149,6 +150,8 @@ export default function LeadDetailPage() {
         />
 
         <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(updated)} paused={!!workspace?.settings?.mls_paused} />
+
+        <LeadFlowStepper lead={lead} />
 
         <ActionZone
           lead={lead}
