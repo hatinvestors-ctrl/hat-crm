@@ -7,12 +7,12 @@ import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import LeadFlowStepper from '../components/lead-detail/LeadFlowStepper'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
-import AINotesSection from '../components/lead-detail/AINotesSection'
-import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard' // TEMP Task 4 wiring — removed/replaced in Task 7
+import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard'
 import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
+import WhatIfPanel from '../components/lead-detail/WhatIfPanel'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -175,7 +175,7 @@ export default function LeadDetailPage() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* ── Group 1: Evaluate ─────────────────────── */}
-            <div className="space-y-4">
+            <div id="step-property" className="space-y-4">
               <PropertyInfoSection
                 lead={lead}
                 userId={user.id}
@@ -183,6 +183,9 @@ export default function LeadDetailPage() {
                 canEdit={canEdit}
                 onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
               />
+            </div>
+
+            <div id="step-renovation" className="space-y-4">
               <FinancialSection
                 lead={lead}
                 userId={user.id}
@@ -195,9 +198,10 @@ export default function LeadDetailPage() {
             <GroupDivider label="Analysis & Notes" />
 
             {/* ── Group 2: Understand ───────────────────── */}
-            <div className="space-y-4">
-              <AINotesSection
+            <div id="step-analysis" className="space-y-4">
+              <DealAnalysisCard
                 lead={lead}
+                userId={user.id}
                 canEdit={canEdit}
                 onUpdated={(updated) => setLead(updated)}
               />
@@ -206,13 +210,10 @@ export default function LeadDetailPage() {
                 canEdit={canEdit}
                 onUpdated={(updated) => setLead(updated)}
               />
-              {/* TEMP Task 4 wiring for build/manual verification — replaced by Task 7's real reorder */}
-              <DealAnalysisCard
-                lead={lead}
-                userId={user.id}
-                canEdit={canEdit}
-                onUpdated={(updated) => setLead(updated)}
-              />
+            </div>
+
+            <div id="step-decision" className="space-y-4">
+              <WhatIfPanel lead={lead} />
             </div>
 
             <GroupDivider label="Contacts & Reports" />
