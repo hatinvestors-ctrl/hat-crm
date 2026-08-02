@@ -5,6 +5,7 @@ import Button from '../ui/Button'
 import EditableField from './EditableField'
 import DealAnalysisPanel from './DealAnalysisPanel'
 import WhatIfPanel from './WhatIfPanel'
+import RenoTierPicker from './RenoTierPicker'
 import { formatCurrency, calculateMAO } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { logDealAnalysis } from '../../lib/activityLogger'
@@ -20,6 +21,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
   const [monthlyRent,  setMonthlyRent]  = useState(lead.rent_estimate || lead.monthly_rent || '')
   const [analyzing,    setAnalyzing]    = useState(false)
   const [analyzeError, setAnalyzeError] = useState(null)
+  const [showRenoPicker, setShowRenoPicker] = useState(false)
 
   // Reno tier picker state — shown when Quick Check is clicked and reno is null/0
   const [showEstimator, setShowEstimator] = useState(false)
@@ -256,22 +258,43 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           />
         </div>
         <div className={`rounded-lg border px-3 py-2.5 ${renoMissing && canEdit ? 'border-dashed border-2 border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]' : 'border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]'}`}>
-          <EditableField
-            label="Renovation Cost"
-            type="currency"
-            value={lead.renovation_cost}
-            formatter={formatCurrency}
-            onSave={(v) => {
-              const newMao = lead.arv ? Math.round(Number(lead.arv) * 0.75 - Number(v || 0) - 2450) : null
-              update({ renovation_cost: v, ...(newMao ? { mao: newMao } : {}) })
-            }}
-            disabled={!canEdit}
-          />
+          <div className="flex items-center justify-between gap-1">
+            <EditableField
+              label="Renovation Cost"
+              type="currency"
+              value={lead.renovation_cost}
+              formatter={formatCurrency}
+              onSave={(v) => {
+                const newMao = lead.arv ? Math.round(Number(lead.arv) * 0.75 - Number(v || 0) - 2450) : null
+                update({ renovation_cost: v, ...(newMao ? { mao: newMao } : {}) })
+              }}
+              disabled={!canEdit}
+            />
+            {canEdit && (
+              <button
+                onClick={() => setShowRenoPicker(true)}
+                title="Pick a renovation scope (AI-suggested tier)"
+                className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-[13px] hover:bg-[color:var(--color-bg)] transition-colors"
+              >
+                🔨
+              </button>
+            )}
+          </div>
           {renoMissing && canEdit && (
             <p className="text-[10px] text-[color:var(--color-warn-text)] mt-1 leading-tight">
               ⚠ Enter before running analysis
             </p>
           )}
+          <RenoTierPicker
+            lead={lead}
+            open={showRenoPicker}
+            onClose={() => setShowRenoPicker(false)}
+            onApply={(reno) => {
+              const newMao = lead.arv ? Math.round(Number(lead.arv) * 0.75 - reno - 2450) : null
+              update({ renovation_cost: reno, ...(newMao ? { mao: newMao } : {}) })
+              setShowRenoPicker(false)
+            }}
+          />
         </div>
       </div>
 
