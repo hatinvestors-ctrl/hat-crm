@@ -21,7 +21,7 @@ export function useDealStaleness(lead) {
 
   const curStrategy = lead.deal_analysis?.strategy || 'flip'
   const inpStrategy = inp.strategy || 'flip'
-  if (curStrategy !== inpStrategy) {
+  if (inp.strategy != null && curStrategy !== inpStrategy) {
     reasons.push('Strategy changed')
   }
 

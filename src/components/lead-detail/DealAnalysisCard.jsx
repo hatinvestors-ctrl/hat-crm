@@ -274,12 +274,9 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [rentOverride,      setRentOverride]      = useState(lead.rent_estimate ? String(Math.round(Number(lead.rent_estimate))) : '')
   const [priceDropOverride, setPriceDropOverride] = useState('')
   const [sellerNotesOverride, setSellerNotesOverride] = useState('')
-  const [arvOverride,  setArvOverride]  = useState(lead.arv ? String(Math.round(Number(lead.arv))) : '')
-  const [renoOverride, setRenoOverride] = useState(lead.renovation_cost ? String(Math.round(Number(lead.renovation_cost))) : '')
   const [aiRent, setAiRent] = useState(null)
   const [lastDom,  setLastDom]  = useState(null)
   const [lastRent, setLastRent] = useState(lead.rent_estimate ? Number(lead.rent_estimate) : null)
-  const [negoStale,    setNegoStale]    = useState(false)
   const [updatingNego, setUpdatingNego] = useState(false)
   const cancelledRef = useRef(false)
 
@@ -342,7 +339,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const estimatedRent = lead.rent_estimate || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
       setAiRent(estimatedRent)
       // Apply any override values already entered by the user (reno, rent, DOM, notes)
-      const renoVal  = renoOverrideVal ?? (renoOverride ? parseFloat(renoOverride.replace(/[^0-9.]/g, ''))  || null : null)
+      const renoVal  = renoOverrideVal ?? null
       const rentVal  = rentOverride  ? parseFloat(rentOverride.replace(/[^0-9.]/g, ''))  || null : null
       const domVal   = domOverride   ? parseInt(domOverride.replace(/[^0-9]/g, ''))       || null : null
       const notesVal = sellerNotesOverride.trim() || null
@@ -428,6 +425,8 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       if (verdictRes.ok && verdictData.ok) {
         await logDealAnalysis(lead.id, userId, verdictData.analysis)
         onUpdated?.({ ...lead, ...dbUpdate, deal_analysis: verdictData.analysis, ai_notes: fullNotes })
+      } else {
+        setGenError(verdictData.error || 'Verdict/score generation failed — comps and negotiation plan were saved, but no deal score is available. Try re-running.')
       }
 
       // Auto-generate scripts in background — no await, runs independently
@@ -555,7 +554,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       if (lead.id) await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
       setLocalNotes(fullNotes)
       onUpdated?.({ ...lead, ai_notes: fullNotes })
-      setNegoStale(false)
     } catch (err) {
       setGenError(err.message || 'Failed to update negotiation plan.')
     } finally {
@@ -816,21 +814,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
-      {/* Stale nego plan notice */}
-      {negoStale && !generating && !updatingNego && (
-        <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
-          <div>
-            <div className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ Negotiation plan is based on old numbers</div>
-            <div className="text-[10.5px] text-[color:var(--color-warn-text)] opacity-80 mt-0.5">You changed ARV or Reno — the plan and scripts still reflect the previous analysis.</div>
-          </div>
-          <button
-            onClick={updateNegoPlan}
-            className="shrink-0 h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-warn)] text-white hover:opacity-90 transition-opacity"
-          >
-            ↻ Update Plan
-          </button>
-        </div>
-      )}
       {updatingNego && (
         <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)] text-[11.5px] text-[color:var(--color-warn-text)]">
           <svg className="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">

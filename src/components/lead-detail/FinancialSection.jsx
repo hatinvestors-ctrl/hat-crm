@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
@@ -8,12 +7,11 @@ import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 
 
 export default function FinancialSection({ lead, userId, members, canEdit, onUpdated }) {
-  const { workspaceId } = useOutletContext()
   const update = useLeadUpdate(lead, userId, members, onUpdated)
 
   const [showRenoPicker, setShowRenoPicker] = useState(false)
 
-  const renoMissing          = !lead.renovation_cost
+  const renoMissing          = lead.renovation_cost == null
 
   return (
     <Card title="Financials" subtitle="Deal numbers at a glance — click any value to edit">
