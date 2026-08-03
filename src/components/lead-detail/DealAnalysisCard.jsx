@@ -23,6 +23,38 @@ function parseAiStartingOffer(notesText) {
   return m ? parseInt(m[1].replace(/,/g, ''), 10) : null
 }
 
+// Free-text property type (as written by the AI) → our fixed select options
+function mapPropertyType(text) {
+  if (!text) return null
+  const t = text.toLowerCase()
+  if (/single|sfr/.test(t)) return 'single_family'
+  if (/duplex|tri-?plex|four-?plex|multi/.test(t)) return 'multi_family'
+  if (/condo/.test(t)) return 'condo'
+  if (/town/.test(t)) return 'townhouse'
+  if (/land|lot/.test(t)) return 'land'
+  if (/commercial/.test(t)) return 'commercial'
+  return null
+}
+
+// Parse the DEAL SNAPSHOT section's "Profile" and "DOM" lines so we can backfill
+// Property Info fields the AI restated but the lead record is missing.
+// Profile line format: "Profile:    3BR/2.5BA | 1217 sqft | ZIP 32218 | Single-Family"
+function parseSnapshotFields(notesText) {
+  if (!notesText) return {}
+  const out = {}
+  const profileMatch = notesText.match(/Profile:\s*([\d.]+)BR\/([\d.]+)BA\s*\|\s*([\d,]+)\s*sqft\s*\|\s*ZIP\s*(\d{5})\s*\|\s*([^\n|]+)/i)
+  if (profileMatch) {
+    out.bedrooms = parseInt(profileMatch[1], 10) || null
+    out.bathrooms = parseFloat(profileMatch[2]) || null
+    out.sqft = parseInt(profileMatch[3].replace(/,/g, ''), 10) || null
+    out.zip_code = profileMatch[4]
+    out.property_type = mapPropertyType(profileMatch[5].trim())
+  }
+  const domMatch = notesText.match(/DOM:\s*(\d+)\s*days?/i)
+  if (domMatch) out.days_on_market = parseInt(domMatch[1], 10)
+  return out
+}
+
 // Fetch comment-type activities for a lead and format as context string
 async function fetchLeadContext(lead) {
   if (!lead.id) return ''
@@ -357,10 +389,22 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const fullNotes = timestamp + [coreNotes, compsNotes, planNotes].filter(Boolean).join('\n\n')
 
       const aiStartingOffer = coreResult.computed_starting_offer ?? parseAiStartingOffer(coreNotes)
+      // Backfill Property Info fields the AI restated in DEAL SNAPSHOT — only where
+      // the lead record doesn't already have a value, never overwrite existing data.
+      const snapshot = parseSnapshotFields(coreNotes)
+      const backfill = {
+        ...(lead.bedrooms == null && snapshot.bedrooms != null ? { bedrooms: snapshot.bedrooms } : {}),
+        ...(lead.bathrooms == null && snapshot.bathrooms != null ? { bathrooms: snapshot.bathrooms } : {}),
+        ...(lead.sqft == null && snapshot.sqft != null ? { sqft: snapshot.sqft } : {}),
+        ...(lead.zip_code == null && snapshot.zip_code != null ? { zip_code: snapshot.zip_code } : {}),
+        ...(lead.property_type == null && snapshot.property_type != null ? { property_type: snapshot.property_type } : {}),
+        ...(lead.days_on_market == null && snapshot.days_on_market != null ? { days_on_market: snapshot.days_on_market } : {}),
+      }
       const dbUpdate = {
         ai_notes: fullNotes,
         ...(finalArv !== null && finalArv !== undefined ? { arv: finalArv } : {}),
         ...(finalMao !== null && finalMao !== undefined ? { mao: finalMao } : {}),
+        ...backfill,
       }
       if (lead.id) {
         await supabase.from('leads').update(dbUpdate).eq('id', lead.id)
@@ -469,11 +513,21 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const fullNotes     = timestamp + coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
       const hasNego             = /NEGOTIATION PLAN/i.test(localNotes)
       const reRunStartingOffer  = coreResult.computed_starting_offer ?? parseAiStartingOffer(coreNotes)
+      const snapshot = parseSnapshotFields(coreNotes)
+      const backfill = {
+        ...(lead.bedrooms == null && snapshot.bedrooms != null ? { bedrooms: snapshot.bedrooms } : {}),
+        ...(lead.bathrooms == null && snapshot.bathrooms != null ? { bathrooms: snapshot.bathrooms } : {}),
+        ...(lead.sqft == null && snapshot.sqft != null ? { sqft: snapshot.sqft } : {}),
+        ...(lead.zip_code == null && snapshot.zip_code != null ? { zip_code: snapshot.zip_code } : {}),
+        ...(lead.property_type == null && snapshot.property_type != null ? { property_type: snapshot.property_type } : {}),
+        ...(lead.days_on_market == null && snapshot.days_on_market != null ? { days_on_market: snapshot.days_on_market } : {}),
+      }
       const supabaseUpdate = {
         ai_notes: fullNotes,
         ...(arv  != null        ? { arv }                  : {}),
         ...(reno != null        ? { renovation_cost: reno } : {}),
         ...(reRunAiMao !== null ? { mao: reRunAiMao }       : {}),
+        ...backfill,
       }
       if (lead.id) {
         await supabase.from('leads').update(supabaseUpdate).eq('id', lead.id)
