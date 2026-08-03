@@ -174,6 +174,7 @@ export default function LeadDetailPage() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* ── Group 1: Evaluate ─────────────────────── */}
+            <GroupDivider label="Property" />
             <div id="step-property" className="space-y-4">
               <PropertyInfoSection
                 lead={lead}
@@ -184,6 +185,7 @@ export default function LeadDetailPage() {
               />
             </div>
 
+            <GroupDivider label="Renovation & Financials" />
             <div id="step-renovation" className="space-y-4">
               <FinancialSection
                 lead={lead}
@@ -194,7 +196,7 @@ export default function LeadDetailPage() {
               />
             </div>
 
-            <GroupDivider label="Analysis & Notes" />
+            <GroupDivider label="AI Analysis & Notes" />
 
             {/* ── Group 2: Understand ───────────────────── */}
             <div id="step-analysis" className="space-y-4">
@@ -211,6 +213,7 @@ export default function LeadDetailPage() {
               />
             </div>
 
+            <GroupDivider label="Decision" />
             <div id="step-decision" className="space-y-4">
               <a
                 href={`/w/${workspaceId}`}
