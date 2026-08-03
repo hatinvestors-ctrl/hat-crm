@@ -214,9 +214,13 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
 
       <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
         BRRRR is judged on two things: <strong className="text-[color:var(--color-text)]">Monthly Cash Flow</strong> (rent left over after mortgage, taxes, insurance)
-        and <strong className="text-[color:var(--color-text)]">Cash-on-Cash Return</strong> (that cash flow ÷ the cash you have left in the deal after refinancing).
-        BUY needs ≥$200/mo and ≥8% CoC · CONDITIONAL needs ≥$100/mo and ≥5% CoC · anything below that is a FAIL as a rental hold.
+        and <strong className="text-[color:var(--color-text)]">Cash-on-Cash Return</strong> (that cash flow ÷ the cash you have left in the deal after refinancing). Both must clear their bar together.
       </p>
+      <ul className="text-[11px] text-[color:var(--color-text-muted)] leading-relaxed space-y-0.5 list-none">
+        <li><strong className="text-[color:var(--color-success-text)]">BUY</strong> — ≥$200/mo cash flow AND ≥8% cash-on-cash. Solid rental, comfortably self-sustaining.</li>
+        <li><strong className="text-[color:var(--color-warn-text)]">CONDITIONAL</strong> — ≥$100/mo AND ≥5% cash-on-cash. Works, but with little cushion for vacancy, repairs, or rent coming in under estimate.</li>
+        <li><strong className="text-[color:var(--color-danger-text)]">FAIL</strong> — below either bar. Not viable as a buy-and-hold rental at these numbers; would need to change rent, ARV, or reno to work (see below).</li>
+      </ul>
 
       <div className="grid grid-cols-2 gap-3 pt-1">
         <div>
@@ -295,8 +299,12 @@ function FlipRealityCheck({ lead, verdict, score }) {
 
       <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
         Flip is judged mainly on <strong className="text-[color:var(--color-text)]">Total Profit</strong> after sale (ARV × 93%, minus the HML loan, holding costs, and cash to close).
-        BUY needs ≥$40,000 profit · CONDITIONAL needs ≥$30,000 · anything below that is a PASS.
       </p>
+      <ul className="text-[11px] text-[color:var(--color-text-muted)] leading-relaxed space-y-0.5 list-none">
+        <li><strong className="text-[color:var(--color-success-text)]">BUY</strong> — ≥$40,000 profit. Healthy margin, safe to proceed even if costs run a bit over.</li>
+        <li><strong className="text-[color:var(--color-warn-text)]">CONDITIONAL</strong> — $30,000–$39,999 profit. Still clears the minimum bar, but the margin is thin — double-check your reno estimate and ARV comps before committing, since a small overrun could wipe out the profit.</li>
+        <li><strong className="text-[color:var(--color-danger-text)]">PASS</strong> — under $30,000. Not enough cushion for the risk of a flip; look for a lower price or walk away.</li>
+      </ul>
 
       <div className="grid grid-cols-2 gap-3 pt-1">
         <div>
