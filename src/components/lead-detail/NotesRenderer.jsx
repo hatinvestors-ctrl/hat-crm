@@ -2132,7 +2132,7 @@ const SECTION_META = {
 // Tab definitions — sections matched by name. Summary intentionally includes
 // RECOMMENDED ACTION so the tab always appears (it's always the first section generated).
 const TABS = [
-  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SNAPSHOT$|^DEAL SCORE$|^OPPORTUNITY SCORE|^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^PROS|^CONS|^KEY INSIGHTS/.test(n) },
+  { id: 'summary',  label: 'Summary',  icon: '📊', match: n => /^DEAL SCORE$|^OPPORTUNITY SCORE|^RECOMMENDED ACTION|^STRATEGY RECOMMENDATION|^NEXT ACTION|^PROS|^CONS|^KEY INSIGHTS/.test(n) },
   { id: 'comps',    label: 'Comps',    icon: '🏡', match: n => /^COMPARABLE SALES|^MARKET COMPS|^RENTAL COMPS|^CRM COMPS USED|^BEDROOM ADD|^ARV ANALYSIS/.test(n) },
   { id: 'strategy', label: 'Strategy', icon: '🎯', match: n => /^NEGOTIATION PLAN|^COMMUNICATIONS/.test(n), alwaysShow: true },
 ]
@@ -2237,7 +2237,7 @@ export default function NotesRenderer({ notes, extraTabs = [], missingFields = [
           : <>
               {(currentTab?.id === 'summary'
                 ? [...(currentTab.items || [])].sort((a, b) => {
-                    const ORDER = ['RECOMMENDED ACTION', 'DEAL SCORE', 'DEAL SNAPSHOT', 'PROS', 'CONS', 'KEY INSIGHTS']
+                    const ORDER = ['RECOMMENDED ACTION', 'DEAL SCORE', 'PROS', 'CONS', 'KEY INSIGHTS']
                     const ai = ORDER.findIndex(o => a.name.toUpperCase().startsWith(o))
                     const bi = ORDER.findIndex(o => b.name.toUpperCase().startsWith(o))
                     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
