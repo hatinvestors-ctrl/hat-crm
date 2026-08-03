@@ -262,6 +262,76 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
   )
 }
 
+// Explains a Flip verdict in plain terms and shows exactly what would need to
+// change to cross into BUY — checked one lever at a time (purchase price, ARV,
+// renovation cost), holding the other two at their current values.
+function FlipRealityCheck({ lead, verdict, score }) {
+  const arv  = Number(lead.arv || 0)
+  const reno = Number(lead.renovation_cost ?? 0)
+  const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
+  const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
+  if (!arv || !pp) return null
+
+  const f = computeFlipBreakdown(pp, arv, reno)
+  const profit = f.totalProfit
+  const holdMonths = f.holdMonths
+
+  const tier = profit >= 40000 ? 'BUY' : profit >= 30000 ? 'CONDITIONAL' : 'PASS'
+
+  const isBuy = (arvVal, renoVal, ppVal) => computeFlipBreakdown(ppVal, arvVal, renoVal, holdMonths).totalProfit >= 40000
+
+  const ppThreshold   = bisectThreshold(p => isBuy(arv, reno, p), pp * 0.5, pp * 1.5)
+  const arvThreshold  = bisectThreshold(a => isBuy(a, reno, pp), arv * 0.5, arv * 2)
+  const renoThreshold = reno > 0 ? bisectThreshold(r => isBuy(arv, r, pp), 0, reno) : null
+
+  const round1k = n => Math.round(n / 1000) * 1000
+
+  const profitColor = profit >= 40000 ? 'text-[color:var(--color-success-text)]' : profit >= 30000 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+  const roiColor = f.roi >= 15 ? 'text-[color:var(--color-success-text)]' : f.roi >= 8 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+
+  return (
+    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">Why Flip {verdict || tier} · Score {score ?? '—'}</div>
+
+      <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
+        Flip is judged mainly on <strong className="text-[color:var(--color-text)]">Total Profit</strong> after sale (ARV × 93%, minus the HML loan, holding costs, and cash to close).
+        BUY needs ≥$40,000 profit · CONDITIONAL needs ≥$30,000 · anything below that is a PASS.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 pt-1">
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Total Profit</div>
+          <div className={`text-[14px] font-bold ${profitColor}`}>{fc(profit)}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">ROI ({holdMonths}mo)</div>
+          <div className={`text-[14px] font-bold ${roiColor}`}>{pct(f.roi)}</div>
+        </div>
+      </div>
+
+      <div className="border-t border-[color:var(--color-line)] pt-2 space-y-1.5">
+        <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold">To make this a BUY — pick one lever (each shown holding the others as-is):</div>
+
+        {tier === 'BUY' ? (
+          <p className="text-[11px] text-[color:var(--color-success-text)]">Already there — no changes needed.</p>
+        ) : (
+          <>
+            <p className="text-[11px] text-[color:var(--color-accent-text)]">
+              <strong>Purchase Price</strong> would need to be {ppThreshold != null ? <><strong>{fc(round1k(ppThreshold))}</strong> or lower (currently {fc(pp)})</> : 'lower than is realistic here'}.
+            </p>
+            <p className="text-[11px] text-[color:var(--color-accent-text)]">
+              <strong>ARV</strong> would need to be {arvThreshold != null ? <><strong>{fc(round1k(arvThreshold))}</strong> or higher (currently {fc(arv)})</> : 'higher than is realistic here'}.
+            </p>
+            <p className="text-[11px] text-[color:var(--color-accent-text)]">
+              <strong>Renovation cost</strong> would need to drop to {renoThreshold != null ? <><strong>{fc(round1k(renoThreshold))}</strong> or less (currently {fc(reno)})</> : reno > 0 ? "no amount fixes this on its own — profit is still short even at $0 reno" : "n/a (already $0)"}.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
   const [targetProfit, setTargetProfit] = useState('30000')
   const parsed = parseFloat(targetProfit.replace(/[^0-9.]/g, '')) || 0
@@ -944,6 +1014,9 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
       {hasAnalysis && strategy === 'brrrr' && (
         <BrrrrRealityCheck lead={lead} verdict={lead.deal_analysis?.verdict} score={lead.deal_analysis?.score} />
+      )}
+      {hasAnalysis && strategy !== 'brrrr' && (
+        <FlipRealityCheck lead={lead} verdict={lead.deal_analysis?.verdict} score={lead.deal_analysis?.score} />
       )}
 
       {/* Override inputs — shown after analysis is available */}
