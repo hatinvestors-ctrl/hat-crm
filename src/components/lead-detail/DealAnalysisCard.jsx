@@ -987,9 +987,12 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
       {hasAnalysis && (() => {
         const a = lead.deal_analysis
-        const theme = a.score >= 70
+        // Color follows the Verdict word itself (what people actually read), not the
+        // numeric Score — a "BUY" verdict should never render in an amber/red box.
+        const v = (a.verdict || '').toUpperCase()
+        const theme = v === 'BUY'
           ? { bg: 'var(--color-success-soft)', border: 'var(--color-success)', text: 'var(--color-success-text)' }
-          : a.score >= 45
+          : v === 'CONDITIONAL' || v === 'CONDITIONAL APPROVE'
           ? { bg: 'var(--color-warn-soft)', border: 'var(--color-warn)', text: 'var(--color-warn-text)' }
           : { bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' }
         return (
