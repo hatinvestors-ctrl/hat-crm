@@ -162,7 +162,7 @@ function DealScoreSection({ body }) {
     'Data Quality':   { icon: '📋', hint: 'How complete our info is — ARV, reno cost, rent estimate. Low score = re-run after getting better numbers' },
   }
 
-  const [showBreakdown, setShowBreakdown] = useState(false)
+  const [showBreakdown, setShowBreakdown] = useState(true)
 
   return (
     <div className="space-y-3">
