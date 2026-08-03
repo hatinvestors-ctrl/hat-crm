@@ -352,11 +352,13 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       if (cancelledRef.current) return
       const compsNotes = freshComps || existingComps
 
-      // Phase 1b — core analysis with comps ARV injected so all numbers agree
+      // Phase 1b — core analysis with comps ARV injected so all numbers agree.
+      // ARV set in Financials is the single source of truth — comps only fill it in
+      // when it's not set yet; they never silently override a value the user typed.
       const compsArvMatch = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
       const resolvedArv = compsArvMatch ? parseInt(compsArvMatch[1].replace(/,/g, '')) : null
       if (resolvedArv) setAiCompsArv(resolvedArv)
-      const arvForCore = resolvedArv || (lead.arv ? Number(lead.arv) : null)
+      const arvForCore = (lead.arv ? Number(lead.arv) : null) ?? resolvedArv
       // Apply any override values already entered by the user (reno, notes) —
       // DOM and Rent are read straight from `lead` (edited in Property Info / Financials).
       const renoVal  = renoOverrideVal ?? null
@@ -476,10 +478,11 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
   // Re-run only core analysis with ARV and/or reno overrides — skips comps (fast ~8s)
   const reRunWithOverrides = async () => {
-    // ARV/Reno have no override input UI here (edited only in FinancialSection) — always
-    // use the AI comps ARV from the last run / lead's DB values, never a stale override.
+    // ARV/Reno have no override input UI here (edited only in FinancialSection) — the
+    // Financials value is always the source of truth; the AI comps ARV only fills in
+    // when Financials has no ARV set yet, never overrides one that's already there.
     // DOM/Rent are read straight from `lead` (edited in Property Info / Financials).
-    const arv  = aiCompsArv || (lead.arv ? Number(lead.arv) : null)
+    const arv  = (lead.arv ? Number(lead.arv) : null) ?? aiCompsArv
     const reno = null
     const priceDrop = priceDropOverride ? parseFloat(priceDropOverride.replace(/[^0-9.]/g, '')) || null : null
     const sellerNotes = sellerNotesOverride.trim() || null
