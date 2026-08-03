@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateMAO } from '../../lib/calculations'
+import { formatCurrency, calculateMAO, calculateFlipProfitAtPrice } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 
 
@@ -91,6 +91,16 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                 <EditableField label="" type="currency" value={lead.mao ?? formulaMao} formatter={formatCurrency}
                   onSave={(v) => update({ mao: v })} disabled={!canEdit}
                   displayClassName="text-[16px] font-bold text-[color:var(--color-accent)]" />
+                {(() => {
+                  const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost)
+                  if (profitAtMao == null) return null
+                  const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+                  return (
+                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="MAO's 75%-of-ARV formula doesn't guarantee a specific profit dollar amount — that depends on ARV size. This shows what buying exactly at MAO would actually net as a flip.">
+                      Flip profit at MAO: ~{formatCurrency(profitAtMao)}
+                    </div>
+                  )
+                })()}
               </div>
               {/* Starting Offer */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)]">
@@ -127,6 +137,16 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               <EditableField label="" type="currency" value={lead.mao ?? formulaMao} formatter={formatCurrency}
                 onSave={(v) => update({ mao: v })} disabled={!canEdit}
                 displayClassName="text-2xl font-bold text-[color:var(--color-accent)]" />
+              {(() => {
+                const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost)
+                if (profitAtMao == null) return null
+                const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+                return (
+                  <div className="text-[10px] mt-0.5" style={{ color: tone }}>
+                    Flip profit at MAO: ~{formatCurrency(profitAtMao)}
+                  </div>
+                )
+              })()}
             </div>
             <div className="min-w-0">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">We Offer</div>

@@ -23,6 +23,28 @@ export function calculateFlipProfit(arv, purchasePrice, renovationCost) {
   return a - num(purchasePrice) - num(renovationCost)
 }
 
+// Full flip profit at a given purchase price — same math as the Deal Analysis
+// Full Breakdown tab (HML financing, holding costs, sale proceeds at 93% of ARV).
+// Used to show "expected profit if bought at MAO" next to MAO, since MAO's fixed
+// 75%-of-ARV rule doesn't by itself guarantee any particular profit dollar amount
+// — that depends on how big the ARV is.
+export function calculateFlipProfitAtPrice(purchasePrice, arv, renovationCost, holdMonths = 3) {
+  const pp   = num(purchasePrice)
+  const rv   = num(arv)
+  const reno = num(renovationCost)
+  if (!pp || !rv) return null
+  const hmlLoan = pp * 0.90 + reno
+  const downPayment = pp * 0.10
+  const points = hmlLoan * 0.02
+  const fixedCosts = 2450
+  const totalCashNeeded = downPayment + points + fixedCosts
+  const monthlyPmt = hmlLoan * 0.01
+  const holdingPerMo = monthlyPmt + 208 + 100
+  const totalHolding = holdingPerMo * holdMonths
+  const saleProceeds = rv * 0.93
+  return saleProceeds - hmlLoan - totalHolding - totalCashNeeded
+}
+
 export function formatCurrency(value) {
   if (value === null || value === undefined || value === '') return '—'
   const n = Number(value)
