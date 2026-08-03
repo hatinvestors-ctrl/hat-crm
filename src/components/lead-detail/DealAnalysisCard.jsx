@@ -152,6 +152,71 @@ function maxOfferForProfit(arv, reno, holdMonths, desiredProfit) {
   return (constant - reno * renoCoeff - desiredProfit) / ppCoeff
 }
 
+// Explains a BRRRR verdict in plain terms and shows exactly what would need to
+// change to cross into the next tier (Monthly Cash Flow and Cash-on-Cash Return
+// are what actually drive the verdict — not the purchase price directly, since
+// the refi loan is 70% of ARV regardless of what you paid).
+function BrrrrRealityCheck({ lead, verdict, score }) {
+  const arv  = Number(lead.arv || 0)
+  const reno = Number(lead.renovation_cost ?? 0)
+  const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
+  const pp   = Number(lead.mao || (arv ? Math.round(arv * 0.75 - reno - 2450) : 0) || lead.asking_price || 0)
+  if (!arv || !pp) return null
+
+  const f = computeBrrrrBreakdown(pp, arv, reno, rent)
+  const cf  = f.monthlyCF
+  const coc = f.coc
+
+  const tier = (cf != null && coc != null && coc >= 8 && cf >= 200) ? 'BUY'
+    : (cf != null && coc != null && coc >= 5 && cf >= 100) ? 'CONDITIONAL'
+    : 'FAIL'
+
+  // Rent needed to hit BUY threshold (≥$200/mo CF) — cash flow depends only on
+  // rent and ARV's refi payment, not on purchase price or reno.
+  const refiMoPmt = arv * 0.70 * 0.006607
+  const rentForBuy = Math.ceil((refiMoPmt + 208 + 100 + 200) / 50) * 50
+  const rentGapForBuy = rent > 0 ? rentForBuy - rent : null
+
+  const cfColor = cf == null ? 'text-[color:var(--color-text-dim)]' : cf >= 200 ? 'text-[color:var(--color-success-text)]' : cf >= 0 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+  const cocColor = coc == null ? 'text-[color:var(--color-text-dim)]' : coc >= 8 ? 'text-[color:var(--color-success-text)]' : coc >= 5 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+
+  return (
+    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">Why BRRRR {verdict || tier} · Score {score ?? '—'}</div>
+
+      <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
+        BRRRR is judged on two things: <strong className="text-[color:var(--color-text)]">Monthly Cash Flow</strong> (rent left over after mortgage, taxes, insurance)
+        and <strong className="text-[color:var(--color-text)]">Cash-on-Cash Return</strong> (that cash flow ÷ the cash you have left in the deal after refinancing).
+        BUY needs ≥$200/mo and ≥8% CoC · CONDITIONAL needs ≥$100/mo and ≥5% CoC · anything below that is a FAIL as a rental hold.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 pt-1">
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Monthly Cash Flow</div>
+          <div className={`text-[14px] font-bold ${cfColor}`}>{cf != null ? fc(cf) + '/mo' : '— (no rent set)'}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Cash-on-Cash Return</div>
+          <div className={`text-[14px] font-bold ${cocColor}`}>{coc != null ? pct(coc) : '—'}</div>
+        </div>
+      </div>
+
+      {rent > 0 && rentGapForBuy != null && rentGapForBuy > 0 && (
+        <p className="text-[11px] text-[color:var(--color-accent-text)] border-t border-[color:var(--color-line)] pt-2">
+          To make this a BUY: rent needs to be at least <strong>{fc(rentForBuy)}/mo</strong> (currently {fc(rent)}/mo — {fc(rentGapForBuy)} short).
+          Note purchase price doesn't move cash flow here — the refi loan is fixed at 70% of ARV regardless of what you paid — so a lower offer helps
+          your cash-on-cash return, not the monthly number.
+        </p>
+      )}
+      {(!rent || rent <= 0) && (
+        <p className="text-[11px] text-[color:var(--color-warn-text)] border-t border-[color:var(--color-line)] pt-2">
+          No rent estimate is set — cash flow can't be computed. Add a Rent Estimate in Financials, then re-run.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
   const [targetProfit, setTargetProfit] = useState('30000')
   const parsed = parseFloat(targetProfit.replace(/[^0-9.]/g, '')) || 0
@@ -831,6 +896,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           </div>
         )
       })()}
+
+      {hasAnalysis && strategy === 'brrrr' && (
+        <BrrrrRealityCheck lead={lead} verdict={lead.deal_analysis?.verdict} score={lead.deal_analysis?.score} />
+      )}
 
       {/* Override inputs — shown after analysis is available */}
       {localNotes && !generating && (
