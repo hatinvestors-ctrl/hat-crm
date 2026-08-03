@@ -693,15 +693,25 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
               {phase === 'analysis' ? 'Analyzing…' : phase === 'negotiation' ? 'Building negotiation plan…' : 'Working…'}
               <button onClick={cancelGenerate} className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">Cancel</button>
             </span>
-          ) : (
+          ) : (!hasAnalysis || staleness.stale) ? (
             <button
               onClick={() => handleRun(false)}
               className={`text-[12px] font-semibold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity ${
                 staleness.stale && hasAnalysis ? 'bg-[color:var(--color-warn)]' : 'bg-[color:var(--color-accent)]'
               }`}
             >
-              {!hasAnalysis ? '✦ Run Analysis' : staleness.stale ? '⚠ Re-run Analysis' : '↺ Re-run Analysis'}
+              {!hasAnalysis ? '✦ Run Analysis' : '⚠ Re-run Analysis'}
             </button>
+          ) : (
+            <span className="flex items-center gap-2 text-[12px]">
+              <span className="text-[color:var(--color-success-text)] font-medium">✓ Up to date</span>
+              <button
+                onClick={() => handleRun(false)}
+                className="text-[11px] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] underline underline-offset-2 transition-colors"
+              >
+                Refresh anyway
+              </button>
+            </span>
           )
         )}
       </div>
