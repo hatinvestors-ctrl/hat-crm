@@ -81,7 +81,7 @@ export default function LeadStatusPipeline({ lead, members, userId, workspaceId,
     }
   }
 
-  const [gridOpen, setGridOpen] = useState(false)
+  const [gridOpen, setGridOpen] = useState(true)
 
   return (
     <div className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg px-4 py-3">
