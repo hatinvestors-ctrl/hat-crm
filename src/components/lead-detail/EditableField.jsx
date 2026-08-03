@@ -140,11 +140,11 @@ export default function EditableField({
           } ${isEmpty ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-text)]'}`}
           title={disabled ? '' : 'Click to edit'}
         >
-          <span className={disabled ? '' : 'border-b border-dashed border-[color:var(--color-line)] group-hover:border-[color:var(--color-accent)]'}>
+          <span className={disabled ? '' : 'border-b border-dashed border-[color:var(--color-accent-soft)] group-hover:border-[color:var(--color-accent)]'}>
             {display || placeholder}
           </span>
           {!disabled && (
-            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[color:var(--color-accent-text)] shrink-0">✎</span>
+            <span className="opacity-50 group-hover:opacity-100 transition-opacity text-[10px] text-[color:var(--color-accent-text)] shrink-0">✎</span>
           )}
         </button>
       )}
