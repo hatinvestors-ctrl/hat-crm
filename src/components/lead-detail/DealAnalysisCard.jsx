@@ -152,10 +152,25 @@ function maxOfferForProfit(arv, reno, holdMonths, desiredProfit) {
   return (constant - reno * renoCoeff - desiredProfit) / ppCoeff
 }
 
+// Generic bisection: finds where evalFn(x) flips from false to true across [lo, hi].
+// Works regardless of whether increasing x makes the condition more or less likely
+// to be true. Returns null if the condition doesn't change within [lo, hi] at all
+// (either always true, or — the case we care about — never true in a realistic range).
+function bisectThreshold(evalFn, lo, hi, iterations = 50) {
+  const trueAtLo = evalFn(lo)
+  const trueAtHi = evalFn(hi)
+  if (trueAtLo === trueAtHi) return trueAtLo ? lo : null
+  let a = lo, b = hi
+  for (let i = 0; i < iterations; i++) {
+    const mid = (a + b) / 2
+    if (evalFn(mid) === trueAtHi) b = mid; else a = mid
+  }
+  return trueAtHi ? b : a
+}
+
 // Explains a BRRRR verdict in plain terms and shows exactly what would need to
-// change to cross into the next tier (Monthly Cash Flow and Cash-on-Cash Return
-// are what actually drive the verdict — not the purchase price directly, since
-// the refi loan is 70% of ARV regardless of what you paid).
+// change to cross into BUY — checked one lever at a time (rent, renovation cost,
+// ARV), holding the other two at their current values.
 function BrrrrRealityCheck({ lead, verdict, score }) {
   const arv  = Number(lead.arv || 0)
   const reno = Number(lead.renovation_cost ?? 0)
@@ -171,11 +186,24 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
     : (cf != null && coc != null && coc >= 5 && cf >= 100) ? 'CONDITIONAL'
     : 'FAIL'
 
-  // Rent needed to hit BUY threshold (≥$200/mo CF) — cash flow depends only on
-  // rent and ARV's refi payment, not on purchase price or reno.
-  const refiMoPmt = arv * 0.70 * 0.006607
-  const rentForBuy = Math.ceil((refiMoPmt + 208 + 100 + 200) / 50) * 50
-  const rentGapForBuy = rent > 0 ? rentForBuy - rent : null
+  const isBuy = (arvVal, renoVal, rentVal) => {
+    const r = computeBrrrrBreakdown(pp, arvVal, renoVal, rentVal)
+    return r.monthlyCF != null && r.coc != null && r.monthlyCF >= 200 && r.coc >= 8
+  }
+
+  // Each lever solved independently — everything else held at its current value.
+  const rentThreshold = rent > 0
+    ? bisectThreshold(r => isBuy(arv, reno, r), rent, rent + 3000)
+    : null
+  const renoThreshold = reno > 0 && rent > 0
+    ? bisectThreshold(r => isBuy(arv, r, rent), 0, reno)
+    : null
+  const arvThreshold = rent > 0
+    ? bisectThreshold(a => isBuy(a, reno, rent), arv * 0.5, arv * 2)
+    : null
+
+  const round50 = n => Math.round(n / 50) * 50
+  const round1k = n => Math.round(n / 1000) * 1000
 
   const cfColor = cf == null ? 'text-[color:var(--color-text-dim)]' : cf >= 200 ? 'text-[color:var(--color-success-text)]' : cf >= 0 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
   const cocColor = coc == null ? 'text-[color:var(--color-text-dim)]' : coc >= 8 ? 'text-[color:var(--color-success-text)]' : coc >= 5 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
@@ -201,14 +229,31 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
         </div>
       </div>
 
-      {rent > 0 && rentGapForBuy != null && rentGapForBuy > 0 && (
-        <p className="text-[11px] text-[color:var(--color-accent-text)] border-t border-[color:var(--color-line)] pt-2">
-          To make this a BUY: rent needs to be at least <strong>{fc(rentForBuy)}/mo</strong> (currently {fc(rent)}/mo — {fc(rentGapForBuy)} short).
-          Note purchase price doesn't move cash flow here — the refi loan is fixed at 70% of ARV regardless of what you paid — so a lower offer helps
-          your cash-on-cash return, not the monthly number.
-        </p>
-      )}
-      {(!rent || rent <= 0) && (
+      {rent > 0 ? (
+        <div className="border-t border-[color:var(--color-line)] pt-2 space-y-1.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold">To make this a BUY — pick one lever (each shown holding the others as-is):</div>
+
+          {tier === 'BUY' ? (
+            <p className="text-[11px] text-[color:var(--color-success-text)]">Already there — no changes needed.</p>
+          ) : (
+            <>
+              <p className="text-[11px] text-[color:var(--color-accent-text)]">
+                <strong>Rent</strong> would need to reach {rentThreshold != null ? <><strong>{fc(round50(rentThreshold))}/mo</strong> (currently {fc(rent)}/mo — {fc(round50(rentThreshold) - rent)} short)</> : 'a level not realistic to reach'}.
+              </p>
+              <p className="text-[11px] text-[color:var(--color-accent-text)]">
+                <strong>Renovation cost</strong> would need to drop to {renoThreshold != null ? <><strong>{fc(round1k(renoThreshold))}</strong> or less (currently {fc(reno)})</> : reno > 0 ? "no amount fixes this on its own — cash flow is still short even at $0 reno" : "n/a (already $0)"}.
+              </p>
+              <p className="text-[11px] text-[color:var(--color-accent-text)]">
+                <strong>ARV</strong> would need to come in {arvThreshold != null ? <>at <strong>{fc(round1k(arvThreshold))}</strong> {arvThreshold < arv ? 'or lower' : 'or higher'} (currently {fc(arv)})</> : 'at a level not realistic to reach'}.
+                {arvThreshold != null && arvThreshold < arv && ' A lower ARV means a smaller refi loan and payment — better cash flow, but less cash back at refi.'}
+              </p>
+              <p className="text-[10px] text-[color:var(--color-text-dim)] italic pt-1">
+                Purchase price alone doesn't move monthly cash flow here — the refi loan is fixed at 70% of ARV regardless of what you paid — but a lower offer still improves your cash-on-cash return.
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
         <p className="text-[11px] text-[color:var(--color-warn-text)] border-t border-[color:var(--color-line)] pt-2">
           No rent estimate is set — cash flow can't be computed. Add a Rent Estimate in Financials, then re-run.
         </p>
