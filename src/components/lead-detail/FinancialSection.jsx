@@ -138,8 +138,8 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         )
       })()}
 
-      {/* ── Section 2: Inputs — ARV + Reno ── */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      {/* ── Section 2: Inputs — ARV + Reno + Rent ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
           <EditableField
             label="After-Repair Value (ARV)"
@@ -190,6 +190,16 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               update({ renovation_cost: reno, ...(newMao ? { mao: newMao } : {}) })
               setShowRenoPicker(false)
             }}
+          />
+        </div>
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+          <EditableField
+            label="Rent Estimate (BRRRR)"
+            type="currency"
+            value={lead.rent_estimate}
+            formatter={formatCurrency}
+            onSave={(v) => update({ rent_estimate: v })}
+            disabled={!canEdit}
           />
         </div>
       </div>

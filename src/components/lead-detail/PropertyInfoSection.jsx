@@ -70,6 +70,14 @@ export default function PropertyInfoSection({ lead, userId, members, canEdit, on
           onSave={(v) => update({ has_garage: v })}
           disabled={!canEdit}
         />
+        <EditableField
+          label="Days on Market"
+          type="number"
+          value={lead.days_on_market}
+          formatter={(v) => `${formatNumber(v)}d`}
+          onSave={(v) => update({ days_on_market: v })}
+          disabled={!canEdit}
+        />
       </div>
 
       <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">

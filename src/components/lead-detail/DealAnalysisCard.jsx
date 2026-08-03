@@ -111,10 +111,10 @@ function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6) {
 const fc = formatCurrency
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 
-function FullBreakdownTab({ lead, strategy, monthlyRent }) {
+function FullBreakdownTab({ lead, strategy }) {
   const arv  = Number(lead.arv || 0)
   const reno = Number(lead.renovation_cost ?? 0)
-  const rent = Number(lead.rent_estimate || lead.monthly_rent || monthlyRent || 0)
+  const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
   const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
   const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
   const isFlip = strategy !== 'brrrr'
@@ -256,7 +256,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const staleness = useDealStaleness(lead)
 
   const [strategy,    setStrategy]    = useState(lead.deal_analysis?.strategy || 'flip')
-  const [monthlyRent, setMonthlyRent] = useState(lead.rent_estimate || lead.monthly_rent || '')
   const [localNotes,  setLocalNotes]  = useState(lead.ai_notes || '')
   const [generating,  setGenerating]  = useState(false)
   const [phase,       setPhase]       = useState(null)
@@ -269,14 +268,11 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [lastArv,  setLastArv]  = useState(lead.arv ? Number(lead.arv) : null)
   const [lastReno, setLastReno] = useState(lead.renovation_cost ? Number(lead.renovation_cost) : null)
   const [refreshingComps, setRefreshingComps] = useState(false)
-  // Override inputs — DOM/Rent/PriceDrop/SellerNotes (not duplicated elsewhere in this card)
-  const [domOverride,       setDomOverride]       = useState('')
-  const [rentOverride,      setRentOverride]      = useState(lead.rent_estimate ? String(Math.round(Number(lead.rent_estimate))) : '')
+  // Override inputs — DOM and Rent are now edited in Property Info / Financials
+  // and read directly from `lead`; only Price Drop % and Seller Notes are
+  // analysis-time-only inputs with no other home.
   const [priceDropOverride, setPriceDropOverride] = useState('')
   const [sellerNotesOverride, setSellerNotesOverride] = useState('')
-  const [aiRent, setAiRent] = useState(null)
-  const [lastDom,  setLastDom]  = useState(null)
-  const [lastRent, setLastRent] = useState(lead.rent_estimate ? Number(lead.rent_estimate) : null)
   const [updatingNego, setUpdatingNego] = useState(false)
   const cancelledRef = useRef(false)
 
@@ -285,13 +281,9 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const hasAnalysis = !!lead.deal_analysis
   const renoMissing = lead.renovation_cost == null
 
-  // Note: ARV/Reno overrides have no input UI in this card (edited only in FinancialSection),
-  // so they are intentionally excluded from this check — see task-4 fix report.
-  const overrideChanged =
-    (domOverride  && parseInt(domOverride.replace(/[^0-9]/g,''))     !== lastDom)  ||
-    (rentOverride      && parseFloat(rentOverride.replace(/[^0-9.]/g,''))      !== lastRent) ||
-    !!priceDropOverride.trim() ||
-    !!sellerNotesOverride.trim()
+  // Note: ARV/Reno/DOM/Rent overrides have no input UI in this card (edited only in
+  // PropertyInfoSection/FinancialSection), so they are intentionally excluded from this check.
+  const overrideChanged = !!priceDropOverride.trim() || !!sellerNotesOverride.trim()
 
   function handleRun(forceRefreshComps) {
     if (renoMissing) { setShowRenoPicker(true); return }
@@ -336,21 +328,15 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const resolvedArv = compsArvMatch ? parseInt(compsArvMatch[1].replace(/,/g, '')) : null
       if (resolvedArv) setAiCompsArv(resolvedArv)
       const arvForCore = resolvedArv || (lead.arv ? Number(lead.arv) : null)
-      const estimatedRent = lead.rent_estimate || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
-      setAiRent(estimatedRent)
-      // Apply any override values already entered by the user (reno, rent, DOM, notes)
+      // Apply any override values already entered by the user (reno, notes) —
+      // DOM and Rent are read straight from `lead` (edited in Property Info / Financials).
       const renoVal  = renoOverrideVal ?? null
-      const rentVal  = rentOverride  ? parseFloat(rentOverride.replace(/[^0-9.]/g, ''))  || null : null
-      const domVal   = domOverride   ? parseInt(domOverride.replace(/[^0-9]/g, ''))       || null : null
       const notesVal = sellerNotesOverride.trim() || null
       if (renoVal) setLastReno(renoVal)
-      if (rentVal) setLastRent(rentVal)
       const leadWithArv = {
         ...leadWithContext,
         ...(arvForCore ? { arv: arvForCore }            : {}),
         ...(renoOverrideVal ?? renoVal ?? lead.renovation_cost ? { renovation_cost: renoOverrideVal ?? renoVal ?? lead.renovation_cost } : {}),
-        ...(rentVal    ? { rent_estimate: rentVal }      : {}),
-        ...(domVal     ? { days_on_market: domVal }      : {}),
         ...(notesVal   ? { notes: notesVal }             : {}),
         competitive_mode: competitiveMode,
       }
@@ -416,7 +402,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           purchase_price: freshMao ?? lead.mao ?? lead.asking_price,
           arv: finalArv ?? lead.arv,
           renovation_cost: effectiveReno || null,
-          monthly_rent: activeStrategy === 'brrrr' ? (parseFloat(monthlyRent) || null) : null,
+          monthly_rent: activeStrategy === 'brrrr' ? (lead.rent_estimate || null) : null,
           strategy: activeStrategy,
           reno_was_estimated: false,
         }),
@@ -451,13 +437,12 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const reRunWithOverrides = async () => {
     // ARV/Reno have no override input UI here (edited only in FinancialSection) — always
     // use the AI comps ARV from the last run / lead's DB values, never a stale override.
+    // DOM/Rent are read straight from `lead` (edited in Property Info / Financials).
     const arv  = aiCompsArv || (lead.arv ? Number(lead.arv) : null)
     const reno = null
-    const dom  = domOverride  ? parseInt(domOverride.replace(/[^0-9]/g, ''))     || null : null
-    const rent      = rentOverride      ? parseFloat(rentOverride.replace(/[^0-9.]/g, ''))      || null : null
     const priceDrop = priceDropOverride ? parseFloat(priceDropOverride.replace(/[^0-9.]/g, '')) || null : null
     const sellerNotes = sellerNotesOverride.trim() || null
-    if (!arv && !reno && dom == null && !rent && priceDrop == null && !sellerNotes) return
+    if (!arv && !reno && priceDrop == null && !sellerNotes) return
     setGenerating(true)
     setGenError(null)
     setPhase('analysis')
@@ -468,8 +453,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         ...lead,
         ...(arv  != null ? { arv }                    : {}),
         ...(reno != null ? { renovation_cost: reno }   : {}),
-        ...(dom  != null ? { days_on_market: dom }     : {}),
-        ...(rent      != null ? { rent_estimate: rent }         : {}),
         ...(priceDrop != null ? { price_drop_pct: priceDrop }  : {}),
         ...(sellerNotes       ? { notes: sellerNotes }          : {}),
         ...(teamComments      ? { team_comments: teamComments } : {}),
@@ -482,8 +465,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const reRunAiMao = coreResult.computed_mao ?? parseAiMao(coreNotes)
       if (arv)         setLastArv(arv)
       if (reno)        setLastReno(reno)
-      if (dom != null) setLastDom(dom)
-      if (rent)        setLastRent(rent)
       // Replace just the core portion — preserve comps/plan/comms
       const existingParts = localNotes.split(/(?=={5,}\s*\n(?:MARKET COMPS|RENTAL COMPS|NEGOTIATION PLAN|COMMUNICATIONS))/i)
       const nonCoreParts  = existingParts.slice(1).join('')
@@ -540,8 +521,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         ...lead,
         ...(lastArv  ? { arv: lastArv }                    : {}),
         ...(lastReno ? { renovation_cost: lastReno }        : {}),
-        ...(lastDom  != null ? { days_on_market: lastDom } : {}),
-        ...(lastRent ? { rent_estimate: lastRent }          : {}),
         ...(priceDropOverride ? { price_drop_pct: parseFloat(priceDropOverride) || null } : {}),
         ...(sellerNotesOverride.trim() ? { notes: sellerNotesOverride.trim() } : {}),
         ...(teamComments      ? { team_comments: teamComments } : {}),
@@ -645,14 +624,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           {strategy === 'brrrr' && (
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-[color:var(--color-text-dim)]">Rent</span>
-              <input
-                type="number"
-                value={monthlyRent}
-                onChange={e => setMonthlyRent(e.target.value)}
-                placeholder="2000"
-                className="w-20 h-7 px-2 text-[12px] bg-[color:var(--color-bg)] border border-[color:var(--color-line)] rounded-lg text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-              />
-              <span className="text-[11px] text-[color:var(--color-text-dim)]">/mo</span>
+              <span className="text-[12px] font-semibold text-[color:var(--color-text)]">
+                {lead.rent_estimate ? fc(lead.rent_estimate) : '—'}
+              </span>
+              <span className="text-[11px] text-[color:var(--color-text-dim)]">/mo · edit in Financials</span>
             </div>
           )}
         </div>
@@ -744,28 +719,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
             Override Inputs → Re-run Analysis
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
-                DOM {lead.days_on_market != null && <span className="normal-case font-normal tracking-normal text-[color:var(--color-text-dim)]">· MLS: {lead.days_on_market}d</span>}
-              </label>
-              <input
-                value={domOverride}
-                onChange={e => setDomOverride(e.target.value)}
-                placeholder={lead.days_on_market != null ? `${lead.days_on_market} days (MLS)` : 'e.g. 45'}
-                className="w-28 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">
-                Rent/mo {aiRent && <span className="normal-case font-normal tracking-normal text-[color:var(--color-accent-text)]">· est: ${aiRent.toLocaleString()}</span>}
-              </label>
-              <input
-                value={rentOverride}
-                onChange={e => setRentOverride(e.target.value)}
-                placeholder={aiRent ? `$${aiRent.toLocaleString()} (est)` : 'e.g. $1,550'}
-                className="w-28 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
-              />
-            </div>
             <div className="flex flex-col gap-0.5">
               <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Price Drop %</label>
               <input
@@ -864,7 +817,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
               id: 'breakdown',
               label: 'Full Breakdown',
               icon: '🧮',
-              content: <FullBreakdownTab lead={lead} strategy={strategy} monthlyRent={monthlyRent} />,
+              content: <FullBreakdownTab lead={lead} strategy={strategy} />,
             },
             {
               id: 'askai',
