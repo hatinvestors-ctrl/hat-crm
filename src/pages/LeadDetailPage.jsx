@@ -12,7 +12,6 @@ import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
-import WhatIfPanel from '../components/lead-detail/WhatIfPanel'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -213,7 +212,15 @@ export default function LeadDetailPage() {
             </div>
 
             <div id="step-decision" className="space-y-4">
-              <WhatIfPanel lead={lead} />
+              <a
+                href={`/w/${workspaceId}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] hover:border-[color:var(--color-accent)] transition-colors"
+              >
+                <span className="text-[13px] font-medium text-[color:var(--color-text)]">
+                  For scenario modeling and ARV/MAO breakpoint sliders, see the Dashboard
+                </span>
+                <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)] shrink-0">Open Dashboard →</span>
+              </a>
             </div>
 
             <GroupDivider label="Contacts & Reports" />
