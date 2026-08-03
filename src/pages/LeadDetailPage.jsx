@@ -216,7 +216,18 @@ export default function LeadDetailPage() {
             <GroupDivider label="Decision" />
             <div id="step-decision" className="space-y-4">
               <a
-                href={`/w/${workspaceId}`}
+                href={(() => {
+                  const params = new URLSearchParams()
+                  if (lead.address) params.set('address', lead.address)
+                  const pp = lead.mao ?? lead.asking_price
+                  if (pp != null) params.set('pp', pp)
+                  if (lead.arv != null) params.set('arv', lead.arv)
+                  if (lead.renovation_cost != null) params.set('reno', lead.renovation_cost)
+                  if (lead.rent_estimate != null) params.set('rent', lead.rent_estimate)
+                  return `/deal-analyzer.html?${params.toString()}`
+                })()}
+                target="_blank"
+                rel="noreferrer"
                 className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] hover:border-[color:var(--color-accent)] transition-colors"
               >
                 <span className="text-[13px] font-medium text-[color:var(--color-text)]">
