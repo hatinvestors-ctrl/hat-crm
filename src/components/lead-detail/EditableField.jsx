@@ -133,14 +133,19 @@ export default function EditableField({
         <button
           onClick={() => !disabled && setEditing(true)}
           disabled={disabled}
-          className={`mt-0.5 w-full text-left px-1 -mx-1 rounded transition-colors ${displayClassName ?? 'text-[13px]'} ${
+          className={`group mt-0.5 w-full inline-flex items-center gap-1 text-left px-1 -mx-1 rounded transition-colors ${displayClassName ?? 'text-[13px]'} ${
             disabled
               ? 'cursor-default'
               : 'cursor-text hover:bg-[color:var(--color-bg-elev-2)]'
           } ${isEmpty ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-text)]'}`}
           title={disabled ? '' : 'Click to edit'}
         >
-          {display || placeholder}
+          <span className={disabled ? '' : 'border-b border-dashed border-[color:var(--color-line)] group-hover:border-[color:var(--color-accent)]'}>
+            {display || placeholder}
+          </span>
+          {!disabled && (
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[color:var(--color-accent-text)] shrink-0">✎</span>
+          )}
         </button>
       )}
     </div>
