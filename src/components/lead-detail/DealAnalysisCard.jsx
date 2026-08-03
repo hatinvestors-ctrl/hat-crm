@@ -260,7 +260,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [generating,  setGenerating]  = useState(false)
   const [phase,       setPhase]       = useState(null)
   const [genError,    setGenError]    = useState(null)
-  const [confirm,     setConfirm]     = useState(false)
   const [showRenoPicker, setShowRenoPicker] = useState(false)
   const [generatingScripts, setGeneratingScripts] = useState(false)
   const [competitiveMode, setCompetitiveMode] = useState(false)
@@ -287,7 +286,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
   function handleRun(forceRefreshComps) {
     if (renoMissing) { setShowRenoPicker(true); return }
-    if (localNotes && !forceRefreshComps) { setConfirm(true); return }
     runGenerate(forceRefreshComps, strategy)
   }
 
@@ -299,7 +297,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   }
 
   const runGenerate = async (forceRefreshComps = false, strategyOverride = null, renoOverrideVal = null) => {
-    setConfirm(false)
     setGenerating(true)
     setGenError(null)
     cancelledRef.current = false
@@ -773,28 +770,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
           </svg>
           Updating negotiation plan with new numbers…
-        </div>
-      )}
-
-      {confirm && (
-        <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">
-          <span className="text-[12px] text-[color:var(--color-warn-text)]">
-            Replace existing AI analysis with a fresh generation?
-          </span>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => setConfirm(false)}
-              className="text-[11.5px] px-2.5 py-1 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => runGenerate(false, strategy)}
-              className="text-[11.5px] px-2.5 py-1 rounded bg-[color:var(--color-warn)] text-white hover:opacity-90 transition-opacity"
-            >
-              Regenerate
-            </button>
-          </div>
         </div>
       )}
 
