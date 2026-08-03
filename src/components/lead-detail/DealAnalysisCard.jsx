@@ -645,9 +645,11 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           ) : (
             <button
               onClick={() => handleRun(false)}
-              className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+              className={`text-[12px] font-semibold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity ${
+                staleness.stale && hasAnalysis ? 'bg-[color:var(--color-warn)]' : 'bg-[color:var(--color-accent)]'
+              }`}
             >
-              {hasAnalysis ? '↺ Re-run Analysis' : '✦ Run Analysis'}
+              {!hasAnalysis ? '✦ Run Analysis' : staleness.stale ? '⚠ Re-run Analysis' : '↺ Re-run Analysis'}
             </button>
           )
         )}
@@ -667,11 +669,8 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       )}
 
       {staleness.stale && hasAnalysis && !generating && (
-        <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
-          <span className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ {staleness.reasons.join(', ')} — results may be outdated.</span>
-          <button onClick={() => handleRun(false)} className="shrink-0 h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-warn)] text-white hover:opacity-90 transition-opacity">
-            Re-run now
-          </button>
+        <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <span className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ {staleness.reasons.join(', ')} — results may be outdated. Use "Re-run Analysis" above.</span>
         </div>
       )}
 
