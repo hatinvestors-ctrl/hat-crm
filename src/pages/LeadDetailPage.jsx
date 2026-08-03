@@ -143,13 +143,13 @@ export default function LeadDetailPage() {
           canEdit={canEdit}
           canAssign={canAssign}
           onEdit={() => setEditOpen(true)}
-          onUpdated={(updated) => setLead(updated)}
+          onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
           onCreateProject={handleCreateProject}
           creatingProject={creatingProject}
           workspaceId={workspaceId}
         />
 
-        <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(updated)} paused={!!workspace?.settings?.mls_paused} />
+        <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
         <LeadFlowStepper lead={lead} />
 
@@ -158,7 +158,7 @@ export default function LeadDetailPage() {
           userId={user.id}
           members={members}
           canEdit={canEdit}
-          onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+          onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
         />
 
         <LeadStatusPipeline
@@ -167,7 +167,7 @@ export default function LeadDetailPage() {
           userId={user.id}
           workspaceId={workspaceId}
           canEdit={canEdit}
-          onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+          onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -181,7 +181,7 @@ export default function LeadDetailPage() {
                 userId={user.id}
                 members={members}
                 canEdit={canEdit}
-                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+                onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
               />
             </div>
 
@@ -192,7 +192,7 @@ export default function LeadDetailPage() {
                 userId={user.id}
                 members={members}
                 canEdit={canEdit}
-                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+                onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
               />
             </div>
 
@@ -204,12 +204,12 @@ export default function LeadDetailPage() {
                 lead={lead}
                 userId={user.id}
                 canEdit={canEdit}
-                onUpdated={(updated) => setLead(updated)}
+                onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
               />
               <NotesSection
                 lead={lead}
                 canEdit={canEdit}
-                onUpdated={(updated) => setLead(updated)}
+                onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
               />
             </div>
 
@@ -246,7 +246,7 @@ export default function LeadDetailPage() {
                 userId={user.id}
                 members={members}
                 canEdit={canEdit}
-                onUpdated={(updated) => { setLead(updated); setActivityRefresh(v => v + 1) }}
+                onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
               />
               <ListingAgentCard lead={lead} />
               <ReportSection lead={lead} />

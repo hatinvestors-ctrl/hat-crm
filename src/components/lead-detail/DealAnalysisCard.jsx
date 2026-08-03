@@ -426,7 +426,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           ...(finalMao !== null && finalMao !== undefined ? { purchase_price: finalMao } : {}),
         }
       } : lead.deal_analysis
-      onUpdated?.({ ...lead, ...dbUpdate, deal_analysis: updatedDealAnalysis, ...(aiStartingOffer !== null ? { starting_offer: aiStartingOffer } : {}) })
+      onUpdated?.({ ...dbUpdate, deal_analysis: updatedDealAnalysis, ...(aiStartingOffer !== null ? { starting_offer: aiStartingOffer } : {}) })
 
       // Verdict/score/profit — same analyze-deal call FinancialSection.runAnalyze used to make
       const activeStrategy = strategyOverride ?? strategy
@@ -451,7 +451,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const verdictData = await verdictRes.json()
       if (verdictRes.ok && verdictData.ok) {
         await logDealAnalysis(lead.id, userId, verdictData.analysis)
-        onUpdated?.({ ...lead, ...dbUpdate, deal_analysis: verdictData.analysis, ai_notes: fullNotes })
+        onUpdated?.({ ...dbUpdate, deal_analysis: verdictData.analysis, ai_notes: fullNotes })
       } else {
         setGenError(verdictData.error || 'Verdict/score generation failed — comps and negotiation plan were saved, but no deal score is available. Try re-running.')
       }
@@ -547,7 +547,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           ...(reno        != null ? { renovation_cost: reno }  : {}),
         }
       } : lead.deal_analysis
-      onUpdated?.({ ...lead, ai_notes: fullNotes, ...supabaseUpdate, deal_analysis: reRunDealAnalysis, ...(reRunStartingOffer !== null ? { starting_offer: reRunStartingOffer } : {}) })
+      onUpdated?.({ ai_notes: fullNotes, ...supabaseUpdate, deal_analysis: reRunDealAnalysis, ...(reRunStartingOffer !== null ? { starting_offer: reRunStartingOffer } : {}) })
       // Auto-update nego plan in background if one already exists
       if (hasNego) updateNegoPlan(fullNotes)
     } catch (err) {
@@ -583,7 +583,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const fullNotes  = [corePart.trim(), compsPart.trim(), planNotes, commsPart].filter(Boolean).join('\n\n')
       if (lead.id) await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
       setLocalNotes(fullNotes)
-      onUpdated?.({ ...lead, ai_notes: fullNotes })
+      onUpdated?.({ ai_notes: fullNotes })
     } catch (err) {
       setGenError(err.message || 'Failed to update negotiation plan.')
     } finally {
@@ -612,7 +612,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const fullNotes = withoutOldComms + '\n\n' + commsNotes
       if (lead.id) await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
       setLocalNotes(fullNotes)
-      onUpdated?.({ ...lead, ai_notes: fullNotes })
+      onUpdated?.({ ai_notes: fullNotes })
     } catch (err) {
       setGenError('Scripts generation failed: ' + (err.message || 'Unknown error'))
     } finally {
@@ -637,7 +637,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const fullNotes = [before.trim(), freshComps.trim(), after.trim()].filter(Boolean).join('\n\n')
       if (lead.id) await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
       setLocalNotes(fullNotes)
-      onUpdated?.({ ...lead, ai_notes: fullNotes })
+      onUpdated?.({ ai_notes: fullNotes })
     } catch (err) {
       setGenError(err.message || 'Failed to refresh comps.')
     } finally {
@@ -723,7 +723,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           onClose={() => setShowRenoPicker(false)}
           onApply={(reno) => {
             setShowRenoPicker(false)
-            onUpdated?.({ ...lead, renovation_cost: reno })
+            onUpdated?.({ renovation_cost: reno })
             supabase.from('leads').update({ renovation_cost: reno }).eq('id', lead.id).then(() => runGenerate(false, strategy, reno))
           }}
         />
