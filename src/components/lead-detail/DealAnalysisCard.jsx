@@ -143,6 +143,61 @@ function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6) {
 const fc = formatCurrency
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 
+// Solves the flip math backward: given a desired profit, what's the max purchase
+// price that still hits it? Same formula as computeFlipBreakdown, solved for pp.
+function maxOfferForProfit(arv, reno, holdMonths, desiredProfit) {
+  const ppCoeff   = 1.018 + 0.009 * holdMonths
+  const renoCoeff = 1.02 + 0.01 * holdMonths
+  const constant  = arv * 0.93 - holdMonths * 308 - 2450
+  return (constant - reno * renoCoeff - desiredProfit) / ppCoeff
+}
+
+function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
+  const [targetProfit, setTargetProfit] = useState('30000')
+  const parsed = parseFloat(targetProfit.replace(/[^0-9.]/g, '')) || 0
+  const maxOffer = arv ? maxOfferForProfit(arv, reno, holdMonths, parsed) : null
+  const roundedMaxOffer = maxOffer != null ? Math.round(maxOffer / 100) * 100 : null
+  const diff = roundedMaxOffer != null ? roundedMaxOffer - currentPP : null
+
+  return (
+    <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3">
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-2">
+        Target Profit → Max Offer
+      </div>
+      <p className="text-[10.5px] text-[color:var(--color-accent-text)] opacity-80 mb-2 leading-snug">
+        MAO above uses the fixed 75% rule. If you'd accept a lower profit to win the deal, this shows what purchase price that allows instead.
+      </p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[9.5px] text-[color:var(--color-accent-text)] uppercase tracking-wider">Acceptable Profit</label>
+          <input
+            value={targetProfit}
+            onChange={e => setTargetProfit(e.target.value)}
+            className="w-32 h-7 px-2 rounded border border-[color:var(--color-accent)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none"
+          />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9.5px] text-[color:var(--color-accent-text)] uppercase tracking-wider">Max Offer</span>
+          <span className="text-[14px] font-bold text-[color:var(--color-text)]">{roundedMaxOffer != null ? fc(roundedMaxOffer) : '—'}</span>
+        </div>
+        {diff != null && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9.5px] text-[color:var(--color-accent-text)] uppercase tracking-wider">vs. Current MAO</span>
+            <span className={`text-[12px] font-semibold ${diff >= 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+              {diff >= 0 ? '+' : ''}{fc(diff)}
+            </span>
+          </div>
+        )}
+      </div>
+      {currentProfit != null && (
+        <p className="text-[10px] text-[color:var(--color-accent-text)] opacity-70 mt-2">
+          Current MAO ({fc(currentPP)}) yields ~{fc(currentProfit)} profit at these ARV/reno numbers.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function FullBreakdownTab({ lead, strategy }) {
   const arv  = Number(lead.arv || 0)
   const reno = Number(lead.renovation_cost ?? 0)
@@ -224,6 +279,8 @@ function FullBreakdownTab({ lead, strategy }) {
           <Row label="Min. profit threshold" value="$30,000" />
           <Row label="Buffer above minimum" value={fc(f.totalProfit - 30000)} positive={f.totalProfit >= 30000} />
         </div>
+
+        <TargetProfitCalc arv={arv} reno={reno} holdMonths={f.holdMonths} currentPP={pp} currentProfit={f.totalProfit} />
       </>) : (<>
         {/* BRRRR — Refi */}
         <div>
