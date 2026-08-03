@@ -61,7 +61,9 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               {/* Ask */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
                 <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold mb-1">Asking</div>
-                <div className="text-[16px] font-bold text-[color:var(--color-text)]">{formatCurrency(ask)}</div>
+                <EditableField label="" type="currency" value={lead.asking_price} formatter={formatCurrency}
+                  onSave={(v) => update({ asking_price: v })} disabled={!canEdit}
+                  displayClassName="text-[16px] font-bold text-[color:var(--color-text)]" />
               </div>
               {/* Gap */}
               {gap != null && (
