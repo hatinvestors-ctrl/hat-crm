@@ -254,9 +254,10 @@ function buildPrompt(lead) {
       const credibilityFloor = pp * floorPct
       anchorRaw = Math.max(anchorRaw, credibilityFloor)
 
-      // Never anchor above MAO (defeats the purpose) or below 65% of ask (truly insulting)
-      anchorRaw = Math.min(anchorRaw, computedMao * 0.995)
+      // Never anchor below 65% of ask (truly insulting) — but MAO is an absolute
+      // ceiling, so apply that cap last; it must win over the 65%-of-ask floor.
       anchorRaw = Math.max(anchorRaw, pp * 0.65)
+      anchorRaw = Math.min(anchorRaw, computedMao * 0.995)
 
       // Build a human-readable note explaining the decision
       const motivationContext = motivationTags.length > 0
@@ -473,8 +474,10 @@ export default async (req) => {
       let raw = computedMaoForResponse - gap * roomFactor
       const floorPct = Math.max(0.72, 0.80 - mScore * 0.008)
       raw = Math.max(raw, _pp * floorPct)
-      raw = Math.min(raw, computedMaoForResponse * 0.995)
       raw = Math.max(raw, _pp * 0.65)
+      // MAO is an absolute ceiling — apply it last so no floor above can push the
+      // offer back over it (a starting offer must never exceed the max we'd pay).
+      raw = Math.min(raw, computedMaoForResponse * 0.995)
       computedStartingOffer = Math.round(raw / 100) * 100
     }
   }
