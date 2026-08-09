@@ -6,7 +6,14 @@ import DecisionStrip from '../components/screener/DecisionStrip'
 import NotesRenderer from '../components/lead-detail/NotesRenderer'
 import { lookupAddress } from '../lib/enrichment'
 import { findDuplicateLeads } from '../lib/leadDedup'
-import { recordPropertyEvent } from '../lib/propertyIntelligence'
+import { recordPropertyEvent, evaluateAndRecordRediscovery } from '../lib/propertyIntelligence'
+
+// Same verdict→priority tiers as DealAnalysisCard.jsx's Smart Lead
+// Prioritization strip — reused here (not recalculated) so the Screener's
+// re-encounter path feeds Capability #4 the same tiers Lead Detail uses.
+const SCREENER_VERDICT_TO_PRIORITY = {
+  'MAKE OFFER': 'HOT', 'NEGOTIATE': 'TODAY', 'LONG SHOT': 'WATCH', 'WATCH': 'WATCH', 'DEAD LEAD': 'IGNORE',
+}
 import { supabase } from '../lib/supabase'
 
 function newDeal(overrides = {}) {
@@ -395,6 +402,20 @@ export default function ScreenerPage() {
           type: 'lead_reencountered',
           content: 'Screener re-analyzed an address with an existing lead — AI analysis updated',
           metadata: { source: 'screener' },
+        })
+        // Capability #4 — "Property updated from Screener" re-encounter trigger.
+        // Reuses deal.score/deal.verdict/deal.mao — already parsed by this
+        // page's own parseScore/parseVerdict, not recalculated here.
+        evaluateAndRecordRediscovery({
+          workspaceId, leadId: existing.id,
+          snapshot: {
+            askingPrice: asking,
+            score: deal.score ?? null,
+            verdict: deal.verdict ?? null,
+            priority: deal.verdict ? (SCREENER_VERDICT_TO_PRIORITY[deal.verdict] || null) : null,
+            mao: deal.mao ?? null,
+            profit: null,
+          },
         })
         updateDeal(dealId, { status: 'saved' })
         setSaving(false)

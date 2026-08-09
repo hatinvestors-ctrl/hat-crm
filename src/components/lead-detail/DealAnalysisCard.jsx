@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
+import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
 
 // Parse the AI-computed MAO from the generated notes text ("Our MAO: $X")
 // so lead.mao always matches exactly what the AI Summary shows.
@@ -653,7 +654,22 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [updatingNego, setUpdatingNego] = useState(false)
   const cancelledRef = useRef(false)
 
+  const [rediscovery, setRediscovery] = useState(null) // Capability #4 — { status, reason } or null
+
   useEffect(() => { setLocalNotes(lead.ai_notes || '') }, [lead.ai_notes])
+
+  // Capability #4 — Opportunity Rediscovery Engine V1. Read-only, cheap:
+  // shows whatever the last evaluateAndRecordRediscovery() run persisted on
+  // this property (see below). Never blocks render, never throws.
+  useEffect(() => {
+    let cancelled = false
+    if (lead.workspace_id && lead.id) {
+      fetchRediscoveryStatus({ workspaceId: lead.workspace_id, leadId: lead.id }).then(r => {
+        if (!cancelled) setRediscovery(r)
+      })
+    }
+    return () => { cancelled = true }
+  }, [lead.workspace_id, lead.id])
 
   const hasAnalysis = !!lead.deal_analysis
   const renoMissing = lead.renovation_cost == null
@@ -765,6 +781,28 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       }
 
       setLocalNotes(fullNotes)
+
+      // Capability #4 — Opportunity Rediscovery Engine V1. This IS the
+      // "existing lead updated" / "new AI analysis" re-encounter moment.
+      // Reuses derivePriority (already parses score/verdict from this same
+      // fullNotes for the Smart Lead Prioritization strip) — no new parsing,
+      // no AI call. Fire-and-forget; never blocks the analysis flow.
+      if (lead.workspace_id && lead.id) {
+        const priorityNow = derivePriority(fullNotes)
+        evaluateAndRecordRediscovery({
+          workspaceId: lead.workspace_id,
+          leadId: lead.id,
+          snapshot: {
+            askingPrice: lead.asking_price != null ? Number(lead.asking_price) : null,
+            score: priorityNow?.confidence ?? null,
+            verdict: priorityNow?.verdict ?? null,
+            priority: priorityNow?.priority ?? null,
+            mao: finalMao ?? (lead.mao != null ? Number(lead.mao) : null),
+            profit: lead.deal_analysis?.profit ?? null,
+          },
+        }).then(r => { if (!cancelledRef.current) setRediscovery(r) })
+      }
+
       // Patch deal_analysis.inputs so isStale stays false after AI analysis updates mao/arv
       const updatedDealAnalysis = lead.deal_analysis ? {
         ...lead.deal_analysis,
@@ -1088,6 +1126,26 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       )}
 
       {genError && <p className="mb-3 text-[11.5px] text-[color:var(--color-danger-text)]">⚠ {genError}</p>}
+
+      {/* Capability #4 — Opportunity Rediscovery Engine V1. Minimal banner
+          only — no timeline, no history page. Reads a status persisted by
+          evaluateAndRecordRediscovery() (see propertyIntelligence.js);
+          renders only for IMPROVED / REVIEW AGAIN, never for
+          UNCHANGED/DECLINED so it never nags on an ordinary lead. */}
+      {(rediscovery?.status === 'IMPROVED' || rediscovery?.status === 'REVIEW AGAIN') && (
+        <div className="mb-3 rounded-lg border-2 px-3 py-2.5 flex items-start gap-2" style={{ borderColor: 'var(--color-accent)', background: 'var(--color-accent-soft)' }}>
+          <span className="text-[16px] leading-none">🔥</span>
+          <div>
+            <div className="text-[13px] font-extrabold text-[color:var(--color-accent-text)]">
+              {rediscovery.status === 'REVIEW AGAIN' ? 'Opportunity Rediscovered' : 'Opportunity Improved'}
+            </div>
+            <div className="text-[11.5px] text-[color:var(--color-accent-text)] opacity-90">This property deserves another review.</div>
+            {rediscovery.reason && (
+              <div className="text-[11.5px] text-[color:var(--color-accent-text)] mt-0.5"><span className="font-semibold">Reason:</span> {rediscovery.reason}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Capability #2 — Executive Decision Layer. Presentation only: every
           value here is read from data already parsed/stored elsewhere in
