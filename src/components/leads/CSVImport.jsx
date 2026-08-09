@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import Button from '../ui/Button'
 import Select from '../ui/Select'
-import { supabase } from '../../lib/supabase'
 import { calculateMAO } from '../../lib/calculations'
 import { DEFAULT_CLOSING_COSTS, DEFAULT_TARGET_PROFIT } from '../../lib/constants'
 import { buildZillowUrl } from '../../lib/zillow'
-import { normalizeAddress, normalizeAddressForDB } from '../../lib/leadDedup'
-import { recordPropertyEvent } from '../../lib/propertyIntelligence'
 import { isSafeHttpUrl } from '../../lib/urlSafety'
+import { importLead } from '../../lib/leadImport'
 
 const LEAD_FIELDS = [
   { value: '', label: '— Skip —' },
@@ -86,6 +84,16 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
     }
   }
 
+  // Capability #6 — Universal Lead Import SDK. This is HatCRM's first path
+  // refactored onto the shared importLead() entry point (src/lib/leadImport.js):
+  // Extract (CSV parsing above) → Normalize (the field mapping/coercion
+  // below, unchanged) → importLead() (dedup, insert, Property Intelligence,
+  // Rediscovery, activity log — all reused as-is from the prior inline
+  // version of this exact logic). Behavior is equivalent to before, with
+  // one intentional improvement: every row now also gets a Rediscovery
+  // baseline snapshot and re-encounter evaluation, which the old inline
+  // version didn't wire up. See migration notes in the capability report
+  // for the one other minor, deliberate behavior change (default lead_source).
   const handleImport = async () => {
     setImporting(true); setError(null); setResult(null)
     try {
@@ -95,12 +103,13 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
       const closingDefault = workspaceDefaults?.default_closing_costs ?? DEFAULT_CLOSING_COSTS
       const profitDefault = workspaceDefaults?.default_target_profit ?? DEFAULT_TARGET_PROFIT
 
+      // Extract + Normalize — unchanged from before, this is CSV-specific
+      // logic that stays in CSVImport.jsx (importLead() doesn't know or
+      // care that the source was a CSV).
       const records = rows
         .map(row => {
           const rec = {
-            workspace_id: workspaceId, created_by: userId,
             closing_costs: closingDefault, target_profit: profitDefault,
-            status: 'new_lead',
           }
           Object.entries(mapping).forEach(([colIdx, field]) => {
             if (!field) return
@@ -134,73 +143,24 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
 
       if (!records.length) throw new Error('No valid rows (Address column empty).')
 
-      // De-duplicate against existing leads in this workspace
-      const { data: existing } = await supabase
-        .from('leads')
-        .select('address')
-        .eq('workspace_id', workspaceId)
-      const existingSet = new Set((existing || []).map(l => normalizeAddressForDB(l.address)))
-      const beforeDedup = records.length
-      const duplicateRows = records.filter(r => existingSet.has(normalizeAddressForDB(r.address)))
-      const deduped = records.filter(r => !existingSet.has(normalizeAddressForDB(r.address)))
-      const duplicatesSkipped = beforeDedup - deduped.length
-
-      // Property Intelligence: rows skipped here are re-encounters of an
-      // address that already has a property/lead — append an event instead
-      // of silently discarding the attempt. Fire-and-forget, never blocks import.
-      duplicateRows.forEach(rec => {
-        recordPropertyEvent({
-          workspaceId, addressFields: rec, type: 'duplicate_attempt',
-          content: 'CSV import row skipped — address already exists',
-          metadata: { source: 'csv_import' },
-        })
-      })
-
-      if (!deduped.length) {
-        throw new Error(`All ${beforeDedup} rows are duplicates of existing leads. Nothing to import.`)
-      }
-
-      // Try bulk insert first; if any row hits the unique constraint, fall back to row-by-row
+      // importLead() — the one shared entry point. Row-by-row so every row
+      // gets its own dedup check, Property Intelligence event, and
+      // Rediscovery evaluation, uniformly.
       let imported = 0
-      let dbDuplicatesSkipped = 0
-      const { data: bulkData, error: bulkErr } = await supabase.from('leads').insert(deduped).select('id')
-      if (bulkErr && bulkErr.code === '23505') {
-        // Fall back: insert one by one, skip constraint violations
-        for (const rec of deduped) {
-          const { data: rowData, error: rowErr } = await supabase.from('leads').insert(rec).select('id').single()
-          if (rowErr?.code === '23505') {
-            dbDuplicatesSkipped++
-            recordPropertyEvent({
-              workspaceId, addressFields: rec, type: 'duplicate_attempt',
-              content: 'CSV import row skipped — address already exists',
-              metadata: { source: 'csv_import' },
-            })
-          } else if (rowErr) {
-            throw rowErr
-          } else {
-            imported++
-            recordPropertyEvent({
-              workspaceId, addressFields: rec, leadId: rowData?.id, type: 'lead_created',
-              content: 'Lead created via CSV import', metadata: { source: 'csv_import' },
-            })
-          }
-        }
-      } else if (bulkErr) {
-        throw bulkErr
-      } else {
-        imported = bulkData.length
-        deduped.forEach(rec => {
-          recordPropertyEvent({
-            workspaceId, addressFields: rec, type: 'lead_created',
-            content: 'Lead created via CSV import', metadata: { source: 'csv_import' },
-          })
-        })
+      let duplicatesSkipped = 0
+      for (const rec of records) {
+        const result = await importLead(
+          { ...rec, source: rec.lead_source || 'csv_import' },
+          { workspaceId, userId, status: 'new_lead' }
+        )
+        if (result.created) imported++
+        else duplicatesSkipped++
       }
 
       setResult({
         imported,
         skipped: rows.length - records.length,
-        duplicatesSkipped: duplicatesSkipped + dbDuplicatesSkipped,
+        duplicatesSkipped,
       })
       onDone?.()
     } catch (e) {
