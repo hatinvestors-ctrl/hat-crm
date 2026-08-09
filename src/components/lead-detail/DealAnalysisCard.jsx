@@ -55,6 +55,51 @@ function parseSnapshotFields(notesText) {
   return out
 }
 
+// --- Smart Lead Prioritization -------------------------------------------
+// Reuses the DEAL SCORE / CRM WORKFLOW / PROS sections the AI already writes
+// into ai_notes (see netlify/functions/generate-core-analysis.mjs) — no new
+// AI call, no new calculation. Just maps the existing verdict/score into the
+// compact glanceable summary Kevin sees the instant he opens the lead.
+const VERDICT_TO_PRIORITY = {
+  'MAKE OFFER': 'HOT',
+  'NEGOTIATE': 'TODAY',
+  'LONG SHOT': 'WATCH',
+  'WATCH': 'WATCH',
+  'DEAD LEAD': 'IGNORE',
+}
+const VERDICT_TO_ACTION = {
+  'MAKE OFFER': 'SEND OFFER',
+  'NEGOTIATE': 'CALL TODAY',
+  'LONG SHOT': 'REQUEST INFORMATION',
+  'WATCH': 'WAIT',
+  'DEAD LEAD': 'IGNORE',
+}
+function derivePriority(notesText) {
+  if (!notesText) return null
+  const scoreMatch = notesText.match(/Total:\s*(\d+)\s*\/\s*100/i)
+  const verdictMatch = notesText.match(/Verdict:\s*([A-Z][A-Z\s]*?)\s*(?:\n|$)/i)
+  if (!scoreMatch && !verdictMatch) return null
+  const verdict = (verdictMatch?.[1] || '').trim().toUpperCase()
+  const confidence = scoreMatch ? parseInt(scoreMatch[1], 10) : null
+  const priority = VERDICT_TO_PRIORITY[verdict] || 'WATCH'
+  const nextAction = VERDICT_TO_ACTION[verdict] || 'WAIT'
+  const prosMatch = notesText.match(/PROS[^\n]*\n([\s\S]*?)(?=\n={5,}|$)/i)
+  const reasons = prosMatch
+    ? prosMatch[1]
+        .split('\n')
+        .map(l => l.replace(/^[\s\-•*]+/, '').trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : []
+  return { priority, confidence, verdict, nextAction, reasons }
+}
+const PRIORITY_THEME = {
+  HOT:    { bg: 'var(--color-danger-soft)',  border: 'var(--color-danger)',  text: 'var(--color-danger-text)' },
+  TODAY:  { bg: 'var(--color-warn-soft)',    border: 'var(--color-warn)',    text: 'var(--color-warn-text)' },
+  WATCH:  { bg: 'var(--color-bg-elev-2)',    border: 'var(--color-line)',    text: 'var(--color-text-muted)' },
+  IGNORE: { bg: 'var(--color-bg-elev-2)',    border: 'var(--color-line)',    text: 'var(--color-text-dim)' },
+}
+
 // Fetch comment-type activities for a lead and format as context string
 async function fetchLeadContext(lead) {
   if (!lead.id) return ''
@@ -896,6 +941,8 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
     }
   }
 
+  const priorityInfo = derivePriority(localNotes)
+
   return (
     <Card title="Deal Analysis" subtitle="Comps, negotiation plan, verdict, and scripts — all from one run">
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-[color:var(--color-line)] mb-3">
@@ -1020,6 +1067,38 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
               <div className="px-3 py-2">
                 <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Profit</div>
                 <div className="text-[14px] font-bold" style={{ color: theme.text }}>{a.profit != null ? fc(a.profit) : '—'}</div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {priorityInfo && (() => {
+        const theme = PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH
+        return (
+          <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Priority</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.priority}</div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Confidence</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.confidence != null ? `${priorityInfo.confidence}/100` : '—'}</div>
+              </div>
+              <div className="px-3 py-2 col-span-2 sm:col-span-1">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Next Action</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.nextAction}</div>
+              </div>
+              <div className="px-3 py-2 col-span-2 sm:col-span-1">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Top Reasons</div>
+                {priorityInfo.reasons.length > 0 ? (
+                  <ul className="text-[11.5px] font-medium leading-tight mt-0.5 space-y-0.5" style={{ color: theme.text }}>
+                    {priorityInfo.reasons.map((r, i) => <li key={i}>• {r}</li>)}
+                  </ul>
+                ) : (
+                  <div className="text-[14px] font-bold" style={{ color: theme.text }}>—</div>
+                )}
               </div>
             </div>
           </div>
