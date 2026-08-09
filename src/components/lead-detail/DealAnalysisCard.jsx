@@ -114,7 +114,10 @@ function derivePriority(notesText) {
   // PROS body sits between the section header and the next '=====' divider.
   // The header itself is immediately followed by a divider line before the
   // bullets start, so strip any leading '=' divider line the capture picks up.
-  const prosMatch = notesText.match(/PROS[^\n]*\n=*\n?([\s\S]*?)(?=\n={5,}|$)/i)
+  // \b word-boundaries — bare "PROS"/"CONS" (no boundary) also matches
+  // mid-word inside prose like "conservative", "considering", "prospect",
+  // grabbing the wrong section entirely. See Capability #2 verification notes.
+  const prosMatch = notesText.match(/\bPROS\b[^\n]*\n=*\n?([\s\S]*?)(?=\n={5,}|$)/i)
   const rawReasons = prosMatch
     ? prosMatch[1]
         .split('\n')
@@ -130,7 +133,18 @@ function derivePriority(notesText) {
   const dataQuality = dataQualityMatch ? parseInt(dataQualityMatch[1], 10) : null
   const walkAwayMatch = notesText.match(/Max Walk-Away:\s*\$([0-9,]+)/i)
   const walkAway = walkAwayMatch ? parseInt(walkAwayMatch[1].replace(/,/g, ''), 10) : null
-  return { priority, confidence, verdict, nextAction, reasons, rawReasons, dataQuality, walkAway }
+  // Capability #2 — Executive Decision "Biggest Risk": reuses the existing
+  // CONS section the AI already writes, same divider-stripping approach as
+  // PROS above. Only the single first (highest-priority) risk is surfaced.
+  const consMatch = notesText.match(/\bCONS\b[^\n]*\n=*\n?([\s\S]*?)(?=\n={5,}|$)/i)
+  const firstCon = consMatch
+    ? consMatch[1]
+        .split('\n')
+        .map(l => l.replace(/^[\s\d.\-•*]+/, '').trim())
+        .find(l => Boolean(l) && !/^=+$/.test(l))
+    : null
+  const biggestRisk = firstCon ? shortenReason(firstCon) : null
+  return { priority, confidence, verdict, nextAction, reasons, rawReasons, dataQuality, walkAway, biggestRisk }
 }
 const PRIORITY_THEME = {
   HOT:    { bg: 'var(--color-danger-soft)',  border: 'var(--color-danger)',  text: 'var(--color-danger-text)' },
@@ -1074,6 +1088,69 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       )}
 
       {genError && <p className="mb-3 text-[11.5px] text-[color:var(--color-danger-text)]">⚠ {genError}</p>}
+
+      {/* Capability #2 — Executive Decision Layer. Presentation only: every
+          value here is read from data already parsed/stored elsewhere in
+          this component (priorityInfo from the Smart Lead Prioritization
+          strip below, lead.deal_analysis.profit, lead.starting_offer,
+          lead.mao) — no new AI call, no new calculation. Sits above the
+          existing Verdict/Score/MAO strip and the Smart Lead Prioritization
+          strip so Kevin sees the bottom line first. */}
+      {priorityInfo && (() => {
+        const theme = PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH
+        const displayLabel = PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority
+        const expectedProfit = lead.deal_analysis?.profit
+        return (
+          <div
+            className="mb-3 rounded-lg border-2 overflow-hidden"
+            style={{ borderColor: theme.border, background: theme.bg }}
+          >
+            <div className="px-3 pt-2 text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>
+              Executive Decision
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 divide-x" style={{ borderColor: theme.border }}>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Decision</div>
+                <div className="text-[17px] font-extrabold leading-tight" style={{ color: theme.text }}>{displayLabel}</div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Expected Profit</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{expectedProfit != null ? fc(expectedProfit) : '—'}</div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Recommended Offer</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.starting_offer ? fc(lead.starting_offer) : '—'}</div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Maximum Offer</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.mao ? fc(lead.mao) : '—'}</div>
+              </div>
+              <div className="px-3 py-2 col-span-2 sm:col-span-1">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Next Action</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.nextAction}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Top Opportunities</div>
+                {priorityInfo.reasons.length > 0 ? (
+                  <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
+                    {priorityInfo.reasons.map((r, i) => <li key={i}>✓ {r}</li>)}
+                  </ul>
+                ) : (
+                  <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                )}
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
+                <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>
+                  {priorityInfo.biggestRisk ? `⚠ ${priorityInfo.biggestRisk}` : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {hasAnalysis && (() => {
         const a = lead.deal_analysis
