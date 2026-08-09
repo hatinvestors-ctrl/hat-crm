@@ -102,10 +102,42 @@ export const LEAD_SOURCES = [
   { value: 'web', label: 'Web / Online' },
   { value: 'imported', label: 'Imported (Podio)' },
   { value: 'redfin_auto', label: '🤖 Redfin (Auto)' },
+  // Capability #6.1 — Lead Source Expansion. Friendly labels for the
+  // automated sources named in the Cycle 3 mission, so a new source shows
+  // a native label the moment it starts writing leads instead of falling
+  // back to its raw value. Values match the pattern the (not-yet-applied)
+  // lead_source CHECK migration allows: supabase/migrations/
+  // 20260809040000_expand_lead_source_check.sql. Purely additive — no
+  // existing value above was touched, no new registry/architecture added.
+  { value: 'zillow_auto',   label: '🤖 Zillow (Auto)' },
+  { value: 'realtor_auto',  label: '🤖 Realtor.com (Auto)' },
+  { value: 'mls_auto',      label: '🤖 MLS (Auto)' },
+  { value: 'probate_auto',  label: '🤖 Probate (Auto)' },
+  { value: 'tax_auto',      label: '🤖 Tax Delinquent (Auto)' },
+  { value: 'water_auto',    label: '🤖 Water Lien (Auto)' },
+  { value: 'code_auto',     label: '🤖 Code Violation (Auto)' },
+  { value: 'facebook_auto', label: '🤖 Facebook (Auto)' },
   { value: 'other', label: 'Other' },
 ]
+export const LEAD_SOURCE_MAP = Object.fromEntries(LEAD_SOURCES.map(s => [s.value, s]))
+
+// True for any automated-import source, not just Redfin — matches the
+// same '_auto'/'_agent' naming convention the CHECK-constraint migration
+// (20260809040000_expand_lead_source_check.sql) validates against. Used
+// to decide when UI copy should say "Redfin" specifically vs. stay
+// source-neutral. Pure string check, no new data/column involved.
+export function isAutomatedLeadSource(leadSource) {
+  return typeof leadSource === 'string' && /^[a-z][a-z0-9]*_(auto|agent)$/.test(leadSource)
+}
 
 // Redfin trigger types — sub-categorization for auto-imported Redfin leads.
+// Capability #6.1: intentionally NOT redesigned into a generic multi-source
+// concept yet, per this capability's mission ("do not redesign
+// redfin_trigger_type yet") — left completely unchanged, including its
+// Redfin-branded 'generic_alert' fallback label, since that fallback is
+// only correct for leads that really are from Redfin. See
+// GENERIC_AUTO_ALERT below for the source-neutral equivalent used when a
+// non-Redfin automated lead has no redfin_trigger_type set.
 export const REDFIN_TRIGGER_TYPES = [
   { value: 'price_drop',     label: '💸 Price Drop',     tone: 'warn'    },
   { value: 'new_listing',    label: '🆕 New Listing',    tone: 'accent'  },
@@ -116,6 +148,13 @@ export const REDFIN_TRIGGER_TYPES = [
   { value: 'generic_alert',  label: '📨 Redfin Alert',   tone: 'neutral' },
 ]
 export const REDFIN_TRIGGER_MAP = Object.fromEntries(REDFIN_TRIGGER_TYPES.map(t => [t.value, t]))
+
+// Source-neutral fallback badge for an automated lead that has no
+// redfin_trigger_type — used only when the lead's source is NOT Redfin
+// (Redfin leads keep using REDFIN_TRIGGER_MAP.generic_alert, unchanged).
+// Deliberately a plain object, not a new registry — this is the one bit
+// of "make auto-import copy source-neutral" this capability requires.
+export const GENERIC_AUTO_ALERT = { value: 'generic_alert', label: '📨 Auto Alert', tone: 'neutral' }
 
 export const PROPERTY_TYPES = [
   { value: 'single_family', label: 'Single Family' },

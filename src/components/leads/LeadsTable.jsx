@@ -4,7 +4,7 @@ import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import { formatCurrency, formatDate } from '../../lib/calculations'
 import { safeTelHref, safeMailtoHref } from '../../lib/urlSafety'
-import { MLS_STATUS_MAP } from '../../lib/constants'
+import { MLS_STATUS_MAP, LEAD_SOURCE_MAP } from '../../lib/constants'
 
 const MLS_TONE = {
   success: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
@@ -113,7 +113,13 @@ export default function LeadsTable({ leads, members = [], workspaceId, sortBy, s
             {lead.auto_imported && (
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[oklch(0.32_0.12_25/0.6)] text-[oklch(0.85_0.16_25)] uppercase tracking-wider"
-                title="Auto-imported from Redfin — not yet human-vetted"
+                title={
+                  // Capability #6.1 — source-neutral: only names the source
+                  // when we actually know a friendly one, otherwise stays generic.
+                  LEAD_SOURCE_MAP[lead.lead_source]
+                    ? `Auto-imported from ${LEAD_SOURCE_MAP[lead.lead_source].label.replace(/^🤖\s*/, '')} — not yet human-vetted`
+                    : 'Auto-imported — not yet human-vetted'
+                }
               >
                 🤖 auto
               </span>

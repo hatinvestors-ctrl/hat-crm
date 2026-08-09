@@ -5,7 +5,19 @@ import LoadingSpinner from '../components/ui/LoadingSpinner'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import { supabase } from '../lib/supabase'
-import { REDFIN_TRIGGER_TYPES, REDFIN_TRIGGER_MAP } from '../lib/constants'
+import { REDFIN_TRIGGER_TYPES, REDFIN_TRIGGER_MAP, GENERIC_AUTO_ALERT, LEAD_SOURCE_MAP } from '../lib/constants'
+
+// Capability #6.1 — source-neutral trigger badge. Redfin leads keep their
+// exact existing "📨 Redfin Alert" fallback (REDFIN_TRIGGER_MAP, unchanged,
+// per "do not redesign redfin_trigger_type yet"); any other automated
+// source with no redfin_trigger_type gets the neutral GENERIC_AUTO_ALERT
+// instead of being mislabeled "Redfin Alert".
+function triggerBadgeFor(lead) {
+  if (lead.redfin_trigger_type && REDFIN_TRIGGER_MAP[lead.redfin_trigger_type]) {
+    return REDFIN_TRIGGER_MAP[lead.redfin_trigger_type]
+  }
+  return lead.lead_source === 'redfin_auto' ? REDFIN_TRIGGER_MAP.generic_alert : GENERIC_AUTO_ALERT
+}
 import { formatCurrency, formatDateTime, formatPhone } from '../lib/calculations'
 import { safeTelHref, safeMailtoHref } from '../lib/urlSafety'
 
@@ -52,7 +64,7 @@ export default function InboxPage() {
     setLoading(true)
     supabase
       .from('leads')
-      .select('id, address, city, state, zip_code, asking_price, bedrooms, bathrooms, sqft, lot_size_sqft, seller_name, phone, email, redfin_trigger_type, is_hot, created_at, updated_at')
+      .select('id, address, city, state, zip_code, asking_price, bedrooms, bathrooms, sqft, lot_size_sqft, seller_name, phone, email, redfin_trigger_type, lead_source, is_hot, created_at, updated_at')
       .eq('workspace_id', workspaceId)
       .eq('status', 'triage')
       .eq('auto_imported', true)
@@ -160,7 +172,7 @@ export default function InboxPage() {
               : `${total} lead${total === 1 ? '' : 's'} awaiting your review.`}
           </h2>
           <p className="text-[13px] text-[color:var(--color-text-muted)] mt-1 leading-relaxed">
-            These came in automatically from Redfin email alerts. Promote good ones into your pipeline, or dismiss the rest.
+            These came in automatically from your connected lead sources (Redfin and others). Promote good ones into your pipeline, or dismiss the rest.
           </p>
         </div>
 
@@ -168,7 +180,7 @@ export default function InboxPage() {
           <EmptyState
             icon="✓"
             title="No new auto-imports waiting."
-            description="Redfin emails get scanned every 2 hours. Anything new will appear here."
+            description="Connected sources are scanned automatically. Anything new will appear here."
             action={
               <Link to={`/w/${workspaceId}/today`}>
                 <Button variant="secondary">Open Today →</Button>
@@ -266,7 +278,15 @@ export default function InboxPage() {
             ) : (
               <div className="space-y-3">
                 {visibleLeads.map(lead => {
-                  const t = REDFIN_TRIGGER_MAP[lead.redfin_trigger_type] || REDFIN_TRIGGER_MAP.generic_alert
+                  const t = triggerBadgeFor(lead)
+                  // "Where the actual source is available, display it" — a
+                  // small neutral chip alongside the trigger badge. Redfin
+                  // is already obvious from the trigger badge itself, so
+                  // skip it there to avoid redundant labeling; every other
+                  // source gets its friendly name shown.
+                  const sourceLabel = lead.lead_source && lead.lead_source !== 'redfin_auto'
+                    ? (LEAD_SOURCE_MAP[lead.lead_source]?.label || lead.lead_source)
+                    : null
                   const isSel = selected.has(lead.id)
                   const isBusy = busyIds.has(lead.id)
                   return (
@@ -298,6 +318,11 @@ export default function InboxPage() {
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ring-1 ring-inset ${TONE_PILL[t.tone]}`}>
                                   {t.label}
                                 </span>
+                                {sourceLabel && (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ring-1 ring-inset ${TONE_PILL.neutral}`}>
+                                    {sourceLabel}
+                                  </span>
+                                )}
                                 {lead.is_hot && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[oklch(0.5_0.22_25)] text-white">
                                     🔥 HOT
