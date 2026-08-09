@@ -33,6 +33,7 @@ const ICONS = {
   ),
   projects: <Icon d={<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>} />,
   book: <Icon d={<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>} />,
+  actionCenter: <Icon d={<><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7z" /></>} />,
 }
 
 const navItemClasses = ({ isActive }) =>
@@ -132,6 +133,10 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
         <NavLink to={base} end className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">{ICONS.dashboard}</span>
           Dashboard
+        </NavLink>
+        <NavLink to={`${base}/action-center`} className={navItemClasses}>
+          <span className="text-[color:var(--color-text-dim)]">{ICONS.actionCenter}</span>
+          <span className="flex-1">Action Center</span>
         </NavLink>
         <NavLink to={`${base}/today`} className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">{ICONS.today}</span>
