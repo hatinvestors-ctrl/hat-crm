@@ -28,7 +28,7 @@ export function calculateFlipProfit(arv, purchasePrice, renovationCost) {
 // Used to show "expected profit if bought at MAO" next to MAO, since MAO's fixed
 // 75%-of-ARV rule doesn't by itself guarantee any particular profit dollar amount
 // — that depends on how big the ARV is.
-export function calculateFlipProfitAtPrice(purchasePrice, arv, renovationCost, holdMonths = 3) {
+export function calculateFlipProfitAtPrice(purchasePrice, arv, renovationCost, holdMonths = 6) {
   const pp   = num(purchasePrice)
   const rv   = num(arv)
   const reno = num(renovationCost)

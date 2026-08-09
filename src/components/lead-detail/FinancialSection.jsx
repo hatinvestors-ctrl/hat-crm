@@ -94,7 +94,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   onSave={(v) => update({ mao: v })} disabled={!canEdit}
                   displayClassName="text-[16px] font-bold text-[color:var(--color-accent)]" />
                 {(() => {
-                  const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost)
+                  const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6)
                   if (profitAtMao == null) return null
                   const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                   return (
@@ -161,7 +161,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
       })()}
 
       {/* ── Section 2: Inputs — ARV + Reno + Rent ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
           <EditableField
             label="After-Repair Value (ARV)"
@@ -221,6 +221,16 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
             value={lead.rent_estimate}
             formatter={formatCurrency}
             onSave={(v) => update({ rent_estimate: v })}
+            disabled={!canEdit}
+          />
+        </div>
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+          <EditableField
+            label="Holding Period"
+            type="number"
+            value={lead.hold_months ?? 6}
+            formatter={(v) => `${v} months`}
+            onSave={(v) => update({ hold_months: v })}
             disabled={!canEdit}
           />
         </div>

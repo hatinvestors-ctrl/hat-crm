@@ -9,6 +9,12 @@ export const LEAD_STATUSES = [
   // ── Triage (auto-imported, awaiting human review) ───────────────
   { value: 'triage',                     label: '🤖 Triage',             category: 'Triage',    tone: 'warn'    },
 
+  // ── Monitor (acquisition engine kept it, not worth Kevin's time yet) ──
+  // Not shown in Inbox (InboxPage filters status='triage' only). Woken up
+  // and promoted to 'triage' when something meaningful changes (price cut,
+  // back on market, DOM threshold). See hat-ai-agents/lib/acquisition-engine.mjs.
+  { value: 'monitor',                    label: '👁️ Monitor',           category: 'Triage',    tone: 'neutral' },
+
   // ── Active pipeline ─────────────────────────────────────────────
   { value: 'new_lead',                   label: 'New Lead',              category: 'Pipeline',  tone: 'neutral' },
   { value: 'mao_calculated',             label: 'MAO Calculated',        category: 'Pipeline',  tone: 'neutral' },

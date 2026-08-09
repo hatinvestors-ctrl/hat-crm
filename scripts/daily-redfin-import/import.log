@@ -1,0 +1,18 @@
+
+[2026-08-06 00:34:32] Starting daily Redfin import...
+
+­ƒÅá HAT-AI Daily Redfin Import ÔÇö 2026-08-05T21:35:06.509Z
+
+­ƒô¼ Fetching Redfin emails...
+Fatal error: Error: No access, refresh token, API key or refresh handler callback is set.
+    at OAuth2Client.getRequestMetadataAsync (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\google-auth-library\build\src\auth\oauth2client.js:307:19)
+    at OAuth2Client.requestAsync (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\google-auth-library\build\src\auth\oauth2client.js:418:34)
+    at OAuth2Client.request (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\google-auth-library\build\src\auth\oauth2client.js:412:25)
+    at createAPIRequestAsync (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\googleapis-common\build\src\apirequest.js:303:31)
+    at createAPIRequest (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\googleapis-common\build\src\apirequest.js:52:16)
+    at Resource$Users$Messages.list (C:\Users\tomer\Documents\PrivateNew180425\CloudeCode\HatCRM\scripts\daily-redfin-import\node_modules\googleapis\build\src\apis\gmail\v1.js:813:65)
+    at fetchTodayRedfinEmails (file:///C:/Users/tomer/Documents/PrivateNew180425/CloudeCode/HatCRM/scripts/daily-redfin-import/index.mjs:184:46)
+    at main (file:///C:/Users/tomer/Documents/PrivateNew180425/CloudeCode/HatCRM/scripts/daily-redfin-import/index.mjs:445:24)
+    at file:///C:/Users/tomer/Documents/PrivateNew180425/CloudeCode/HatCRM/scripts/daily-redfin-import/index.mjs:519:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+[2026-08-06 00:34:32] Completed.

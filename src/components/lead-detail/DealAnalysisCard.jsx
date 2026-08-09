@@ -102,7 +102,7 @@ async function callFnFull(name, body) {
 }
 
 // ── Same formulas as analyze-deal.mjs ──────────────────────────────────────
-function computeFlipBreakdown(pp, arv, reno, holdMonths = 3) {
+function computeFlipBreakdown(pp, arv, reno, holdMonths = 6) {
   const hmlLoan         = pp * 0.90 + reno
   const monthlyPmt      = hmlLoan * 0.01
   const points          = hmlLoan * 0.02
@@ -177,8 +177,9 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
   const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
   const pp   = Number(lead.mao || (arv ? Math.round(arv * 0.75 - reno - 2450) : 0) || lead.asking_price || 0)
   if (!arv || !pp) return null
+  const holdMonths = lead.hold_months || 6
 
-  const f = computeBrrrrBreakdown(pp, arv, reno, rent)
+  const f = computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
   const cf  = f.monthlyCF
   const coc = f.coc
 
@@ -187,7 +188,7 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
     : 'FAIL'
 
   const isBuy = (arvVal, renoVal, rentVal) => {
-    const r = computeBrrrrBreakdown(pp, arvVal, renoVal, rentVal)
+    const r = computeBrrrrBreakdown(pp, arvVal, renoVal, rentVal, holdMonths)
     return r.monthlyCF != null && r.coc != null && r.monthlyCF >= 200 && r.coc >= 8
   }
 
@@ -275,10 +276,10 @@ function FlipRealityCheck({ lead, verdict, score }) {
   const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
   const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
   if (!arv || !pp) return null
+  const holdMonths = lead.hold_months || 6
 
-  const f = computeFlipBreakdown(pp, arv, reno)
+  const f = computeFlipBreakdown(pp, arv, reno, holdMonths)
   const profit = f.totalProfit
-  const holdMonths = f.holdMonths
 
   const tier = profit >= 40000 ? 'BUY' : profit >= 30000 ? 'CONDITIONAL' : 'PASS'
 
@@ -393,7 +394,8 @@ function FullBreakdownTab({ lead, strategy }) {
   const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
   const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
   const isFlip = strategy !== 'brrrr'
-  const f = isFlip ? computeFlipBreakdown(pp, arv, reno) : computeBrrrrBreakdown(pp, arv, reno, rent)
+  const holdMonths = lead.hold_months || 6
+  const f = isFlip ? computeFlipBreakdown(pp, arv, reno, holdMonths) : computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
 
   const Row = ({ label, value, bold, positive, separator, indent }) => (
     separator
@@ -693,6 +695,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           monthly_rent: activeStrategy === 'brrrr' ? (lead.rent_estimate || null) : null,
           strategy: activeStrategy,
           reno_was_estimated: false,
+          hold_months: lead.hold_months || 6,
         }),
       })
       const verdictData = await verdictRes.json()
