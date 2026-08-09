@@ -11,7 +11,7 @@
 //   - lead.status (existing field) — Follow Up bucket
 // No AI call, no new scoring, no new database table.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -28,6 +28,19 @@ const CATEGORY_META = {
   FOLLOW_UP:         { icon: '🟡', label: 'Follow Up',          theme: { bg: 'var(--color-accent-soft)', border: 'var(--color-accent)', text: 'var(--color-accent-text)' } },
   RECENTLY_IMPROVED: { icon: '⚪', label: 'Recently Improved',  theme: PRIORITY_THEME.WATCH },
 }
+
+// #5.1 — Quick filters. Client-side only, filters the already-loaded
+// `items` array — no new query, no backend change. FLIP/BRRRR reuse the
+// existing deal_analysis.strategy field; ACT_NOW/REVIEW_TODAY just narrow
+// to that one category (Follow Up / Recently Improved stay reachable via
+// "All").
+const QUICK_FILTERS = [
+  { key: 'ALL', label: 'All' },
+  { key: 'FLIP', label: 'Flip' },
+  { key: 'BRRRR', label: 'BRRRR' },
+  { key: 'ACT_NOW', label: 'Act Now' },
+  { key: 'REVIEW_TODAY', label: 'Review Today' },
+]
 
 // Statuses that mean "waiting on someone else to respond" — the existing
 // lead.status values that match the mission's own Follow Up examples
@@ -86,6 +99,8 @@ function classifyLead(lead, rediscovery) {
     // Which specific status put this in Follow Up — used to render
     // sub-sections (Offer Sent / Negotiating / etc.) instead of one pile.
     followUpStatus: category === 'FOLLOW_UP' ? lead.status : null,
+    // #5.1 quick filters — existing field, passed through as-is, not recalculated.
+    strategy: lead.deal_analysis?.strategy ?? null,
   }
 }
 
@@ -114,6 +129,13 @@ function sortCategory(category, items) {
   }
 }
 
+const NA = 'Not available' // #5.1 — replaces bare "—" so missing data reads as intentional, not broken
+
+// #5.1 — Card hierarchy top to bottom: Address → Next Action → Expected
+// Profit (emphasized — Kevin's primary decision metric) → Maximum Offer →
+// Reason (clamped ~2 lines + "More…", opens the same lead — no new modal,
+// the whole card is already a Link). No fields added or removed, no
+// classification/business-logic change — presentation only.
 function ActionCard({ item, workspaceId }) {
   const theme = CATEGORY_META[item.category].theme
   return (
@@ -123,9 +145,10 @@ function ActionCard({ item, workspaceId }) {
       style={{ borderColor: theme.border, background: theme.bg }}
     >
       <div className="px-3.5 py-3">
+        {/* 1. Address */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[13.5px] font-semibold text-[color:var(--color-text)] truncate">{item.lead.address}</div>
+            <div className="text-[14px] font-bold text-[color:var(--color-text)] truncate">{item.lead.address}</div>
             {item.lead.city && <div className="text-[11px] text-[color:var(--color-text-dim)]">{item.lead.city}</div>}
           </div>
           {item.decision && (
@@ -135,24 +158,35 @@ function ActionCard({ item, workspaceId }) {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2.5 text-[11.5px]">
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Next Action</div>
-            <div className="font-semibold text-[color:var(--color-text)]">{item.nextAction || '—'}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Profit</div>
-            <div className="font-semibold text-[color:var(--color-text)]">{item.expectedProfit != null ? formatCurrency(item.expectedProfit) : '—'}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Maximum Offer</div>
-            <div className="font-semibold text-[color:var(--color-text)]">{item.maxOffer != null ? formatCurrency(item.maxOffer) : '—'}</div>
+        {/* 2. Next Action */}
+        <div className="mt-2">
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Next Action</div>
+          <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.nextAction || NA}</div>
+        </div>
+
+        {/* 3. Expected Profit — visually the loudest number on the card */}
+        <div className="mt-2 rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Profit</div>
+          <div
+            className="text-[18px] font-extrabold tabular-nums"
+            style={{ color: item.expectedProfit != null ? 'var(--color-success-text)' : 'var(--color-text-dim)' }}
+          >
+            {item.expectedProfit != null ? formatCurrency(item.expectedProfit) : NA}
           </div>
         </div>
 
+        {/* 4. Maximum Offer */}
+        <div className="mt-2">
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Maximum Offer</div>
+          <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.maxOffer != null ? formatCurrency(item.maxOffer) : NA}</div>
+        </div>
+
+        {/* 5. Reason — clamped to ~2 lines, "More…" just hints the full lead has more; clicking anywhere on the card (including here) opens it */}
         {item.reason && (
           <div className="text-[11px] text-[color:var(--color-text-muted)] mt-2 leading-snug">
-            <span className="font-semibold text-[color:var(--color-text)]">Reason: </span>{item.reason}
+            <span className="font-semibold text-[color:var(--color-text)]">Reason: </span>
+            <span className="line-clamp-2">{item.reason}</span>
+            <span className="text-[color:var(--color-accent-text)] font-medium"> More…</span>
           </div>
         )}
       </div>
@@ -164,6 +198,7 @@ export default function ActionCenterPage() {
   const { workspace, workspaceId, user, userRole } = useOutletContext()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('ALL')
 
   useEffect(() => {
     if (!workspaceId) return
@@ -219,44 +254,132 @@ export default function ActionCenterPage() {
     return () => { cancelled = true }
   }, [workspaceId, user.id, userRole])
 
+  // #5.1 performance — memoize the derived/sorted/filtered lists so a
+  // filter click or unrelated re-render doesn't re-sort everything from
+  // scratch. Classification itself already only runs once per data load
+  // (in the effect above), not per render.
+  const totalCount = items.length
+
+  const filteredItems = useMemo(() => {
+    if (filter === 'ALL') return items
+    if (filter === 'FLIP' || filter === 'BRRRR') return items.filter(i => i.strategy === filter.toLowerCase())
+    return items.filter(i => i.category === filter)
+  }, [items, filter])
+
+  const byCategory = useMemo(() => ({
+    ACT_NOW: sortCategory('ACT_NOW', filteredItems.filter(i => i.category === 'ACT_NOW')),
+    REVIEW_TODAY: sortCategory('REVIEW_TODAY', filteredItems.filter(i => i.category === 'REVIEW_TODAY')),
+    FOLLOW_UP: sortCategory('FOLLOW_UP', filteredItems.filter(i => i.category === 'FOLLOW_UP')),
+    RECENTLY_IMPROVED: sortCategory('RECENTLY_IMPROVED', filteredItems.filter(i => i.category === 'RECENTLY_IMPROVED')),
+  }), [filteredItems])
+
+  // #5.1 business value summary — simple sum/average over values that
+  // already exist on each item (lead.mao, deal_analysis.profit). Omitted
+  // entirely when no item has the underlying value, per spec ("if a value
+  // is unavailable, omit it").
+  const kpis = useMemo(() => {
+    const withProfit = filteredItems.filter(i => i.expectedProfit != null)
+    const withOffer = filteredItems.filter(i => i.maxOffer != null)
+    const totalProfit = withProfit.reduce((sum, i) => sum + i.expectedProfit, 0)
+    const pipelineValue = withOffer.reduce((sum, i) => sum + i.maxOffer, 0)
+    return {
+      pipelineValue: withOffer.length > 0 ? pipelineValue : null,
+      totalProfit: withProfit.length > 0 ? totalProfit : null,
+      avgProfit: withProfit.length > 0 ? totalProfit / withProfit.length : null,
+    }
+  }, [filteredItems])
+
   if (loading) return <LoadingSpinner fullPage label="Scanning for opportunities…" />
 
-  const byCategory = {
-    ACT_NOW: sortCategory('ACT_NOW', items.filter(i => i.category === 'ACT_NOW')),
-    REVIEW_TODAY: sortCategory('REVIEW_TODAY', items.filter(i => i.category === 'REVIEW_TODAY')),
-    FOLLOW_UP: sortCategory('FOLLOW_UP', items.filter(i => i.category === 'FOLLOW_UP')),
-    RECENTLY_IMPROVED: sortCategory('RECENTLY_IMPROVED', items.filter(i => i.category === 'RECENTLY_IMPROVED')),
-  }
-  const totalCount = items.length
+  const filteredCount = filteredItems.length
 
   return (
     <>
       <Topbar title="Action Center" breadcrumbs={[{ label: workspace.name }, { label: 'Action Center' }]} />
 
       <div className="px-6 py-6 w-full flex-1">
-        <div className="pb-5 border-b border-[color:var(--color-line)] mb-6">
-          <p className="text-[12px] text-[color:var(--color-text-dim)]">What deserves attention right now</p>
+        {/* #5.1 — action-oriented header: "Today's Mission" + compact
+            per-category counts, replacing the flatter "N properties need
+            your attention" line. Same underlying counts as the summary
+            tiles below, just surfaced immediately. */}
+        <div className="pb-5 border-b border-[color:var(--color-line)] mb-5">
+          <p className="text-[12px] text-[color:var(--color-text-dim)] uppercase tracking-wider font-semibold">Today's Mission</p>
           <h2 className="text-[22px] font-semibold text-[color:var(--color-text)] tracking-tight mt-1">
-            {totalCount === 0 ? 'Nothing needs action right now.' : `${totalCount} propert${totalCount === 1 ? 'y needs' : 'ies need'} your attention.`}
+            {totalCount === 0 ? 'Nothing needs action right now.' : `${totalCount} Opportunit${totalCount === 1 ? 'y' : 'ies'} Ready`}
           </h2>
+          {totalCount > 0 && (
+            <p className="text-[12.5px] text-[color:var(--color-text-muted)] mt-1">
+              Act Now: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'ACT_NOW').length}</span>
+              {'  ·  '}Review Today: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'REVIEW_TODAY').length}</span>
+              {'  ·  '}Follow Up: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'FOLLOW_UP').length}</span>
+            </p>
+          )}
         </div>
 
-        {/* Top summary — 4 numbers only */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {/* #5.1 — business value KPI row, only for values that exist */}
+        {(kpis.pipelineValue != null || kpis.totalProfit != null || kpis.avgProfit != null) && (
+          <div className="flex flex-wrap gap-3 mb-5">
+            {kpis.pipelineValue != null && (
+              <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Potential Pipeline Value</div>
+                <div className="text-[17px] font-bold text-[color:var(--color-text)] tabular-nums">{formatCurrency(kpis.pipelineValue)}</div>
+              </div>
+            )}
+            {kpis.totalProfit != null && (
+              <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Total Expected Profit</div>
+                <div className="text-[17px] font-bold text-[color:var(--color-success-text)] tabular-nums">{formatCurrency(kpis.totalProfit)}</div>
+              </div>
+            )}
+            {kpis.avgProfit != null && (
+              <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Average Expected Profit</div>
+                <div className="text-[17px] font-bold text-[color:var(--color-text)] tabular-nums">{formatCurrency(kpis.avgProfit)}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Top summary — 4 numbers only (unaffected by quick filters, always the full picture) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {Object.entries(CATEGORY_META).map(([key, meta]) => (
             <div key={key} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3 text-center">
               <div className="text-[20px]">{meta.icon}</div>
-              <div className="text-[22px] font-bold text-[color:var(--color-text)] tabular-nums mt-0.5">{byCategory[key].length}</div>
+              <div className="text-[22px] font-bold text-[color:var(--color-text)] tabular-nums mt-0.5">{items.filter(i => i.category === key).length}</div>
               <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mt-0.5">{meta.label}</div>
             </div>
           ))}
         </div>
 
-        {totalCount === 0 ? (
+        {/* #5.1 — quick filters, client-side only */}
+        {totalCount > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            {QUICK_FILTERS.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={`text-[11.5px] font-semibold px-2.5 h-7 rounded-full border transition-colors ${
+                  filter === f.key
+                    ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-white'
+                    : 'bg-[color:var(--color-bg-elev)] border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {filteredCount === 0 ? (
           <EmptyState
             icon="✓"
-            title="All clear."
-            description="No lead currently meets Act Now, Review Today, Follow Up, or Recently Improved criteria."
+            title={totalCount === 0 ? 'All clear.' : 'No matches for this filter.'}
+            description={
+              totalCount === 0
+                ? 'No lead currently meets Act Now, Review Today, Follow Up, or Recently Improved criteria.'
+                : 'Nothing in the current view matches this filter. Try "All" to see everything.'
+            }
           />
         ) : (
           <div className="space-y-6">
@@ -288,7 +411,7 @@ export default function ActionCenterPage() {
                           <div className="text-[11px] font-semibold text-[color:var(--color-text-muted)] mb-1.5">
                             {STATUS_MAP[status]?.label || status} <span className="text-[color:var(--color-text-dim)]">({subItems.length})</span>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                             {subItems.map(item => (
                               <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
                             ))}
@@ -297,7 +420,7 @@ export default function ActionCenterPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {list.map(item => (
                         <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
                       ))}
