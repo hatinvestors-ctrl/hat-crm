@@ -1,5 +1,11 @@
-import { supabase } from './supabase'
-import { escapeLike } from './safeQuery'
+import { escapeLike } from './safeQuery.js'
+// `supabase` is imported lazily inside findDuplicateLeads() below (Capability
+// #9) rather than statically here, so the pure normalizeAddress()/
+// normalizeAddressForDB()/streetCore() helpers in this file stay importable
+// from plain Node scripts (e.g. scripts/enrich-property-cli.mjs) without
+// pulling in src/lib/supabase.js, which requires Vite's import.meta.env and
+// crashes under plain `node`. No behavior change for existing callers —
+// Vite/webpack handle dynamic import() the same as static for bundled code.
 
 // Normalize for comparison: lowercase, strip punctuation, collapse spaces,
 // expand common abbreviations so "5959 Buckley Dr" matches "5959 buckley drive".
@@ -49,7 +55,10 @@ const STREET_SUFFIXES = new Set([
 
 // Extract house number and street name words without suffix for fuzzy matching.
 // "2712 cherrywood road" → { num: "2712", words: ["cherrywood"] }
-function streetCore(norm) {
+// Exported (Capability #9) so src/lib/propertyEnrichment.js can reuse the exact
+// same house-number/street-name split for public-record address matching,
+// instead of re-implementing it.
+export function streetCore(norm) {
   const parts = norm.split(' ')
   if (parts.length < 2) return null
   const num = parts[0]
@@ -66,6 +75,7 @@ export async function findDuplicateLeads(workspaceId, address, excludeLeadId = n
   if (!workspaceId || !address?.trim()) return []
   const norm = normalizeAddress(address)
   if (norm.length < 4) return []
+  const { supabase } = await import('./supabase.js')
 
   // Coarse SQL prefilter — use the first numeric part (street number) to narrow results
   const firstToken = norm.split(' ')[0]

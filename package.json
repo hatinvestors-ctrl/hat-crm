@@ -7,7 +7,8 @@
     "dev": "netlify dev",
     "dev:vite": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "enrich-property": "node scripts/enrich-property-cli.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
