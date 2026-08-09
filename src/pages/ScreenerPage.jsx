@@ -6,6 +6,7 @@ import DecisionStrip from '../components/screener/DecisionStrip'
 import NotesRenderer from '../components/lead-detail/NotesRenderer'
 import { lookupAddress } from '../lib/enrichment'
 import { findDuplicateLeads } from '../lib/leadDedup'
+import { recordPropertyEvent } from '../lib/propertyIntelligence'
 import { supabase } from '../lib/supabase'
 
 function newDeal(overrides = {}) {
@@ -389,6 +390,12 @@ export default function ScreenerPage() {
             mao:          deal.mao  || null,
           })
           .eq('id', existing.id)
+        recordPropertyEvent({
+          workspaceId, addressFields: { address: deal.address }, leadId: existing.id,
+          type: 'lead_reencountered',
+          content: 'Screener re-analyzed an address with an existing lead — AI analysis updated',
+          metadata: { source: 'screener' },
+        })
         updateDeal(dealId, { status: 'saved' })
         setSaving(false)
         return
@@ -419,6 +426,13 @@ export default function ScreenerPage() {
       }).select('id').single()
 
       if (error) throw error
+
+      recordPropertyEvent({
+        workspaceId,
+        addressFields: { address: deal.address, city: deal.enriched?.city, state: deal.enriched?.state || 'FL', zip_code: deal.enriched?.zip_code },
+        leadId: lead?.id, type: 'lead_created',
+        content: 'Lead created via Deal Screener', metadata: { source: 'screener' },
+      })
 
       if (deal.sourceName && lead?.id) {
         let agentId = null

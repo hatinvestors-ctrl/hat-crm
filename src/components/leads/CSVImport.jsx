@@ -6,6 +6,7 @@ import { calculateMAO } from '../../lib/calculations'
 import { DEFAULT_CLOSING_COSTS, DEFAULT_TARGET_PROFIT } from '../../lib/constants'
 import { buildZillowUrl } from '../../lib/zillow'
 import { normalizeAddress, normalizeAddressForDB } from '../../lib/leadDedup'
+import { recordPropertyEvent } from '../../lib/propertyIntelligence'
 import { isSafeHttpUrl } from '../../lib/urlSafety'
 
 const LEAD_FIELDS = [
@@ -140,8 +141,20 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
         .eq('workspace_id', workspaceId)
       const existingSet = new Set((existing || []).map(l => normalizeAddressForDB(l.address)))
       const beforeDedup = records.length
+      const duplicateRows = records.filter(r => existingSet.has(normalizeAddressForDB(r.address)))
       const deduped = records.filter(r => !existingSet.has(normalizeAddressForDB(r.address)))
       const duplicatesSkipped = beforeDedup - deduped.length
+
+      // Property Intelligence: rows skipped here are re-encounters of an
+      // address that already has a property/lead — append an event instead
+      // of silently discarding the attempt. Fire-and-forget, never blocks import.
+      duplicateRows.forEach(rec => {
+        recordPropertyEvent({
+          workspaceId, addressFields: rec, type: 'duplicate_attempt',
+          content: 'CSV import row skipped — address already exists',
+          metadata: { source: 'csv_import' },
+        })
+      })
 
       if (!deduped.length) {
         throw new Error(`All ${beforeDedup} rows are duplicates of existing leads. Nothing to import.`)
@@ -154,19 +167,34 @@ export default function CSVImport({ workspaceId, userId, workspaceDefaults, onDo
       if (bulkErr && bulkErr.code === '23505') {
         // Fall back: insert one by one, skip constraint violations
         for (const rec of deduped) {
-          const { error: rowErr } = await supabase.from('leads').insert(rec).select('id').single()
+          const { data: rowData, error: rowErr } = await supabase.from('leads').insert(rec).select('id').single()
           if (rowErr?.code === '23505') {
             dbDuplicatesSkipped++
+            recordPropertyEvent({
+              workspaceId, addressFields: rec, type: 'duplicate_attempt',
+              content: 'CSV import row skipped — address already exists',
+              metadata: { source: 'csv_import' },
+            })
           } else if (rowErr) {
             throw rowErr
           } else {
             imported++
+            recordPropertyEvent({
+              workspaceId, addressFields: rec, leadId: rowData?.id, type: 'lead_created',
+              content: 'Lead created via CSV import', metadata: { source: 'csv_import' },
+            })
           }
         }
       } else if (bulkErr) {
         throw bulkErr
       } else {
         imported = bulkData.length
+        deduped.forEach(rec => {
+          recordPropertyEvent({
+            workspaceId, addressFields: rec, type: 'lead_created',
+            content: 'Lead created via CSV import', metadata: { source: 'csv_import' },
+          })
+        })
       }
 
       setResult({

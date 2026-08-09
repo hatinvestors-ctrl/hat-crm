@@ -15,6 +15,7 @@ import { refreshLeadMls, mlsStatusMeta } from '../../lib/mlsStatus'
 import { calculateMAO } from '../../lib/calculations'
 import { supabase } from '../../lib/supabase'
 import { logLeadCreated, logChanges } from '../../lib/activityLogger'
+import { recordPropertyEvent } from '../../lib/propertyIntelligence'
 import { lookupAddress } from '../../lib/enrichment'
 import { upsertAgentFromLead } from '../../lib/agentOutreach'
 
@@ -251,11 +252,23 @@ export default function LeadForm({ open, onClose, onSaved, lead, workspaceId, us
           .single()
         if (insErr) {
           if (insErr.code === '23505') {
+            // Property Intelligence: same address encountered again — the
+            // existing lead's history is preserved (this insert never
+            // happened); just append an event so the attempt isn't lost.
+            recordPropertyEvent({
+              workspaceId, addressFields: payload, type: 'duplicate_attempt',
+              content: 'Add Lead attempted for an address that already exists',
+              metadata: { source: 'lead_form' },
+            })
             throw new Error('A lead with this address already exists in your workspace.')
           }
           throw insErr
         }
         await logLeadCreated(created.id, userId)
+        recordPropertyEvent({
+          workspaceId, addressFields: created, leadId: created.id, type: 'lead_created',
+          content: 'Lead created', metadata: { source: 'lead_form' },
+        })
         onSaved?.(created)
       }
       onClose?.()
