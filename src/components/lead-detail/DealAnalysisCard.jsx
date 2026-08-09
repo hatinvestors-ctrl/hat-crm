@@ -74,6 +74,34 @@ const VERDICT_TO_ACTION = {
   'WATCH': 'WAIT',
   'DEAD LEAD': 'IGNORE',
 }
+// v1.0.1 polish — Kevin-facing display text only. The underlying priority
+// value (HOT/TODAY/WATCH/IGNORE) driving VERDICT_TO_PRIORITY above is
+// unchanged; this is purely a label swap for readability.
+const PRIORITY_DISPLAY = {
+  HOT: 'ACT NOW',
+  TODAY: 'REVIEW TODAY',
+  WATCH: 'WATCH',
+  IGNORE: 'PASS',
+}
+
+// v1.0.1 polish — reduces a PROS bullet line to ~one short scannable line
+// without inventing content. Strips the AI's own parenthetical/dash-clause
+// padding and hard-caps length; never rewrites or adds facts. If nothing
+// safe to trim is found, the original line is simply truncated with an
+// ellipsis so meaning isn't altered.
+function shortenReason(text) {
+  if (!text) return ''
+  // Drop trailing clauses the AI tacks on after a dash/em-dash or in
+  // parentheses — these are elaboration, not the core fact.
+  let short = text
+    .split(/\s+[—–-]\s+/)[0]
+    .replace(/\([^)]*\)/g, '')
+    .trim()
+  const MAX = 42
+  if (short.length > MAX) short = short.slice(0, MAX).trim() + '…'
+  return short
+}
+
 function derivePriority(notesText) {
   if (!notesText) return null
   const scoreMatch = notesText.match(/Total:\s*(\d+)\s*\/\s*100/i)
@@ -83,15 +111,26 @@ function derivePriority(notesText) {
   const confidence = scoreMatch ? parseInt(scoreMatch[1], 10) : null
   const priority = VERDICT_TO_PRIORITY[verdict] || 'WATCH'
   const nextAction = VERDICT_TO_ACTION[verdict] || 'WAIT'
-  const prosMatch = notesText.match(/PROS[^\n]*\n([\s\S]*?)(?=\n={5,}|$)/i)
-  const reasons = prosMatch
+  // PROS body sits between the section header and the next '=====' divider.
+  // The header itself is immediately followed by a divider line before the
+  // bullets start, so strip any leading '=' divider line the capture picks up.
+  const prosMatch = notesText.match(/PROS[^\n]*\n=*\n?([\s\S]*?)(?=\n={5,}|$)/i)
+  const rawReasons = prosMatch
     ? prosMatch[1]
         .split('\n')
-        .map(l => l.replace(/^[\s\-•*]+/, '').trim())
-        .filter(Boolean)
+        .map(l => l.replace(/^[\s\d.\-•*]+/, '').trim())
+        .filter(l => Boolean(l) && !/^=+$/.test(l))
         .slice(0, 3)
     : []
-  return { priority, confidence, verdict, nextAction, reasons }
+  const reasons = rawReasons.map(shortenReason)
+  // v1.0.1: Data Quality (already computed/written by the AI, DEAL SCORE
+  // section) and Max Walk-Away (already computed, RECOMMENDED ACTION
+  // section) — shown only when reliably parseable, never invented.
+  const dataQualityMatch = notesText.match(/Data Quality:\s*(\d+)\s*\/\s*10/i)
+  const dataQuality = dataQualityMatch ? parseInt(dataQualityMatch[1], 10) : null
+  const walkAwayMatch = notesText.match(/Max Walk-Away:\s*\$([0-9,]+)/i)
+  const walkAway = walkAwayMatch ? parseInt(walkAwayMatch[1].replace(/,/g, ''), 10) : null
+  return { priority, confidence, verdict, nextAction, reasons, rawReasons, dataQuality, walkAway }
 }
 const PRIORITY_THEME = {
   HOT:    { bg: 'var(--color-danger-soft)',  border: 'var(--color-danger)',  text: 'var(--color-danger-text)' },
@@ -588,6 +627,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [generatingScripts, setGeneratingScripts] = useState(false)
   const [competitiveMode, setCompetitiveMode] = useState(false)
   const [aiCompsArv, setAiCompsArv] = useState(null)
+  const [showReasonDetail, setShowReasonDetail] = useState(false) // v1.0.1 — "View details" toggle for Why This Is Worth Your Time
   const [lastArv,  setLastArv]  = useState(lead.arv ? Number(lead.arv) : null)
   const [lastReno, setLastReno] = useState(lead.renovation_cost ? Number(lead.renovation_cost) : null)
   const [refreshingComps, setRefreshingComps] = useState(false)
@@ -1075,27 +1115,53 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
       {priorityInfo && (() => {
         const theme = PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH
+        const displayLabel = PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority
+        const isUrgent = priorityInfo.priority === 'HOT'
         return (
-          <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
+          <div
+            className="mb-3 rounded-lg border overflow-hidden"
+            style={{ borderColor: theme.border, background: theme.bg, ...(isUrgent ? { borderWidth: 2 } : {}) }}
+          >
+            <div className={`grid grid-cols-2 ${priorityInfo.walkAway != null ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} divide-x`} style={{ borderColor: theme.border }}>
               <div className="px-3 py-2">
                 <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Priority</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.priority}</div>
+                <div className={`font-bold ${isUrgent ? 'text-[16px]' : 'text-[14px]'}`} style={{ color: theme.text }}>
+                  {isUrgent ? '🔥 ' : ''}{displayLabel}
+                </div>
+              </div>
+              <div className="px-3 py-2" title="Analysis Score reflects the current deal analysis. Data Quality reflects how complete the underlying information is.">
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Analysis Score</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.confidence != null ? `${priorityInfo.confidence}/100` : '—'}</div>
+                {priorityInfo.dataQuality != null && (
+                  <div className="text-[10px] font-medium opacity-80 mt-0.5" style={{ color: theme.text }}>Data Quality: {priorityInfo.dataQuality}/10</div>
+                )}
               </div>
               <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Confidence</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.confidence != null ? `${priorityInfo.confidence}/100` : '—'}</div>
-              </div>
-              <div className="px-3 py-2 col-span-2 sm:col-span-1">
                 <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Next Action</div>
                 <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.nextAction}</div>
               </div>
+              {priorityInfo.walkAway != null && (
+                <div className="px-3 py-2">
+                  <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Walk Away</div>
+                  <div className="text-[14px] font-bold" style={{ color: theme.text }}>{fc(priorityInfo.walkAway)}</div>
+                </div>
+              )}
               <div className="px-3 py-2 col-span-2 sm:col-span-1">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Top Reasons</div>
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>WHY THIS IS WORTH YOUR TIME</div>
                 {priorityInfo.reasons.length > 0 ? (
-                  <ul className="text-[11.5px] font-medium leading-tight mt-0.5 space-y-0.5" style={{ color: theme.text }}>
-                    {priorityInfo.reasons.map((r, i) => <li key={i}>• {r}</li>)}
-                  </ul>
+                  <>
+                    <ul className="text-[11.5px] font-medium leading-tight mt-0.5 space-y-0.5" style={{ color: theme.text }}>
+                      {(showReasonDetail ? priorityInfo.rawReasons : priorityInfo.reasons).map((r, i) => <li key={i}>• {r}</li>)}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setShowReasonDetail(v => !v)}
+                      className="text-[10px] underline underline-offset-2 mt-1 opacity-70 hover:opacity-100 transition-opacity"
+                      style={{ color: theme.text }}
+                    >
+                      {showReasonDetail ? 'Show summary' : 'View details'}
+                    </button>
+                  </>
                 ) : (
                   <div className="text-[14px] font-bold" style={{ color: theme.text }}>—</div>
                 )}
