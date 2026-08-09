@@ -19,7 +19,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/calculations'
 import { applyLeadVisibility } from '../lib/leadVisibility'
-import { TERMINAL_STATUSES } from '../lib/constants'
+import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
 
 const CATEGORY_META = {
@@ -29,12 +29,26 @@ const CATEGORY_META = {
   RECENTLY_IMPROVED: { icon: '⚪', label: 'Recently Improved',  theme: PRIORITY_THEME.WATCH },
 }
 
+// Statuses that mean "waiting on someone else to respond" — the existing
+// lead.status values that match the mission's own Follow Up examples
+// (waiting on agent / waiting on seller). Reuses LEAD_STATUSES values
+// as-is (src/lib/constants.js) — no new status invented. Grouped into
+// distinct sub-sections within Follow Up so different waiting reasons
+// aren't dumped into one undifferentiated pile.
+const FOLLOW_UP_STATUSES = ['follow_up', 'offer_sent', 'negotiating', 'offer_pending_hat_signing', 'offer_signed']
+
+function isToday(isoString) {
+  if (!isoString) return false
+  return new Date(isoString).toDateString() === new Date().toDateString()
+}
+
 // Reuses derivePriority + rediscovery status already persisted per lead —
 // no recalculation. Classifies each lead into exactly one bucket (or none,
 // if it isn't actionable), per the priority order in the spec.
 function classifyLead(lead, rediscovery) {
   const priorityInfo = derivePriority(lead.ai_notes)
-  if (!priorityInfo && !rediscovery && lead.status !== 'follow_up') return null
+  const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
+  if (!priorityInfo && !rediscovery && !isFollowUpStatus) return null
 
   const priceImproved = rediscovery?.status === 'IMPROVED' && /price dropped/i.test(rediscovery.reason || '')
 
@@ -43,7 +57,12 @@ function classifyLead(lead, rediscovery) {
     category = 'ACT_NOW'
   } else if (priorityInfo?.priority === 'TODAY') {
     category = 'REVIEW_TODAY'
-  } else if (lead.status === 'follow_up') {
+  } else if (isFollowUpStatus) {
+    // A status change that happened today means Kevin just acted on it
+    // (e.g. sent an offer moments ago) — give it a day before nagging him
+    // to follow up on his own same-day action. Reuses updated_at, the
+    // existing timestamp that changes when status changes; no new field.
+    if (isToday(lead.updated_at)) return null
     category = 'FOLLOW_UP'
   } else if (rediscovery?.status === 'IMPROVED') {
     category = 'RECENTLY_IMPROVED'
@@ -51,7 +70,7 @@ function classifyLead(lead, rediscovery) {
   if (!category) return null
 
   const decision = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority) : null
-  const nextAction = priorityInfo?.nextAction || (lead.status === 'follow_up' ? 'FOLLOW UP' : null)
+  const nextAction = priorityInfo?.nextAction || (isFollowUpStatus ? 'FOLLOW UP' : null)
   const reason = rediscovery?.reason || priorityInfo?.reasons?.[0] || null
 
   return {
@@ -64,6 +83,9 @@ function classifyLead(lead, rediscovery) {
     reason,
     score: priorityInfo?.confidence ?? null,
     rediscoveredAt: rediscovery?.updatedAt || null,
+    // Which specific status put this in Follow Up — used to render
+    // sub-sections (Offer Sent / Negotiating / etc.) instead of one pile.
+    followUpStatus: category === 'FOLLOW_UP' ? lead.status : null,
   }
 }
 
@@ -241,6 +263,16 @@ export default function ActionCenterPage() {
             {Object.entries(CATEGORY_META).map(([key, meta]) => {
               const list = byCategory[key]
               if (list.length === 0) return null
+
+              // Follow Up gets sub-sections per waiting-reason status so
+              // "waiting on seller" and "waiting to sign" etc. aren't all
+              // dumped in one pile — everything else renders as one grid.
+              const subGroups = key === 'FOLLOW_UP'
+                ? FOLLOW_UP_STATUSES
+                    .map(status => ({ status, items: list.filter(i => i.followUpStatus === status) }))
+                    .filter(g => g.items.length > 0)
+                : null
+
               return (
                 <section key={key}>
                   <div className="flex items-center gap-2 mb-2.5">
@@ -248,11 +280,29 @@ export default function ActionCenterPage() {
                     <h3 className="text-[13.5px] font-bold uppercase tracking-wide text-[color:var(--color-text)]">{meta.label}</h3>
                     <span className="text-[11px] text-[color:var(--color-text-dim)] tabular-nums">({list.length})</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {list.map(item => (
-                      <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
-                    ))}
-                  </div>
+
+                  {subGroups ? (
+                    <div className="space-y-4">
+                      {subGroups.map(({ status, items: subItems }) => (
+                        <div key={status}>
+                          <div className="text-[11px] font-semibold text-[color:var(--color-text-muted)] mb-1.5">
+                            {STATUS_MAP[status]?.label || status} <span className="text-[color:var(--color-text-dim)]">({subItems.length})</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {subItems.map(item => (
+                              <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {list.map(item => (
+                        <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
+                      ))}
+                    </div>
+                  )}
                 </section>
               )
             })}
