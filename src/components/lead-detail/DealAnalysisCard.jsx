@@ -9,6 +9,7 @@ import { formatCurrency } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
+import { isDistressedLead } from '../../lib/distressInfo'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../../lib/leadPriority'
 
 // Parse the AI-computed MAO from the generated notes text ("Our MAO: $X")
@@ -990,6 +991,15 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
               </svg>
               {phase === 'analysis' ? 'Analyzing…' : phase === 'negotiation' ? 'Building negotiation plan…' : 'Working…'}
               <button onClick={cancelGenerate} className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">Cancel</button>
+            </span>
+          ) : (!hasAnalysis && isDistressedLead(lead) && !lead.asking_price && !lead.arv) ? (
+            // Capability #10.1 — an off-market lead with no ARV/asking
+            // price yet has nothing meaningful to underwrite. Don't
+            // invite a click that would run on empty inputs; explain
+            // instead. Reappears as a normal button the moment ARV or
+            // asking price is filled in — no change to handleRun itself.
+            <span className="text-[11.5px] text-[color:var(--color-text-dim)] italic">
+              More property/financial information is needed before underwriting.
             </span>
           ) : (!hasAnalysis || staleness.stale) ? (
             <button

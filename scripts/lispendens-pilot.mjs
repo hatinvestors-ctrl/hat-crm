@@ -163,17 +163,24 @@ async function nodeImportLead(normalizedLead, { workspaceId, status = 'triage' }
   }
 
   const { source, distress_data, is_distressed, ...rest } = normalizedLead
-  const payload = {
+  const basePayload = {
     ...rest,
     workspace_id: workspaceId,
     created_by: null,
-    lead_source: 'other', // see src/lib/leadImport.js — lead_source is DB-CHECK-constrained; 'other' is always valid
     status,
     ...(distress_data !== undefined ? { distress_data } : {}),
     ...(is_distressed !== undefined ? { is_distressed } : {}),
   }
 
-  const { data: created, error: insErr } = await supabase.from('leads').insert(payload).select().single()
+  // Capability #10.1 — try the generic 'off_market' source first (needs
+  // supabase/migrations/20260810020000_off_market_lead_source.sql applied);
+  // fall back to 'other' exactly like importLead() does, so this script
+  // keeps working today even before that migration is run.
+  let created, insErr
+  ;({ data: created, error: insErr } = await supabase.from('leads').insert({ ...basePayload, lead_source: 'off_market' }).select().single())
+  if (insErr && insErr.code === '23514') {
+    ;({ data: created, error: insErr } = await supabase.from('leads').insert({ ...basePayload, lead_source: 'other' }).select().single())
+  }
   if (insErr) {
     if (insErr.code === '23505') {
       const propertyId = await recordPropertyEvent({

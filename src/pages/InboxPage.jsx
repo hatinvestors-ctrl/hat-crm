@@ -7,6 +7,26 @@ import Button from '../components/ui/Button'
 import { supabase } from '../lib/supabase'
 import { REDFIN_TRIGGER_TYPES, REDFIN_TRIGGER_MAP, GENERIC_AUTO_ALERT, LEAD_SOURCE_MAP } from '../lib/constants'
 import { DistressBadge } from '../components/lead-detail/DistressBanner'
+import { isDistressedLead } from '../lib/distressInfo'
+
+// Capability #10.1 — coarse source-group tabs (ALL/REDFIN/ZILLOW/OFF-MARKET),
+// additive alongside the existing Redfin trigger-type tabs below, not a
+// replacement. Off-market uses the shared isDistressedLead() (structured
+// distress_data first, falls back to the pilot's own fixed-format notes
+// block only where distress_data doesn't exist yet) — not ad-hoc text
+// search.
+const SOURCE_GROUPS = [
+  { value: 'all',        label: 'All' },
+  { value: 'redfin',     label: 'Redfin' },
+  { value: 'zillow',     label: 'Zillow' },
+  { value: 'off_market', label: '⚠ Off-Market' },
+]
+function sourceGroupOf(lead) {
+  if (isDistressedLead(lead)) return 'off_market'
+  if (lead.lead_source === 'redfin_auto') return 'redfin'
+  if (lead.lead_source === 'zillow_auto') return 'zillow'
+  return 'other'
+}
 
 // Capability #6.1 — source-neutral trigger badge. Redfin leads keep their
 // exact existing "📨 Redfin Alert" fallback (REDFIN_TRIGGER_MAP, unchanged,
@@ -54,6 +74,7 @@ export default function InboxPage() {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTrigger, setActiveTrigger] = useState('all')
+  const [activeSourceGroup, setActiveSourceGroup] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [selected, setSelected] = useState(new Set())
   const [busyIds, setBusyIds] = useState(new Set())
@@ -91,11 +112,23 @@ export default function InboxPage() {
     return c
   }, [leads])
 
+  const sourceGroupCounts = useMemo(() => {
+    const c = { all: leads.length, redfin: 0, zillow: 0, off_market: 0 }
+    for (const l of leads) {
+      const g = sourceGroupOf(l)
+      if (g !== 'other') c[g] = (c[g] || 0) + 1
+    }
+    return c
+  }, [leads])
+
   // Filtered + sorted view
   const visibleLeads = useMemo(() => {
     let rows = activeTrigger === 'all'
       ? leads
       : leads.filter(l => (l.redfin_trigger_type || 'generic_alert') === activeTrigger)
+    if (activeSourceGroup !== 'all') {
+      rows = rows.filter(l => sourceGroupOf(l) === activeSourceGroup)
+    }
     rows = [...rows].sort((a, b) => {
       switch (sortBy) {
         case 'oldest':     return new Date(a.created_at) - new Date(b.created_at)
@@ -106,7 +139,7 @@ export default function InboxPage() {
       }
     })
     return rows
-  }, [leads, activeTrigger, sortBy])
+  }, [leads, activeTrigger, activeSourceGroup, sortBy])
 
   const updateStatus = async (ids, patch) => {
     setBusyIds(prev => new Set([...prev, ...ids]))
@@ -190,6 +223,28 @@ export default function InboxPage() {
           />
         ) : (
           <>
+            {/* Source-group tabs (Capability #10.1) — additive, sits above the existing trigger tabs */}
+            <div className="flex flex-wrap gap-1.5">
+              {SOURCE_GROUPS.map(g => {
+                const active = activeSourceGroup === g.value
+                const n = sourceGroupCounts[g.value] || 0
+                return (
+                  <button
+                    key={g.value}
+                    onClick={() => setActiveSourceGroup(g.value)}
+                    className={`inline-flex items-center gap-1.5 px-3 h-7 rounded-md text-[12px] font-semibold transition-all ${
+                      active
+                        ? 'bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)] ring-1 ring-[color:var(--color-accent)]'
+                        : 'bg-transparent hover:bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+                    }`}
+                  >
+                    {g.label}
+                    {g.value !== 'all' && <span className="text-[10px] tabular-nums opacity-70">· {n}</span>}
+                  </button>
+                )
+              })}
+            </div>
+
             {/* Trigger-type segment tabs */}
             <div className="flex flex-wrap gap-1.5">
               <button

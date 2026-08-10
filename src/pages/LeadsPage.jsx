@@ -129,7 +129,18 @@ export default function LeadsPage() {
     if (effectiveFilters.screened === true) q = q.eq('screened', true)
     if (effectiveFilters.assigned_to === 'unassigned') q = q.is('assigned_to', null)
     else if (effectiveFilters.assigned_to) q = q.eq('assigned_to', effectiveFilters.assigned_to)
-    if (effectiveFilters.lead_source) q = q.eq('lead_source', effectiveFilters.lead_source)
+    if (effectiveFilters.lead_source === 'off_market') {
+      // Capability #10.1 — bridges the gap until the #10.1 migration is
+      // applied: today's pilot leads were inserted with lead_source='other'
+      // (the migration adding 'off_market' as an allowed value isn't live
+      // yet), so also match the pilot's own fixed-format notes marker.
+      // Once the migration runs and future imports use lead_source=
+      // 'off_market' directly, the notes half of this becomes redundant
+      // but harmless — safe to leave as-is or remove later.
+      q = q.or(`lead_source.eq.off_market,notes.ilike.⚠ DISTRESSED OPPORTUNITY%`)
+    } else if (effectiveFilters.lead_source) {
+      q = q.eq('lead_source', effectiveFilters.lead_source)
+    }
     if (effectiveFilters.redfin_trigger_type) q = q.eq('redfin_trigger_type', effectiveFilters.redfin_trigger_type)
     if (effectiveFilters.city) q = q.ilike('city', `%${escapeLike(effectiveFilters.city)}%`)
     if (effectiveFilters.zip_code) q = q.ilike('zip_code', `%${escapeLike(effectiveFilters.zip_code)}%`)

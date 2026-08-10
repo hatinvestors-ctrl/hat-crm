@@ -117,6 +117,13 @@ export const LEAD_SOURCES = [
   { value: 'water_auto',    label: '🤖 Water Lien (Auto)' },
   { value: 'code_auto',     label: '🤖 Code Violation (Auto)' },
   { value: 'facebook_auto', label: '🤖 Facebook (Auto)' },
+  // Capability #10.1 — ONE generic source for every off-market/distress
+  // feed (Lis Pendens today; tax delinquency/code violations/probate/liens
+  // later), instead of a new lead_source per feed. The SPECIFIC signal
+  // (distress_type/distress_source) lives in distress_data, not here — see
+  // supabase/migrations/20260810020000_off_market_lead_source.sql (not yet
+  // applied; explicit literal, doesn't match the _auto/_agent pattern).
+  { value: 'off_market', label: '⚠ Off-Market' },
   { value: 'other', label: 'Other' },
 ]
 export const LEAD_SOURCE_MAP = Object.fromEntries(LEAD_SOURCES.map(s => [s.value, s]))

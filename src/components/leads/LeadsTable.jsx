@@ -5,6 +5,7 @@ import EmptyState from '../ui/EmptyState'
 import { formatCurrency, formatDate } from '../../lib/calculations'
 import { safeTelHref, safeMailtoHref } from '../../lib/urlSafety'
 import { MLS_STATUS_MAP, LEAD_SOURCE_MAP } from '../../lib/constants'
+import { isDistressedLead } from '../../lib/distressInfo'
 
 const MLS_TONE = {
   success: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
@@ -140,7 +141,9 @@ export default function LeadsTable({ leads, members = [], workspaceId, sortBy, s
           }
         </td>
         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)] capitalize">
-          {(lead.lead_source || '').replace(/_/g, ' ') || '—'}
+          {isDistressedLead(lead)
+            ? <span className="text-amber-700 dark:text-amber-400 font-semibold normal-case">⚠ Off-Market</span>
+            : (lead.lead_source || '').replace(/_/g, ' ') || '—'}
         </td>
         <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums">{formatCurrency(lead.arv)}</td>
         <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums font-medium">{formatCurrency(lead.mao)}</td>

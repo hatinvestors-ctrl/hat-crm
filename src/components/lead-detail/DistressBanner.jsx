@@ -1,85 +1,105 @@
 // src/components/lead-detail/DistressBanner.jsx
-// Capability #10 — Real Distressed Leads Pilot (Duval Lis Pendens V1).
+// Capability #10 (initial) / #10.1 (UX polish) — Real Distressed Leads Pilot.
 //
-// Minimal, additive UI: renders only when a lead's notes begin with the
-// marker the pilot pipeline (scripts/lispendens-pilot.mjs) writes. Reads
-// straight from the existing `notes` column — no dependency on the new
-// leads.distress_data/is_distressed columns, so this works even before
-// that migration is applied. If those columns are present and populated,
-// they're used instead (cleaner structured render); notes is always the
-// fallback so nothing breaks either way.
-//
-// Deliberately does NOT show MAO / Starting Offer / Expected Profit — see
-// mission Section 7: off-market discovery has no asking price/ARV/reno
-// estimate to base those on, and fabricating them would mislead Kevin.
+// Structured "⚠ OFF-MARKET OPPORTUNITY" card: within 5 seconds Kevin should
+// see why the property is here, the distress signal, owner, absentee
+// status, filing date, and a conservative next action — no fabricated
+// financials. Reads through getDistressInfo() (src/lib/distressInfo.js),
+// which prefers structured `distress_data` and falls back to parsing the
+// pilot's own fixed-format notes block when the #10 migration hasn't been
+// applied yet — same information either way, this component doesn't care
+// which path supplied it.
 
-const MARKER = '⚠ DISTRESSED OPPORTUNITY'
+import {
+  getDistressInfo, getWhyHereReasons, getNextAction,
+  fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
+} from '../../lib/distressInfo'
 
 export default function DistressBanner({ lead }) {
   if (!lead) return null
+  const info = getDistressInfo(lead)
+  if (!info) return null
 
-  const structured = lead.distress_data
-  const fromNotes = !structured && typeof lead.notes === 'string' && lead.notes.startsWith(MARKER)
-  if (!structured && !fromNotes) return null
+  const owner = lead.owner_name || info.current_owner
+  const whyHere = getWhyHereReasons(lead, info)
+  const nextAction = getNextAction(lead, info)
+  const parcel = fmtParcel(info.parcel_id || lead.enrichment_data?.parcel_id)
 
-  // Structured path (once the migration is applied and future distress
-  // sources populate distress_data directly).
-  if (structured) {
-    return (
-      <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 space-y-1.5 text-sm">
-        <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-          <span>⚠</span> DISTRESSED OPPORTUNITY
+  return (
+    <div className="rounded-lg border border-amber-300/70 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/70 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-2.5 border-b border-amber-300/50 dark:border-amber-800/50 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[13px] font-bold text-amber-800 dark:text-amber-300">⚠ OFF-MARKET OPPORTUNITY</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700/80 dark:text-amber-400/80">
+            {fmtDistressType(info.distress_type)}
+          </div>
         </div>
-        <Row label="Signal" value={structured.distress_type === 'lis_pendens' ? 'Lis Pendens / Pre-Foreclosure' : structured.distress_type} />
-        <Row label="Filed" value={structured.distress_filing_date} />
-        <Row label="Owner" value={structured.current_owner || lead.owner_name} />
-        <Row label="Source Party" value={structured.source_party} />
-        <Row label="Owner Match" value={structured.owner_match_status} />
-        <Row label="Absentee Owner" value={fmtBool(structured.absentee_owner)} />
-        <Row label="Parcel" value={lead.enrichment_data?.parcel_id} />
-        <Row label="Source" value="Duval County Public Record" />
-        <Row label="Case / Instrument" value={structured.distress_case_or_instrument} />
-        <div className="pt-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
-          Recommended Next Step: {structured.owner_match_status === 'MATCH' ? 'REVIEW OPPORTUNITY' : 'RESEARCH OWNER'}
-        </div>
+        {nextAction && (
+          <div className="text-right shrink-0">
+            <div className="text-[9px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">Next Action</div>
+            <div className="text-[13px] font-bold text-amber-800 dark:text-amber-300">{nextAction}</div>
+          </div>
+        )}
       </div>
-    )
-  }
 
-  // Fallback: raw notes block the pilot wrote — same information, less
-  // structured, but shows the moment a lead exists, no migration required.
-  return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 text-sm whitespace-pre-line text-amber-800 dark:text-amber-300">
-      {lead.notes}
+      {/* Fact grid */}
+      <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-[12.5px]">
+        <Fact label="Filed" value={fmtFilingDate(info.distress_filing_date)} />
+        <Fact label="Owner" value={owner} />
+        <Fact label="Owner Match" value={info.owner_match_status ? fmtOwnerMatch(info.owner_match_status) : null} />
+        <Fact label="Absentee Owner" value={fmtAbsentee(info.absentee_owner)} />
+        <Fact label="Parcel" value={parcel} />
+        <Fact label="Source" value={fmtDistressSource(info.distress_source)} />
+        {info.distress_case_or_instrument && (
+          <Fact label="Case / Instrument" value={info.distress_case_or_instrument} />
+        )}
+      </div>
+
+      {/* Why this property is here */}
+      {whyHere.length > 0 && (
+        <div className="px-4 pb-3 pt-1 border-t border-amber-300/40 dark:border-amber-800/40">
+          <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-1">
+            Why This Property Is Here
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {whyHere.map(reason => (
+              <span key={reason} className="text-[12px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function Row({ label, value }) {
-  if (value === null || value === undefined || value === '') return null
+function Fact({ label, value }) {
+  if (!value) return null
   return (
-    <div className="flex gap-2">
-      <span className="text-amber-700/70 dark:text-amber-400/70 shrink-0">{label}:</span>
-      <span className="text-amber-900 dark:text-amber-200 font-medium">{String(value)}</span>
+    <div className="min-w-0">
+      <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">{label}</div>
+      <div className="text-amber-900 dark:text-amber-200 font-medium truncate" title={String(value)}>{value}</div>
     </div>
   )
 }
 
-function fmtBool(v) {
-  if (v === true) return 'Yes'
-  if (v === false) return 'No'
-  return 'Unknown'
-}
-
-// Small badge for Action Center / lead cards — exported separately so card
-// components can opt in without pulling in the full banner.
+// Small badge for Inbox/Leads/Action Center cards.
 export function DistressBadge({ lead }) {
-  if (!lead) return null
-  const isDistressed = lead.is_distressed || (typeof lead.notes === 'string' && lead.notes.startsWith(MARKER))
-  if (!isDistressed) return null
+  const info = getDistressInfo(lead)
+  if (!info) return null
   return (
     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
       ⚠ Off Market
+    </span>
+  )
+}
+
+export function PreForeclosureBadge({ lead }) {
+  const info = getDistressInfo(lead)
+  if (info?.distress_type !== 'lis_pendens') return null
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+      Pre-Foreclosure
     </span>
   )
 }

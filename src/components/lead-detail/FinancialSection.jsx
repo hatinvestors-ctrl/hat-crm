@@ -4,6 +4,7 @@ import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
 import { formatCurrency, calculateMAO, calculateFlipProfitAtPrice } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
+import { isDistressedLead } from '../../lib/distressInfo'
 
 
 export default function FinancialSection({ lead, userId, members, canEdit, onUpdated }) {
@@ -13,8 +14,24 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
 
   const renoMissing          = lead.renovation_cost == null
 
+  // Capability #10.1 — an off-market lead has no seller asking price by
+  // definition; don't let it read as a missing/required first step. Only
+  // shown when there's truly nothing to underwrite from yet (no ask, no
+  // ARV) — once Kevin fills in ARV/reno, the normal Financials flow below
+  // takes over unchanged. Does not touch the analysis engine itself.
+  const isOffMarketNoInputs = isDistressedLead(lead) && !lead.asking_price && !lead.arv
+
   return (
     <Card title="Financials" subtitle="Deal numbers at a glance — click any value to edit">
+
+      {isOffMarketNoInputs && (
+        <div className="mb-4 rounded-lg border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/60 px-3 py-2.5">
+          <div className="text-[12px] font-semibold text-amber-800 dark:text-amber-300">OFF-MARKET — NO ASKING PRICE</div>
+          <div className="text-[11.5px] text-amber-700/90 dark:text-amber-400/90 mt-0.5">
+            More property/financial information is needed before underwriting. Add ARV and renovation cost below when available.
+          </div>
+        </div>
+      )}
 
       {/* ── Section 1: Price story — Ask → Gap → MAO → Starting Offer ── */}
       {lead.asking_price && (lead.arv || lead.mao) && (() => {

@@ -150,9 +150,9 @@ export default function LeadDetailPage() {
           workspaceId={workspaceId}
         />
 
-        <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
-
         <DistressBanner lead={lead} />
+
+        <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
         <LeadFlowStepper lead={lead} />
 

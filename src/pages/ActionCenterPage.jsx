@@ -21,12 +21,18 @@ import { formatCurrency } from '../lib/calculations'
 import { applyLeadVisibility } from '../lib/leadVisibility'
 import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
+import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType } from '../lib/distressInfo'
 
 const CATEGORY_META = {
   ACT_NOW:           { icon: '🔥', label: 'Act Now',            theme: PRIORITY_THEME.HOT },
   REVIEW_TODAY:      { icon: '🟠', label: 'Review Today',       theme: PRIORITY_THEME.TODAY },
   FOLLOW_UP:         { icon: '🟡', label: 'Follow Up',          theme: { bg: 'var(--color-accent-soft)', border: 'var(--color-accent)', text: 'var(--color-accent-text)' } },
   RECENTLY_IMPROVED: { icon: '⚪', label: 'Recently Improved',  theme: PRIORITY_THEME.WATCH },
+  // Capability #10.1 — own bucket, deliberately NOT folded into ACT_NOW.
+  // A Lis Pendens filing alone never overrides the existing priority
+  // engine; this only catches leads that engine has no opinion on yet
+  // (no AI analysis run — true for every off-market lead today).
+  OFF_MARKET:        { icon: '⚠', label: 'Off-Market',          theme: { bg: 'rgba(217,119,6,0.12)', border: 'rgb(217,119,6)', text: 'rgb(180,95,6)' } },
 }
 
 // #5.1 — Quick filters. Client-side only, filters the already-loaded
@@ -40,6 +46,7 @@ const QUICK_FILTERS = [
   { key: 'BRRRR', label: 'BRRRR' },
   { key: 'ACT_NOW', label: 'Act Now' },
   { key: 'REVIEW_TODAY', label: 'Review Today' },
+  { key: 'OFF_MARKET', label: '⚠ Off-Market' },
 ]
 
 // Statuses that mean "waiting on someone else to respond" — the existing
@@ -61,7 +68,8 @@ function isToday(isoString) {
 function classifyLead(lead, rediscovery) {
   const priorityInfo = derivePriority(lead.ai_notes)
   const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
-  if (!priorityInfo && !rediscovery && !isFollowUpStatus) return null
+  const distressed = isDistressedLead(lead)
+  if (!priorityInfo && !rediscovery && !isFollowUpStatus && !distressed) return null
 
   const priceImproved = rediscovery?.status === 'IMPROVED' && /price dropped/i.test(rediscovery.reason || '')
 
@@ -79,11 +87,20 @@ function classifyLead(lead, rediscovery) {
     category = 'FOLLOW_UP'
   } else if (rediscovery?.status === 'IMPROVED') {
     category = 'RECENTLY_IMPROVED'
+  } else if (distressed) {
+    // Capability #10.1 — conservative catch-all: a distressed lead the
+    // existing priority engine has no opinion on (no AI analysis run yet,
+    // true for every off-market lead today) still deserves to be visible,
+    // but never as ACT_NOW just because a filing exists.
+    category = 'OFF_MARKET'
   }
   if (!category) return null
 
-  const decision = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority) : null
+  const distressInfo = distressed ? getDistressInfo(lead) : null
+  const decision = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority)
+    : (category === 'OFF_MARKET' ? fmtDistressType(distressInfo?.distress_type) : null)
   const nextAction = priorityInfo?.nextAction || (isFollowUpStatus ? 'FOLLOW UP' : null)
+    || (category === 'OFF_MARKET' ? getNextAction(lead, distressInfo) : null)
   const reason = rediscovery?.reason || priorityInfo?.reasons?.[0] || null
 
   return {
@@ -91,6 +108,10 @@ function classifyLead(lead, rediscovery) {
     lead,
     decision,
     nextAction,
+    distressed,
+    // Never fabricated for an off-market lead — both stay null unless the
+    // existing engine already computed them (e.g. Kevin later ran an
+    // analysis on it), per the mission's explicit instruction.
     expectedProfit: lead.deal_analysis?.profit ?? null,
     maxOffer: lead.mao ?? null,
     reason,
@@ -164,22 +185,52 @@ function ActionCard({ item, workspaceId }) {
           <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.nextAction || NA}</div>
         </div>
 
-        {/* 3. Expected Profit — visually the loudest number on the card */}
-        <div className="mt-2 rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Profit</div>
-          <div
-            className="text-[18px] font-extrabold tabular-nums"
-            style={{ color: item.expectedProfit != null ? 'var(--color-success-text)' : 'var(--color-text-dim)' }}
-          >
-            {item.expectedProfit != null ? formatCurrency(item.expectedProfit) : NA}
+        {/* 3/4. Off-market leads: no Expected Profit/MAO exist yet (no
+             asking price/ARV) — showing them, even as "Not available",
+             still reads as "something's missing" for a category where
+             nothing SHOULD exist yet. Prioritize Owner/Absentee instead,
+             per the mission's example card. Non-distressed categories are
+             completely unchanged below. */}
+        {item.category === 'OFF_MARKET' ? (
+          <div className="mt-2 space-y-1.5">
+            {item.lead.owner_name && (
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Owner</div>
+                <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.lead.owner_name}</div>
+              </div>
+            )}
+            <div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Absentee</div>
+              <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">
+                {(() => {
+                  const info = getDistressInfo(item.lead)
+                  if (info?.absentee_owner === true) return 'YES'
+                  if (info?.absentee_owner === false) return 'No'
+                  return NA
+                })()}
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* 3. Expected Profit — visually the loudest number on the card */}
+            <div className="mt-2 rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Profit</div>
+              <div
+                className="text-[18px] font-extrabold tabular-nums"
+                style={{ color: item.expectedProfit != null ? 'var(--color-success-text)' : 'var(--color-text-dim)' }}
+              >
+                {item.expectedProfit != null ? formatCurrency(item.expectedProfit) : NA}
+              </div>
+            </div>
 
-        {/* 4. Maximum Offer */}
-        <div className="mt-2">
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Maximum Offer</div>
-          <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.maxOffer != null ? formatCurrency(item.maxOffer) : NA}</div>
-        </div>
+            {/* 4. Maximum Offer */}
+            <div className="mt-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Maximum Offer</div>
+              <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.maxOffer != null ? formatCurrency(item.maxOffer) : NA}</div>
+            </div>
+          </>
+        )}
 
         {/* 5. Reason — clamped to ~2 lines, "More…" just hints the full lead has more; clicking anywhere on the card (including here) opens it */}
         {item.reason && (
@@ -209,7 +260,7 @@ export default function ActionCenterPage() {
 
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at')
+        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
@@ -271,6 +322,7 @@ export default function ActionCenterPage() {
     REVIEW_TODAY: sortCategory('REVIEW_TODAY', filteredItems.filter(i => i.category === 'REVIEW_TODAY')),
     FOLLOW_UP: sortCategory('FOLLOW_UP', filteredItems.filter(i => i.category === 'FOLLOW_UP')),
     RECENTLY_IMPROVED: sortCategory('RECENTLY_IMPROVED', filteredItems.filter(i => i.category === 'RECENTLY_IMPROVED')),
+    OFF_MARKET: filteredItems.filter(i => i.category === 'OFF_MARKET'),
   }), [filteredItems])
 
   // #5.1 business value summary — simple sum/average over values that
