@@ -1,0 +1,849 @@
+[
+  {
+    "address": "10200   BELLE RIVE BLVD",
+    "instrument": "2026182340",
+    "filer": "PNC BANK NATIONAL ASSOCIATION",
+    "owner": "JACKSON KIMBERLY A",
+    "absentee": true,
+    "zipCode": "32256",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"PNC BANK NATIONAL ASSOCIATION\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 75,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Absentee owner",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "2566   BEACHVIEW DR",
+    "instrument": "2026184722",
+    "filer": "SUMMERWALK HOMEOWNERS ASSOCIATION INC.",
+    "owner": "MENDOZA ERNEST",
+    "absentee": false,
+    "zipCode": "32218",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"SUMMERWALK HOMEOWNERS ASSOCIATION INC.\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "6446 S ISH BRANT RD",
+    "instrument": "2026183826",
+    "filer": "FREEDOM MORTGAGE CORPORATION",
+    "owner": "SIMS TYRELL",
+    "absentee": false,
+    "zipCode": "32210",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"FREEDOM MORTGAGE CORPORATION\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "2596   BEACHVIEW DR",
+    "instrument": "2026184735",
+    "filer": "SUMMERWALK HOMEOWNERS ASSOCIATION INC.",
+    "owner": "THOMPSON ONEIL ANDRE",
+    "absentee": false,
+    "zipCode": "32218",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"SUMMERWALK HOMEOWNERS ASSOCIATION INC.\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "0   GATEWAY CT",
+    "instrument": "2026184639",
+    "filer": "FREEDOM MORTGAGE CORPORATION",
+    "owner": "MAGNOLIA MEADOWS HOMEOWNERS ASSOCIATION INC",
+    "absentee": true,
+    "zipCode": "32219",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"FREEDOM MORTGAGE CORPORATION\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 0,
+      "priority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "why": [],
+      "missing": [],
+      "excluded": true
+    },
+    "excluded": true,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "3358   NET CT",
+    "instrument": "2026183726",
+    "filer": "FOREST HILLS OWNERS ASSOCIATION INC",
+    "owner": "STEVENSON CHRISTOPHER E",
+    "absentee": false,
+    "zipCode": "32277",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"FOREST HILLS OWNERS ASSOCIATION INC\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "3603 E LEDBURY DR",
+    "instrument": "2026183240",
+    "filer": "CITIMORTGAGE INC",
+    "owner": "SABEN KENNETH N",
+    "absentee": false,
+    "zipCode": "32210",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"CITIMORTGAGE INC\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "7415   LAWN TENNIS LN",
+    "instrument": "2026184622",
+    "filer": "FOREST HILLS OWNERS ASSOCIATION INC",
+    "owner": "HUNDLEY JIMMY D SR",
+    "absentee": false,
+    "zipCode": "32277",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"FOREST HILLS OWNERS ASSOCIATION INC\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "3419   NET CT",
+    "instrument": "2026185132",
+    "filer": "FOREST HILLS OWNERS ASSOCIATION INC",
+    "owner": "BROOKE ALEC ET AL",
+    "absentee": false,
+    "zipCode": "32277",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"FOREST HILLS OWNERS ASSOCIATION INC\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "8849 S OLD KINGS RD",
+    "instrument": "2026183779",
+    "filer": "ASSOCIATION RESOURCES LLC",
+    "owner": "KING REAL ESTATE LLC",
+    "absentee": true,
+    "zipCode": "32257",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "OTHER_CIVIL",
+      "distress_category_confidence": "low",
+      "distress_category_reason": "Filer \"ASSOCIATION RESOURCES LLC\" doesn't match a known mortgage/HOA/tax/municipal pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 58,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "Other Civil identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Absentee owner",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "7566 W GINGER TEA TRL",
+    "instrument": "2026184719",
+    "filer": "CINNAMON LAKES THREE ASSOCIATION INC",
+    "owner": "7566 GINGER TEA TRAIL TRUST",
+    "absentee": false,
+    "zipCode": "32244",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "OTHER_CIVIL",
+      "distress_category_confidence": "low",
+      "distress_category_reason": "Filer \"CINNAMON LAKES THREE ASSOCIATION INC\" doesn't match a known mortgage/HOA/tax/municipal pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 48,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "Other Civil identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "3562   GRASSY RIDE DR",
+    "instrument": "2026184315",
+    "filer": "LAKEVIEW LOAN SERVICING LLC",
+    "owner": "NOTTENKAMPER TAYLOR",
+    "absentee": false,
+    "zipCode": "32223",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"LAKEVIEW LOAN SERVICING LLC\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "6398   BUCKING BRONCO DR",
+    "instrument": "2026182189",
+    "filer": "WINCHESTER RIDGE PHASE 2 OWNERS ASSOCIATION INC",
+    "owner": "MASIAS BEATRIZ E  ET AL",
+    "absentee": false,
+    "zipCode": "32234",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"WINCHESTER RIDGE PHASE 2 OWNERS ASSOCIATION INC\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "12264   CROSSFIELD DR",
+    "instrument": "2026182060",
+    "filer": "LAKEVIEW LOAN SERVICING LLC",
+    "owner": "LAIDLER ANTHONY",
+    "absentee": false,
+    "zipCode": "32219",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"LAKEVIEW LOAN SERVICING LLC\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 58,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Owner match unconfirmed",
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "4947   TAN ST",
+    "instrument": "2026182239",
+    "filer": "U S BANK NATIONAL ASSOCIATION TRUSTEE",
+    "owner": "TOHAL ANNE MARIE ESTATE",
+    "absentee": false,
+    "zipCode": "32258",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"U S BANK NATIONAL ASSOCIATION TRUSTEE\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 58,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Owner match unconfirmed",
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "971 S 16TH AVE",
+    "instrument": "2026182231",
+    "filer": "FREEDOM MORTGAGE CORPORATION",
+    "owner": "WEAVER JAMES BURGESS JR",
+    "absentee": false,
+    "zipCode": "32250",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"FREEDOM MORTGAGE CORPORATION\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "11498   KALEEL RD",
+    "instrument": "2026183625",
+    "filer": "U S BANK TRUST COMPANY NATIONAL ASSOCIATION TRUSTEE",
+    "owner": "HARRELL TOMMY EDWARD",
+    "absentee": false,
+    "zipCode": "32218",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"U S BANK TRUST COMPANY NATIONAL ASSOCIATION TRUSTEE\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "12019   SEA GROVE PL",
+    "instrument": "2026184773",
+    "filer": "SUMMERWALK HOMEOWNERS ASSOCIATION INC.",
+    "owner": "POWELL LESLIE ALSTON ET AL",
+    "absentee": false,
+    "zipCode": "32218",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "HOA_CONDO_LIEN",
+      "distress_category_confidence": "high",
+      "distress_category_reason": "Filer \"SUMMERWALK HOMEOWNERS ASSOCIATION INC.\" matches hoa condo lien pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Preferred HAT geography"
+      ]
+    },
+    "opportunity": {
+      "score": 52,
+      "priority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "why": [
+        "HOA / Condo Lien identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  },
+  {
+    "address": "3433   JACONA DR",
+    "instrument": "2026184717",
+    "filer": "MOVEMENT MORTGAGE LLC",
+    "owner": "HALL CONNOR MCKENZY",
+    "absentee": false,
+    "zipCode": "32277",
+    "yearBuilt": null,
+    "sqft": null,
+    "distress": {
+      "distress_category": "MORTGAGE_FORECLOSURE",
+      "distress_category_confidence": "medium",
+      "distress_category_reason": "Filer \"MOVEMENT MORTGAGE LLC\" matches mortgage foreclosure pattern"
+    },
+    "buyBox": {
+      "fit": "POSSIBLE_FIT",
+      "reasons": [
+        "Outside preferred geography (not blocked)"
+      ]
+    },
+    "opportunity": {
+      "score": 65,
+      "priority": {
+        "min": 60,
+        "key": "REVIEW",
+        "label": "🟠 REVIEW"
+      },
+      "why": [
+        "Mortgage foreclosure identified",
+        "Possible buy-box fit",
+        "Owner verified",
+        "Property identity verified"
+      ],
+      "missing": [
+        "Property type",
+        "Year built/sqft/beds/baths",
+        "ARV",
+        "Renovation estimate",
+        "Owner contact"
+      ]
+    },
+    "excluded": false,
+    "priorHistory": false,
+    "propertyEventCount": 1
+  }
+]

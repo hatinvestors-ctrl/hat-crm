@@ -11,13 +11,14 @@
 // which path supplied it.
 
 import {
-  getDistressInfo, getWhyHereReasons, getNextAction,
+  getDistressInfo, getWhyHereReasons, getNextAction, getOpportunityInfo, fmtBuyBoxFit,
   fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
 } from '../../lib/distressInfo'
 
 export default function DistressBanner({ lead }) {
   if (!lead) return null
   const info = getDistressInfo(lead)
+  const opp = getOpportunityInfo(lead)
   if (!info) return null
 
   const owner = lead.owner_name || info.current_owner
@@ -56,8 +57,43 @@ export default function DistressBanner({ lead }) {
         )}
       </div>
 
-      {/* Why this property is here */}
-      {whyHere.length > 0 && (
+      {/* Capability #10.2 — Distress Type / Property Fit / Opportunity Score,
+          only once the pilot quality review has actually scored this lead
+          (opp is null for anything not yet reprocessed — degrades cleanly
+          to the #10.1 layout below). */}
+      {opp && (
+        <div className="px-4 py-2.5 border-t border-amber-300/40 dark:border-amber-800/40 grid grid-cols-3 gap-3">
+          <Fact label="Distress Type" value={opp.distress_category_label} />
+          <Fact label="Property Fit" value={fmtBuyBoxFit(opp.buy_box_fit)} />
+          <div>
+            <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">Opportunity</div>
+            <div className="text-amber-900 dark:text-amber-200 font-bold">
+              {opp.opportunity_score}/100 — {opp.opportunity_priority?.label}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Why / Missing — Capability #10.2's evidence-based reasons take over
+          from #10.1's simpler "why here" list once a lead has been scored,
+          so nothing is shown twice. */}
+      {opp ? (
+        <div className="px-4 pb-3 pt-1 border-t border-amber-300/40 dark:border-amber-800/40 space-y-1.5">
+          {opp.opportunity_why.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {opp.opportunity_why.map(reason => (
+                <span key={reason} className="text-[12px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
+              ))}
+            </div>
+          )}
+          {opp.opportunity_missing.length > 0 && (
+            <div className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+              <span className="font-semibold uppercase tracking-wide text-[9.5px] mr-1">Missing:</span>
+              {opp.opportunity_missing.join(' • ')}
+            </div>
+          )}
+        </div>
+      ) : whyHere.length > 0 && (
         <div className="px-4 pb-3 pt-1 border-t border-amber-300/40 dark:border-amber-800/40">
           <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-1">
             Why This Property Is Here

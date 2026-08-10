@@ -133,6 +133,7 @@ const OUT_FIELDS = [
  * @property {boolean} matched
  * @property {string|null} parcel_id
  * @property {string|null} property_address
+ * @property {string|null} zip_code
  * @property {string|null} owner_name
  * @property {string|null} owner_mailing_address
  * @property {string|null} property_type - best-effort only; see limitations, often null
@@ -194,6 +195,40 @@ function buildQueryUrl(where, { fields = OUT_FIELDS, resultRecordCount = 5 } = {
 
 function escapeSqlString(s) {
   return String(s).replace(/'/g, "''")
+}
+
+// Capability #10.2 — best-effort SUPPLEMENTARY lookup for fields Duval's
+// own layer never has (year_built, living_area, unit_count, sale price) —
+// see file header "Architecture deviation" note. Deliberately a SINGLE
+// attempt with a short timeout and NO retry, unlike queryByHouseNumberLookupOnly/
+// queryByParcelIdFull above: this is a one-time batch enrichment pass over
+// a small, known pilot (not a live per-request path), and the statewide
+// PHY_ADDR1 exact-match query was re-verified live (Capability #10.2) to
+// still be unreliable (both re-test addresses timed out at 15s) — hammering
+// it with retries would just be "no aggressive scraping" violated for a
+// service already documented as flaky, not a fix. Returns nulls on any
+// failure; NEVER throws, NEVER invents a value.
+export async function tryFetchStatewideCharacteristics(address, { timeoutMs = 12000 } = {}) {
+  try {
+    const where = `PHY_ADDR1 = '${escapeSqlString(String(address).toUpperCase())}'`
+    const json = await fetchWithTimeout(buildQueryUrl(where, {
+      fields: 'PARCEL_ID,ACT_YR_BLT,EFF_YR_BLT,TOT_LVG_AR,NO_RES_UNT,SALE_PRC1,SALE_YR1,SALE_MO1',
+      resultRecordCount: 3,
+    }), timeoutMs)
+    const features = json.features || []
+    if (features.length !== 1) return null // 0 or 2+ candidates — do not guess which one
+    const a = features[0].attributes
+    return {
+      year_built: a.ACT_YR_BLT ?? a.EFF_YR_BLT ?? null,
+      living_area: a.TOT_LVG_AR ?? null,
+      unit_count: a.NO_RES_UNT ?? null,
+      last_sale_price: a.SALE_PRC1 ?? null,
+      last_sale_date: toIsoDate(a.SALE_YR1, a.SALE_MO1),
+      source: 'fl_statewide_cadastral',
+    }
+  } catch {
+    return null // timeout/error — leave fields null, never fabricate
+  }
 }
 
 // Fast, reliable path (verified: ~0.5-1.5s regardless of field count) —
@@ -384,7 +419,7 @@ export function mapDuvalAttributesToEnrichedProperty(attrs, matchStatus) {
   if (!attrs) {
     return {
       matched: false,
-      parcel_id: null, property_address: null, owner_name: null, owner_mailing_address: null,
+      parcel_id: null, property_address: null, zip_code: null, owner_name: null, owner_mailing_address: null,
       property_type: null, land_use: null, year_built: null, living_area: null, unit_count: null,
       just_value: null, assessed_value: null, taxable_value: null,
       last_sale_price: null, last_sale_date: null, previous_sale_price: null, previous_sale_date: null,
@@ -424,6 +459,10 @@ export function mapDuvalAttributesToEnrichedProperty(attrs, matchStatus) {
     matched: true,
     parcel_id: attrs.RE ?? null, // Duval RE number — NOT a statewide PARCEL_ID, see file header
     property_address: propertyAddress || null,
+    // Capability #10.2 — ZIPCODE was already being fetched (DUVAL_OUT_FIELDS)
+    // but never mapped into the output shape until now; free, reliable win,
+    // no extra request.
+    zip_code: attrs.ZIPCODE ? String(attrs.ZIPCODE) : null,
     owner_name: attrs.LNAMEOWNER ?? null,
     owner_mailing_address: ownerMailing,
     property_type: null, // not decoded — see limitations
@@ -634,7 +673,7 @@ function mapAttributesToEnrichedProperty(attrs, matchStatus) {
   if (!attrs) {
     return {
       matched: false,
-      parcel_id: null, property_address: null, owner_name: null, owner_mailing_address: null,
+      parcel_id: null, property_address: null, zip_code: null, owner_name: null, owner_mailing_address: null,
       property_type: null, land_use: null, year_built: null, living_area: null, unit_count: null,
       just_value: null, assessed_value: null, taxable_value: null,
       last_sale_price: null, last_sale_date: null, previous_sale_price: null, previous_sale_date: null,
@@ -650,6 +689,7 @@ function mapAttributesToEnrichedProperty(attrs, matchStatus) {
     matched: true,
     parcel_id: attrs.PARCEL_ID ?? null,
     property_address: attrs.PHY_ADDR1 ?? null,
+    zip_code: attrs.PHY_ZIPCD ? String(attrs.PHY_ZIPCD) : null,
     owner_name: attrs.OWN_NAME ?? null,
     owner_mailing_address: ownerMailing,
     property_type: null, // see limitations — DOR_UC decoding intentionally not guessed at in V1

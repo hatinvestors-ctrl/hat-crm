@@ -21,7 +21,7 @@ import { formatCurrency } from '../lib/calculations'
 import { applyLeadVisibility } from '../lib/leadVisibility'
 import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
-import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType } from '../lib/distressInfo'
+import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo } from '../lib/distressInfo'
 
 const CATEGORY_META = {
   ACT_NOW:           { icon: '🔥', label: 'Act Now',            theme: PRIORITY_THEME.HOT },
@@ -97,8 +97,13 @@ function classifyLead(lead, rediscovery) {
   if (!category) return null
 
   const distressInfo = distressed ? getDistressInfo(lead) : null
+  // Capability #10.2 — once a lead has been through the pilot quality
+  // review (scripts/cap10_2_reprocess.mjs), prefer its evidence-based
+  // decision label over the plain distress-type fallback; a lead not yet
+  // reprocessed still shows the #10.1 fallback exactly as before.
+  const opportunity = distressed ? getOpportunityInfo(lead) : null
   const decision = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority)
-    : (category === 'OFF_MARKET' ? fmtDistressType(distressInfo?.distress_type) : null)
+    : (category === 'OFF_MARKET' ? (opportunity?.opportunity_priority?.label || fmtDistressType(distressInfo?.distress_type)) : null)
   const nextAction = priorityInfo?.nextAction || (isFollowUpStatus ? 'FOLLOW UP' : null)
     || (category === 'OFF_MARKET' ? getNextAction(lead, distressInfo) : null)
   const reason = rediscovery?.reason || priorityInfo?.reasons?.[0] || null
@@ -109,6 +114,7 @@ function classifyLead(lead, rediscovery) {
     decision,
     nextAction,
     distressed,
+    opportunity,
     // Never fabricated for an off-market lead — both stay null unless the
     // existing engine already computed them (e.g. Kevin later ran an
     // analysis on it), per the mission's explicit instruction.
@@ -193,6 +199,19 @@ function ActionCard({ item, workspaceId }) {
              completely unchanged below. */}
         {item.category === 'OFF_MARKET' ? (
           <div className="mt-2 space-y-1.5">
+            {/* Capability #10.2 — Opportunity Score, once scored, replaces
+                the plain Owner/Absentee-only view with the same evidence
+                the Lead Detail card shows, so the strongest opportunities
+                are identifiable without opening every card. */}
+            {item.opportunity ? (
+              <div className="rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Opportunity</div>
+                <div className="text-[16px] font-extrabold tabular-nums text-amber-700 dark:text-amber-400">
+                  {item.opportunity.opportunity_score}/100
+                </div>
+                <div className="text-[10.5px] text-[color:var(--color-text-muted)]">{item.opportunity.distress_category_label}</div>
+              </div>
+            ) : null}
             {item.lead.owner_name && (
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Owner</div>
@@ -260,7 +279,7 @@ export default function ActionCenterPage() {
 
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name')
+        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
@@ -322,7 +341,8 @@ export default function ActionCenterPage() {
     REVIEW_TODAY: sortCategory('REVIEW_TODAY', filteredItems.filter(i => i.category === 'REVIEW_TODAY')),
     FOLLOW_UP: sortCategory('FOLLOW_UP', filteredItems.filter(i => i.category === 'FOLLOW_UP')),
     RECENTLY_IMPROVED: sortCategory('RECENTLY_IMPROVED', filteredItems.filter(i => i.category === 'RECENTLY_IMPROVED')),
-    OFF_MARKET: filteredItems.filter(i => i.category === 'OFF_MARKET'),
+    OFF_MARKET: [...filteredItems.filter(i => i.category === 'OFF_MARKET')]
+      .sort((a, b) => (b.opportunity?.opportunity_score ?? -1) - (a.opportunity?.opportunity_score ?? -1)),
   }), [filteredItems])
 
   // #5.1 business value summary — simple sum/average over values that

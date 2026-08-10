@@ -107,6 +107,39 @@ export function fmtParcel(parcelId) {
   return String(parcelId).trim().replace(/\s+/g, '-')
 }
 
+// ── Capability #10.2 additions ───────────────────────────────────────────
+// Distress-category, buy-box fit, and Opportunity Score live in the
+// EXISTING enrichment_data JSONB column (Capability #9) rather than the
+// still-unapplied distress_data migration — see
+// scripts/cap10_2_reprocess.mjs for exactly what's written there.
+import { DISTRESS_CATEGORY_LABELS } from './distressScoring.js'
+
+export function getOpportunityInfo(lead) {
+  const e = lead?.enrichment_data
+  if (!e || e.opportunity_score == null) return null
+  return {
+    distress_category: e.distress_category,
+    distress_category_label: DISTRESS_CATEGORY_LABELS[e.distress_category] || e.distress_category,
+    distress_category_confidence: e.distress_category_confidence,
+    buy_box_fit: e.buy_box_fit,
+    opportunity_score: e.opportunity_score,
+    opportunity_priority: e.opportunity_priority,
+    opportunity_why: e.opportunity_why || [],
+    opportunity_missing: e.opportunity_missing || [],
+    excluded: e.excluded,
+    excluded_reason: e.excluded_reason,
+  }
+}
+
+export function fmtBuyBoxFit(fit) {
+  switch (fit) {
+    case 'FIT': return 'Fit'
+    case 'POSSIBLE_FIT': return 'Possible Fit'
+    case 'NOT_FIT': return 'Not Fit'
+    default: return 'Insufficient Data'
+  }
+}
+
 export function fmtFilingDate(iso) {
   if (!iso) return null
   const d = new Date(iso + 'T00:00:00')
