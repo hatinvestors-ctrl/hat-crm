@@ -21,11 +21,63 @@
 // #8) are NOT implemented in V1 — see "Decision: live API only for V1"
 // below. The interface is structured so that source can be added later as
 // a fallback without any caller-visible change.
+//
+// Capability #9.2 — Duval Address Resolver: added a SECOND, Duval-only
+// identity resolver on top of the City of Jacksonville's own official
+// parcel service (verified reachable and inspected live, not guessed):
+//   https://maps.coj.net/coj/rest/services/CityBiz/Parcels/MapServer/0
+// This is tried FIRST for any address, because it was found (Capability
+// #9.1) to be fast/reliable where the statewide service's address search
+// is not (see FETCH_TIMEOUT_MS comment). It falls back to the statewide
+// address path on NO_MATCH/ERROR so nothing regresses for non-Duval
+// addresses or if the Duval service is unreachable (see readiness report
+// re: production/Netlify network access — this fallback is exactly why
+// that matters).
+//
+// Architecture deviation from the mission's literal "Duval Parcel Service
+// -> Parcel ID -> hand off to Capability #9 exact parcel enrichment":
+// empirically tested (6+ format variants) and could NOT find a reliable
+// mapping from Duval's own parcel number (`RE`, e.g. "0960490000") to the
+// statewide layer's `PARCEL_ID`/`ALT_KEY` schemes — every attempt either
+// returned a clean empty result or timed out. Rather than invent a mapping,
+// Duval-resolved properties are enriched DIRECTLY from the Duval service's
+// own rich field set (owner, mailing address, land/building value, sale
+// date) instead of handing off to the statewide connector. `parcel_id` in
+// the output is the Duval `RE` number, clearly labeled via
+// `enrichment_source: 'duval_coj_parcels'` so callers never confuse it with
+// a statewide PARCEL_ID. Duval's schema definitively lacks year_built,
+// living_area, unit_count, and any sale PRICE field (only SALESLDD/MM/YY —
+// date components, verified via live metadata) — those are left `null`,
+// never invented. See delivery report "Limitations".
 
 import { normalizeAddress, normalizeAddressForDB, streetCore } from './leadDedup.js'
 
 const CADASTRAL_FEATURE_SERVICE =
   'https://services9.arcgis.com/Gh9awoU677aKree0/arcgis/rest/services/Florida_Statewide_Cadastral/FeatureServer/0/query'
+
+// City of Jacksonville official Duval County parcel service. Verified live
+// (Capability #9.2) via direct curl against the metadata endpoint
+// (`.../MapServer/0?f=json` -> HTTP 200) and via two exact-match test
+// queries against real Duval addresses. Fields below are exactly what that
+// metadata response listed — nothing guessed.
+const DUVAL_PARCELS_SERVICE = 'https://maps.coj.net/coj/rest/services/CityBiz/Parcels/MapServer/0/query'
+
+// Minimal fields for the broad step-1 lookup (address identity only).
+const DUVAL_LOOKUP_FIELDS = 'RE,STREET_NO,ST_DIR,ST_NAME,ST_TYPE,UNIT_NO,ADDRCITY,ZIPCODE'
+
+// Full field set for the actual enrichment record — only fields verified
+// present on this layer's metadata. CAMA_VAL is deliberately EXCLUDED: live
+// testing (Capability #9.2) found it returns the literal value 100 for
+// every property queried (6 different real parcels, all exactly 100) while
+// TOT_LND_VA/TOT_BLD_VA/TOT_IMPR_V vary realistically — CAMA_VAL is treated
+// as a non-functional/placeholder field on this map layer, not real data.
+const DUVAL_OUT_FIELDS = [
+  'RE', 'STREET_NO', 'ST_DIR', 'ST_NAME', 'ST_TYPE', 'UNIT_NO', 'ADDRCITY', 'ZIPCODE',
+  'LNAMEOWNER', 'MAILADDR1', 'MAILADDR2', 'MAILADDR3', 'MAILCITY', 'MAILSTATE', 'MAILZIP',
+  'TOT_LND_VA', 'TOT_BLD_VA', 'TOT_IMPR_V',
+  'SALESLDD', 'SALESLMM', 'SALESLYY',
+  'ACRES', 'NBBLDGS',
+].join(',')
 
 // Duval County = the consolidated City of Jacksonville. IMPORTANT (found
 // during live testing, not assumed): filtering by PHY_CITY or CO_NO in the
@@ -188,6 +240,293 @@ async function queryByHouseNumberLookupOnly(houseNum) {
   // match beyond this window — see delivery report "Limitations".
   const json = await fetchWithRetry(buildQueryUrl(where, { fields: LOOKUP_FIELDS, resultRecordCount: 50 }))
   return json.features || []
+}
+
+function buildDuvalQueryUrl(where, { fields = DUVAL_OUT_FIELDS, resultRecordCount = 50 } = {}) {
+  const params = new URLSearchParams({
+    where,
+    outFields: fields,
+    returnGeometry: 'false', // never download geometry
+    resultRecordCount: String(resultRecordCount),
+    f: 'json',
+  })
+  return `${DUVAL_PARCELS_SERVICE}?${params.toString()}`
+}
+
+// Duval's address is split across STREET_NO/ST_NAME/ST_TYPE/ST_DIR instead
+// of one PHY_ADDR1 string. Query broad-but-cheap (house number + exact
+// street name, case-insensitive) and let the same streetCore() suffix/word
+// normalization already used everywhere else in this codebase decide the
+// exact match client-side — so "5235 Batley Rd" and "5235 Batley Road"
+// resolve identically without any new/duplicate normalization logic.
+async function queryDuvalByHouseNumber(houseNum) {
+  const where = `STREET_NO = '${escapeSqlString(houseNum)}'`
+  // resultRecordCount=500, not the service's 2,000 max. Verified via direct
+  // timing (Capability #9.2): a real house number can appear on 60-70+
+  // Duval streets city-wide, and the statewide connector's 50-row cap was
+  // found to genuinely miss real matches (exceededTransferLimit:true). This
+  // service stayed fast (under 1s) at 500 rows in testing, unlike the
+  // statewide service's sharp slowdown above ~100 rows — so 500 is safe
+  // headroom here, not copied blindly from the other connector's limit.
+  const json = await fetchWithRetry(buildDuvalQueryUrl(where, { fields: DUVAL_LOOKUP_FIELDS, resultRecordCount: 500 }))
+  return json.features || []
+}
+
+async function queryDuvalByRe(re) {
+  const where = `RE = '${escapeSqlString(re)}'`
+  const json = await fetchWithRetry(buildDuvalQueryUrl(where, { fields: DUVAL_OUT_FIELDS }))
+  return json.features || []
+}
+
+// Capability #10 — resolves a Duval RE parcel by CURRENT OWNER NAME instead
+// of address. Used only for distress-source records (e.g. Lis Pendens) that
+// carry a party name but no property address at all. Reuses the exact same
+// service/fields as the address resolver above — no new connector.
+//
+// Verified live (Capability #10): LNAMEOWNER is stored "LASTNAME FIRSTNAME
+// [MIDDLE/SUFFIX]" — a prefix LIKE query on "LASTNAME FIRSTNAME" reliably
+// finds the right person even when Duval's record carries a middle
+// name/initial the source document didn't include. Never used to GUESS an
+// address for an ordinary lead — this is intentionally scoped to distress
+// records where the source itself only provides a name (see Section 6 of
+// the mission: SOURCE PARTY vs CURRENT PROPERTY OWNER must stay distinct,
+// only a strong deterministic match becomes MATCH).
+async function queryDuvalByOwnerNamePrefix(namePrefix) {
+  const where = `UPPER(LNAMEOWNER) LIKE '${escapeSqlString(namePrefix.toUpperCase())}%'`
+  const json = await fetchWithRetry(buildDuvalQueryUrl(where, { fields: DUVAL_LOOKUP_FIELDS + ',LNAMEOWNER', resultRecordCount: 50 }))
+  return json.features || []
+}
+
+// Reassembles Duval's split address fields into one string shaped like
+// PHY_ADDR1 so it can be run through the existing normalizeAddress()/
+// streetCore() helpers unchanged.
+function duvalAddressString(attrs) {
+  return [attrs.STREET_NO, attrs.ST_DIR, attrs.ST_NAME, attrs.ST_TYPE].filter(Boolean).join(' ')
+}
+
+// Found during live testing (Capability #9.2): several real Duval records
+// carry a directional prefix (ST_DIR, e.g. "100 S Northside Dr") that a
+// caller's plain-English input often omits ("100 Northside Dr") — this is
+// exactly the kind of harmless difference the mission asks to normalize
+// (same class as ST/STREET, RD/ROAD), not a real address discrepancy. It's
+// applied SYMMETRICALLY to both sides of the comparison, so it never masks
+// a genuine ambiguity: if both an "N" and an "S" variant exist for the same
+// house number + street name, they still collapse to the same stripped
+// words and correctly fall into the existing matches.length > 1 ->
+// AMBIGUOUS path below, rather than silently guessing one.
+const DIRECTION_WORDS = new Set(['n', 's', 'e', 'w'])
+function stripLeadingDirection(words) {
+  const parts = words.split(' ')
+  if (parts.length > 1 && DIRECTION_WORDS.has(parts[0])) return parts.slice(1).join(' ')
+  return words
+}
+
+// Duval-only identity resolver (Capability #9.2). Same NEVER GUESS
+// contract as matchProperty() below: EXACT_ADDRESS / NO_MATCH / AMBIGUOUS /
+// ERROR only, no fuzzy matching beyond the shared normalizeAddress()/
+// streetCore() suffix normalization.
+async function resolveDuvalAddress(address) {
+  const normalized = normalizeAddress(address)
+  const core = streetCore(normalized)
+  if (!core) return { status: 'NO_MATCH', record: null }
+
+  let candidates
+  try {
+    candidates = await queryDuvalByHouseNumber(core.num)
+  } catch (err) {
+    return { status: 'ERROR', record: null, error: err.message }
+  }
+
+  const inputWords = stripLeadingDirection(core.words)
+  const matches = candidates.filter(f => {
+    const attrs = f.attributes || {}
+    const fCore = streetCore(normalizeAddress(duvalAddressString(attrs)))
+    return fCore && fCore.num === core.num && stripLeadingDirection(fCore.words) === inputWords
+  })
+  if (matches.length === 0) return { status: 'NO_MATCH', record: null }
+  if (matches.length > 1) return { status: 'AMBIGUOUS', record: null }
+
+  const re = matches[0].attributes?.RE
+  if (!re) return { status: 'AMBIGUOUS', record: null }
+
+  let fullFeatures
+  try {
+    fullFeatures = await queryDuvalByRe(re)
+  } catch (err) {
+    return { status: 'ERROR', record: null, error: err.message }
+  }
+  if (fullFeatures.length !== 1) return { status: 'AMBIGUOUS', record: null }
+  return { status: 'EXACT_ADDRESS', record: fullFeatures[0].attributes }
+}
+
+function toIsoDateFromParts(yy, mm) {
+  if (!yy) return null
+  const y = Number(yy)
+  if (!y) return null
+  // SALESLYY is verified (Capability #9.2 metadata) as a 2-digit year on
+  // this layer — assume 2000s since this is present-day tax-roll data, no
+  // pre-2000 sale would still be "last sale" on an active parcel record.
+  const fullYear = y < 100 ? 2000 + y : y
+  const m = mm ? String(mm).padStart(2, '0') : '01'
+  return `${fullYear}-${m}-01`
+}
+
+// Maps Duval's raw attributes -> the same EnrichedProperty shape as the
+// statewide connector, so callers never need to know which source resolved
+// a given property. Fields Duval's schema doesn't have (year_built,
+// living_area, unit_count, sale price, just/assessed/taxable value) are
+// left null rather than guessed — see file-header note on why CAMA_VAL and
+// TOT_LND_VA/TOT_BLD_VA/TOT_IMPR_V are not force-fit into just_value/
+// assessed_value/taxable_value (those have specific FL statutory meanings
+// this layer's fields were not verified to match).
+export function mapDuvalAttributesToEnrichedProperty(attrs, matchStatus) {
+  const now = new Date().toISOString()
+  if (!attrs) {
+    return {
+      matched: false,
+      parcel_id: null, property_address: null, owner_name: null, owner_mailing_address: null,
+      property_type: null, land_use: null, year_built: null, living_area: null, unit_count: null,
+      just_value: null, assessed_value: null, taxable_value: null,
+      last_sale_price: null, last_sale_date: null, previous_sale_price: null, previous_sale_date: null,
+      absentee_owner: 'unknown',
+      enrichment_source: 'duval_coj_parcels', enriched_at: now,
+      match_confidence: matchStatus,
+    }
+  }
+
+  const propertyAddress = duvalAddressString(attrs)
+  const ownerMailing = [attrs.MAILADDR1, attrs.MAILADDR2, attrs.MAILADDR3, attrs.MAILCITY, attrs.MAILSTATE, attrs.MAILZIP]
+    .filter(Boolean).join(', ') || null
+
+  // Found during Capability #10 real-pilot testing: two real bugs in how
+  // the absentee signal was computed for Duval records.
+  // (1) MAILADDR1 is not reliably the street line — Duval sometimes puts a
+  //     "C/O <name>" line in MAILADDR1 and the real street in MAILADDR2
+  //     (e.g. RE 044181 0820: MAILADDR1="C/O LESLIE A POWELL",
+  //     MAILADDR2="12019 SEA GROVE PL" — same as the property address,
+  //     but comparing only MAILADDR1 against the property address produced
+  //     a false absentee=true). Fixed by picking whichever of
+  //     MAILADDR1/2/3 actually starts with a house number.
+  // (2) Duval's own address fields put direction as a separate leading
+  //     token (STREET_NO ST_DIR ST_NAME ST_TYPE -> "3603 E LEDBURY DR"),
+  //     but a mailing address string can carry direction as a TRAILING
+  //     word ("3603 LEDBURY DR E") — the exact same street, different
+  //     convention. streetCore()'s word-order-sensitive match treated
+  //     these as different streets, another false absentee=true. Fixed by
+  //     stripping any standalone N/S/E/W token from both sides (not just a
+  //     leading one) before comparing, mirroring the leading-direction fix
+  //     already applied to address matching in Capability #9.2.
+  const mailStreetLine = [attrs.MAILADDR1, attrs.MAILADDR2, attrs.MAILADDR3]
+    .find(line => line && /^\d/.test(String(line).trim())) || attrs.MAILADDR1
+  const stripDirectionAnywhere = s => (s || '').replace(/\b[NSEW]\b\.?/gi, ' ').replace(/\s+/g, ' ').trim()
+
+  return {
+    matched: true,
+    parcel_id: attrs.RE ?? null, // Duval RE number — NOT a statewide PARCEL_ID, see file header
+    property_address: propertyAddress || null,
+    owner_name: attrs.LNAMEOWNER ?? null,
+    owner_mailing_address: ownerMailing,
+    property_type: null, // not decoded — see limitations
+    land_use: null, // Duval layer's metadata did not verify a DOR-use-code equivalent field
+    year_built: null, // not present on this layer — see limitations
+    living_area: null, // not present on this layer — see limitations
+    // NOT attrs.NBBLDGS: that field is "number of buildings on the parcel",
+    // not dwelling-unit count — different meaning, would misrepresent the
+    // data if put in this slot. Duval has no verified unit-count field.
+    unit_count: null,
+    just_value: null, // see file header: CAMA_VAL found unreliable, TOT_* not statutorily equivalent
+    assessed_value: null,
+    taxable_value: null,
+    last_sale_price: null, // Duval layer has no sale-price field — see limitations
+    last_sale_date: toIsoDateFromParts(attrs.SALESLYY, attrs.SALESLMM),
+    previous_sale_price: null,
+    previous_sale_date: null,
+    absentee_owner: computeAbsenteeOwner(
+      { own_addr1: stripDirectionAnywhere(mailStreetLine) },
+      stripDirectionAnywhere(propertyAddress)
+    ),
+    enrichment_source: 'duval_coj_parcels',
+    enriched_at: now,
+    match_confidence: matchStatus,
+  }
+}
+
+// Normalizes a name for comparison: uppercase, collapse whitespace, strip
+// punctuation. Deliberately simple — no phonetic/fuzzy matching, per the
+// mission's "no aggressive fuzzy matching" rule.
+function normalizeOwnerName(name) {
+  if (!name) return ''
+  return String(name).toUpperCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Capability #10 — resolves a distress-source PARTY NAME (e.g. a Lis
+ * Pendens defendant) to a Duval property by CURRENT OWNER NAME. Returns
+ * the same EXACT_ADDRESS/NO_MATCH/AMBIGUOUS/ERROR contract as the address
+ * resolver, PLUS an owner_match_status classifying how strong the name
+ * match is — SOURCE PARTY and CURRENT PROPERTY OWNER are never assumed
+ * identical just because a search found a hit.
+ *
+ * @param {string} sourcePartyName - name as it appears on the source record
+ * @returns {Promise<{status: string, record: object|null, ownerMatchStatus: string}>}
+ */
+export async function resolveDuvalOwnerIdentity(sourcePartyName) {
+  const normalizedSource = normalizeOwnerName(sourcePartyName)
+  if (!normalizedSource || normalizedSource.split(' ').length < 2) {
+    // Not even "LASTNAME FIRSTNAME" shape (e.g. a company/trust name with
+    // no clear person name) — do not guess at a prefix query.
+    return { status: 'NO_MATCH', record: null, ownerMatchStatus: 'UNKNOWN' }
+  }
+
+  // Try progressively shorter prefixes: full name first (handles the
+  // common case where the source name IS exactly "LASTNAME FIRSTNAME"),
+  // then just "LASTNAME FIRSTNAME" (first two tokens) if the full string
+  // finds nothing — Duval's LNAMEOWNER often carries a middle name/suffix
+  // the source document doesn't include.
+  const tokens = normalizedSource.split(' ')
+  const candidates = new Set([normalizedSource, tokens.slice(0, 2).join(' ')])
+
+  let features = []
+  for (const prefix of candidates) {
+    try {
+      features = await queryDuvalByOwnerNamePrefix(prefix)
+    } catch (err) {
+      return { status: 'ERROR', record: null, ownerMatchStatus: 'UNKNOWN', error: err.message }
+    }
+    if (features.length > 0) break
+  }
+
+  if (features.length === 0) return { status: 'NO_MATCH', record: null, ownerMatchStatus: 'UNKNOWN' }
+  if (features.length > 1) return { status: 'AMBIGUOUS', record: null, ownerMatchStatus: 'UNKNOWN' }
+
+  const re = features[0].attributes?.RE
+  if (!re) return { status: 'AMBIGUOUS', record: null, ownerMatchStatus: 'UNKNOWN' }
+
+  let fullFeatures
+  try {
+    fullFeatures = await queryDuvalByRe(re)
+  } catch (err) {
+    return { status: 'ERROR', record: null, ownerMatchStatus: 'UNKNOWN', error: err.message }
+  }
+  if (fullFeatures.length !== 1) return { status: 'AMBIGUOUS', record: null, ownerMatchStatus: 'UNKNOWN' }
+
+  const record = fullFeatures[0].attributes
+  const normalizedCurrentOwner = normalizeOwnerName(record.LNAMEOWNER)
+  // MATCH: current owner name equals the source name exactly, or the
+  // source name's tokens are a prefix of the current owner name (a middle
+  // name/suffix Duval has that the source record simply omitted).
+  // POSSIBLE_MATCH: same last name + first name found via search (that's
+  // how we got here) but the full strings diverge more than a pure prefix
+  // (e.g. "ET AL", a different middle name) — still worth human review,
+  // never auto-treated as certain.
+  let ownerMatchStatus
+  if (normalizedCurrentOwner === normalizedSource || normalizedCurrentOwner.startsWith(normalizedSource + ' ')) {
+    ownerMatchStatus = 'MATCH'
+  } else {
+    ownerMatchStatus = 'POSSIBLE_MATCH'
+  }
+
+  return { status: 'EXACT_ADDRESS', record, ownerMatchStatus }
 }
 
 // ── 1. Property matching ────────────────────────────────────────────────
@@ -420,8 +759,29 @@ export async function enrichProperty(identity, options = {}) {
 
   let result
   try {
-    const { status, record } = await matchProperty({ address, parcel_id: parcelId })
-    result = mapAttributesToEnrichedProperty(record, status)
+    // Capability #9.2 — try the Duval-only resolver first for any address
+    // lookup (not for a caller-supplied parcel_id, which is always a
+    // statewide PARCEL_ID by existing contract). Falls back to the
+    // statewide address path on NO_MATCH/AMBIGUOUS/ERROR so non-Duval
+    // addresses and Duval-service outages behave exactly as before #9.2.
+    if (address && !parcelId) {
+      const duval = await resolveDuvalAddress(address)
+      if (duval.status === 'EXACT_ADDRESS') {
+        result = mapDuvalAttributesToEnrichedProperty(duval.record, duval.status)
+      } else if (duval.status === 'AMBIGUOUS') {
+        // Duval itself found more than one plausible match — do not fall
+        // through to a different source and risk a different wrong-house
+        // guess; AMBIGUOUS is a terminal, honest outcome.
+        result = mapDuvalAttributesToEnrichedProperty(null, 'AMBIGUOUS')
+      } else {
+        // NO_MATCH or ERROR from Duval — fall back to the statewide path.
+        const { status, record } = await matchProperty({ address, parcel_id: parcelId })
+        result = mapAttributesToEnrichedProperty(record, status)
+      }
+    } else {
+      const { status, record } = await matchProperty({ address, parcel_id: parcelId })
+      result = mapAttributesToEnrichedProperty(record, status)
+    }
   } catch (err) {
     // #2 — API/network/timeout/malformed-response error handling: never
     // throw into the caller, degrade to an explicit no-match-with-error

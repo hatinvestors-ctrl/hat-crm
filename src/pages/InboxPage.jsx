@@ -6,6 +6,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import { supabase } from '../lib/supabase'
 import { REDFIN_TRIGGER_TYPES, REDFIN_TRIGGER_MAP, GENERIC_AUTO_ALERT, LEAD_SOURCE_MAP } from '../lib/constants'
+import { DistressBadge } from '../components/lead-detail/DistressBanner'
 
 // Capability #6.1 — source-neutral trigger badge. Redfin leads keep their
 // exact existing "📨 Redfin Alert" fallback (REDFIN_TRIGGER_MAP, unchanged,
@@ -64,7 +65,7 @@ export default function InboxPage() {
     setLoading(true)
     supabase
       .from('leads')
-      .select('id, address, city, state, zip_code, asking_price, bedrooms, bathrooms, sqft, lot_size_sqft, seller_name, phone, email, redfin_trigger_type, lead_source, is_hot, created_at, updated_at')
+      .select('id, address, city, state, zip_code, asking_price, bedrooms, bathrooms, sqft, lot_size_sqft, seller_name, phone, email, redfin_trigger_type, lead_source, is_hot, created_at, updated_at, notes, owner_name')
       .eq('workspace_id', workspaceId)
       .eq('status', 'triage')
       .eq('auto_imported', true)
@@ -328,6 +329,7 @@ export default function InboxPage() {
                                     🔥 HOT
                                   </span>
                                 )}
+                                <DistressBadge lead={lead} />
                               </div>
                               <div className="text-[12px] text-[color:var(--color-text-dim)] mt-0.5">
                                 {[lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')}

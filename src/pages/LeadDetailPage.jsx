@@ -11,6 +11,7 @@ import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard'
 import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
 import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
+import DistressBanner from '../components/lead-detail/DistressBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
@@ -150,6 +151,8 @@ export default function LeadDetailPage() {
         />
 
         <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
+
+        <DistressBanner lead={lead} />
 
         <LeadFlowStepper lead={lead} />
 
