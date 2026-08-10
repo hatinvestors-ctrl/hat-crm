@@ -6,6 +6,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions."batchdata-enrich"]
+  timeout = 45
+
 [functions."analyze-deal"]
   timeout = 120
 

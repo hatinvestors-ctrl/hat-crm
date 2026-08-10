@@ -27,6 +27,9 @@ functions = "C:\\Users\\tomer\\Documents\\PrivateNew180425\\CloudeCode\\HatCRM\\
 
 [functions]
 
+[functions.batchdata-enrich]
+timeout = 45.0
+
 [functions.analyze-deal]
 timeout = 120.0
 

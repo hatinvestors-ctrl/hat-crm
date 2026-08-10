@@ -74,6 +74,15 @@ export const SCORE_WEIGHTS = {
   distressQuality: { MORTGAGE_FORECLOSURE: 25, HOA_CONDO_LIEN: 12, TAX_RELATED: 15, MUNICIPAL_LIEN: 10, OTHER_CIVIL: 8, UNKNOWN: 3 },
   propertyFitFit: 20,
   propertyFitPossible: 10,
+  // Capability #10.4 — real finding: once BatchData supplied actual
+  // property_type for 10200 Belle Rive Blvd, the buy-box correctly
+  // resolved to NOT_FIT (a condominium — hard-rejected by HAT's existing
+  // rules), but the score still landed at 75/REVIEW because NOT_FIT simply
+  // withheld the FIT/POSSIBLE_FIT bonus rather than penalizing it. A hard
+  // buy-box rejection should meaningfully outweigh a strong distress
+  // signal, not just fail to add to it — same class of fix as #10.2's
+  // HOA-owner exclusion.
+  propertyFitNotFit: -40,
   ownerResolvedMatch: 15,
   ownerResolvedPossible: 8,
   absenteeOwner: 10,
@@ -127,6 +136,7 @@ export function computeOpportunityScore(input) {
 
   if (input.buyBoxFit === 'FIT') { score += w.propertyFitFit; why.push('Fits HAT buy box') }
   else if (input.buyBoxFit === 'POSSIBLE_FIT') { score += w.propertyFitPossible; why.push('Possible buy-box fit') }
+  else if (input.buyBoxFit === 'NOT_FIT') { score += w.propertyFitNotFit; missing.push('Does not fit HAT buy box') }
   else if (input.buyBoxFit === 'INSUFFICIENT_DATA') missing.push('Property fit unconfirmed')
 
   if (input.ownerMatchStatus === 'MATCH') { score += w.ownerResolvedMatch; why.push('Owner verified') }

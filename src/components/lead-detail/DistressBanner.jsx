@@ -123,6 +123,12 @@ export default function DistressBanner({ lead }) {
             <Fact label="Email" value={lead.email} />
             <Fact label="Contact Match" value={fmtContactMatch(lead.enrichment_data?.contact_match_status)} />
             <Fact label="Contact Source" value={lead.enrichment_data?.contact_source} />
+            {/* Capability #10.4 — DNC preserved for visibility only; never
+                used anywhere to decide or gate outreach (no outreach exists
+                in this codebase at all). */}
+            {lead.enrichment_data?.contact_dnc != null && (
+              <Fact label="DNC" value={lead.enrichment_data.contact_dnc ? 'Yes — Do Not Call' : 'No'} />
+            )}
           </div>
         ) : (
           <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic">Not found yet</div>
