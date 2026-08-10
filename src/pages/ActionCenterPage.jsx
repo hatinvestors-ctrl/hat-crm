@@ -22,6 +22,7 @@ import { applyLeadVisibility } from '../lib/leadVisibility'
 import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
 import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo } from '../lib/distressInfo'
+import { isContactReady } from '../lib/contactEnrichment'
 
 const CATEGORY_META = {
   ACT_NOW:           { icon: '🔥', label: 'Act Now',            theme: PRIORITY_THEME.HOT },
@@ -205,7 +206,19 @@ function ActionCard({ item, workspaceId }) {
                 are identifiable without opening every card. */}
             {item.opportunity ? (
               <div className="rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
-                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Opportunity</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Opportunity</div>
+                  {/* Capability #10.3 — contactability signal only, never
+                      a priority input by itself (mission: contact alone
+                      must not create HIGH PRIORITY). */}
+                  <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                    isContactReady(item.lead)
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                      : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]'
+                  }`}>
+                    {isContactReady(item.lead) ? 'Contact Ready' : 'Contact Needed'}
+                  </span>
+                </div>
                 <div className="text-[16px] font-extrabold tabular-nums text-amber-700 dark:text-amber-400">
                   {item.opportunity.opportunity_score}/100
                 </div>
@@ -279,7 +292,7 @@ export default function ActionCenterPage() {
 
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data')
+        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)

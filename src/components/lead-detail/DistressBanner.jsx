@@ -14,6 +14,7 @@ import {
   getDistressInfo, getWhyHereReasons, getNextAction, getOpportunityInfo, fmtBuyBoxFit,
   fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
 } from '../../lib/distressInfo'
+import { fmtContactMatch } from '../../lib/contactEnrichment'
 
 export default function DistressBanner({ lead }) {
   if (!lead) return null
@@ -105,6 +106,28 @@ export default function DistressBanner({ lead }) {
           </div>
         </div>
       )}
+
+      {/* Capability #10.3 — Owner Contact. Never invented: shows real
+          phone/email only when a legitimate source actually returned one
+          (leads.phone/leads.email — the same existing columns every other
+          lead type already uses, reused rather than a new contact table).
+          "Not found yet" is the honest, expected state today — no paid
+          skip-trace provider is connected (see delivery report). */}
+      <div className="px-4 py-2.5 border-t border-amber-300/40 dark:border-amber-800/40">
+        <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-1">
+          Owner Contact
+        </div>
+        {(lead.phone || lead.email) ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[12.5px]">
+            <Fact label="Phone" value={lead.phone} />
+            <Fact label="Email" value={lead.email} />
+            <Fact label="Contact Match" value={fmtContactMatch(lead.enrichment_data?.contact_match_status)} />
+            <Fact label="Contact Source" value={lead.enrichment_data?.contact_source} />
+          </div>
+        ) : (
+          <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic">Not found yet</div>
+        )}
+      </div>
     </div>
   )
 }

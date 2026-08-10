@@ -1,0 +1,401 @@
+[
+  {
+    "address": "3433   JACONA DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "3419   NET CT",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "8849 S OLD KINGS RD",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 58,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "OTHER_CIVIL",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "7566 W GINGER TEA TRL",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 48,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "OTHER_CIVIL",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "3562   GRASSY RIDE DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "6398   BUCKING BRONCO DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "12264   CROSSFIELD DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 58,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "4947   TAN ST",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 58,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "971 S 16TH AVE",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "11498   KALEEL RD",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "12019   SEA GROVE PL",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "10200   BELLE RIVE BLVD",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 75,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "2566   BEACHVIEW DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "6446 S ISH BRANT RD",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "2596   BEACHVIEW DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "3358   NET CT",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "7415   LAWN TENNIS LN",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 52,
+    "opportunityPriority": {
+      "key": "RESEARCH",
+      "min": 40,
+      "label": "🟡 RESEARCH"
+    },
+    "distressCategory": "HOA_CONDO_LIEN",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "0   GATEWAY CT",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 0,
+    "opportunityPriority": {
+      "key": "LOW_PRIORITY",
+      "min": 0,
+      "label": "⚪ LOW PRIORITY"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  },
+  {
+    "address": "3603 E LEDBURY DR",
+    "rentcastFound": false,
+    "rentcastError": "No data found for that address.",
+    "propertyType": null,
+    "beds": null,
+    "baths": null,
+    "sqft": null,
+    "yearBuilt": null,
+    "phone": null,
+    "email": null,
+    "contactMatchStatus": "NO_MATCH",
+    "opportunityScore": 65,
+    "opportunityPriority": {
+      "key": "REVIEW",
+      "min": 60,
+      "label": "🟠 REVIEW"
+    },
+    "distressCategory": "MORTGAGE_FORECLOSURE",
+    "buyBoxFit": "POSSIBLE_FIT"
+  }
+]
