@@ -16,6 +16,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { qualifyBuyBox } from '../../src/lib/buyBox.js'
 import { computeOpportunityScore } from '../../src/lib/distressScoring.js'
+import { buildStrongestIdentity, formatStreetWithUnit, parseUnitAwareAddress } from '../../src/lib/addressIdentity.js'
+import { batchDataPreflight } from '../../src/lib/batchDataPreflight.js'
+import { deriveBatchDataHealth } from '../../src/lib/batchDataHealth.js'
+import { MATCH_TOKEN_OVERLAP_LIKELY, MATCH_TOKEN_OVERLAP_AMBIGUOUS } from '../../src/lib/batchDataConfig.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -30,8 +34,6 @@ const BATCHDATA_API_KEY = process.env.BATCHDATA_API_KEY
 // endpoint's name, and not documented anywhere reachable to us.
 const BATCHDATA_BASE_V1 = 'https://api.batchdata.com/api/v1'
 const BATCHDATA_BASE_V3 = 'https://api.batchdata.com/api/v3'
-const RECENT_ENRICHMENT_WINDOW_MS = 24 * 60 * 60 * 1000
-
 function json(status, body) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 }
@@ -95,22 +97,56 @@ async function callBatchData(base, path, body) {
   }
 }
 
-// ── Owner-match safety — same conservative discipline as #9.2/#10 ───────
+// ── Owner-match safety V2 — Capability #10.5: adds unit awareness on top
+// of #10.4's name-token matching. ────────────────────────────────────────
 function normalizeName(n) {
   if (!n) return ''
   return String(n).toUpperCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim()
 }
-function classifyPersonMatch(person, lead) {
+const MATCH_RANK = ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH']
+function downgrade(status, steps = 1) {
+  const idx = Math.min(MATCH_RANK.indexOf(status) + steps, MATCH_RANK.length - 1)
+  return MATCH_RANK[idx]
+}
+
+/**
+ * @param {object} person - one BatchData persons[] entry
+ * @param {object} lead
+ * @param {{unit: string|null}} identity - our own best-known identity (from buildStrongestIdentity)
+ */
+function classifyPersonMatch(person, lead, identity) {
   const returnedName = normalizeName(person?.name?.full || [person?.name?.first, person?.name?.last].filter(Boolean).join(' '))
   const ourOwner = normalizeName(lead.owner_name)
   if (!returnedName || !ourOwner) return 'NO_MATCH'
-  if (returnedName === ourOwner) return 'VERIFIED'
-  const returnedTokens = new Set(returnedName.split(' '))
-  const ourTokens = ourOwner.split(' ').filter(Boolean)
-  const overlap = ourTokens.filter(t => returnedTokens.has(t)).length
-  if (overlap >= 2) return 'LIKELY'
-  if (overlap === 1) return 'AMBIGUOUS'
-  return 'NO_MATCH'
+
+  let status
+  if (returnedName === ourOwner) status = 'VERIFIED'
+  else {
+    const returnedTokens = new Set(returnedName.split(' '))
+    const ourTokens = ourOwner.split(' ').filter(Boolean)
+    const overlap = ourTokens.filter(t => returnedTokens.has(t)).length
+    if (overlap >= MATCH_TOKEN_OVERLAP_LIKELY) status = 'LIKELY'
+    else if (overlap >= MATCH_TOKEN_OVERLAP_AMBIGUOUS) status = 'AMBIGUOUS'
+    else return 'NO_MATCH'
+  }
+
+  // Critical rule (mission Section 8): a strong street/name match with a
+  // conflicting or missing required unit is NOT enough to attach owner
+  // contact automatically. Only applies when WE know a unit is required
+  // (identity.unit set) — never invents a requirement that doesn't exist.
+  if (identity?.unit) {
+    const matchedAddr = (person.addresses || []).find(a => a.propertyMailingAddress) || person.addresses?.[0]
+    const returnedUnit = matchedAddr ? parseUnitAwareAddress(matchedAddr.fullAddress || matchedAddr.street || '').unit : null
+    if (!returnedUnit) {
+      // BatchData didn't return unit-level detail at all for this person —
+      // can't confirm it's the right unit within a multi-unit property.
+      status = downgrade(status, 1)
+    } else if (returnedUnit !== identity.unit) {
+      // Confirmed different unit — never attach another unit's contact.
+      status = downgrade(status, 2)
+    }
+  }
+  return status
 }
 
 // Real fields confirmed live (Stage 1): persons[].phones[] = { rank, number,
@@ -161,20 +197,46 @@ export default async function handler(req) {
 
   let body
   try { body = await req.json() } catch { return json(400, { ok: false, error: 'Invalid JSON body' }) }
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+  // ── Health check mode (Section 14) — never spends money; derives status
+  // from recently stored call outcomes instead of a live billable request.
+  if (body?.mode === 'health') {
+    const { data: recent } = await supabase
+      .from('leads').select('enrichment_data')
+      .not('enrichment_data->>contact_enriched_at', 'is', null)
+      .order('enrichment_data->>contact_enriched_at', { ascending: false })
+      .limit(10)
+    return json(200, { ok: true, ...deriveBatchDataHealth(recent || []) })
+  }
+
   const { lead_id, force = false } = body || {}
   if (!lead_id) return json(400, { ok: false, error: 'lead_id is required' })
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   const { data: lead, error: leadErr } = await supabase.from('leads').select('*').eq('id', lead_id).maybeSingle()
   if (leadErr || !lead) return json(404, { ok: false, error: 'Lead not found' })
 
-  // Duplicate-payment guard (Section 23).
-  const lastEnriched = lead.enrichment_data?.contact_enriched_at
-  if (!force && lastEnriched && (Date.now() - new Date(lastEnriched).getTime()) < RECENT_ENRICHMENT_WINDOW_MS) {
-    return json(200, { ok: true, skipped: true, reason: 'Already BatchData-enriched within the last 24h — pass force:true to re-run and re-pay', lead })
+  // ── Pre-flight gate (Section 5) — the ONE decision point before any
+  // paid call. Only READY_FOR_LOOKUP proceeds. ──────────────────────────
+  const preflight = batchDataPreflight(lead, force)
+  if (preflight.decision !== 'READY_FOR_LOOKUP') {
+    return json(200, { ok: true, skipped: true, decision: preflight.decision, reason: preflight.reason, lead })
   }
 
-  const addressParts = { street: lead.address, city: lead.city || 'Jacksonville', state: lead.state || 'FL', zip: lead.zip_code || '' }
+  // ── Idempotency lock (Section 7) — simplest safe mechanism for
+  // HatCRM's actual scale (single admin, occasional double-click/retry),
+  // not a distributed job queue. Written BEFORE the paid call so a second
+  // concurrent request sees LOOKUP_IN_PROGRESS in its own pre-flight check.
+  const lockAt = new Date().toISOString()
+  await supabase.from('leads').update({
+    enrichment_data: { ...(lead.enrichment_data || {}), batchdata_lock_at: lockAt },
+  }).eq('id', lead.id)
+
+  // ── Strongest available identity (Section 3/4) — unit-aware. This is
+  // the direct fix for #10.4's Belle Rive Blvd wrong-owner match: a known
+  // unit is now included in every request BatchData receives.
+  const identity = buildStrongestIdentity(lead)
+  const addressParts = { street: formatStreetWithUnit(identity), city: identity.city || 'Jacksonville', state: identity.state || 'FL', zip: identity.zip || '' }
 
   // ── Skip trace ──────────────────────────────────────────────────────
   const skipTraceResult = await callBatchData(BATCHDATA_BASE_V3, '/property/skip-trace', {
@@ -199,7 +261,7 @@ export default async function handler(req) {
     } else {
       skipTraceStatus = 'SUCCESS'
       // Best matching person only — never blindly attach every returned contact.
-      const ranked = persons.map(p => ({ p, match: classifyPersonMatch(p, lead) }))
+      const ranked = persons.map(p => ({ p, match: classifyPersonMatch(p, lead, identity) }))
         .sort((a, b) => ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(a.match) - ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(b.match))
       contactMatchStatus = ranked[0].match
       if (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') {
@@ -287,6 +349,9 @@ export default async function handler(req) {
 
   const updatedEnrichmentData = {
     ...(lead.enrichment_data || {}),
+    batchdata_lock_at: null, // release the idempotency lock acquired above
+    identity_unit_used: identity.unit,
+    identity_source: identity.identitySource,
     contact_source: (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') ? 'batchdata' : (lead.enrichment_data?.contact_source || 'none_connected'),
     contact_match_status: contactMatchStatus,
     contact_enriched_at: now,
@@ -310,6 +375,19 @@ export default async function handler(req) {
   }
   leadUpdate.enrichment_data = updatedEnrichmentData
 
+  // Compact UI-safe status (Section 15) — Kevin never sees an HTTP code.
+  let uiStatus
+  if (skipTraceStatus === 'BILLING_ERROR' || skipTraceStatus === 'AUTH_ERROR' || skipTraceStatus === 'PROVIDER_ERROR' || skipTraceStatus === 'NETWORK_ERROR') {
+    uiStatus = 'ENRICHMENT TEMPORARILY UNAVAILABLE'
+  } else if (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') {
+    uiStatus = 'CONTACT READY'
+  } else if (contactMatchStatus === 'AMBIGUOUS') {
+    uiStatus = 'MATCH NEEDS REVIEW'
+  } else {
+    uiStatus = 'CONTACT NEEDED'
+  }
+  leadUpdate.enrichment_data.contact_ui_status = uiStatus
+
   const { error: updErr } = await supabase.from('leads').update(leadUpdate).eq('id', lead.id)
   if (updErr) return json(500, { ok: false, error: `DB update failed: ${updErr.message}` })
 
@@ -317,9 +395,11 @@ export default async function handler(req) {
     ok: true,
     lead_id: lead.id,
     address: lead.address,
+    uiStatus,
     skipTraceStatus,
     propertyStatus,
     contactMatchStatus,
+    identityUnit: identity.unit,
     phoneFound: !!phones.primary,
     emailFound: !!email,
     dnc: phones.dnc,

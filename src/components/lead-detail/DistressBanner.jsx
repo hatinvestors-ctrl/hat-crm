@@ -114,8 +114,22 @@ export default function DistressBanner({ lead }) {
           "Not found yet" is the honest, expected state today — no paid
           skip-trace provider is connected (see delivery report). */}
       <div className="px-4 py-2.5 border-t border-amber-300/40 dark:border-amber-800/40">
-        <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-1">
-          Owner Contact
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">
+            Owner Contact
+          </div>
+          {/* Capability #10.5 — compact, honest status. Never shows a raw
+              HTTP/provider error to Kevin (mission Section 15). */}
+          {lead.enrichment_data?.contact_ui_status === 'ENRICHMENT TEMPORARILY UNAVAILABLE' && (
+            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">
+              Enrichment Temporarily Unavailable
+            </span>
+          )}
+          {lead.enrichment_data?.contact_ui_status === 'MATCH NEEDS REVIEW' && (
+            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+              Match Needs Review
+            </span>
+          )}
         </div>
         {(lead.phone || lead.email) ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[12.5px]">

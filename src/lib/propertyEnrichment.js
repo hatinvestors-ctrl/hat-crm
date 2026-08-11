@@ -336,7 +336,14 @@ async function queryDuvalByOwnerNamePrefix(namePrefix) {
 // PHY_ADDR1 so it can be run through the existing normalizeAddress()/
 // streetCore() helpers unchanged.
 function duvalAddressString(attrs) {
-  return [attrs.STREET_NO, attrs.ST_DIR, attrs.ST_NAME, attrs.ST_TYPE].filter(Boolean).join(' ')
+  const base = [attrs.STREET_NO, attrs.ST_DIR, attrs.ST_NAME, attrs.ST_TYPE].filter(Boolean).join(' ')
+  // Capability #10.5 — UNIT_NO was already fetched (DUVAL_LOOKUP_FIELDS/
+  // DUVAL_OUT_FIELDS since #9.2) but never mapped into the output, the
+  // same class of oversight the ZIPCODE fix (#10.2) caught. A real
+  // multi-unit property's identity is incomplete without it — #10.4's
+  // Belle Rive Blvd wrong-owner match traced directly back to this gap.
+  const unit = String(attrs.UNIT_NO || '').trim()
+  return unit ? `${base} UNIT ${unit}` : base
 }
 
 // Found during live testing (Capability #9.2): several real Duval records
