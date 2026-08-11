@@ -33,6 +33,16 @@ const FILER_PATTERNS = [
     re: /\b(CITY OF JACKSONVILLE|DUVAL COUNTY|CODE ENFORCEMENT|MUNICIPAL)\b/i,
     confidence: 'high',
   },
+  {
+    // Capability #14 — real filer evidence from the Duval Clerk's own LIEN
+    // (LN) document type: contracting/trade companies filing a Claim of
+    // Lien (mechanic's/construction lien) against a property owner who
+    // didn't pay for work performed. Matched on the filer's real business
+    // name, same evidence pattern as every other category above.
+    category: 'CONTRACTOR_LIEN',
+    re: /\b(CONSTRUCTION|CONTRACTING|CONTRACTOR|ROOFING|PLUMBING|ELECTRIC|HEATING|AIR COND|HVAC|BUILDERS?|REMODEL|PAVING|LANDSCAP)\b/i,
+    confidence: 'medium',
+  },
 ]
 
 /**
@@ -65,8 +75,40 @@ export const DISTRESS_CATEGORY_LABELS = {
   HOA_CONDO_LIEN: 'HOA / Condo Lien',
   TAX_RELATED: 'Tax Related',
   MUNICIPAL_LIEN: 'Municipal Lien',
+  CONTRACTOR_LIEN: 'Contractor / Mechanic’s Lien',
   OTHER_CIVIL: 'Other Civil',
   UNKNOWN: 'Unknown',
+}
+
+// ── Capability #14 — conservative lien SIGNAL STRENGTH ──────────────────
+// Deliberately separate from distress_category above: category says WHAT
+// kind of lien it is (real filer evidence); strength says how much weight
+// that lien deserves as an acquisition signal, given the real context we
+// actually have (legal description present, is the "party" a business
+// rather than a person, other corroborating signals on this property).
+// Never claims a single lien alone proves a motivated seller.
+export function classifyLienStrength({ distressCategory, hasLegalDescription, partyLooksLikeBusiness, otherSignalCount = 0 }) {
+  if (otherSignalCount > 0) {
+    return { strength: 'STRONG_FINANCIAL_DISTRESS', reason: `Corroborated by ${otherSignalCount} other distress signal(s) on this property` }
+  }
+  if (partyLooksLikeBusiness) {
+    // The named "debtor" on the lien is itself a company, not the
+    // individual property owner — e.g. a contest-of-lien between two
+    // businesses. Real evidence, but not a residential-seller-distress signal.
+    return { strength: 'NON_ACQUISITION_SIGNAL', reason: 'Named party is a business entity, not an individual property owner' }
+  }
+  if (distressCategory === 'HOA_CONDO_LIEN' || distressCategory === 'CONTRACTOR_LIEN') {
+    return hasLegalDescription
+      ? { strength: 'MODERATE_DISTRESS', reason: 'Lien tied to a specific legal description; unpaid HOA/contractor debt is a real but moderate signal alone' }
+      : { strength: 'WEAK_DISTRESS', reason: 'Lien type suggests real distress but no legal description ties it to this specific property' }
+  }
+  if (distressCategory === 'TAX_RELATED') {
+    return { strength: 'WEAK_DISTRESS', reason: 'Federal/state tax liens attach to the debtor broadly, not a specific property — no legal description confirms this parcel' }
+  }
+  if (distressCategory === 'MUNICIPAL_LIEN') {
+    return { strength: 'MODERATE_DISTRESS', reason: 'Municipal lien filed against the property' }
+  }
+  return { strength: 'UNKNOWN', reason: 'Lien category and party context do not support a confident distress classification' }
 }
 
 // ── 9. Opportunity Score — explainable, 0-100, centralized weights ──────

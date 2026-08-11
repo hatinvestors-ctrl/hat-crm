@@ -13,6 +13,7 @@
 import {
   getDistressInfo, getWhyHereReasons, getNextAction, getOpportunityInfo, fmtBuyBoxFit,
   fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
+  fmtLienAmount, fmtLienStatus,
 } from '../../lib/distressInfo'
 import { fmtContactMatch } from '../../lib/contactEnrichment'
 
@@ -55,6 +56,14 @@ export default function DistressBanner({ lead }) {
         <Fact label="Source" value={fmtDistressSource(info.distress_source)} />
         {info.distress_case_or_instrument && (
           <Fact label="Case / Instrument" value={info.distress_case_or_instrument} />
+        )}
+        {/* Capability #14 — recorded lien only; both are no-ops (Fact
+            returns null) for every other distress type. */}
+        {info.distress_type === 'recorded_lien' && (
+          <>
+            <Fact label="Amount" value={fmtLienAmount(info.lien_amount)} />
+            <Fact label="Status" value={fmtLienStatus(info.lien_status)} />
+          </>
         )}
       </div>
 

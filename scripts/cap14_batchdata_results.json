@@ -1,0 +1,361 @@
+[
+  {
+    "leadId": "a61cd14b-3cdf-4bf3-884d-850b3ce86be5",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "a61cd14b-3cdf-4bf3-884d-850b3ce86be5",
+      "address": "8550   TOUCHTON RD UNIT 2121",
+      "uiStatus": "MATCH NEEDS REVIEW",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "AMBIGUOUS",
+      "identityUnit": "2121",
+      "phoneFound": false,
+      "emailFound": false,
+      "dnc": null,
+      "propertyFields": {
+        "property_type": "condo",
+        "property_type_detail": "Condominium Unit",
+        "year_built": 2005,
+        "sqft": 1613,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "lot_size_sqft": 225,
+        "last_sale_price": null,
+        "last_sale_date": "2006-03-06T00:00:00.000Z",
+        "avm_estimate": 200316
+      },
+      "opportunityScore": 8,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "NOT_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "311ecae2-1e6c-4a49-bdfa-5c1819ef491d",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "311ecae2-1e6c-4a49-bdfa-5c1819ef491d",
+      "address": "11803   BEARDGRASS WY",
+      "uiStatus": "CONTACT NEEDED",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "NO_MATCH",
+      "identityUnit": null,
+      "phoneFound": false,
+      "emailFound": false,
+      "dnc": null,
+      "propertyFields": {
+        "property_type": "townhouse",
+        "property_type_detail": "Townhouse",
+        "year_built": 2023,
+        "sqft": 1368,
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "lot_size_sqft": 1620,
+        "last_sale_price": null,
+        "last_sale_date": "2023-04-28T00:00:00.000Z",
+        "avm_estimate": 276435
+      },
+      "opportunityScore": 8,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "NOT_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "8e72297d-0f15-4b6e-b365-2c377bdba3a9",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "8e72297d-0f15-4b6e-b365-2c377bdba3a9",
+      "address": "11764   BEARDGRASS WY",
+      "uiStatus": "CONTACT NEEDED",
+      "skipTraceStatus": "NO_MATCH",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "NO_MATCH",
+      "identityUnit": null,
+      "phoneFound": false,
+      "emailFound": false,
+      "dnc": null,
+      "propertyFields": {
+        "property_type": "townhouse",
+        "property_type_detail": "Townhouse",
+        "year_built": 2023,
+        "sqft": 1368,
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "lot_size_sqft": 1620,
+        "last_sale_price": null,
+        "last_sale_date": "2023-08-11T00:00:00.000Z",
+        "avm_estimate": 282870
+      },
+      "opportunityScore": 8,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "NOT_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "dbe378b3-c4d3-4a3e-8f88-d31a0d19c7c3",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "dbe378b3-c4d3-4a3e-8f88-d31a0d19c7c3",
+      "address": "2929   JUSTINA RD",
+      "uiStatus": "CONTACT NEEDED",
+      "skipTraceStatus": "NO_MATCH",
+      "propertyStatus": "NO_MATCH",
+      "contactMatchStatus": "NO_MATCH",
+      "identityUnit": "2412",
+      "phoneFound": false,
+      "emailFound": false,
+      "dnc": null,
+      "propertyFields": {},
+      "opportunityScore": 38,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "INSUFFICIENT_DATA",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "ed865ecb-8ed9-4c3b-bd1e-2f3216db5f38",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "ed865ecb-8ed9-4c3b-bd1e-2f3216db5f38",
+      "address": "7669   LEGACY TRL",
+      "uiStatus": "CONTACT READY",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "LIKELY",
+      "identityUnit": null,
+      "phoneFound": true,
+      "emailFound": true,
+      "dnc": false,
+      "propertyFields": {
+        "property_type": "townhouse",
+        "property_type_detail": "Townhouse",
+        "year_built": 2021,
+        "sqft": 1202,
+        "bedrooms": 2,
+        "bathrooms": 3,
+        "lot_size_sqft": 2154,
+        "last_sale_price": null,
+        "last_sale_date": "2021-09-22T00:00:00.000Z",
+        "avm_estimate": 247479
+      },
+      "opportunityScore": 8,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "NOT_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "62035ffa-a5dd-46f8-9f7d-a137e1b6a22d",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "62035ffa-a5dd-46f8-9f7d-a137e1b6a22d",
+      "address": "11795   BEARDGRASS WY",
+      "uiStatus": "CONTACT READY",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "LIKELY",
+      "identityUnit": null,
+      "phoneFound": true,
+      "emailFound": true,
+      "dnc": false,
+      "propertyFields": {
+        "property_type": "townhouse",
+        "property_type_detail": "Townhouse",
+        "year_built": 2023,
+        "sqft": 1627,
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "lot_size_sqft": 3178,
+        "last_sale_price": null,
+        "last_sale_date": "2023-05-03T00:00:00.000Z",
+        "avm_estimate": 306757
+      },
+      "opportunityScore": 8,
+      "opportunityPriority": {
+        "min": 0,
+        "key": "LOW_PRIORITY",
+        "label": "⚪ LOW PRIORITY"
+      },
+      "buyBoxFit": "NOT_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "f13f3fba-5402-47db-98cf-ad9e05234004",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "f13f3fba-5402-47db-98cf-ad9e05234004",
+      "address": "7558   GROSSMAN CT",
+      "uiStatus": "CONTACT READY",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "LIKELY",
+      "identityUnit": null,
+      "phoneFound": true,
+      "emailFound": true,
+      "dnc": true,
+      "propertyFields": {
+        "property_type": "single_family",
+        "property_type_detail": "Single Family",
+        "year_built": 2014,
+        "sqft": 1861,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "lot_size_sqft": 10992,
+        "last_sale_price": null,
+        "last_sale_date": "2015-01-26T00:00:00.000Z",
+        "avm_estimate": 311313
+      },
+      "opportunityScore": 48,
+      "opportunityPriority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "buyBoxFit": "POSSIBLE_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "76392faa-96bc-4e47-b45d-c7be49e99e60",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "76392faa-96bc-4e47-b45d-c7be49e99e60",
+      "address": "7388   BENES TRL",
+      "uiStatus": "CONTACT READY",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "LIKELY",
+      "identityUnit": null,
+      "phoneFound": true,
+      "emailFound": true,
+      "dnc": false,
+      "propertyFields": {
+        "property_type": "single_family",
+        "property_type_detail": "Single Family",
+        "year_built": 2014,
+        "sqft": 1861,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "lot_size_sqft": 7408,
+        "last_sale_price": null,
+        "last_sale_date": "2014-04-23T00:00:00.000Z",
+        "avm_estimate": 303235
+      },
+      "opportunityScore": 48,
+      "opportunityPriority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "buyBoxFit": "POSSIBLE_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "fe3d92cb-0613-41c2-8ba6-0668aeeeee6a",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "fe3d92cb-0613-41c2-8ba6-0668aeeeee6a",
+      "address": "7581   COSMO CT",
+      "uiStatus": "CONTACT READY",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "LIKELY",
+      "identityUnit": null,
+      "phoneFound": true,
+      "emailFound": true,
+      "dnc": false,
+      "propertyFields": {
+        "property_type": "single_family",
+        "property_type_detail": "Single Family",
+        "year_built": 2013,
+        "sqft": 2186,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "lot_size_sqft": 12699,
+        "last_sale_price": null,
+        "last_sale_date": "2013-04-16T00:00:00.000Z",
+        "avm_estimate": 332715
+      },
+      "opportunityScore": 48,
+      "opportunityPriority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "buyBoxFit": "POSSIBLE_FIT",
+      "excluded": false
+    }
+  },
+  {
+    "leadId": "e8d4b364-8ffd-4eb9-a81c-ed4e12c78348",
+    "ok": true,
+    "body": {
+      "ok": true,
+      "lead_id": "e8d4b364-8ffd-4eb9-a81c-ed4e12c78348",
+      "address": "6333   WHITBY CT",
+      "uiStatus": "CONTACT NEEDED",
+      "skipTraceStatus": "SUCCESS",
+      "propertyStatus": "SUCCESS",
+      "contactMatchStatus": "NO_MATCH",
+      "identityUnit": null,
+      "phoneFound": false,
+      "emailFound": false,
+      "dnc": null,
+      "propertyFields": {
+        "property_type": "single_family",
+        "property_type_detail": "Single Family",
+        "year_built": 2009,
+        "sqft": 2148,
+        "bedrooms": 4,
+        "bathrooms": 2,
+        "lot_size_sqft": 10401,
+        "last_sale_price": null,
+        "last_sale_date": "2009-09-18T00:00:00.000Z",
+        "avm_estimate": 331853
+      },
+      "opportunityScore": 48,
+      "opportunityPriority": {
+        "min": 40,
+        "key": "RESEARCH",
+        "label": "🟡 RESEARCH"
+      },
+      "buyBoxFit": "POSSIBLE_FIT",
+      "excluded": false
+    }
+  }
+]

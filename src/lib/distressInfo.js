@@ -20,7 +20,11 @@ function parseNotesBlock(notes) {
     return line ? line.slice(label.length + 1).trim() : null
   }
   const signalLine = lines[0] || ''
-  const distressType = signalLine.toLowerCase().includes('lis pendens') ? 'lis_pendens' : null
+  const distressType = signalLine.toLowerCase().includes('lis pendens')
+    ? 'lis_pendens'
+    : signalLine.toLowerCase().includes('lien')
+      ? 'recorded_lien'
+      : null
 
   return {
     distress_type: distressType,
@@ -36,6 +40,9 @@ function parseNotesBlock(notes) {
       if (v === 'false') return false
       return null
     })(),
+    // Capability #14 — recorded lien only; null for every other distress type.
+    lien_amount: get('Amount'),
+    lien_status: get('Status'),
     source_reference: 'Duval County Public Record',
     enrichment_status: 'enriched',
   }
@@ -75,7 +82,24 @@ export function fmtAbsentee(value) {
 
 export function fmtDistressType(type) {
   if (type === 'lis_pendens') return 'Pre-Foreclosure • Lis Pendens'
+  if (type === 'recorded_lien') return 'Recorded Lien'
   return 'Distress Signal'
+}
+
+// Capability #14 — lien amount arrives as a real dollar figure only when
+// the source Consideration field was actually populated; most HOA/tax
+// liens on this source leave it at 0, which is NOT the same as "$0 owed"
+// — so a zero/missing amount renders as "Not disclosed", never as $0.
+export function fmtLienAmount(amount) {
+  const n = Number(amount)
+  if (!amount || !Number.isFinite(n) || n <= 0) return 'Not disclosed'
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+export function fmtLienStatus(status) {
+  if (status === 'active' || status === 'Active') return 'Active'
+  if (status === 'released' || status === 'Released') return 'Released'
+  return 'Unknown'
 }
 
 export function fmtDistressSource(source) {
@@ -87,6 +111,7 @@ export function fmtDistressSource(source) {
 export function getWhyHereReasons(lead, info) {
   const reasons = []
   if (info?.distress_type === 'lis_pendens') reasons.push('Lis Pendens filed')
+  if (info?.distress_type === 'recorded_lien') reasons.push('Recorded lien found')
   if (lead?.owner_name || info?.current_owner) reasons.push('Property successfully identified')
   if (lead?.owner_name) reasons.push('Current owner identified')
   if (info?.absentee_owner === true) reasons.push('Absentee owner')
