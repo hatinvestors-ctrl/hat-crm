@@ -28,6 +28,19 @@ export function deriveBatchDataHealth(recentLeads) {
   if (mostRecent === 'BILLING_ERROR') return { health: 'NO_BALANCE', sample_size: statuses.length, reason: 'Most recent attempt failed with BILLING_ERROR' }
   if (mostRecent === 'AUTH_ERROR') return { health: 'AUTH_FAILURE', sample_size: statuses.length, reason: 'Most recent attempt failed with AUTH_ERROR' }
 
+  // Capability #10.6 real finding: a stale batch of yesterday's
+  // billing-exhaustion failures (which still carry a contact_enriched_at
+  // timestamp from when they were recorded) can outnumber a handful of
+  // fresh, real successes in the same 10-sample window, producing a
+  // DEGRADED read even immediately after live calls just succeeded. The
+  // single most recent status is the strongest real signal available — a
+  // fresh SUCCESS means the account is confirmed healthy right now,
+  // regardless of what an older, already-resolved outage looks like
+  // averaged into the same sample.
+  if (mostRecent === 'SUCCESS') {
+    return { health: 'HEALTHY', sample_size: statuses.length, reason: 'Most recent attempt succeeded' }
+  }
+
   const errorCount = statuses.filter(s => s === 'BILLING_ERROR' || s === 'AUTH_ERROR' || s === 'PROVIDER_ERROR' || s === 'NETWORK_ERROR').length
   const errorRate = errorCount / statuses.length
   if (errorRate >= 0.5) return { health: 'DEGRADED', sample_size: statuses.length, reason: `${errorCount}/${statuses.length} of recent attempts errored` }
