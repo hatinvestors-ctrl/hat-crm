@@ -32,7 +32,14 @@ export function classifyZip(zip) {
 
 const HARD_REJECT_TYPE_PATTERNS = [
   { re: /\bcondo(minium)?\b/i, reason: 'Condominium' },
-  { re: /\btown ?home\b/i, reason: 'Townhome' },
+  // Capability #11 real finding: the mirrored source (hat-ai-agents/lib/
+  // acquisition-engine.mjs) only matches "town ?home", which NEVER matches
+  // "townhouse" — the exact value normalizePropertyType() actually
+  // produces everywhere in this codebase (RentCast and BatchData both
+  // normalize to 'townhouse', never 'townhome'). Caught live: a real
+  // townhouse (2839 Black Buck Cir) incorrectly passed as FIT. Widened to
+  // catch both spellings.
+  { re: /\btown ?home\b|\btownhouse\b/i, reason: 'Townhouse' },
   { re: /\bapartment\b/i, reason: 'Apartment' },
   { re: /\bcommercial\b/i, reason: 'Commercial property' },
   { re: /\bland[- ]?only\b|\bvacant lot\b|\bunimproved land\b/i, reason: 'Land only' },
