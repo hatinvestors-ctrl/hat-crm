@@ -448,6 +448,99 @@ function buildRisks(fit, confidence) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// 9. HUMAN ACQUISITION OVERRIDE — Capability #15.5, Sections 1-4. A
+// SEPARATE concept from canonical Buy Box (Section 1's explicit
+// requirement) — canonical FIT is never corrupted/overwritten by a human
+// judgment call; the override sits alongside it and only changes the
+// OPERATIONAL recommendation. Reversible (Section 4) — nothing here is
+// destructive, it only reads lead.acquisition_override (additive column,
+// see migration) and, when active, forces the final recommendation.
+//
+// Storage shape (Section 1): { active, decision: 'DO_NOT_PURSUE', reason,
+// created_by, created_at }. Column not yet migrated in production — see
+// delivery report; this function degrades safely to a no-op (returns
+// null) when the field doesn't exist on the lead object at all.
+// ══════════════════════════════════════════════════════════════════════
+export function applyHumanOverride(lead, decision) {
+  const override = lead.acquisition_override
+  if (!override?.active || override.decision !== 'DO_NOT_PURSUE') return decision
+
+  // Hard guardrail (Section 3) — no Opportunity/Confidence combination can
+  // survive an active override reaching an acquisition action. Canonical
+  // fit/opportunity/confidence/urgency are left untouched in the returned
+  // object — only recommendation/next_best_action change.
+  return {
+    ...decision,
+    recommendation: 'PASS',
+    next_best_action: 'HUMAN_OVERRIDE',
+    why: [`Human acquisition override active: ${override.reason || 'no reason recorded'}`],
+    human_override: { active: true, reason: override.reason || null, created_by: override.created_by || null, created_at: override.created_at || null },
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 10. QUALITATIVE SIGNAL APPLICATION — Sections 6-8. Deterministic
+// interpretation of AI-SUPPLIED evidence (src/lib/qualitativeIntelligence.js
+// does the actual LLM call, elsewhere, and only ever returns structured
+// signal arrays — never a recommendation, never a number). This function
+// is the ONLY place those signals are allowed to touch a V2 decision, and
+// it can only ever LOWER confidence / ADD a verify-style next action —
+// never raise Opportunity, never touch Fit, never produce SEND_OFFER or
+// CONTACT_OWNER on its own.
+// ══════════════════════════════════════════════════════════════════════
+export function applyQualitativeSignals(decision, qualitative) {
+  if (!qualitative) return decision
+  let confidence = decision.confidence
+  let next_best_action = decision.next_best_action
+  const risks_missing = [...decision.risks_missing]
+  const why = [...decision.why]
+
+  if (qualitative.risk_signals?.length) {
+    // Unresolved risk lowers Confidence (Section 8) — capped reduction,
+    // never zeroes it, never touches Opportunity.
+    confidence = { ...confidence, score: Math.max(0, confidence.score - 15 * qualitative.risk_signals.length), missing: [...new Set([...confidence.missing, ...qualitative.risk_signals])].slice(0, 6) }
+    // A serious unresolved risk can redirect the NEXT ACTION toward
+    // verifying it, but never escalates to ACT_NOW/SEND_OFFER/CONTACT_OWNER
+    // — only ever substitutes a more specific "go verify this" action when
+    // the current recommendation was already a verify/review-style step.
+    if (['REVIEW_TODAY', 'RESEARCH'].includes(decision.recommendation)) {
+      const riskAction = qualitative.risk_signals.some(s => /flood/i.test(s)) ? 'VERIFY_FLOOD_RISK'
+        : qualitative.risk_signals.some(s => /title/i.test(s)) ? 'VERIFY_TITLE'
+        : qualitative.risk_signals.some(s => /roof|foundation|structural/i.test(s)) ? 'VERIFY_CONDITION'
+        : null
+      if (riskAction) next_best_action = riskAction
+    }
+    risks_missing.unshift(...qualitative.risk_signals)
+  }
+  if (qualitative.condition_signals?.length) risks_missing.push(...qualitative.condition_signals)
+  if (qualitative.motivation_signals?.length) why.push(...qualitative.motivation_signals)
+
+  return {
+    ...decision,
+    confidence,
+    next_best_action,
+    why: [...new Set(why)].slice(0, 8),
+    risks_missing: [...new Set(risks_missing)].slice(0, 8),
+    qualitative: { risk_count: qualitative.risk_signals?.length || 0, qualitative_confidence: qualitative.qualitative_confidence, analyzed_at: qualitative.analyzed_at, cache_key: qualitative.cache_key },
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 11. STALENESS — Section 17. Simplest reliable mechanism: compare when
+// this decision was calculated against when any trigger-relevant field
+// last actually changed (lead.updated_at, which every existing write path
+// already bumps). No new column required.
+// ══════════════════════════════════════════════════════════════════════
+export function computeStaleness(decision, lead) {
+  if (!decision?.calculated_at || !lead?.updated_at) return { stale: false, reason: 'Insufficient data to determine staleness' }
+  const decidedAt = new Date(decision.calculated_at).getTime()
+  const updatedAt = new Date(lead.updated_at).getTime()
+  if (Number.isNaN(decidedAt) || Number.isNaN(updatedAt)) return { stale: false, reason: 'Invalid timestamp' }
+  const stale = updatedAt > decidedAt
+  return { stale, reason: stale ? 'Lead data updated after this decision was calculated' : null }
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // TOP-LEVEL — one shared output contract for both market types (Section
 // 4), now built entirely on the canonical property-decision-data resolver
 // (Capability #15.2) instead of each sub-function independently guessing
@@ -462,7 +555,7 @@ export function computeDecisionV2(lead, marketType, { trigger = 'MANUAL_RECALCUL
   const urgency = computeUrgency(lead, marketType)
   const { recommendation, next_best_action } = computeRecommendation({ fit, opportunity, confidence, urgency, status: lead.status, marketType })
 
-  return {
+  const decision = {
     fit,
     legacy_ingestion_buy_box_status: legacyBuyBox.legacy_ingestion_buy_box_status,
     buy_box_conflict: legacyBuyBox.buy_box_conflict,
@@ -481,6 +574,29 @@ export function computeDecisionV2(lead, marketType, { trigger = 'MANUAL_RECALCUL
     trigger,
     version: '2.0-shadow',
   }
+
+  // Capability #15.5, Section 3 — applied LAST, after every other
+  // computation, so an active override can never be silently bypassed by
+  // any upstream branch. Canonical fit/opportunity/confidence remain
+  // exactly as computed above (Section 1 — override never corrupts them);
+  // only the operational recommendation changes.
+  return applyHumanOverride(lead, decision)
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Loop / duplicate-write protection (Section 16). A caller writing
+// decision_v2 back to the same lead must not treat its OWN write as a new
+// PROPERTY_DATA_UPDATE/CONTACT_ENRICHMENT trigger. Compare a content hash
+// of the fields that actually feed V2 — writing decision_v2 itself touches
+// none of them, so this always resolves false for a self-triggered write.
+// ══════════════════════════════════════════════════════════════════════
+const DECISION_INPUT_FIELDS = ['asking_price', 'list_price', 'property_type', 'bedrooms', 'bathrooms', 'sqft', 'zip_code', 'year_built', 'lot_size_sqft', 'arv', 'renovation_cost', 'rent_estimate', 'status']
+export function decisionInputHash(lead) {
+  const relevant = Object.fromEntries(DECISION_INPUT_FIELDS.map(f => [f, lead[f] ?? null]))
+  relevant.distress_data = JSON.stringify(lead.distress_data || {})
+  relevant.phone = lead.phone || null
+  relevant.email = lead.email || null
+  return JSON.stringify(relevant)
 }
 
 // ══════════════════════════════════════════════════════════════════════

@@ -42,7 +42,13 @@ const HARD_REJECT_TYPE_PATTERNS = [
   { re: /\btown ?home\b|\btownhouse\b/i, reason: 'Townhouse' },
   { re: /\bapartment\b/i, reason: 'Apartment' },
   { re: /\bcommercial\b/i, reason: 'Commercial property' },
-  { re: /\bland[- ]?only\b|\bvacant lot\b|\bunimproved land\b/i, reason: 'Land only' },
+  // Capability #15.5 real finding — same bug class as the #11 townhouse
+  // fix: normalizePropertyType() (batchdata-enrich.mjs/enrich-lead.mjs)
+  // produces the bare short value 'land' for any land/lot listing, which
+  // never matched "land only"/"land-only". Confirmed live: 8849 S Old
+  // Kings Rd (property_type='land') was returning FIT. Widened to match
+  // the bare normalized value too.
+  { re: /\bland[- ]?only\b|\bvacant lot\b|\bunimproved land\b|^land$/i, reason: 'Land only' },
   { re: /\bmanufactured home\b|\bmobile home\b/i, reason: 'Manufactured/mobile home' },
 ]
 
