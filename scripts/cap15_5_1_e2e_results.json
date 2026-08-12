@@ -1,0 +1,271 @@
+{
+  "llmCalls": 0,
+  "tests": [
+    {
+      "name": "ASKING_PRICE_CHANGE",
+      "triggered": true,
+      "trigger": "PRICE_CHANGE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "ASKING_PRICE_RESTORE",
+      "triggered": true,
+      "trigger": "PRICE_CHANGE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "RENOVATION_UNKNOWN_TO_KNOWN",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "FLIP"
+      }
+    },
+    {
+      "name": "RENOVATION_CHANGE",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "FLIP"
+      },
+      "after": {
+        "opp": 43,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "MONITOR",
+        "strategy": "FLIP"
+      }
+    },
+    {
+      "name": "RENOVATION_RESTORE_TO_UNKNOWN",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 43,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "MONITOR",
+        "strategy": "FLIP"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "ARV_CHANGE",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "ARV_RESTORE",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "RENT_UNKNOWN_TO_KNOWN_BRRRR",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "FLIP"
+      },
+      "after": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "BOTH"
+      }
+    },
+    {
+      "name": "RENT_CHANGE",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "BOTH"
+      },
+      "after": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "BOTH"
+      }
+    },
+    {
+      "name": "RENT_RESTORE_TO_UNKNOWN",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 47,
+        "conf": 85,
+        "fit": "FIT",
+        "rec": "REVIEW_TODAY",
+        "strategy": "BOTH"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "PROPERTY_TYPE_TO_EXCLUDED",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "NOT_FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "PROPERTY_TYPE_RESTORE",
+      "triggered": true,
+      "trigger": "PROPERTY_DATA_UPDATE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "NOT_FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "STATUS_CHANGE_TO_FOLLOWUP",
+      "triggered": true,
+      "trigger": "STATUS_CHANGE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "FOLLOW_UP",
+        "strategy": "UNKNOWN"
+      }
+    },
+    {
+      "name": "STATUS_RESTORE",
+      "triggered": true,
+      "trigger": "STATUS_CHANGE",
+      "before": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "FOLLOW_UP",
+        "strategy": "UNKNOWN"
+      },
+      "after": {
+        "opp": 15,
+        "conf": 65,
+        "fit": "FIT",
+        "rec": "PASS",
+        "strategy": "UNKNOWN"
+      }
+    }
+  ]
+}

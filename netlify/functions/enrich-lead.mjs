@@ -99,6 +99,9 @@ function normalizePropertyType(raw) {
   if (s.includes('multi') || s.includes('duplex') || s.includes('triplex') || s.includes('quad')) return 'multi_family'
   if (s.includes('condo')) return 'condo'
   if (s.includes('town')) return 'townhouse'
+  // Capability #15.5.1 fix — see batchdata-enrich.mjs's normalizePropertyType()
+  // for the full explanation (manufactured/mobile had no branch at all).
+  if (s.includes('manufactured') || s.includes('mobile home') || s.includes('mobile')) return 'manufactured_home'
   if (s.includes('land') || s.includes('lot')) return 'land'
   if (s.includes('commerc')) return 'commercial'
   return 'other'

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 import { logChanges } from '../lib/activityLogger'
 import { calculateMAO } from '../lib/calculations'
 import { fireLeadNotifications, fireLeadNotification } from '../lib/leadNotifications'
+import { maybeRecalculateDecisionV2 } from '../lib/decisionV2Persistence'
 
 export function useLeadUpdate(lead, userId, members, onUpdated) {
   return async function update(patch) {
@@ -53,6 +54,15 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
       }
 
       onUpdated?.(updated)
+
+      // Capability #15.5.1, Section 5 — deterministic V2 recalculation on
+      // every real structured edit through the ONE hook every field edit
+      // in the app already goes through. shouldTriggerV2Recalc() (#15.2)
+      // decides whether this specific patch actually matters (asking_price/
+      // arv/renovation_cost/rent_estimate/zip_code/property_type/bedrooms/
+      // bathrooms/sqft/status/etc.) — never fires for cosmetic fields, never
+      // calls an LLM. Fire-and-forget: never delays the UI update.
+      maybeRecalculateDecisionV2(supabase, lead, updated).catch(() => {})
     }
     return updated
   }

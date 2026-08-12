@@ -49,7 +49,10 @@ const HARD_REJECT_TYPE_PATTERNS = [
   // Kings Rd (property_type='land') was returning FIT. Widened to match
   // the bare normalized value too.
   { re: /\bland[- ]?only\b|\bvacant lot\b|\bunimproved land\b|^land$/i, reason: 'Land only' },
-  { re: /\bmanufactured home\b|\bmobile home\b/i, reason: 'Manufactured/mobile home' },
+  // Capability #15.5.1 — widened to also match the normalized short value
+  // 'manufactured_home' now produced by normalizePropertyType() (which
+  // previously had no branch for this at all — see batchdata-enrich.mjs).
+  { re: /\bmanufactured home\b|\bmobile home\b|^manufactured_home$/i, reason: 'Manufactured/mobile home' },
 ]
 
 export function hardTypeReject(propertyType) {

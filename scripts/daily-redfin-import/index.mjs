@@ -7,11 +7,15 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { google } from 'googleapis'
 import 'dotenv/config'
+// Capability #15.5.1 — this script writes leads directly via raw REST
+// (sbPost), bypassing src/lib/leadImport.js entirely, so it needs its own
+// explicit V2 recalculation call after insert. Pure JS, no browser deps.
+import { computeDecisionV2 } from '../../src/lib/decisionEngineV2.js'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const SUPABASE_PAT = process.env.SUPABASE_PAT || 'sbp_05434f76c664e2ed394f7e128cd22eb78058bcc1'
-const SUPABASE_PROJECT_REF = 'pyrgotfotmwazigewlke'
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://pyrgotfotmwazigewlke.supabase.co'
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const WORKSPACE_ID = 'd854b1e3-b174-45f7-b11d-1b92d8e7b87d'
 const SUMMARY_RECIPIENTS = ['tom@hatinvestors.com', 'hemi@hatinvestors.com']
 
@@ -65,25 +69,31 @@ async function lookupZip(address) {
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 
-async function supabaseQuery(query) {
-  const r = await fetch(`https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${SUPABASE_PAT}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
-  })
+function sbHeaders() {
+  return {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  }
+}
+
+async function sbGet(path) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: sbHeaders() })
   const text = await r.text()
-  if (!r.ok) throw new Error(`Supabase error ${r.status}: ${text}`)
+  if (!r.ok) throw new Error(`Supabase GET error ${r.status}: ${text}`)
   try { return JSON.parse(text) } catch { return [] }
 }
 
-function sqlStr(v) {
-  if (v == null) return 'NULL'
-  return `'${String(v).replace(/'/g, "''")}'`
-}
-function sqlNum(v) {
-  if (v == null) return 'NULL'
-  const n = Number(v)
-  return isNaN(n) ? 'NULL' : String(n)
+async function sbPost(table, body) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: sbHeaders(),
+    body: JSON.stringify(body),
+  })
+  const text = await r.text()
+  if (!r.ok) throw new Error(`Supabase POST error ${r.status}: ${text}`)
+  try { return JSON.parse(text) } catch { return [] }
 }
 
 // Normalize address for dedup — handles "Lane" vs "Ln", "Street" vs "St", etc.
@@ -103,26 +113,16 @@ function normalizeAddress(addr) {
 }
 
 async function addressExists(address) {
-  // Strategy 1: exact match (fast)
-  const exact = await supabaseQuery(`
-    SELECT id FROM public.leads
-    WHERE workspace_id = ${sqlStr(WORKSPACE_ID)}
-    AND LOWER(REGEXP_REPLACE(address, '[.,#]', '', 'g')) = LOWER(REGEXP_REPLACE(${sqlStr(address)}, '[.,#]', '', 'g'))
-    LIMIT 1
-  `)
+  const wsFilter = `workspace_id=eq.${WORKSPACE_ID}`
+  // Strategy 1: exact ilike match
+  const exact = await sbGet(`leads?${wsFilter}&address=ilike.${encodeURIComponent(address)}&select=id&limit=1`)
   if (exact.length > 0) return true
 
-  // Strategy 2: match on house number + first word of street name (catches Ln vs Lane, St vs Street)
+  // Strategy 2: house number + first street word (catches Ln vs Lane, St vs Street)
   const parts = address.trim().split(/\s+/)
   if (parts.length >= 2) {
-    const houseNum = parts[0]       // e.g. "8456"
-    const streetWord = parts[1]     // e.g. "Boysenberry"
-    const fuzzy = await supabaseQuery(`
-      SELECT id FROM public.leads
-      WHERE workspace_id = ${sqlStr(WORKSPACE_ID)}
-      AND address ILIKE ${sqlStr(houseNum + ' ' + streetWord + '%')}
-      LIMIT 1
-    `)
+    const prefix = `${parts[0]} ${parts[1]}`
+    const fuzzy = await sbGet(`leads?${wsFilter}&address=ilike.${encodeURIComponent(prefix + '*')}&select=id&limit=1`)
     if (fuzzy.length > 0) return true
   }
 
@@ -131,25 +131,58 @@ async function addressExists(address) {
 
 async function insertLead(lead) {
   const now = new Date().toISOString()
-  return supabaseQuery(`
-    INSERT INTO public.leads
-      (workspace_id, address, city, state, zip_code, property_type,
-       bedrooms, bathrooms, sqft, asking_price, list_price,
-       lead_source, redfin_trigger_type, status, auto_imported,
-       mls_status, is_hot, notes,
-       listing_agent_name, listing_agent_phone, listing_agent_email,
-       assigned_to, created_at, updated_at)
-    VALUES (
-      ${sqlStr(WORKSPACE_ID)}, ${sqlStr(lead.address)}, 'Jacksonville', 'FL', ${sqlStr(lead.zip_code)},
-      'single_family', ${sqlNum(lead.bedrooms)}, ${sqlNum(lead.bathrooms)}, ${sqlNum(lead.sqft)},
-      ${sqlNum(lead.asking_price)}, ${sqlNum(lead.list_price)},
-      'redfin_auto', ${sqlStr(lead.redfin_trigger_type)}, 'triage', true, 'active',
-      ${lead.is_hot ? 'true' : 'false'}, ${sqlStr(lead.notes)},
-      ${sqlStr(lead.listing_agent_name)}, ${sqlStr(lead.listing_agent_phone)}, ${sqlStr(lead.listing_agent_email)},
-      '6d551c7a-6191-4f33-9d48-e7fd3a985fad', ${sqlStr(now)}, ${sqlStr(now)}
-    )
-    RETURNING id, address
-  `)
+  const row = {
+    workspace_id: WORKSPACE_ID,
+    address: lead.address,
+    city: 'Jacksonville',
+    state: 'FL',
+    zip_code: lead.zip_code || null,
+    property_type: 'single_family',
+    bedrooms: lead.bedrooms || null,
+    bathrooms: lead.bathrooms || null,
+    sqft: lead.sqft || null,
+    asking_price: lead.asking_price || null,
+    list_price: lead.list_price || null,
+    lead_source: 'redfin_auto',
+    redfin_trigger_type: lead.redfin_trigger_type || null,
+    status: 'triage',
+    auto_imported: true,
+    mls_status: 'active',
+    is_hot: lead.is_hot || false,
+    notes: lead.notes || null,
+    listing_agent_name: lead.listing_agent_name || null,
+    listing_agent_phone: lead.listing_agent_phone || null,
+    listing_agent_email: lead.listing_agent_email || null,
+    assigned_to: '6d551c7a-6191-4f33-9d48-e7fd3a985fad',
+    created_at: now,
+    updated_at: now,
+  }
+  const created = await sbPost('leads', row)
+  await recalculateDecisionV2ForNewLead(created?.[0])
+  return created
+}
+
+// Capability #15.5.1 — Section 4: trigger deterministic V2 immediately on
+// ingestion, never delayed waiting for AI. Never blocks/fails the real
+// insert above (already returned) — errors here are caught and logged
+// only, including the expected "column does not exist" case until the
+// #15.2/#15.5 migrations are applied.
+async function recalculateDecisionV2ForNewLead(lead) {
+  if (!lead?.id) return
+  try {
+    const decision = computeDecisionV2(lead, 'on_market', { trigger: 'NEW_LEAD' })
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.${lead.id}`, {
+      method: 'PATCH',
+      headers: sbHeaders(),
+      body: JSON.stringify({ decision_v2: decision, decision_v2_updated_at: decision.calculated_at }),
+    })
+    if (!r.ok) {
+      const text = await r.text()
+      if (!/decision_v2/i.test(text)) console.warn('[daily-redfin-import] V2 write failed (non-fatal):', text)
+    }
+  } catch (err) {
+    console.warn('[daily-redfin-import] V2 recalculation failed (non-fatal):', err.message)
+  }
 }
 
 // ─── Gmail ────────────────────────────────────────────────────────────────────

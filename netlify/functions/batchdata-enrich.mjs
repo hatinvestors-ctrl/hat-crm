@@ -182,6 +182,15 @@ function normalizePropertyType(raw) {
   if (s.includes('multi') || s.includes('duplex') || s.includes('triplex') || s.includes('quad')) return 'multi_family'
   if (s.includes('condo')) return 'condo'
   if (s.includes('town')) return 'townhouse'
+  // Capability #15.5.1 real finding — manufactured/mobile homes had NO
+  // branch here at all, so they silently fell through to 'other' (which
+  // buyBox.js treats as FIT), directly violating HAT's own documented
+  // hard-skip list (hat-ai-agents/.claude/agents/crm-agent.md: "manufactured/
+  // mobile home (unless enabled)"). The raw text never reached buyBox.js's
+  // hard-reject regex because only this NORMALIZED short value is passed
+  // to it downstream — same bug class as the #15.3 townhouse and #15.5 land
+  // fixes.
+  if (s.includes('manufactured') || s.includes('mobile home') || s.includes('mobile')) return 'manufactured_home'
   if (s.includes('land') || s.includes('lot')) return 'land'
   if (s.includes('commerc')) return 'commercial'
   return 'other'

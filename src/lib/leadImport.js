@@ -24,6 +24,7 @@ import { supabase } from './supabase'
 import { normalizeAddressForDB } from './leadDedup'
 import { recordPropertyEvent, evaluateAndRecordRediscovery } from './propertyIntelligence'
 import { logLeadCreated } from './activityLogger'
+import { recalculateDecisionV2 } from './decisionV2Persistence'
 
 // ── NormalizedLead contract ────────────────────────────────────────────
 // This is the ONE documented shape every future source's Extract+Normalize
@@ -229,6 +230,11 @@ export async function importLead(normalizedLead, options) {
       profit: null,
     },
   })
+
+  // Capability #15.5.1, Section 4 — deterministic V2 immediately on
+  // ingestion, never delayed waiting for AI. Never blocks/fails the
+  // import above (already inserted and returned regardless).
+  recalculateDecisionV2(supabase, created, 'NEW_LEAD').catch(() => {})
 
   return { created: true, leadId: created.id, status: 'created', propertyId, lead: created }
 }
