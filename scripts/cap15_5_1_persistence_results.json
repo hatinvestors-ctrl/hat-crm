@@ -1,0 +1,83 @@
+{
+  "creation": {
+    "written": true,
+    "updated_at": "2026-08-12T23:10:04.167+00:00",
+    "opp": 15,
+    "fit": "FIT"
+  },
+  "asking_price_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 15,
+    "conf": 65,
+    "fit": "FIT",
+    "rec": "PASS",
+    "strategy": "UNKNOWN"
+  },
+  "arv_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 15,
+    "conf": 65,
+    "fit": "FIT",
+    "rec": "PASS",
+    "strategy": "UNKNOWN"
+  },
+  "renovation_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 62,
+    "conf": 85,
+    "fit": "FIT",
+    "rec": "REVIEW_TODAY",
+    "strategy": "FLIP"
+  },
+  "rent_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 62,
+    "conf": 85,
+    "fit": "FIT",
+    "rec": "REVIEW_TODAY",
+    "strategy": "BOTH"
+  },
+  "zip_property_type_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 62,
+    "conf": 85,
+    "fit": "NOT_FIT",
+    "rec": "MONITOR",
+    "strategy": "BOTH"
+  },
+  "status_update": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 62,
+    "conf": 85,
+    "fit": "FIT",
+    "rec": "FOLLOW_UP",
+    "strategy": "BOTH"
+  },
+  "distress_update_simulated": {
+    "written": true,
+    "updated_at_changed": true,
+    "opp": 62,
+    "conf": 85,
+    "fit": "FIT",
+    "rec": "REVIEW_TODAY",
+    "strategy": "BOTH"
+  },
+  "human_override_apply": {
+    "fit_unchanged": true,
+    "opp_unchanged": true,
+    "recommendation_is_pass": true,
+    "next_action": "HUMAN_OVERRIDE"
+  },
+  "human_override_remove": {
+    "recommendation_restored": true,
+    "recommendation": "REVIEW_TODAY",
+    "matches_pre_override": true
+  },
+  "cleanup_verified": true
+}

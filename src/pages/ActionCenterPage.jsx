@@ -23,6 +23,7 @@ import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
 import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo } from '../lib/distressInfo'
 import { isContactReady } from '../lib/contactEnrichment'
+import { isV2ActionCenter } from '../lib/featureFlags'
 
 const CATEGORY_META = {
   ACT_NOW:           { icon: '🔥', label: 'Act Now',            theme: PRIORITY_THEME.HOT },
@@ -129,6 +130,61 @@ function classifyLead(lead, rediscovery) {
     followUpStatus: category === 'FOLLOW_UP' ? lead.status : null,
     // #5.1 quick filters — existing field, passed through as-is, not recalculated.
     strategy: lead.deal_analysis?.strategy ?? null,
+  }
+}
+
+// Capability #15.5.1 closure — V2 read path. Produces the EXACT SAME item
+// shape classifyLead() does (same field names) so every render/sort
+// function below works completely unchanged — this is a read-source swap
+// only, never a UI change. On-market and off-market both read
+// lead.decision_v2 and land in the SAME buckets (Section: "source should
+// not control priority") — the old OFF_MARKET-only bucket is retired
+// under V2; a distressed lead with a strong decision now competes for
+// ACT_NOW/REVIEW_TODAY/FOLLOW_UP exactly like an on-market one.
+//
+// MONITOR and PASS recommendations (including an active Human Override,
+// which always resolves to PASS) are excluded from the active worklist
+// entirely — consistent with V1's own behavior today (a WATCH-tier lead
+// isn't shown as any bucket either). No stored decision yet (migration
+// just applied, historical leads haven't been touched) falls back to null
+// — never invents a decision.
+const V2_RECOMMENDATION_TO_CATEGORY = {
+  ACT_NOW: 'ACT_NOW',
+  REVIEW_TODAY: 'REVIEW_TODAY',
+  RESEARCH: 'REVIEW_TODAY', // folded in — no new bucket/UI section added
+  FOLLOW_UP: 'FOLLOW_UP',
+}
+const NEXT_ACTION_LABELS = {
+  SEND_OFFER: 'Send Offer', CALL_AGENT: 'Call Agent', CONTACT_OWNER: 'Contact Owner',
+  VERIFY_ARV: 'Verify ARV', VERIFY_CONDITION: 'Verify Condition', RESEARCH_OWNER: 'Research Owner',
+  VERIFY_OWNER: 'Verify Owner', FOLLOW_UP: 'Follow Up', WAIT_FOR_PRICE_DROP: 'Wait for Price Drop',
+  MONITOR_PROPERTY: 'Monitor Property', VERIFY_FLOOD_RISK: 'Verify Flood Risk', VERIFY_TITLE: 'Verify Title',
+  HUMAN_OVERRIDE: 'Human Override — Do Not Pursue', PASS: 'Pass',
+}
+
+function classifyLeadV2(lead) {
+  const d = lead.decision_v2
+  if (!d) return null
+  const category = V2_RECOMMENDATION_TO_CATEGORY[d.recommendation]
+  if (!category) return null // MONITOR / PASS / Human Override — not an active task
+
+  const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
+  if (category === 'FOLLOW_UP' && isToday(lead.updated_at)) return null
+
+  return {
+    category,
+    lead,
+    decision: d.recommendation.replace(/_/g, ' '),
+    nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
+    distressed: false, // always renders the generic (non-OFF_MARKET) card layout — see ActionCard
+    opportunity: null,
+    expectedProfit: lead.deal_analysis?.profit ?? null,
+    maxOffer: lead.mao ?? null,
+    reason: d.why?.[0] || null,
+    score: d.opportunity?.score ?? null,
+    rediscoveredAt: null,
+    followUpStatus: category === 'FOLLOW_UP' ? lead.status : null,
+    strategy: d.strategy ?? lead.deal_analysis?.strategy ?? null,
   }
 }
 
@@ -292,7 +348,7 @@ export default function ActionCenterPage() {
 
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email')
+        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email, decision_v2, acquisition_override')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
@@ -324,7 +380,7 @@ export default function ActionCenterPage() {
       }
 
       const classified = (leads || [])
-        .map(lead => classifyLead(lead, rediscoveryByLead[lead.id]))
+        .map(lead => isV2ActionCenter ? classifyLeadV2(lead) : classifyLead(lead, rediscoveryByLead[lead.id]))
         .filter(Boolean)
 
       if (!cancelled) {
