@@ -41,11 +41,34 @@ export function computeFit(propertyDecisionData) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Legacy Buy Box compatibility layer (Section 8/9, Capability #15.2).
-// lead.status='not_in_buy_box' is evidence from a SEPARATE authority (the
-// external on-market ingestion agent, hat-ai-agents repo — out of this
-// repo's reach) — it is preserved, never removed, and compared against
-// the canonical result rather than trusted or discarded blindly.
+// Legacy Buy Box compatibility layer (Section 8/9, Capability #15.2/#15.3).
+//
+// Capability #15.3 ROOT-CAUSE FINDING — traced the actual hat-ai-agents
+// source (lib/acquisition-engine.mjs + .claude/agents/crm-agent.md), not
+// inferred from stored statuses. Two real facts, confirmed from that repo:
+//
+// 1. The DETERMINISTIC engine's hard property-fit rejects (blocked ZIP,
+//    condo/townhome/apartment/commercial/land/manufactured home) are
+//    ALREADY functionally identical to src/lib/buyBox.js's rules — both
+//    were mirrored from the same source, and #15.3 synced the one real
+//    drift found (townhome-only regex not matching "townhouse", already
+//    fixed here in Capability #11) back into hat-ai-agents.
+// 2. `lead.status='not_in_buy_box'` is NOT written by that deterministic
+//    engine at all. crm-agent.md, verbatim: "Flag as `not_in_buy_box`
+//    only after Tomer reviews in Inbox — do not auto-set this on import."
+//    It is a MANUAL, human/AI-assisted triage judgment applied after
+//    insertion — which can legitimately be based on information no
+//    property-fit engine can see (photos, agent conversation, asking
+//    price judgment, portfolio concentration, deal economics) — not a
+//    second automated Buy Box authority.
+//
+// So the 0/6 agreement found in #15.2 was never "rule engine A disagrees
+// with rule engine B." It's "a deterministic property-fit re-derivation
+// disagrees with a one-time human workflow decision whose actual reasoning
+// was never captured in any field this engine (or that one) can read."
+// That is exactly why this layer preserves legacy status as HISTORICAL
+// EVIDENCE rather than a competing authority (Section 6/18) — it is real
+// signal (a human looked at this and passed), just not a Buy Box fact.
 // ══════════════════════════════════════════════════════════════════════
 export function compareLegacyBuyBox(lead, canonicalFit) {
   const legacyStatus = lead.status === 'not_in_buy_box' ? 'NOT_FIT' : null
@@ -54,8 +77,8 @@ export function compareLegacyBuyBox(lead, canonicalFit) {
   const conflict = legacyStatus !== canonicalFit.status
   let reason = null
   if (conflict) {
-    if (canonicalFit.missing?.length) reason = `Canonical Buy Box lacks data ingestion had at import time (missing: ${canonicalFit.missing.join(', ')}) — cannot confirm ingestion's exclusion was wrong`
-    else if (canonicalFit.status === 'FIT' || canonicalFit.status === 'POSSIBLE_FIT') reason = 'Ingestion-time exclusion no longer reproduces from currently stored ZIP/property type — likely stale ingestion decision, property data drift since import, or a real rule difference between the external ingestion agent and src/lib/buyBox.js'
+    if (canonicalFit.missing?.length) reason = `Canonical Buy Box lacks data this lead has (missing: ${canonicalFit.missing.join(', ')}) — cannot confirm the manual review was wrong`
+    else reason = '"not_in_buy_box" is a manual workflow judgment applied during Kevin/Tomer\'s Inbox review (see hat-ai-agents/.claude/agents/crm-agent.md), not an automated property-fit rule — it may reflect deal economics, condition, or judgment the canonical property-only Buy Box structurally cannot see. Treat as evidence to review, not as proof the canonical FIT is wrong.'
   }
   return { legacy_ingestion_buy_box_status: legacyStatus, buy_box_conflict: conflict, conflict_reason: reason }
 }

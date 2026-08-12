@@ -1065,22 +1065,22 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
-      {/* Capability #15.1 — Phase 1 fix. Audit #15 found real leads scoring
-          89/100 "MAKE OFFER" while lead.status already said
-          'not_in_buy_box' (set by the on-market ingestion agent at import
-          time) — Deal Score never consults that status, so the
-          contradiction was invisible to Kevin. This does NOT touch the V1
-          score/verdict below (still shown exactly as-is, per the mission's
-          "do not silently rewrite historical scores"); it just makes the
-          Buy Box failure impossible to miss, placed first, above
-          everything else. */}
+      {/* Capability #15.1 — Phase 1 fix, copy corrected in #15.3. Audit #15
+          found real leads scoring 89/100 "MAKE OFFER" while lead.status
+          already said 'not_in_buy_box' — Deal Score never consults that
+          status, so the contradiction was invisible to Kevin. #15.3 traced
+          the actual hat-ai-agents source and found `not_in_buy_box` is a
+          MANUAL reviewer judgment applied in Inbox (crm-agent.md: "do not
+          auto-set this on import") — not an automated geography/type rule
+          the way the original #15.1 copy implied. Wording updated to match
+          that reality. Still doesn't touch the V1 score/verdict below. */}
       {lead.status === 'not_in_buy_box' && (
         <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border-2" style={{ borderColor: 'var(--color-danger)', background: 'var(--color-danger-soft)' }}>
           <span className="text-[16px] leading-none">🚫</span>
           <div>
-            <div className="text-[13px] font-extrabold text-[color:var(--color-danger-text)]">BUY BOX: NOT FIT</div>
+            <div className="text-[13px] font-extrabold text-[color:var(--color-danger-text)]">MARKED NOT IN BUY BOX</div>
             <div className="text-[11.5px] text-[color:var(--color-danger-text)] opacity-90">
-              This property failed HAT's Buy Box (geography/property type) at import. Any verdict or score below reflects deal economics only — it does not mean HAT currently buys this type of property here.
+              A reviewer previously marked this property as not fitting HAT's criteria. Any verdict or score below reflects deal economics only and does not know about this decision — check the original reasoning before acting on a high score.
             </div>
           </div>
         </div>
