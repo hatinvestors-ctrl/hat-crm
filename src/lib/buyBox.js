@@ -107,3 +107,36 @@ export function qualifyBuyBox(p) {
   }
   return { fit: 'POSSIBLE_FIT', reasons }
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// Capability #15.2 — CANONICAL Buy Box entry point (Section 7). This is
+// the ONE function Decision Engine V2 calls for both on-market and
+// off-market leads. It does not replace qualifyBuyBox() above (every
+// existing caller — netlify/functions/batchdata-enrich.mjs — keeps
+// calling that exact function, unchanged, so nothing already in
+// production is touched) — it wraps it with the canonical
+// property-decision-data resolver's missing/conflicts, and normalizes
+// the output shape to {status, reasons, missing, conflicts} per the
+// mission's Section 10 contract. No numeric fit score is introduced.
+//
+// acquisitionProfile is accepted but unused today — HAT is the only
+// profile that exists; the parameter exists so this signature doesn't
+// need to change again when a second profile becomes real (Section 7:
+// "do not build multi-tenant SaaS yet, but avoid embedding source-
+// specific logic").
+// ══════════════════════════════════════════════════════════════════════
+export function qualifyBuyBoxCanonical(propertyDecisionData, acquisitionProfile = 'HAT') {
+  const result = qualifyBuyBox({
+    zip_code: propertyDecisionData.zip,
+    property_type: propertyDecisionData.property_type,
+    bedrooms: propertyDecisionData.bedrooms,
+  })
+  const relevantMissing = ['zip', 'property_type'].filter(f => propertyDecisionData.missing?.includes(f))
+  const relevantConflicts = (propertyDecisionData.conflicts || []).filter(c => c.field === 'zip' || c.field === 'property_type')
+  return {
+    status: result.fit,
+    reasons: result.reasons,
+    missing: relevantMissing,
+    conflicts: relevantConflicts,
+  }
+}

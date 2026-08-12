@@ -20,6 +20,12 @@ import { buildStrongestIdentity, formatStreetWithUnit, parseUnitAwareAddress } f
 import { batchDataPreflight } from '../../src/lib/batchDataPreflight.js'
 import { deriveBatchDataHealth } from '../../src/lib/batchDataHealth.js'
 import { MATCH_TOKEN_OVERLAP_LIKELY, MATCH_TOKEN_OVERLAP_AMBIGUOUS } from '../../src/lib/batchDataConfig.js'
+// Capability #15.2 — event-driven V2 shadow recalculation (Section 15).
+// BatchData enrichment is exactly the "CONTACT_ENRICHMENT"/"PROPERTY_DATA_UPDATE"
+// event this file already fires on completion — the natural, safe trigger
+// point (no new hook needed, no page-load trigger, no extra LLM cost since
+// V2 is fully deterministic).
+import { computeDecisionV2 } from '../../src/lib/decisionEngineV2.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -388,7 +394,28 @@ export default async function handler(req) {
   }
   leadUpdate.enrichment_data.contact_ui_status = uiStatus
 
-  const { error: updErr } = await supabase.from('leads').update(leadUpdate).eq('id', lead.id)
+  // Capability #15.2 — SHADOW ONLY. Computed from the post-enrichment
+  // merged lead so it reflects the same fresh data the response returns.
+  // Never blocks or fails the real (V1) enrichment write below — if the
+  // decision_v2 column doesn't exist yet (migration not yet applied by a
+  // human in Supabase Studio, see delivery report), this silently no-ops
+  // and V1 behavior is completely unaffected.
+  try {
+    const marketType = lead.is_distressed ? 'off_market' : 'on_market'
+    const mergedLeadForV2 = { ...lead, ...leadUpdate }
+    const decisionV2 = computeDecisionV2(mergedLeadForV2, marketType, { trigger: 'CONTACT_ENRICHMENT' })
+    leadUpdate.decision_v2 = decisionV2
+    leadUpdate.decision_v2_updated_at = new Date().toISOString()
+  } catch (v2Err) {
+    console.warn('[batchdata-enrich] V2 shadow computation non-fatal error:', v2Err.message)
+  }
+
+  let { error: updErr } = await supabase.from('leads').update(leadUpdate).eq('id', lead.id)
+  if (updErr && /decision_v2/i.test(updErr.message || '')) {
+    // decision_v2 column not migrated yet — retry without it so V1 is never blocked.
+    const { decision_v2, decision_v2_updated_at, ...v1Only } = leadUpdate
+    ;({ error: updErr } = await supabase.from('leads').update(v1Only).eq('id', lead.id))
+  }
   if (updErr) return json(500, { ok: false, error: `DB update failed: ${updErr.message}` })
 
   return json(200, {

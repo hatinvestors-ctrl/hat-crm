@@ -20,24 +20,44 @@
 // BRRRR refi rate: 6.7%                              (src/lib/dealCalculations.js default refi_interest_rate — the AI prompt's "6.875%" is documented audit drift, not adopted here)
 // HML carry costs: 2% points + $1,500 fees + 12%/yr x avg hold months (generate-core-analysis.mjs's own PRE-COMPUTED — not AI-invented — JS block; no other deterministic HML model exists in the codebase, adopted as-is)
 
-import { qualifyBuyBox } from './buyBox.js'
+import { qualifyBuyBox, qualifyBuyBoxCanonical } from './buyBox.js'
 import { calculateMAO, calculateFlipProfitAtPrice } from './calculations.js'
 import { classifyDistress, classifyLienStrength } from './distressScoring.js'
+import { getPropertyDecisionData } from './propertyDecisionData.js'
 
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v))
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 // ══════════════════════════════════════════════════════════════════════
-// 1. FIT — ONE shared Buy Box standard for both market types (Section 5).
-// No artificial 0-100 score; reuses the existing semantic buyBox.js output.
+// 1. FIT — ONE canonical Buy Box standard for both market types (Section
+// 5/7, Capability #15.2). Reuses the existing semantic buyBox.js output
+// via qualifyBuyBoxCanonical(), fed by getPropertyDecisionData() — the one
+// resolver, instead of each caller independently guessing where
+// property_type/zip actually live this time.
 // ══════════════════════════════════════════════════════════════════════
-export function computeFit(property) {
-  const result = qualifyBuyBox({
-    zip_code: property.zip_code,
-    property_type: property.property_type,
-    bedrooms: property.bedrooms,
-  })
-  return { status: result.fit, reasons: result.reasons }
+export function computeFit(propertyDecisionData) {
+  const result = qualifyBuyBoxCanonical(propertyDecisionData)
+  return { status: result.status, reasons: result.reasons, missing: result.missing, conflicts: result.conflicts }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Legacy Buy Box compatibility layer (Section 8/9, Capability #15.2).
+// lead.status='not_in_buy_box' is evidence from a SEPARATE authority (the
+// external on-market ingestion agent, hat-ai-agents repo — out of this
+// repo's reach) — it is preserved, never removed, and compared against
+// the canonical result rather than trusted or discarded blindly.
+// ══════════════════════════════════════════════════════════════════════
+export function compareLegacyBuyBox(lead, canonicalFit) {
+  const legacyStatus = lead.status === 'not_in_buy_box' ? 'NOT_FIT' : null
+  if (legacyStatus === null) return { legacy_ingestion_buy_box_status: null, buy_box_conflict: false, conflict_reason: null }
+
+  const conflict = legacyStatus !== canonicalFit.status
+  let reason = null
+  if (conflict) {
+    if (canonicalFit.missing?.length) reason = `Canonical Buy Box lacks data ingestion had at import time (missing: ${canonicalFit.missing.join(', ')}) — cannot confirm ingestion's exclusion was wrong`
+    else if (canonicalFit.status === 'FIT' || canonicalFit.status === 'POSSIBLE_FIT') reason = 'Ingestion-time exclusion no longer reproduces from currently stored ZIP/property type — likely stale ingestion decision, property data drift since import, or a real rule difference between the external ingestion agent and src/lib/buyBox.js'
+  }
+  return { legacy_ingestion_buy_box_status: legacyStatus, buy_box_conflict: conflict, conflict_reason: reason }
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -177,10 +197,11 @@ export function computeOnMarketOpportunity(lead) {
 // an explicit, capped, explained bonus (Section 11) instead of an
 // emergent side effect.
 // ══════════════════════════════════════════════════════════════════════
-export function computeOffMarketOpportunity(lead) {
+export function computeOffMarketOpportunity(lead, pdd) {
   const reasons = []
   const dd = lead.distress_data || {}
   const e = lead.enrichment_data || {}
+  pdd = pdd || getPropertyDecisionData(lead)
 
   const { distress_category } = classifyDistress({ filer: dd.source_party || '' })
   const category = dd.distress_category || distress_category || 'UNKNOWN'
@@ -225,11 +246,13 @@ export function computeOffMarketOpportunity(lead) {
   if (signalCount >= 2 || hasCorroboratingHistory) { multiSignal = 10; reasons.push('Corroborated by multiple independent signals') }
   multiSignal = clamp(multiSignal, 0, 15)
 
-  // Data completeness — small, capped.
+  // Data completeness — small, capped. Reads the CANONICAL resolver
+  // (Capability #15.2), not enrichment_data directly — see propertyDecisionData.js
+  // header for why that was the root cause of #15.1's stale-data findings.
   let completeness = 0
-  if (lead.zip_code) completeness += 3
-  if (e.property_type) completeness += 4
-  if (e.year_built || e.living_area) completeness += 3
+  if (pdd.zip) completeness += 3
+  if (pdd.property_type) completeness += 4
+  if (pdd.year_built || pdd.sqft) completeness += 3
   completeness = clamp(completeness, 0, 10)
 
   const score = clamp(distressQuality + identityOwner + absentee + contact + multiSignal + completeness, 0, 100)
@@ -239,17 +262,18 @@ export function computeOffMarketOpportunity(lead) {
 // ══════════════════════════════════════════════════════════════════════
 // 5. CONFIDENCE (0-100) — Section 12. Evidence QUALITY, never deal quality.
 // ══════════════════════════════════════════════════════════════════════
-export function computeConfidence(lead, marketType) {
+export function computeConfidence(lead, marketType, pdd) {
   const reasons = []
   const missing = []
   let score = 0
+  pdd = pdd || getPropertyDecisionData(lead)
 
   if (marketType === 'on_market') {
-    if (lead.arv) { score += 25; reasons.push('ARV on file') } else missing.push('ARV unknown')
-    if (lead.asking_price) { score += 20; reasons.push('Asking price known') } else missing.push('Asking price unknown')
-    if (lead.renovation_cost != null) { score += 20; reasons.push('Renovation estimate on file') } else missing.push('Renovation cost unknown')
-    if (lead.sqft && lead.bedrooms && lead.bathrooms) { score += 15; reasons.push('Property characteristics complete') } else missing.push('Property characteristics incomplete')
-    if (lead.zip_code) score += 10
+    if (pdd.arv) { score += 25; reasons.push('ARV on file') } else missing.push('ARV unknown')
+    if (pdd.asking_price) { score += 20; reasons.push('Asking price known') } else missing.push('Asking price unknown')
+    if (pdd.renovation != null) { score += 20; reasons.push('Renovation estimate on file') } else missing.push('Renovation cost unknown')
+    if (pdd.sqft && pdd.bedrooms && pdd.bathrooms) { score += 15; reasons.push('Property characteristics complete') } else missing.push('Property characteristics incomplete')
+    if (pdd.zip) score += 10
     const ageDays = lead.created_at ? (Date.now() - new Date(lead.created_at).getTime()) / 86400000 : null
     if (ageDays != null && ageDays < 30) { score += 10; reasons.push('Recently sourced data') } else if (ageDays != null && ageDays > 120) missing.push('Data may be stale (sourced 120+ days ago)')
   } else {
@@ -261,12 +285,13 @@ export function computeConfidence(lead, marketType) {
     else if (ownerMatch === 'POSSIBLE_MATCH' || ownerMatch === 'LIKELY') { score += 12; missing.push('Owner match not fully verified') }
     else missing.push('Owner match unknown')
     if (lead.phone || lead.email) { score += 15; reasons.push('Contact confirmed') } else missing.push('Contact not found')
-    if (e.property_type) { score += 15; reasons.push('Property characteristics known') } else missing.push('Property type unknown')
+    if (pdd.property_type) { score += 15; reasons.push('Property characteristics known') } else missing.push('Property type unknown')
     if (dd.source_reference) score += 10
     if (dd.distress_filing_date) {
       const ageDays = (Date.now() - new Date(dd.distress_filing_date).getTime()) / 86400000
       if (ageDays < 60) { score += 10; reasons.push('Recent filing') } else missing.push('Filing is not recent')
     }
+    if (pdd.conflicts?.some(c => c.field === 'property_type' || c.field === 'zip')) missing.push('Property data conflict detected — see conflicts')
   }
 
   return { score: clamp(Math.round(score), 0, 100), reasons: reasons.slice(0, 5), missing: [...new Set(missing)].slice(0, 5) }
@@ -363,25 +388,25 @@ function buildRisks(fit, confidence) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// TOP-LEVEL — one shared output contract for both market types (Section 4).
+// TOP-LEVEL — one shared output contract for both market types (Section
+// 4), now built entirely on the canonical property-decision-data resolver
+// (Capability #15.2) instead of each sub-function independently guessing
+// where a field lives.
 // ══════════════════════════════════════════════════════════════════════
-export function computeDecisionV2(lead, marketType) {
-  // Off-market leads frequently only carry ZIP inside enrichment_data (the
-  // BatchData/Duval enrichment payload) — leads.zip_code itself is often
-  // never backfilled for these. Fall back so FIT isn't wrongly starved of
-  // known data.
-  const fit = computeFit({
-    zip_code: lead.zip_code || (marketType === 'off_market' ? lead.enrichment_data?.zip_code : null),
-    property_type: marketType === 'on_market' ? lead.property_type : lead.enrichment_data?.property_type,
-    bedrooms: marketType === 'on_market' ? lead.bedrooms : lead.enrichment_data?.bedrooms,
-  })
-  const opportunity = marketType === 'on_market' ? computeOnMarketOpportunity(lead) : computeOffMarketOpportunity(lead)
-  const confidence = computeConfidence(lead, marketType)
+export function computeDecisionV2(lead, marketType, { trigger = 'MANUAL_RECALCULATION' } = {}) {
+  const pdd = getPropertyDecisionData(lead)
+  const fit = computeFit(pdd)
+  const legacyBuyBox = compareLegacyBuyBox(lead, fit)
+  const opportunity = marketType === 'on_market' ? computeOnMarketOpportunity(lead) : computeOffMarketOpportunity(lead, pdd)
+  const confidence = computeConfidence(lead, marketType, pdd)
   const urgency = computeUrgency(lead, marketType)
   const { recommendation, next_best_action } = computeRecommendation({ fit, opportunity, confidence, urgency, status: lead.status, marketType })
 
   return {
     fit,
+    legacy_ingestion_buy_box_status: legacyBuyBox.legacy_ingestion_buy_box_status,
+    buy_box_conflict: legacyBuyBox.buy_box_conflict,
+    buy_box_conflict_reason: legacyBuyBox.conflict_reason,
     opportunity: { score: opportunity.score, reasons: opportunity.reasons },
     confidence,
     urgency,
@@ -389,9 +414,41 @@ export function computeDecisionV2(lead, marketType) {
     next_best_action,
     why: buildWhy(fit, opportunity, confidence, urgency),
     risks_missing: buildRisks(fit, confidence),
+    data_conflicts: pdd.conflicts,
     strategy: marketType === 'on_market' ? opportunity.strategy?.best : null,
     source: marketType === 'on_market' ? (lead.lead_source || 'unknown') : (lead.distress_data?.distress_source || 'unknown'),
     calculated_at: new Date().toISOString(),
-    version: 'v2-shadow',
+    trigger,
+    version: '2.0-shadow',
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// EVENT-DRIVEN SHADOW RECALCULATION TRIGGER (Section 15/18, Capability
+// #15.2). Pure decision function — callers pass old/new lead field
+// snapshots; this never touches the network or DB itself. Deliberately
+// conservative: only fields that can actually change FIT/Opportunity/
+// Confidence/Urgency/Recommendation trigger a recompute. No page-load
+// trigger exists anywhere in this codebase (Section 15's explicit rule).
+// ══════════════════════════════════════════════════════════════════════
+const TRIGGER_FIELDS = {
+  NEW_LEAD: null, // handled by caller (no "old" lead exists)
+  PRICE_CHANGE: ['asking_price', 'list_price'],
+  PROPERTY_DATA_UPDATE: ['property_type', 'bedrooms', 'bathrooms', 'sqft', 'zip_code', 'year_built', 'lot_size_sqft', 'arv', 'renovation_cost', 'rent_estimate'],
+  DISTRESS_EVENT: ['distress_data'],
+  CONTACT_ENRICHMENT: ['phone', 'email', 'enrichment_data'],
+  STATUS_CHANGE: ['status'],
+}
+
+export function shouldTriggerV2Recalc(oldLead, newLead) {
+  if (!oldLead) return { should: true, trigger: 'NEW_LEAD' }
+  for (const [trigger, fields] of Object.entries(TRIGGER_FIELDS)) {
+    if (!fields) continue
+    for (const f of fields) {
+      const oldVal = f === 'distress_data' || f === 'enrichment_data' ? JSON.stringify(oldLead[f] || {}) : oldLead[f]
+      const newVal = f === 'distress_data' || f === 'enrichment_data' ? JSON.stringify(newLead[f] || {}) : newLead[f]
+      if (oldVal !== newVal) return { should: true, trigger }
+    }
+  }
+  return { should: false, trigger: null }
 }
