@@ -142,10 +142,23 @@ import { DISTRESS_CATEGORY_LABELS } from './distressScoring.js'
 export function getOpportunityInfo(lead) {
   const e = lead?.enrichment_data
   if (!e || e.opportunity_score == null) return null
+  // Capability #15.1 — Phase 1 fix. distress_category is WRITTEN to
+  // lead.distress_data (see scripts/cap14_lien_pipeline.mjs and the
+  // original Lis Pendens pilot), but this function historically only read
+  // it from lead.enrichment_data — populated just once, for the original
+  // Lis Pendens batch, by the one-off scripts/cap10_2_reprocess.mjs
+  // backfill script. Every lead enriched since (all Recorded Liens,
+  // Capability #14) never got that backfill, so "Distress Type" rendered
+  // blank in DistressBanner despite the category being known. Canonical
+  // source is now distress_data (where every current pipeline writes it);
+  // enrichment_data is kept only as a fallback for any lead that predates
+  // this fix and was never re-processed.
+  const category = lead?.distress_data?.distress_category || e.distress_category
+  const categoryConfidence = lead?.distress_data?.distress_category_confidence || e.distress_category_confidence
   return {
-    distress_category: e.distress_category,
-    distress_category_label: DISTRESS_CATEGORY_LABELS[e.distress_category] || e.distress_category,
-    distress_category_confidence: e.distress_category_confidence,
+    distress_category: category,
+    distress_category_label: DISTRESS_CATEGORY_LABELS[category] || category,
+    distress_category_confidence: categoryConfidence,
     buy_box_fit: e.buy_box_fit,
     opportunity_score: e.opportunity_score,
     opportunity_priority: e.opportunity_priority,

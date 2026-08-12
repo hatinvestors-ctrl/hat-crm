@@ -1,3 +1,9 @@
+// ⚠ QUARANTINED — Capability #15.1 (2026-08-12). Same status as
+// generate-ai-notes.mjs (see that file's header for the full conflict
+// analysis) — this is its `-background` twin, also with zero live
+// callers. Canonical scoring path: netlify/functions/generate-core-analysis.mjs.
+// Not deleted, but must not be used as a scoring reference.
+//
 // AI investor notes generator — HAT Investors
 //
 // POST /.netlify/functions/generate-ai-notes

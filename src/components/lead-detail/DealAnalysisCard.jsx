@@ -1065,6 +1065,27 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
+      {/* Capability #15.1 — Phase 1 fix. Audit #15 found real leads scoring
+          89/100 "MAKE OFFER" while lead.status already said
+          'not_in_buy_box' (set by the on-market ingestion agent at import
+          time) — Deal Score never consults that status, so the
+          contradiction was invisible to Kevin. This does NOT touch the V1
+          score/verdict below (still shown exactly as-is, per the mission's
+          "do not silently rewrite historical scores"); it just makes the
+          Buy Box failure impossible to miss, placed first, above
+          everything else. */}
+      {lead.status === 'not_in_buy_box' && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border-2" style={{ borderColor: 'var(--color-danger)', background: 'var(--color-danger-soft)' }}>
+          <span className="text-[16px] leading-none">🚫</span>
+          <div>
+            <div className="text-[13px] font-extrabold text-[color:var(--color-danger-text)]">BUY BOX: NOT FIT</div>
+            <div className="text-[11.5px] text-[color:var(--color-danger-text)] opacity-90">
+              This property failed HAT's Buy Box (geography/property type) at import. Any verdict or score below reflects deal economics only — it does not mean HAT currently buys this type of property here.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Capability #2 — Executive Decision Layer. Presentation only: every
           value here is read from data already parsed/stored elsewhere in
           this component (priorityInfo from the Smart Lead Prioritization

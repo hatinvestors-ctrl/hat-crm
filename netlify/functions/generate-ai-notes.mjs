@@ -1,3 +1,30 @@
+// ⚠ QUARANTINED — Capability #15.1 (2026-08-12). NOT the canonical scoring
+// path. Confirmed via full-repo grep: this function has ZERO callers in
+// src/ — no page or component invokes it. The CANONICAL, live Deal Score
+// path is netlify/functions/generate-core-analysis.mjs, called from
+// ScreenerPage.jsx and DealAnalysisCard.jsx ("Run Analysis").
+//
+// Capability #15's audit found this file's Deal Score formula (Price Gap
+// 20 / Deal Math 25 / Cash Flow 10 / ZIP Quality 15 / Seller Motivation 20
+// / ARV Confidence 10) and verdict vocabulary (BUY NOW / OFFER & NEGOTIATE
+// / WATCH / DEAD LEAD) BOTH disagree with generate-core-analysis.mjs's
+// live formula and vocabulary (Deal Return 30 / Price Gap 20 / Seller
+// Signals 15 / Market & Exit 15 / Cash Flow 10 / Data Quality 10; MAKE
+// OFFER / NEGOTIATE / LONG SHOT / WATCH / DEAD LEAD). Its own
+// SCREENER_SYSTEM_PROMPT variant is worse still — it drops Cash Flow and
+// Seller Motivation entirely, so its Deal Score can never exceed 70/100
+// while reusing verdict thresholds written for a 100-point scale.
+// src/lib/leadPriority.js's VERDICT_TO_PRIORITY map only recognizes the
+// generate-core-analysis.mjs vocabulary — if this file were ever
+// reconnected to any UI as-is, its best-scoring leads (verdict "BUY NOW")
+// would silently fall through to the WATCH default in Action Center.
+//
+// Not deleted (kept as an audit trail / in case something outside this
+// repo still calls the deployed endpoint directly) — but must NOT be used
+// as a reference implementation for Decision Engine V2 or any future
+// scoring work. See docs/decision-engine-v2 report (Capability #15.1) for
+// the full conflict analysis.
+//
 // AI investor notes generator — HAT Investors
 //
 // POST /.netlify/functions/generate-ai-notes

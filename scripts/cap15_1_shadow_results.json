@@ -1,0 +1,2538 @@
+{
+  "counts": {
+    "V2_IMPROVES_ACTION": 38,
+    "NO_MEANINGFUL_CHANGE": 1,
+    "V2_IMPROVES_CONFIDENCE": 1
+  },
+  "results": [
+    {
+      "address": "1106 Comanche St, Jacksonville, FL 32205",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 89,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT",
+        "priorityDisplay": "ACT NOW",
+        "nextAction": "SEND OFFER"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "2BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 62,
+          "reasons": [
+            "FLIP economics: 27/40",
+            "Ask already at/below MAO",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CALL_AGENT",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "FLIP",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.326Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "4405 Rainer Road",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "sold",
+      "v1": {
+        "score": 88,
+        "verdict": "",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "WAIT"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "4BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 58,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Gap to MAO is small (<10%)",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 90,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CALL_AGENT",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.354Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "3634 Rogers Avenue",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "offer_accepted",
+      "v1": {
+        "score": 82,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT",
+        "priorityDisplay": "ACT NOW",
+        "nextAction": "SEND OFFER"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 68,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Ask already at/below MAO",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "ACT_NOW",
+        "next_best_action": "SEND_OFFER",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.355Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "NO_MEANINGFUL_CHANGE",
+      "agree": true
+    },
+    {
+      "address": "8925 Devonshire Blvd",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "sold",
+      "v1": {
+        "score": 82,
+        "verdict": "",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "WAIT"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 38,
+          "reasons": [
+            "Best available economics: 3/40",
+            "Ask already at/below MAO",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 90,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 3/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "NEITHER",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.355Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "1722 Dupre Drive",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 72,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT",
+        "priorityDisplay": "ACT NOW",
+        "nextAction": "SEND OFFER"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 58,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Gap to MAO is small (<10%)",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.356Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "10234 Elmhurst Dr, Jacksonville, FL 32218",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 68,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT",
+        "priorityDisplay": "ACT NOW",
+        "nextAction": "SEND OFFER"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CALL_AGENT",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.357Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "5919 Sonora Dr W",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "dead_lead",
+      "v1": {
+        "score": 68,
+        "verdict": "",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "WAIT"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "FLIP economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 90,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "FLIP",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.357Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "5646 RICKER Road, Jacksonville, FL 32244",
+      "source": "other",
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 62,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "4BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 58,
+          "reasons": [
+            "FLIP economics: 27/40",
+            "Gap to MAO is small (<10%)",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Property characteristics complete"
+          ],
+          "missing": [
+            "Renovation cost unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Follow-up overdue"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography",
+          "Follow-up overdue"
+        ],
+        "risks_missing": [
+          "Renovation cost unknown"
+        ],
+        "strategy": "FLIP",
+        "source": "other",
+        "calculated_at": "2026-08-12T11:44:58.358Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7832 Delaroche Ct",
+      "source": "wholesaler",
+      "marketType": "ON_MARKET",
+      "status": "dead_lead",
+      "v1": {
+        "score": 61,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "4BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 43,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 90,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "wholesaler",
+        "calculated_at": "2026-08-12T11:44:58.358Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "4649 Delta Ave",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "dead_lead",
+      "v1": {
+        "score": 58,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 15,
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 75,
+          "reasons": [
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": [
+            "ARV unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Matches HAT Buy Box",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [
+          "ARV unknown"
+        ],
+        "strategy": "UNKNOWN",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.359Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "5143 Palmer Ave",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "dead_lead",
+      "v1": {
+        "score": 57,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 58,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Gap to MAO is small (<10%)",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.359Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "1658 Evergreen Lane E.",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 56,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 47,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.359Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "2653 Sandra Ln",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 55,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 53,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.362Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "4748 French St, Jacksonville, FL 32205",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 53,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 47,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.362Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "2356 3rd Ave",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 49,
+        "verdict": "WATCH",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "WAIT"
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 15,
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 45,
+          "reasons": [
+            "Asking price known",
+            "Property characteristics complete"
+          ],
+          "missing": [
+            "ARV unknown",
+            "Renovation cost unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [
+          "ARV unknown",
+          "Renovation cost unknown"
+        ],
+        "strategy": "UNKNOWN",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.362Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_CONFIDENCE",
+      "agree": false
+    },
+    {
+      "address": "5911 John F Kennedy Drive N",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 47,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY",
+        "priorityDisplay": "REVIEW TODAY",
+        "nextAction": "CALL TODAY"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 49,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.362Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "402 W 63rd St",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 41,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "REQUEST INFORMATION"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "2BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 54,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Price reduced 8% from original list",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Recent price reduction"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CALL_AGENT",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Price reduced 8% from original list",
+          "Preferred HAT geography",
+          "Recent price reduction"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.363Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "3818 Harbor View Dr",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "follow_up",
+      "v1": {
+        "score": 40,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "REQUEST INFORMATION"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 62,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "FOLLOW_UP",
+        "next_best_action": "FOLLOW_UP",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.363Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "3001 Harbison St",
+      "source": "redfin_auto",
+      "marketType": "ON_MARKET",
+      "status": "dead_lead",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "REQUEST INFORMATION"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 43,
+          "reasons": [
+            "BOTH economics: 27/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 100,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete",
+            "Recently sourced data"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BOTH",
+        "source": "redfin_auto",
+        "calculated_at": "2026-08-12T11:44:58.363Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "5202 Chivalry Drive",
+      "source": null,
+      "marketType": "ON_MARKET",
+      "status": "sold",
+      "v1": {
+        "score": 38,
+        "verdict": "",
+        "priority": "WATCH",
+        "priorityDisplay": "WATCH",
+        "nextAction": "WAIT"
+      },
+      "v2": {
+        "fit": {
+          "status": "FIT",
+          "reasons": [
+            "Preferred HAT geography",
+            "Residential property type confirmed",
+            "3BR — has a rental angle"
+          ]
+        },
+        "opportunity": {
+          "score": 49,
+          "reasons": [
+            "BRRRR economics: 33/40",
+            "Preferred HAT geography"
+          ]
+        },
+        "confidence": {
+          "score": 90,
+          "reasons": [
+            "ARV on file",
+            "Asking price known",
+            "Renovation estimate on file",
+            "Property characteristics complete"
+          ],
+          "missing": []
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CALL_AGENT",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks_missing": [],
+        "strategy": "BRRRR",
+        "source": "unknown",
+        "calculated_at": "2026-08-12T11:44:58.363Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "11764   BEARDGRASS WY",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "NOT_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Absentee owner",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.369Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "11803   BEARDGRASS WY",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "NOT_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Absentee owner",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.370Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "11795   BEARDGRASS WY",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "NOT_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 57,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Absentee owner",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.371Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7669   LEGACY TRL",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "NOT_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 57,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Absentee owner",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.371Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "8848   ARBOR BREEZE LN",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": null,
+        "priority": null,
+        "priorityDisplay": "UNSCORED",
+        "buyBoxFit": null,
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 32,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.371Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "8920   ARBOR BREEZE LN",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": null,
+        "priority": null,
+        "priorityDisplay": "UNSCORED",
+        "buyBoxFit": null,
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 32,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.371Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "3547   HARTSFIELD FOREST CIR",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": null,
+        "priority": null,
+        "priorityDisplay": "UNSCORED",
+        "buyBoxFit": null,
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 32,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.372Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7586   MISHKIE DR",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": null,
+        "priority": null,
+        "priorityDisplay": "UNSCORED",
+        "buyBoxFit": null,
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 32,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.372Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "6333   WHITBY CT",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "priorityDisplay": "🟡 RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 42,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.372Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7581   COSMO CT",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "priorityDisplay": "🟡 RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.372Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7388   BENES TRL",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "priorityDisplay": "🟡 RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.373Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7558   GROSSMAN CT",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "priorityDisplay": "🟡 RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.373Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "11226   BUCKNER LN",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": null,
+        "priority": null,
+        "priorityDisplay": "UNSCORED",
+        "buyBoxFit": null,
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 27,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "PASS",
+        "next_best_action": "PASS",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.374Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "2929   JUSTINA RD",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 38,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "INSUFFICIENT_DATA",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Outside preferred geography (not blocked)"
+          ]
+        },
+        "opportunity": {
+          "score": 39,
+          "reasons": [
+            "contractor lien",
+            "Absentee owner",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 57,
+          "reasons": [
+            "Property identity verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Owner match not fully verified",
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "contractor lien",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Owner match not fully verified",
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.375Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "8550   TOUCHTON RD UNIT 2121",
+      "source": "liens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "priorityDisplay": "⚪ LOW PRIORITY",
+        "buyBoxFit": "NOT_FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 52,
+          "reasons": [
+            "hoa condo lien",
+            "Owner identity verified",
+            "Absentee owner",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "MEDIUM",
+          "reasons": [
+            "No strong timing signal either way"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "liens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.375Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "9712   WOODSTONE MILL DR",
+      "source": "lispendens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "priorityDisplay": "🔥 HIGH PRIORITY",
+        "buyBoxFit": "FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 41,
+          "reasons": [
+            "other civil",
+            "Owner identity verified",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Foreclosure filed 9 days ago"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "other civil",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 9 days ago"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "lispendens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.376Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "7505   NASTURTIUM WY",
+      "source": "lispendens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "priorityDisplay": "🟠 REVIEW",
+        "buyBoxFit": "FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 51,
+          "reasons": [
+            "other civil",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Foreclosure filed 9 days ago"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "other civil",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 9 days ago"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "lispendens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.376Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "10940   VENTNOR AVE",
+      "source": "lispendens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "priorityDisplay": "🔥 HIGH PRIORITY",
+        "buyBoxFit": "FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 41,
+          "reasons": [
+            "other civil",
+            "Owner identity verified",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 70,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Recent filing"
+          ],
+          "missing": [
+            "Contact not found",
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Foreclosure filed 8 days ago"
+          ]
+        },
+        "recommendation": "MONITOR",
+        "next_best_action": "MONITOR_PROPERTY",
+        "why": [
+          "other civil",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 8 days ago"
+        ],
+        "risks_missing": [
+          "Contact not found",
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "lispendens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.376Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "10317   PLANTERS WOOD DR",
+      "source": "lispendens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "priorityDisplay": "🟠 REVIEW",
+        "buyBoxFit": "FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 51,
+          "reasons": [
+            "other civil",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Foreclosure filed 8 days ago"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "other civil",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 8 days ago"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "lispendens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.377Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    },
+    {
+      "address": "3977   CLEARBROOK COVE RD",
+      "source": "lispendens_duval_clerk",
+      "marketType": "OFF_MARKET",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "priorityDisplay": "🟠 REVIEW",
+        "buyBoxFit": "FIT",
+        "nextAction": null
+      },
+      "v2": {
+        "fit": {
+          "status": "POSSIBLE_FIT",
+          "reasons": [
+            "Preferred HAT geography"
+          ]
+        },
+        "opportunity": {
+          "score": 51,
+          "reasons": [
+            "other civil",
+            "Owner identity verified",
+            "Contact available",
+            "Corroborated by multiple independent signals"
+          ]
+        },
+        "confidence": {
+          "score": 85,
+          "reasons": [
+            "Property identity verified",
+            "Owner match verified",
+            "Contact confirmed",
+            "Recent filing"
+          ],
+          "missing": [
+            "Property type unknown"
+          ]
+        },
+        "urgency": {
+          "level": "HIGH",
+          "reasons": [
+            "Foreclosure filed 8 days ago"
+          ]
+        },
+        "recommendation": "REVIEW_TODAY",
+        "next_best_action": "CONTACT_OWNER",
+        "why": [
+          "other civil",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 8 days ago"
+        ],
+        "risks_missing": [
+          "Property type unknown"
+        ],
+        "strategy": null,
+        "source": "lispendens_duval_clerk",
+        "calculated_at": "2026-08-12T11:44:58.377Z",
+        "version": "v2-shadow"
+      },
+      "disagreementType": "V2_IMPROVES_ACTION",
+      "agree": false
+    }
+  ]
+}
