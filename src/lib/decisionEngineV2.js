@@ -91,6 +91,13 @@ function computeFlipEconomics(lead) {
   const arv = num(lead.arv)
   const reno = num(lead.renovation_cost)
   if (!arv) return { viable: false, reason: 'ARV unknown', strength: 0 }
+  // Capability #15.4 BUG FIX — `reno ?? 0` previously treated an UNKNOWN
+  // renovation cost as a KNOWN $0 renovation cost, inflating MAO and net
+  // profit with invented economics (Section 4's explicit "null must not
+  // become 0" rule). Only proceed on 0 when a human/system already saved
+  // an explicit lead.mao (which presumably already accounted for reno);
+  // otherwise unknown reno makes flip math genuinely unavailable.
+  if (reno == null && lead.mao == null) return { viable: false, reason: 'Renovation cost unknown', strength: 0 }
 
   const mao = num(lead.mao) ?? calculateMAO(arv, reno ?? 0)
   const netProfit = calculateFlipProfitAtPrice(mao, arv, reno ?? 0, lead.hold_months || 6)
@@ -115,6 +122,13 @@ function computeBrrrrEconomics(lead) {
   const reno = num(lead.renovation_cost)
   const rent = num(lead.rent_estimate)
   if (!arv || reno == null) return { viable: false, reason: 'ARV/renovation unknown', strength: 0 }
+  // Capability #15.4 BUG FIX — the previous `rent || <bedroom-count
+  // default>` fallback invented a rent estimate whenever rent_estimate was
+  // unknown, which then silently drove cashflow/strength math (Section 4's
+  // "missing rent must not create fake BRRRR economics" rule, and
+  // Section 8's explicit test). BRRRR is correctly marked unavailable when
+  // rent is unknown — Flip can still be evaluated independently (Section 8).
+  if (rent == null) return { viable: false, reason: 'Rent estimate unknown', strength: 0 }
 
   const pp = num(lead.mao) ?? calculateMAO(arv, reno)
   if (!pp) return { viable: false, reason: 'MAO unavailable', strength: 0 }
@@ -125,7 +139,7 @@ function computeBrrrrEconomics(lead) {
   const refi = arv * 0.70 // canonical LTV, see file header
   const cashLeftIn = allIn - refi
 
-  const rentEstimate = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1550 : 1200)
+  const rentEstimate = rent
   const refiRate = 0.067 // canonical rate, see file header
   const n = 360
   const monthlyRate = refiRate / 12
@@ -170,9 +184,11 @@ export function computeOnMarketOpportunity(lead) {
   if (economics > 0) reasons.push(`${strategy.best !== 'NEITHER' && strategy.best !== 'UNKNOWN' ? strategy.best : 'Best available'} economics: ${economics}/40`)
 
   // Closeability — ask vs MAO gap, capped 20, independent fact from Economics.
+  // Capability #15.4 BUG FIX — same reno-as-$0 invention as Flip/BRRRR
+  // above; only derive an unstored MAO when renovation is actually known.
   let closeability = 0
   const ask = num(lead.asking_price)
-  const mao = num(lead.mao) ?? (lead.arv ? calculateMAO(lead.arv, lead.renovation_cost ?? 0) : null)
+  const mao = num(lead.mao) ?? (lead.arv && lead.renovation_cost != null ? calculateMAO(lead.arv, lead.renovation_cost) : null)
   if (ask && mao) {
     const pctAbove = ((ask - mao) / mao) * 100
     if (pctAbove <= 0) { closeability = 20; reasons.push('Ask already at/below MAO') }
@@ -226,8 +242,19 @@ export function computeOffMarketOpportunity(lead, pdd) {
   const e = lead.enrichment_data || {}
   pdd = pdd || getPropertyDecisionData(lead)
 
+  // Capability #15.4 BUG FIX — this previously only checked
+  // dd.distress_category, silently falling back to re-classifying from
+  // dd.source_party (often a person's name, e.g. a Lis Pendens defendant,
+  // which never matches a bank/HOA/tax filer regex) whenever it was
+  // missing. Confirmed live: 9712 Woodstone Mill Dr — a real Mortgage
+  // Foreclosure — has distress_category stored ONLY in enrichment_data
+  // (the older Capability #10.2 backfill target), not distress_data, so
+  // this fell all the way through to 'OTHER_CIVIL' (8 pts instead of the
+  // correct 30), dropping Opportunity from a genuine 85-equivalent down to
+  // 48. Same root cause distressInfo.js's getOpportunityInfo() already
+  // fixed in Capability #15.2 — this call site was missed.
   const { distress_category } = classifyDistress({ filer: dd.source_party || '' })
-  const category = dd.distress_category || distress_category || 'UNKNOWN'
+  const category = dd.distress_category || e.distress_category || distress_category || 'UNKNOWN'
 
   // Distress quality — Mortgage Foreclosure materially stronger than a bare
   // Recorded Lien (Section 9's explicit requirement, carried over from V1).
@@ -377,8 +404,18 @@ export function computeRecommendation({ fit, opportunity, confidence, urgency, s
       next_best_action: marketType === 'on_market' ? onMarketAction : offMarketAction,
     }
   }
+  // Capability #15.4 — Next Best Action precision fix (Section 7/14): pick
+  // VERIFY_CONDITION when renovation is specifically the gap rather than
+  // always defaulting to VERIFY_ARV, using the same controlled vocabulary
+  // (no new actions added, per the mission's "do not expand unless clearly
+  // necessary" instruction — VERIFY_CONDITION already existed for the
+  // INSUFFICIENT_DATA fit case above).
+  const onMarketVerifyAction = confidence.missing?.includes('Renovation cost unknown') && !confidence.missing?.includes('ARV unknown')
+    ? 'VERIFY_CONDITION'
+    : 'VERIFY_ARV'
+
   if (promising && confidence.score < 55) {
-    return { recommendation: 'REVIEW_TODAY', next_best_action: marketType === 'on_market' ? 'VERIFY_ARV' : 'VERIFY_OWNER' }
+    return { recommendation: 'REVIEW_TODAY', next_best_action: marketType === 'on_market' ? onMarketVerifyAction : 'VERIFY_OWNER' }
   }
   if (promising) {
     return { recommendation: 'REVIEW_TODAY', next_best_action: marketType === 'on_market' ? 'CALL_AGENT' : 'CONTACT_OWNER' }
@@ -387,7 +424,7 @@ export function computeRecommendation({ fit, opportunity, confidence, urgency, s
     return { recommendation: 'PASS', next_best_action: 'PASS' }
   }
   if (fit.status === 'INSUFFICIENT_DATA' || confidence.score < 40) {
-    return { recommendation: 'RESEARCH', next_best_action: marketType === 'on_market' ? 'VERIFY_ARV' : 'RESEARCH_OWNER' }
+    return { recommendation: 'RESEARCH', next_best_action: marketType === 'on_market' ? onMarketVerifyAction : 'RESEARCH_OWNER' }
   }
   return { recommendation: 'MONITOR', next_best_action: urgency.level === 'LOW' ? 'WAIT_FOR_PRICE_DROP' : 'MONITOR_PROPERTY' }
 }

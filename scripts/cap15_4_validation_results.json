@@ -1,0 +1,2225 @@
+{
+  "sampleCounts": {
+    "onMarket": 50,
+    "offMarket": 25,
+    "total": 75
+  },
+  "renoUnknownCount": 3,
+  "arvUnknownCount": 1,
+  "rentUnknownCount": 36,
+  "renoUnknownDetail": [
+    {
+      "address": "5602 International Dr, Jacksonville, FL 32219",
+      "asking": 160000,
+      "arv": 200000,
+      "reno": null,
+      "rent": null,
+      "flipStrength": 10,
+      "flipViable": false,
+      "brrrrStrength": 0,
+      "brrrrViable": false,
+      "brrrrReason": "ARV/renovation unknown",
+      "opportunity": 44,
+      "confidence": 65,
+      "recommendation": "PASS",
+      "next_action": "PASS"
+    },
+    {
+      "address": "1281 Independence Drive",
+      "asking": 169900,
+      "arv": 245000,
+      "reno": null,
+      "rent": null,
+      "flipStrength": 26,
+      "flipViable": true,
+      "brrrrStrength": 0,
+      "brrrrViable": false,
+      "brrrrReason": "ARV/renovation unknown",
+      "opportunity": 66,
+      "confidence": 80,
+      "recommendation": "PASS",
+      "next_action": "PASS"
+    },
+    {
+      "address": "3147 Cathedral Lane",
+      "asking": 129000,
+      "arv": 175000,
+      "reno": null,
+      "rent": null,
+      "flipStrength": 0,
+      "flipViable": false,
+      "flipReason": "Renovation cost unknown",
+      "brrrrStrength": 0,
+      "brrrrViable": false,
+      "brrrrReason": "ARV/renovation unknown",
+      "opportunity": 7,
+      "confidence": 80,
+      "recommendation": "PASS",
+      "next_action": "PASS"
+    }
+  ],
+  "rentUnknownDetail": [
+    {
+      "address": "4542 Blount Avenue",
+      "rent": null,
+      "flipViable": true,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "FLIP"
+    },
+    {
+      "address": "4152 Jammes Road",
+      "rent": null,
+      "flipViable": true,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "FLIP"
+    },
+    {
+      "address": "10516 Timber Creek Ln",
+      "rent": null,
+      "flipViable": true,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "FLIP"
+    },
+    {
+      "address": "9124 5TH Avenue, Jacksonville, FL 32208",
+      "rent": null,
+      "flipViable": false,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "NEITHER"
+    },
+    {
+      "address": "4934 Donnybrook Avenue",
+      "rent": null,
+      "flipViable": false,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "NEITHER"
+    },
+    {
+      "address": "1640 Bassett Road",
+      "rent": null,
+      "flipViable": false,
+      "brrrrViable": false,
+      "brrrrReason": "Rent estimate unknown",
+      "best": "NEITHER"
+    }
+  ],
+  "buckets": {
+    "90-100": 0,
+    "80-89": 2,
+    "70-79": 2,
+    "60-69": 19,
+    "50-59": 9,
+    "40-49": 23,
+    "<40": 20
+  },
+  "avgOpp": 48,
+  "avgConf": 94,
+  "urgencyCounts": {
+    "HIGH": 12,
+    "MEDIUM": 63,
+    "LOW": 0
+  },
+  "highUrgencyLeads": [
+    {
+      "address": "4826 Riverdale Rd",
+      "reasons": [
+        "Recent price reduction"
+      ],
+      "marketType": "on_market"
+    },
+    {
+      "address": "402 W 63rd St",
+      "reasons": [
+        "Recent price reduction"
+      ],
+      "marketType": "on_market"
+    },
+    {
+      "address": "9712   WOODSTONE MILL DR",
+      "reasons": [
+        "Foreclosure filed 10 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "7505   NASTURTIUM WY",
+      "reasons": [
+        "Foreclosure filed 10 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "10940   VENTNOR AVE",
+      "reasons": [
+        "Foreclosure filed 9 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "10317   PLANTERS WOOD DR",
+      "reasons": [
+        "Foreclosure filed 9 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "3977   CLEARBROOK COVE RD",
+      "reasons": [
+        "Foreclosure filed 9 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "2839   BLACK BUCK CIR",
+      "reasons": [
+        "Foreclosure filed 8 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "15270   BAREBACK DR",
+      "reasons": [
+        "Foreclosure filed 3 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "3364   VOLLEY DR",
+      "reasons": [
+        "Foreclosure filed 3 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "12123   HOPKINTON CT",
+      "reasons": [
+        "Foreclosure filed 2 days ago"
+      ],
+      "marketType": "off_market"
+    },
+    {
+      "address": "2742   GILMORE ST",
+      "reasons": [
+        "Foreclosure filed 2 days ago"
+      ],
+      "marketType": "off_market"
+    }
+  ],
+  "recCounts": {
+    "ACT_NOW": 4,
+    "REVIEW_TODAY": 15,
+    "RESEARCH": 1,
+    "FOLLOW_UP": 26,
+    "MONITOR": 15,
+    "PASS": 14
+  },
+  "guardrailFailures": 0,
+  "repeatable": true,
+  "sensitivity": [
+    {
+      "variable": "renovation_cost",
+      "value": 30000,
+      "opportunity": 65,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "FLIP"
+    },
+    {
+      "variable": "renovation_cost",
+      "value": 60000,
+      "opportunity": 52,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "FLIP"
+    },
+    {
+      "variable": "renovation_cost",
+      "value": 90000,
+      "opportunity": 30,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "NEITHER"
+    },
+    {
+      "variable": "asking_price_delta",
+      "value": 0,
+      "opportunity": 52,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "FLIP"
+    },
+    {
+      "variable": "asking_price_delta",
+      "value": -10000,
+      "opportunity": 58,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "FLIP"
+    },
+    {
+      "variable": "asking_price_delta",
+      "value": -20000,
+      "opportunity": 62,
+      "confidence": 100,
+      "recommendation": "FOLLOW_UP",
+      "strategy": "FLIP"
+    }
+  ],
+  "rows": [
+    {
+      "address": "4542 Blount Avenue",
+      "marketType": "on_market",
+      "status": "offer_sent",
+      "v1": {
+        "score": 61,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 52,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4152 Jammes Road",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "10516 Timber Creek Ln",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 55,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 55,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Distressed-seller language found",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "9124 5TH Avenue, Jacksonville, FL 32208",
+      "marketType": "on_market",
+      "status": "new_lead",
+      "v1": {
+        "score": 78,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "INSUFFICIENT_DATA",
+        "opportunity": 33,
+        "confidence": 75,
+        "urgency": "MEDIUM",
+        "recommendation": "RESEARCH",
+        "next_action": "VERIFY_ARV",
+        "strategy": "NEITHER",
+        "why": [
+          "Best available economics: 13/40",
+          "Ask already at/below MAO"
+        ],
+        "risks": [
+          "Buy Box fit not yet determinable",
+          "Property characteristics incomplete"
+        ]
+      }
+    },
+    {
+      "address": "4934 Donnybrook Avenue",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 28,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 29,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1640 Bassett Road",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 29,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4748 French St, Jacksonville, FL 32205",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 53,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1735 Ribault Scenic Drive",
+      "marketType": "on_market",
+      "status": "triage",
+      "v1": {
+        "score": 32,
+        "verdict": "DEAD LEAD",
+        "priority": "IGNORE"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1923 Banbury Rd",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 28,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 21,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "6946 Oakwood St",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 20,
+        "verdict": "DEAD LEAD",
+        "priority": "IGNORE"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 49,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BRRRR",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "2653 Sandra Ln",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 55,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 33,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3634 Rogers Avenue",
+      "marketType": "on_market",
+      "status": "offer_accepted",
+      "v1": {
+        "score": 82,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 48,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "7180 Lucky Dr W",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 47,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 33,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4826 Riverdale Rd",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 45,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography",
+          "Recent price reduction"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3833 Anvers Blvd",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 57,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "402 W 63rd St",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 41,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 34,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Price reduced 8% from original list",
+          "Preferred HAT geography",
+          "Recent price reduction"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1106 Comanche St, Jacksonville, FL 32205",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 89,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1574 Hamilton St, Jacksonville, FL 32210",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 56,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "10234 Elmhurst Dr, Jacksonville, FL 32218",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 68,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 52,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "8916 Yeoman Dr, Jacksonville, FL 32208",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 29,
+        "verdict": "DEAD LEAD",
+        "priority": "IGNORE"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 29,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "8445 Alderman Rd, Jacksonville, FL 32211",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 28,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 35,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4612 Fremont St, Jacksonville, FL 32210",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 61,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "BOTH",
+        "why": [
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "6931 Miss Muffet Ln N, Jacksonville, FL 32210",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 82,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3634 Rogers Ave, Jacksonville, FL 32208, USA",
+      "marketType": "on_market",
+      "status": "new_lead",
+      "v1": {
+        "score": 56,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 44,
+        "confidence": 85,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": [
+          "Property characteristics incomplete"
+        ]
+      }
+    },
+    {
+      "address": "1522 Ida St",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 89,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 48,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "5911 John F Kennedy Drive N",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 47,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 29,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 13/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "6733 Cherbourg Ave S,",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 54,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BOTH",
+        "why": [
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3001 Harbison St",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "5612 Sabena Rd",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 47,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1658 Evergreen Lane E.",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 56,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4649 Delta Ave",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 58,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 15,
+        "confidence": 75,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "UNKNOWN",
+        "why": [
+          "Matches HAT Buy Box",
+          "Preferred HAT geography"
+        ],
+        "risks": [
+          "ARV unknown"
+        ]
+      }
+    },
+    {
+      "address": "7403 Wonder Ln",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 61,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1722 Dupre Drive",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 72,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 58,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "6365 Catoma Street",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 72,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 52,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "831 E Brookmont Ave",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 28,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 35,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1324 Placid Pl",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 82,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 38,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "NEITHER",
+        "why": [
+          "Matches HAT Buy Box",
+          "Best available economics: 3/40",
+          "Ask already at/below MAO",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "6453 Solandra Drive S",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 48,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "5602 International Dr, Jacksonville, FL 32219",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 38,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 44,
+        "confidence": 65,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "NEITHER",
+        "why": [
+          "Best available economics: 13/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": [
+          "Renovation cost unknown",
+          "Property characteristics incomplete"
+        ]
+      }
+    },
+    {
+      "address": "3818 Harbor View Dr",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 40,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "BRRRR",
+        "why": [
+          "Matches HAT Buy Box",
+          "BRRRR economics: 33/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "4420 Travelers Rd",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 60,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "5143 Palmer Ave",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 57,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 58,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "BOTH",
+        "why": [
+          "Matches HAT Buy Box",
+          "BOTH economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "13438 Galway Avenue",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 49,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "1281 Independence Drive",
+      "marketType": "on_market",
+      "status": "dead_lead",
+      "v1": {
+        "score": 62,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 66,
+        "confidence": 80,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 35/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": [
+          "Renovation cost unknown"
+        ]
+      }
+    },
+    {
+      "address": "6752 Miss Muffet Lane N",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 68,
+        "verdict": "MAKE OFFER",
+        "priority": "HOT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 60,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Distressed-seller language found",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "10607 Jolynn Road",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 23,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 35,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "2120 Lordun Terrace",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 45,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 47,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "5630 Patsy Anne Drive",
+      "marketType": "on_market",
+      "status": "sold",
+      "v1": {
+        "score": 68,
+        "verdict": "NEGOTIATE",
+        "priority": "TODAY"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 58,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CALL_AGENT",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Gap to MAO is small (<10%)",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3243 Ernest Street",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 29,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 43,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3147 Cathedral Lane",
+      "marketType": "on_market",
+      "status": "not_in_buy_box",
+      "v1": {
+        "score": 38,
+        "verdict": "WATCH",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 7,
+        "confidence": 80,
+        "urgency": "MEDIUM",
+        "recommendation": "PASS",
+        "next_action": "PASS",
+        "strategy": "UNKNOWN",
+        "why": [
+          "Matches HAT Buy Box"
+        ],
+        "risks": [
+          "Renovation cost unknown"
+        ]
+      }
+    },
+    {
+      "address": "10516 Timber Creek Lane",
+      "marketType": "on_market",
+      "status": "follow_up",
+      "v1": {
+        "score": 28,
+        "verdict": "LONG SHOT",
+        "priority": "WATCH"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 51,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "FOLLOW_UP",
+        "next_action": "FOLLOW_UP",
+        "strategy": "FLIP",
+        "why": [
+          "Matches HAT Buy Box",
+          "FLIP economics: 27/40",
+          "Distressed-seller language found",
+          "Preferred HAT geography"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "11764   BEARDGRASS WY",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 62,
+        "confidence": 85,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Buy Box: Townhouse",
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "11803   BEARDGRASS WY",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 62,
+        "confidence": 85,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Buy Box: Townhouse",
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "11795   BEARDGRASS WY",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 67,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Buy Box: Townhouse"
+        ]
+      }
+    },
+    {
+      "address": "7669   LEGACY TRL",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 67,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Buy Box: Townhouse"
+        ]
+      }
+    },
+    {
+      "address": "8848   ARBOR BREEZE LN",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {},
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 35,
+        "confidence": 70,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks": [
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "8920   ARBOR BREEZE LN",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {},
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 35,
+        "confidence": 70,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks": [
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "3547   HARTSFIELD FOREST CIR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {},
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 35,
+        "confidence": 70,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks": [
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "7586   MISHKIE DR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {},
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 35,
+        "confidence": 70,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks": [
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "6333   WHITBY CT",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 52,
+        "confidence": 85,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "7581   COSMO CT",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "7388   BENES TRL",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "7558   GROSSMAN CT",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 48,
+        "priority": "RESEARCH",
+        "buyBoxFit": "POSSIBLE_FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "MEDIUM",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "11226   BUCKNER LN",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {},
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 30,
+        "confidence": 70,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified"
+        ],
+        "risks": [
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "2929   JUSTINA RD",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 38,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "INSUFFICIENT_DATA"
+      },
+      "v2": {
+        "fit": "POSSIBLE_FIT",
+        "opportunity": 42,
+        "confidence": 57,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "contractor lien",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Owner match not fully verified",
+          "Contact not found",
+          "Property type unknown"
+        ]
+      }
+    },
+    {
+      "address": "8550   TOUCHTON RD UNIT 2121",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 8,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 62,
+        "confidence": 85,
+        "urgency": "MEDIUM",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "hoa condo lien",
+          "Owner identity verified",
+          "Absentee owner",
+          "Corroborated by multiple independent signals"
+        ],
+        "risks": [
+          "Buy Box: Condominium",
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "9712   WOODSTONE MILL DR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 70,
+        "confidence": 85,
+        "urgency": "HIGH",
+        "recommendation": "ACT_NOW",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "Mortgage foreclosure",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 10 days ago"
+        ],
+        "risks": [
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "7505   NASTURTIUM WY",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 10 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "10940   VENTNOR AVE",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 70,
+        "confidence": 85,
+        "urgency": "HIGH",
+        "recommendation": "ACT_NOW",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "Mortgage foreclosure",
+          "Owner identity verified",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 9 days ago"
+        ],
+        "risks": [
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "10317   PLANTERS WOOD DR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 9 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3977   CLEARBROOK COVE RD",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 9 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "2839   BLACK BUCK CIR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 10,
+        "priority": "LOW_PRIORITY",
+        "buyBoxFit": "NOT_FIT"
+      },
+      "v2": {
+        "fit": "NOT_FIT",
+        "opportunity": 60,
+        "confidence": 85,
+        "urgency": "HIGH",
+        "recommendation": "MONITOR",
+        "next_action": "MONITOR_PROPERTY",
+        "strategy": null,
+        "why": [
+          "Mortgage foreclosure",
+          "Owner identity verified",
+          "Foreclosure filed 8 days ago"
+        ],
+        "risks": [
+          "Buy Box: Townhouse",
+          "Contact not found"
+        ]
+      }
+    },
+    {
+      "address": "15270   BAREBACK DR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 3 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "3364   VOLLEY DR",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 72,
+        "priority": "REVIEW",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 62,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "REVIEW_TODAY",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "hoa condo lien",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 3 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "12123   HOPKINTON CT",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 80,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "ACT_NOW",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "Mortgage foreclosure",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 2 days ago"
+        ],
+        "risks": []
+      }
+    },
+    {
+      "address": "2742   GILMORE ST",
+      "marketType": "off_market",
+      "status": "triage",
+      "v1": {
+        "score": 85,
+        "priority": "HIGH_PRIORITY",
+        "buyBoxFit": "FIT"
+      },
+      "v2": {
+        "fit": "FIT",
+        "opportunity": 80,
+        "confidence": 100,
+        "urgency": "HIGH",
+        "recommendation": "ACT_NOW",
+        "next_action": "CONTACT_OWNER",
+        "strategy": null,
+        "why": [
+          "Matches HAT Buy Box",
+          "Mortgage foreclosure",
+          "Owner identity verified",
+          "Contact available",
+          "Corroborated by multiple independent signals",
+          "Foreclosure filed 2 days ago"
+        ],
+        "risks": []
+      }
+    }
+  ]
+}
