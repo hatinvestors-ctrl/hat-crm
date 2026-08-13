@@ -50,8 +50,16 @@ export function shortenReason(text) {
     .split(/\s+[—–-]\s+/)[0]
     .replace(/\([^)]*\)/g, '')
     .trim()
-  const MAX = 42
-  if (short.length > MAX) short = short.slice(0, MAX).trim() + '…'
+  // Long enough that most AI-written bullets fit whole (fixes bullets being
+  // cut off mid-sentence, e.g. "Prior sale at $269,900 in 2023 suggests
+  // th…"). Only trims genuinely long outliers, and does so at the last
+  // word boundary before the cap so it never severs a word mid-way.
+  const MAX = 110
+  if (short.length > MAX) {
+    const cut = short.slice(0, MAX)
+    const lastSpace = cut.lastIndexOf(' ')
+    short = (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim() + '…'
+  }
   return short
 }
 
