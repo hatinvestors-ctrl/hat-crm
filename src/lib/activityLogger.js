@@ -91,8 +91,36 @@ const OUTCOME_LABELS = {
   dead_lead: 'Dead Lead',
 }
 
+// Capability #18, Section 4 — decision-at-time-of-action snapshot. V2's
+// decision_v2 changes over time (recalculated on every meaningful edit);
+// without freezing what it said AT THE MOMENT Kevin acted, "did ACT NOW
+// leads actually convert?" becomes unanswerable retroactively once V2
+// re-scores the lead later. Bounded to the exact fields the mission lists
+// — never the full decision_v2 blob, never anything V2 didn't already
+// compute (no recalculation happens here).
+function snapshotDecision(lead) {
+  const d = lead.decision_v2
+  if (!d) return null
+  return {
+    opportunity: d.opportunity?.score ?? null,
+    confidence: d.confidence?.score ?? null,
+    urgency: d.urgency?.level ?? null,
+    recommendation: d.recommendation ?? null,
+    next_best_action: d.next_best_action ?? null,
+    fit: d.fit?.status ?? null,
+    strategy: d.strategy ?? null,
+    asking_price: lead.asking_price ?? null,
+    arv: lead.arv ?? null,
+    renovation_cost: lead.renovation_cost ?? null,
+    rent_estimate: lead.rent_estimate ?? null,
+    mao: lead.mao ?? null,
+    lead_source: lead.lead_source ?? null,
+    snapshotted_at: new Date().toISOString(),
+  }
+}
+
 export async function logOutcome(leadId, userId, {
-  outcome, note, followUpDate, sellerExpectation, offerAmount, counterAmount,
+  outcome, note, followUpDate, sellerExpectation, offerAmount, counterAmount, lead,
 } = {}) {
   const label = OUTCOME_LABELS[outcome] || outcome || 'Outcome logged'
   const parts = [`Outcome: ${label}`]
@@ -115,6 +143,7 @@ export async function logOutcome(leadId, userId, {
       seller_expectation: sellerExpectation ?? null,
       offer_amount: offerAmount ?? null,
       counter_amount: counterAmount ?? null,
+      decision_snapshot: lead ? snapshotDecision(lead) : null,
     },
   })
 }

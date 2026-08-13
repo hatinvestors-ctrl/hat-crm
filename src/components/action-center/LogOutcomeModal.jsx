@@ -87,9 +87,13 @@ export default function LogOutcomeModal({ lead, userId, members, onClose, onSave
 
       const updated = Object.keys(patch).length ? await update(patch) : lead
 
+      // Capability #18, Section 4 — snapshot what V2 believed AT THIS
+      // MOMENT (pre-patch `lead`, not `updated`) alongside the outcome, so
+      // later analysis isn't corrupted by V2 re-scoring the lead after.
       await logOutcome(lead.id, userId, {
         outcome: outcome.key,
         note,
+        lead,
         followUpDate: outcome.needsFollowUp ? (followUpDate || null) : null,
         sellerExpectation: sellerExpectation ? Number(sellerExpectation) : null,
         offerAmount: outcome.needsOffer && offerAmount ? Number(offerAmount) : null,

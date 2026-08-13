@@ -138,6 +138,13 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
           <span className="text-[color:var(--color-text-dim)]">{ICONS.actionCenter}</span>
           <span className="flex-1">Action Center</span>
         </NavLink>
+        {/* Capability #18 — Acquisition Intelligence / Performance. Plain
+            emoji icon (no ICONS.* entry added) — keeps this a one-line,
+            additive nav change matching the existing pattern's footprint. */}
+        <NavLink to={`${base}/performance`} className={navItemClasses}>
+          <span className="text-[color:var(--color-text-dim)]">📊</span>
+          <span className="flex-1">Performance</span>
+        </NavLink>
         <NavLink to={`${base}/today`} className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">{ICONS.today}</span>
           <span className="flex-1">Today</span>
