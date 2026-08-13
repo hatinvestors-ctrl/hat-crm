@@ -67,8 +67,17 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           const raw    = Math.max(anchor, floor)
           return Math.round(Math.min(raw, mao * 0.995) / 100) * 100
         })()
-        const aiArv = lead.deal_analysis?.inputs?.arv
-        const offerIsStale = aiArv != null && Number(lead.arv) !== Number(aiArv)
+        // Bug fix: this only ever compared ARV against the last AI run's
+        // inputs — a renovation-cost-only edit (which also moves MAO, and
+        // therefore should move Starting Offer) never marked the offer
+        // stale, so "We Offer" silently kept showing a number computed
+        // against the OLD MAO. Now compares both inputs that actually
+        // drive MAO/offer math.
+        const aiArv  = lead.deal_analysis?.inputs?.arv
+        const aiReno = lead.deal_analysis?.inputs?.renovation_cost
+        const arvChanged  = aiArv != null && Number(lead.arv) !== Number(aiArv)
+        const renoChanged = aiReno !== undefined && Number(lead.renovation_cost || 0) !== Number(aiReno || 0)
+        const offerIsStale = arvChanged || renoChanged
         const displayOffer = (offerIsStale || !lead.starting_offer) ? liveStartingOffer : lead.starting_offer
         const pct        = gap != null ? Math.round((gap / ask) * 100) : null
         const dealOk     = gap != null && gap <= 0
