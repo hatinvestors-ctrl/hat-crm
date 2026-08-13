@@ -24,11 +24,20 @@ import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPri
 import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo } from '../lib/distressInfo'
 import { isContactReady } from '../lib/contactEnrichment'
 import { isV2ActionCenter } from '../lib/featureFlags'
+import { classifyFollowUpDate, daysOverdue } from '../lib/followUpTiming'
+import LogOutcomeModal from '../components/action-center/LogOutcomeModal'
 
+// Capability #17 — order matches the mission's explicit Today-queue
+// priority (Section 3): OVERDUE, RE-ENGAGE, ACT NOW, FOLLOW UP TODAY,
+// REVIEW TODAY, RESEARCH/VERIFY. UPCOMING is deliberately NOT in this map
+// — it never renders as a Today section; it's reachable only via the
+// "Upcoming" quick filter (Section 2/10), so it can never clutter Today.
 const CATEGORY_META = {
+  OVERDUE:           { icon: '⏰', label: 'Overdue',             theme: { bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' } },
+  RE_ENGAGE:         { icon: '🔥', label: 'Re-Engage',           theme: { bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' } },
   ACT_NOW:           { icon: '🔥', label: 'Act Now',            theme: PRIORITY_THEME.HOT },
+  FOLLOW_UP_TODAY:   { icon: '🟡', label: 'Follow Up Today',    theme: { bg: 'var(--color-accent-soft)', border: 'var(--color-accent)', text: 'var(--color-accent-text)' } },
   REVIEW_TODAY:      { icon: '🟠', label: 'Review Today',       theme: PRIORITY_THEME.TODAY },
-  FOLLOW_UP:         { icon: '🟡', label: 'Follow Up',          theme: { bg: 'var(--color-accent-soft)', border: 'var(--color-accent)', text: 'var(--color-accent-text)' } },
   RECENTLY_IMPROVED: { icon: '⚪', label: 'Recently Improved',  theme: PRIORITY_THEME.WATCH },
   // Capability #10.1 — own bucket, deliberately NOT folded into ACT_NOW.
   // A Lis Pendens filing alone never overrides the existing priority
@@ -43,7 +52,10 @@ const CATEGORY_META = {
 // to that one category (Follow Up / Recently Improved stay reachable via
 // "All").
 const QUICK_FILTERS = [
-  { key: 'ALL', label: 'All' },
+  { key: 'ALL', label: 'Today' },
+  { key: 'OVERDUE', label: 'Overdue' },
+  { key: 'RE_ENGAGE', label: 'Re-Engage' },
+  { key: 'UPCOMING', label: 'Upcoming' }, // Capability #17 — the ONLY place future follow-ups are reachable; never a Today section.
   { key: 'FLIP', label: 'Flip' },
   { key: 'BRRRR', label: 'BRRRR' },
   { key: 'ACT_NOW', label: 'Act Now' },
@@ -86,7 +98,12 @@ function classifyLead(lead, rediscovery) {
     // to follow up on his own same-day action. Reuses updated_at, the
     // existing timestamp that changes when status changes; no new field.
     if (isToday(lead.updated_at)) return null
-    category = 'FOLLOW_UP'
+    // Capability #17 — V1 fallback gets the same Today/Overdue/Upcoming
+    // split as V2 (Section 2), just without V2's Re-Engage signal (V1 has
+    // no urgency concept to reuse). UPCOMING is intentionally excluded
+    // from the Today queue by never being in CATEGORY_META.
+    const due = classifyFollowUpDate(lead.follow_up_date)
+    category = due === 'OVERDUE' ? 'OVERDUE' : due === 'TODAY' ? 'FOLLOW_UP_TODAY' : 'UPCOMING'
   } else if (rediscovery?.status === 'IMPROVED') {
     category = 'RECENTLY_IMPROVED'
   } else if (distressed) {
@@ -165,11 +182,60 @@ const NEXT_ACTION_LABELS = {
 function classifyLeadV2(lead) {
   const d = lead.decision_v2
   if (!d) return null
-  const category = V2_RECOMMENDATION_TO_CATEGORY[d.recommendation]
-  if (!category) return null // MONITOR / PASS / Human Override — not an active task
-
   const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
-  if (category === 'FOLLOW_UP' && isToday(lead.updated_at)) return null
+
+  // Capability #17, Section 7 — RE-ENGAGE. Reuses V2's EXISTING urgency
+  // signal (computeUrgency() in decisionEngineV2.js already detects a
+  // real price reduction or a fresh distress filing — see that file) —
+  // no new event-diff system, no change to V2 Opportunity. A follow-up-
+  // status lead with genuine new timing evidence returns to Today
+  // regardless of its scheduled follow_up_date. dead_lead and an active
+  // Human Override are excluded so a timer/signal can never silently
+  // resurrect either (Section 8) — dead_lead already can't reach here
+  // (FOLLOW_UP_STATUSES doesn't include it), and Human Override always
+  // forces recommendation=PASS upstream, so it never reaches this
+  // function with a FOLLOW_UP-shaped decision in the first place; the
+  // explicit checks below are defense-in-depth, not the only guardrail.
+  // "Follow-up overdue" is computeUrgency()'s own HIGH-urgency reason for a
+  // lead whose follow_up_date already passed (decisionEngineV2.js:360) — it
+  // is NOT a new external event, it's the same information the OVERDUE
+  // bucket already surfaces. Re-engagement (Section 7) means something
+  // changed BEFORE the scheduled follow-up; excluding this reason keeps
+  // RE_ENGAGE limited to genuine signals (price reduction, fresh distress
+  // filing) and prevents every merely-overdue lead from double-counting as
+  // both OVERDUE and RE_ENGAGE.
+  const hasGenuineReEngageSignal = d.urgency?.level === 'HIGH' && (d.urgency?.reasons || []).some(r => r !== 'Follow-up overdue')
+  if (isFollowUpStatus && hasGenuineReEngageSignal && d.next_best_action !== 'HUMAN_OVERRIDE' && lead.status !== 'dead_lead') {
+    const reason = d.urgency?.reasons?.find(r => r !== 'Follow-up overdue') || d.why?.[0] || 'New timing signal detected'
+    return {
+      category: 'RE_ENGAGE',
+      lead,
+      decision: 'RE-ENGAGE',
+      nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
+      distressed: false,
+      opportunity: null,
+      expectedProfit: lead.deal_analysis?.profit ?? null,
+      maxOffer: lead.mao ?? null,
+      reason, // always visible on the card — Section 7's explicit requirement
+      score: d.opportunity?.score ?? null,
+      rediscoveredAt: null,
+      followUpStatus: lead.status,
+      strategy: d.strategy ?? lead.deal_analysis?.strategy ?? null,
+    }
+  }
+
+  const baseCategory = V2_RECOMMENDATION_TO_CATEGORY[d.recommendation]
+  if (!baseCategory) return null // MONITOR / PASS / Human Override — not an active task
+
+  // Capability #17, Section 2 — Today/Overdue/Upcoming split, replacing
+  // the single undifferentiated FOLLOW_UP bucket every prior capability
+  // used. This is the actual fix for "all follow_up leads appear
+  // together today" (see audit in the delivery report).
+  let category = baseCategory
+  if (baseCategory === 'FOLLOW_UP') {
+    const due = classifyFollowUpDate(lead.follow_up_date)
+    category = due === 'OVERDUE' ? 'OVERDUE' : due === 'TODAY' ? 'FOLLOW_UP_TODAY' : 'UPCOMING'
+  }
 
   return {
     category,
@@ -183,7 +249,7 @@ function classifyLeadV2(lead) {
     reason: d.why?.[0] || null,
     score: d.opportunity?.score ?? null,
     rediscoveredAt: null,
-    followUpStatus: category === 'FOLLOW_UP' ? lead.status : null,
+    followUpStatus: baseCategory === 'FOLLOW_UP' ? lead.status : null,
     strategy: d.strategy ?? lead.deal_analysis?.strategy ?? null,
   }
 }
@@ -201,6 +267,8 @@ function sortCategory(category, items) {
     case 'RECENTLY_IMPROVED':
       return [...items].sort((a, b) => (b.rediscoveredAt ? new Date(b.rediscoveredAt).getTime() : 0) - (a.rediscoveredAt ? new Date(a.rediscoveredAt).getTime() : 0))
     case 'FOLLOW_UP':
+    case 'FOLLOW_UP_TODAY':
+    case 'UPCOMING':
       return [...items].sort((a, b) => {
         const ad = a.lead.follow_up_date, bd = b.lead.follow_up_date
         if (!ad && !bd) return 0
@@ -208,6 +276,15 @@ function sortCategory(category, items) {
         if (!bd) return -1
         return ad.localeCompare(bd)
       })
+    case 'OVERDUE':
+      // Longest-overdue first — the ones most likely to be forgotten.
+      return [...items].sort((a, b) => {
+        const ad = a.lead.follow_up_date, bd = b.lead.follow_up_date
+        if (!ad || !bd) return 0
+        return ad.localeCompare(bd)
+      })
+    case 'RE_ENGAGE':
+      return [...items].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity))
     default:
       return items
   }
@@ -220,12 +297,13 @@ const NA = 'Not available' // #5.1 — replaces bare "—" so missing data reads
 // Reason (clamped ~2 lines + "More…", opens the same lead — no new modal,
 // the whole card is already a Link). No fields added or removed, no
 // classification/business-logic change — presentation only.
-function ActionCard({ item, workspaceId }) {
+function ActionCard({ item, workspaceId, userId, members, onLeadUpdated }) {
   const theme = CATEGORY_META[item.category].theme
+  const [showOutcome, setShowOutcome] = useState(false)
   return (
     <Link
       to={`/w/${workspaceId}/leads/${item.lead.id}`}
-      className="block rounded-lg border overflow-hidden hover:opacity-90 transition-opacity"
+      className="block rounded-lg border overflow-hidden hover:opacity-90 transition-opacity relative"
       style={{ borderColor: theme.border, background: theme.bg }}
     >
       <div className="px-3.5 py-3">
@@ -320,6 +398,15 @@ function ActionCard({ item, workspaceId }) {
           </>
         )}
 
+        {/* Capability #17 — "why today" is never hidden: overdue leads show
+            exactly how overdue, re-engaged leads show the item.reason line
+            below (already populated with the real urgency signal). */}
+        {item.category === 'OVERDUE' && item.lead.follow_up_date && (
+          <div className="text-[10.5px] font-bold text-[color:var(--color-danger-text)] mt-1.5">
+            ⏰ {daysOverdue(item.lead.follow_up_date)} day{daysOverdue(item.lead.follow_up_date) === 1 ? '' : 's'} overdue
+          </div>
+        )}
+
         {/* 5. Reason — clamped to ~2 lines, "More…" just hints the full lead has more; clicking anywhere on the card (including here) opens it */}
         {item.reason && (
           <div className="text-[11px] text-[color:var(--color-text-muted)] mt-2 leading-snug">
@@ -328,16 +415,40 @@ function ActionCard({ item, workspaceId }) {
             <span className="text-[color:var(--color-accent-text)] font-medium"> More…</span>
           </div>
         )}
+
+        {/* Capability #17, Section 4 — Fast Outcome Capture, reachable
+            directly from the card (no need to open the lead first). */}
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowOutcome(true) }}
+          className="mt-2.5 w-full text-[11px] font-semibold px-2 py-1.5 rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]"
+        >
+          Log Outcome
+        </button>
       </div>
+
+      {showOutcome && (
+        <LogOutcomeModal
+          lead={item.lead}
+          userId={userId}
+          members={members}
+          onClose={() => setShowOutcome(false)}
+          onSaved={(updated) => onLeadUpdated?.(updated)}
+        />
+      )}
     </Link>
   )
 }
 
 export default function ActionCenterPage() {
-  const { workspace, workspaceId, user, userRole } = useOutletContext()
+  const { workspace, workspaceId, user, userRole, members } = useOutletContext()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ALL')
+  // Capability #17, Section 4 — bump to refetch after Log Outcome saves,
+  // so a status/follow_up_date change re-buckets the lead (e.g. out of
+  // Today once a future follow-up is set) without a full page reload.
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     if (!workspaceId) return
@@ -391,28 +502,32 @@ export default function ActionCenterPage() {
 
     load()
     return () => { cancelled = true }
-  }, [workspaceId, user.id, userRole])
+  }, [workspaceId, user.id, userRole, refreshTick])
 
-  // #5.1 performance — memoize the derived/sorted/filtered lists so a
-  // filter click or unrelated re-render doesn't re-sort everything from
-  // scratch. Classification itself already only runs once per data load
-  // (in the effect above), not per render.
+  // Capability #17, Section 11 — "Actions Today" deliberately EXCLUDES
+  // UPCOMING (future follow-ups) from every headline count. `items` still
+  // holds everything (including UPCOMING) so the Upcoming filter can find
+  // them; `todayCount` is what Kevin actually sees as his workload.
   const totalCount = items.length
+  const todayCount = useMemo(() => items.filter(i => i.category !== 'UPCOMING').length, [items])
 
   const filteredItems = useMemo(() => {
-    if (filter === 'ALL') return items
+    if (filter === 'ALL') return items.filter(i => i.category !== 'UPCOMING') // "Today" — Section 2's core rule
     if (filter === 'FLIP' || filter === 'BRRRR') return items.filter(i => i.strategy === filter.toLowerCase())
     return items.filter(i => i.category === filter)
   }, [items, filter])
 
   const byCategory = useMemo(() => ({
+    OVERDUE: sortCategory('OVERDUE', filteredItems.filter(i => i.category === 'OVERDUE')),
+    RE_ENGAGE: sortCategory('RE_ENGAGE', filteredItems.filter(i => i.category === 'RE_ENGAGE')),
     ACT_NOW: sortCategory('ACT_NOW', filteredItems.filter(i => i.category === 'ACT_NOW')),
+    FOLLOW_UP_TODAY: sortCategory('FOLLOW_UP_TODAY', filteredItems.filter(i => i.category === 'FOLLOW_UP_TODAY')),
     REVIEW_TODAY: sortCategory('REVIEW_TODAY', filteredItems.filter(i => i.category === 'REVIEW_TODAY')),
-    FOLLOW_UP: sortCategory('FOLLOW_UP', filteredItems.filter(i => i.category === 'FOLLOW_UP')),
     RECENTLY_IMPROVED: sortCategory('RECENTLY_IMPROVED', filteredItems.filter(i => i.category === 'RECENTLY_IMPROVED')),
     OFF_MARKET: [...filteredItems.filter(i => i.category === 'OFF_MARKET')]
       .sort((a, b) => (b.opportunity?.opportunity_score ?? -1) - (a.opportunity?.opportunity_score ?? -1)),
-  }), [filteredItems])
+    UPCOMING: sortCategory('UPCOMING', items.filter(i => i.category === 'UPCOMING')), // only ever populated when filter==='UPCOMING'
+  }), [filteredItems, items])
 
   // #5.1 business value summary — simple sum/average over values that
   // already exist on each item (lead.mao, deal_analysis.profit). Omitted
@@ -439,20 +554,22 @@ export default function ActionCenterPage() {
       <Topbar title="Action Center" breadcrumbs={[{ label: workspace.name }, { label: 'Action Center' }]} />
 
       <div className="px-6 py-6 w-full flex-1">
-        {/* #5.1 — action-oriented header: "Today's Mission" + compact
-            per-category counts, replacing the flatter "N properties need
-            your attention" line. Same underlying counts as the summary
-            tiles below, just surfaced immediately. */}
+        {/* Capability #17, Section 11 — compact operational summary.
+            Deliberately EXCLUDES Upcoming from "Actions Today" (todayCount)
+            — a future follow-up is never counted as work Kevin owes today. */}
         <div className="pb-5 border-b border-[color:var(--color-line)] mb-5">
-          <p className="text-[12px] text-[color:var(--color-text-dim)] uppercase tracking-wider font-semibold">Today's Mission</p>
+          <p className="text-[12px] text-[color:var(--color-text-dim)] uppercase tracking-wider font-semibold">Today</p>
           <h2 className="text-[22px] font-semibold text-[color:var(--color-text)] tracking-tight mt-1">
-            {totalCount === 0 ? 'Nothing needs action right now.' : `${totalCount} Opportunit${totalCount === 1 ? 'y' : 'ies'} Ready`}
+            {todayCount === 0 ? 'Nothing needs action right now.' : `${todayCount} Action${todayCount === 1 ? '' : 's'} Today`}
           </h2>
-          {totalCount > 0 && (
+          {todayCount > 0 && (
             <p className="text-[12.5px] text-[color:var(--color-text-muted)] mt-1">
+              {items.filter(i => i.category === 'OVERDUE').length > 0 && <>Overdue: <span className="font-semibold text-[color:var(--color-danger-text)]">{items.filter(i => i.category === 'OVERDUE').length}</span>{'  ·  '}</>}
+              {items.filter(i => i.category === 'RE_ENGAGE').length > 0 && <>Re-Engage: <span className="font-semibold text-[color:var(--color-danger-text)]">{items.filter(i => i.category === 'RE_ENGAGE').length}</span>{'  ·  '}</>}
               Act Now: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'ACT_NOW').length}</span>
+              {'  ·  '}Follow-Up: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'FOLLOW_UP_TODAY').length}</span>
               {'  ·  '}Review Today: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'REVIEW_TODAY').length}</span>
-              {'  ·  '}Follow Up: <span className="font-semibold text-[color:var(--color-text)]">{items.filter(i => i.category === 'FOLLOW_UP').length}</span>
+              {items.filter(i => i.category === 'UPCOMING').length > 0 && <span className="text-[color:var(--color-text-faint)]">{'  ·  '}{items.filter(i => i.category === 'UPCOMING').length} upcoming (not counted)</span>}
             </p>
           )}
         </div>
@@ -515,23 +632,38 @@ export default function ActionCenterPage() {
         {filteredCount === 0 ? (
           <EmptyState
             icon="✓"
-            title={totalCount === 0 ? 'All clear.' : 'No matches for this filter.'}
+            title={todayCount === 0 ? 'All clear.' : 'No matches for this filter.'}
             description={
-              totalCount === 0
-                ? 'No lead currently meets Act Now, Review Today, Follow Up, or Recently Improved criteria.'
-                : 'Nothing in the current view matches this filter. Try "All" to see everything.'
+              todayCount === 0
+                ? 'No lead currently meets Overdue, Re-Engage, Act Now, Follow Up Today, or Review Today criteria.'
+                : 'Nothing in the current view matches this filter. Try "Today" to see everything due.'
             }
           />
+        ) : filter === 'UPCOMING' ? (
+          // Capability #17, Section 2/10 — the ONLY place future follow-ups
+          // render. Deliberately a flat, compact list (no sub-sections,
+          // no KPIs) — this is a reference view, not part of Today's work.
+          <section>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[15px]">📅</span>
+              <h3 className="text-[13.5px] font-bold uppercase tracking-wide text-[color:var(--color-text)]">Upcoming Follow-Ups</h3>
+              <span className="text-[11px] text-[color:var(--color-text-dim)] tabular-nums">({byCategory.UPCOMING.length})</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {byCategory.UPCOMING.map(item => <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} userId={user.id} members={members} onLeadUpdated={() => setRefreshTick(t => t + 1)} />)}
+            </div>
+          </section>
         ) : (
           <div className="space-y-6">
             {Object.entries(CATEGORY_META).map(([key, meta]) => {
               const list = byCategory[key]
               if (list.length === 0) return null
 
-              // Follow Up gets sub-sections per waiting-reason status so
-              // "waiting on seller" and "waiting to sign" etc. aren't all
-              // dumped in one pile — everything else renders as one grid.
-              const subGroups = key === 'FOLLOW_UP'
+              // Overdue/Follow-Up-Today get sub-sections per waiting-reason
+              // status so "waiting on seller" and "waiting to sign" etc.
+              // aren't all dumped in one pile — everything else renders as
+              // one grid.
+              const subGroups = (key === 'FOLLOW_UP_TODAY' || key === 'OVERDUE')
                 ? FOLLOW_UP_STATUSES
                     .map(status => ({ status, items: list.filter(i => i.followUpStatus === status) }))
                     .filter(g => g.items.length > 0)
@@ -554,7 +686,7 @@ export default function ActionCenterPage() {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                             {subItems.map(item => (
-                              <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
+                              <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} userId={user.id} members={members} onLeadUpdated={() => setRefreshTick(t => t + 1)} />
                             ))}
                           </div>
                         </div>
@@ -563,7 +695,7 @@ export default function ActionCenterPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {list.map(item => (
-                        <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} />
+                        <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} userId={user.id} members={members} onLeadUpdated={() => setRefreshTick(t => t + 1)} />
                       ))}
                     </div>
                   )}

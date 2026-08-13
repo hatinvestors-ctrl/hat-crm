@@ -41,6 +41,7 @@ HARD RULES:
 - For off-market/distressed leads: outreach must be neutral, respectful, and NEVER reference foreclosure/distress/liens/financial hardship, EVEN INDIRECTLY. Do not use phrases like "situations where traditional options aren't working out," "time-sensitive situation," "no strings attached," "we can help," or anything implying you know about the owner's financial, legal, or personal circumstances. The message should read exactly like reaching out about any ordinary property purchase — e.g. "I'm reaching out regarding the property at [address]. We purchase properties directly in the area and wanted to see whether you'd be open to discussing a possible sale." Nothing more.
 - If contact info is not available (off-market, "contact_ready": false), the message field must explain what research step comes first — never draft outreach text.
 - Never fabricate a person's name — use it only if given.
+- If "last_contact" is present in the context (Kevin's most recent logged outcome), use it: the "summary" must state WHAT HAPPENED last time and WHY CONTACT NOW (reference days_since_contact, the prior outcome, and any seller/offer/counter figures given). "questions" must build on what's already known — never re-ask something last_contact already answered. If last_contact is null/absent, this is a first contact — say so plainly, don't imply a prior conversation.
 
 Return ONLY valid JSON, no markdown fences, no other text, in exactly this shape:
 {
@@ -71,7 +72,31 @@ export default async (req) => {
     if (leadErr || !lead) return json(404, { ok: false, error: 'Lead not found' })
     if (!lead.decision_v2) return json(400, { ok: false, error: 'NO_V2_DECISION — run V2 recalculation first' })
 
-    const context = buildDealBriefContext(lead)
+    // Capability #17, Section 9 — last logged outcome (Log Outcome flow),
+    // read-only, gives the Copilot WHAT HAPPENED / WHAT CHANGED / WHY
+    // CONTACT NOW context without a new table or re-deriving it client-side.
+    let contactHistory = null
+    const { data: lastOutcomeRow } = await supabase
+      .from('lead_activities')
+      .select('content, metadata, created_at')
+      .eq('lead_id', lead_id)
+      .eq('metadata->>event', 'outcome_logged')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (lastOutcomeRow) {
+      const daysSince = Math.round((Date.now() - new Date(lastOutcomeRow.created_at).getTime()) / 86400000)
+      contactHistory = {
+        outcome: lastOutcomeRow.metadata?.outcome || null,
+        note: lastOutcomeRow.metadata?.note || null,
+        seller_expectation: lastOutcomeRow.metadata?.seller_expectation ?? null,
+        offer_amount: lastOutcomeRow.metadata?.offer_amount ?? null,
+        counter_amount: lastOutcomeRow.metadata?.counter_amount ?? null,
+        days_since_contact: daysSince,
+      }
+    }
+
+    const context = buildDealBriefContext(lead, contactHistory)
     const inputHash = computeDealBriefInputHash(lead)
 
     // Cache hit — never re-calls the LLM if nothing meaningful changed (Section 10).

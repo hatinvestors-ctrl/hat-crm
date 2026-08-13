@@ -1,0 +1,15 @@
+{
+  "before": {
+    "totalCards": 14,
+    "followUpCards": 0,
+    "futureShownAsToday": 0
+  },
+  "after": {
+    "today": 29,
+    "overdue": 7,
+    "followUpToday": 6,
+    "reEngage": 2,
+    "upcoming": 72,
+    "suppressedFuture": 72
+  }
+}

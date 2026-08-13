@@ -42,6 +42,8 @@ export function computeDealBriefInputHash(lead) {
     distress_data: JSON.stringify(lead.distress_data || {}),
     notes: lead.notes || '',
     ai_notes_len: (lead.ai_notes || '').length, // full text is long/volatile; length is a cheap-enough proxy for "materially changed"
+    follow_up_date: lead.follow_up_date ?? null, // Capability #17 — a new outcome/follow-up date is a "what changed" the brief should reflect
+    status: lead.status,
   }
   return stableHash(JSON.stringify(parts))
 }
@@ -90,7 +92,13 @@ export function computePriceGuidance(lead) {
 // ── The exact, bounded set of fields the AI is allowed to read (Section 2/6) ──
 // Mirrors qualitativeIntelligence.js's contract: structured facts only,
 // AI never sees or touches raw scoring weights/formulas.
-export function buildDealBriefContext(lead) {
+// Capability #17, Section 9 — last contact outcome/note/seller-expectation/
+// offer/counter, so the Copilot can answer WHAT HAPPENED / WHAT CHANGED /
+// WHY CONTACT NOW without re-deriving it from raw activity rows itself.
+// `contactHistory` is optional and caller-supplied (the Netlify function
+// queries lead_activities server-side) — this function stays deterministic
+// and never queries the DB itself.
+export function buildDealBriefContext(lead, contactHistory = null) {
   const d = lead.decision_v2 || {}
   const dd = lead.distress_data || {}
   const priceGuidance = computePriceGuidance(lead)
@@ -110,5 +118,6 @@ export function buildDealBriefContext(lead) {
     listing_agent_name: lead.listing_agent_name || null,
     notes: (lead.notes || '').slice(0, 1500),
     workflow_status: lead.status,
+    last_contact: contactHistory,
   }
 }
