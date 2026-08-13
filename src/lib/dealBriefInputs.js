@@ -9,7 +9,7 @@
 // the math is.
 
 import { computeStrategy } from './decisionEngineV2.js'
-import { calculateMAO } from './calculations.js'
+import { calculateMAO, calculateFlipMAO, calculateBrrrrMAO } from './calculations.js'
 
 // Browser-safe (no node:crypto — this module is imported client-side too).
 // Not cryptographic — just needs to change whenever the input does, for
@@ -55,13 +55,23 @@ export function computePriceGuidance(lead) {
   const strategy = computeStrategy(lead)
   const arv = lead.arv ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
+  const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : null
   const ask = lead.asking_price ? Number(lead.asking_price) : null
-  const mao = lead.mao != null ? Number(lead.mao) : (arv && reno != null ? calculateMAO(arv, reno) : null)
+  const holdMonths = lead.hold_months || 6
 
   const missing = []
   if (!arv) missing.push('ARV')
   if (reno == null) missing.push('Renovation estimate')
-  if (strategy.best === 'BRRRR' && lead.rent_estimate == null) missing.push('Rent estimate')
+  if (strategy.best === 'BRRRR' && rent == null) missing.push('Rent estimate')
+
+  // Capability #19.1, Section 17 — Copilot price guidance now names the
+  // strategy its MAO belongs to (never a bare, ambiguous "MAO"), sourced
+  // from the SAME strategy-specific solvers Path to a Deal uses — the AI
+  // never computes this number, only narrates it.
+  const strategyMao = strategy.best === 'BRRRR'
+    ? (rent != null ? calculateBrrrrMAO(arv, reno, rent, holdMonths)?.mao ?? null : null)
+    : (arv && reno != null ? calculateFlipMAO(arv, reno, holdMonths) : null)
+  const mao = strategyMao ?? (lead.mao != null ? Number(lead.mao) : (arv && reno != null ? calculateMAO(arv, reno) : null))
 
   if (!mao || missing.length > 0) {
     return {

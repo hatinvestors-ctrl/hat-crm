@@ -207,12 +207,12 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
           <SubSection title="Questions to Ask"><Bullets items={brief.questions} /></SubSection>
 
           {brief.price_guidance && (
-            <SubSection title="Price Guidance">
+            <SubSection title={`Price Guidance${brief.price_guidance.strategy ? ` (${brief.price_guidance.strategy})` : ''}`}>
               {brief.price_guidance.ready ? (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
                   <Chip label="Ask" value={brief.price_guidance.ask ? `$${brief.price_guidance.ask.toLocaleString()}` : NA} />
                   <Chip label="Opening" value={`$${brief.price_guidance.opening.toLocaleString()}`} />
-                  <Chip label="Target/Ceiling" value={`$${brief.price_guidance.target.toLocaleString()}`} />
+                  <Chip label={`${brief.price_guidance.strategy || ''} MAO`.trim()} value={`$${brief.price_guidance.target.toLocaleString()}`} />
                 </div>
               ) : (
                 <div className="text-[12px] text-[color:var(--color-text-dim)]">

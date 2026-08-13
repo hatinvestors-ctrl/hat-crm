@@ -5,7 +5,10 @@ import NotesRenderer from './NotesRenderer'
 import DealQA from './DealQA'
 import RenoTierPicker from './RenoTierPicker'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency } from '../../lib/calculations'
+import {
+  formatCurrency, computeFlipBreakdown, computeBrrrrBreakdown, bisectThreshold,
+  calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN,
+} from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
@@ -110,242 +113,178 @@ async function callFnFull(name, body) {
   return data
 }
 
-// ── Same formulas as analyze-deal.mjs ──────────────────────────────────────
-function computeFlipBreakdown(pp, arv, reno, holdMonths = 6) {
-  const hmlLoan         = pp * 0.90 + reno
-  const monthlyPmt      = hmlLoan * 0.01
-  const points          = hmlLoan * 0.02
-  const downPayment     = pp * 0.10
-  const fixedCosts      = 2450
-  const totalCashNeeded = downPayment + points + fixedCosts
-  const holdingPerMo    = monthlyPmt + 208 + 100
-  const totalHolding    = holdingPerMo * holdMonths
-  const saleProceeds    = arv * 0.93
-  const totalProfit     = saleProceeds - hmlLoan - totalHolding - totalCashNeeded
-  const roi             = totalCashNeeded > 0 ? (totalProfit / totalCashNeeded) * 100 : 0
-  const annualizedRoi   = holdMonths > 0 ? (roi / holdMonths) * 12 : 0
-  return { hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding, saleProceeds, totalProfit, roi, annualizedRoi, holdMonths }
-}
-
-function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6) {
-  const hmlLoan           = pp * 0.90 + reno
-  const monthlyPmt        = hmlLoan * 0.01
-  const points            = hmlLoan * 0.02
-  const downPayment       = pp * 0.10
-  const fixedCosts        = 2450
-  const totalCashNeeded   = downPayment + points + fixedCosts
-  const holdingPerMo      = monthlyPmt + 208 + 100
-  const totalHolding      = holdingPerMo * holdMonths
-  const refiLoan          = arv * 0.70
-  const refiCosts         = refiLoan * 0.03
-  const refiCashOut       = refiLoan - refiCosts - hmlLoan - totalHolding
-  const totalCashInvested = refiCashOut >= 0
-    ? Math.max(0, totalCashNeeded - refiCashOut)
-    : totalCashNeeded + Math.abs(refiCashOut)
-  const refiMoPmt         = refiLoan * 0.006607
-  const monthlyCF         = monthlyRent > 0 ? monthlyRent - refiMoPmt - 208 - 100 : null
-  const annualCF          = monthlyCF != null ? monthlyCF * 12 : null
-  const coc               = totalCashInvested > 0 && annualCF != null ? (annualCF / totalCashInvested) * 100 : null
-  return { hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding, refiLoan, refiCosts, refiCashOut, totalCashInvested, refiMoPmt, monthlyCF, annualCF, coc, holdMonths }
-}
-
+// Capability #19.1 — computeFlipBreakdown/computeBrrrrBreakdown/
+// bisectThreshold/maxOfferForProfit moved to src/lib/calculations.js
+// (calculateFlipMAO/calculateBrrrrMAO) so there is exactly ONE
+// implementation of the canonical Flip/BRRRR cost model, not one per
+// component. Imported above.
 const fc = formatCurrency
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
-
-// Solves the flip math backward: given a desired profit, what's the max purchase
-// price that still hits it? Same formula as computeFlipBreakdown, solved for pp.
-function maxOfferForProfit(arv, reno, holdMonths, desiredProfit) {
-  const ppCoeff   = 1.018 + 0.009 * holdMonths
-  const renoCoeff = 1.02 + 0.01 * holdMonths
-  const constant  = arv * 0.93 - holdMonths * 308 - 2450
-  return (constant - reno * renoCoeff - desiredProfit) / ppCoeff
-}
-
-// Generic bisection: finds where evalFn(x) flips from false to true across [lo, hi].
-// Works regardless of whether increasing x makes the condition more or less likely
-// to be true. Returns null if the condition doesn't change within [lo, hi] at all
-// (either always true, or — the case we care about — never true in a realistic range).
-function bisectThreshold(evalFn, lo, hi, iterations = 50) {
-  const trueAtLo = evalFn(lo)
-  const trueAtHi = evalFn(hi)
-  if (trueAtLo === trueAtHi) return trueAtLo ? lo : null
-  let a = lo, b = hi
-  for (let i = 0; i < iterations; i++) {
-    const mid = (a + b) / 2
-    if (evalFn(mid) === trueAtHi) b = mid; else a = mid
-  }
-  return trueAtHi ? b : a
-}
 
 // Explains a BRRRR verdict in plain terms and shows exactly what would need to
 // change to cross into BUY — checked one lever at a time (rent, renovation cost,
 // ARV), holding the other two at their current values.
-function BrrrrRealityCheck({ lead, verdict, score }) {
-  const arv  = Number(lead.arv || 0)
-  const reno = Number(lead.renovation_cost ?? 0)
-  const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
-  const pp   = Number(lead.mao || (arv ? Math.round(arv * 0.75 - reno - 2450) : 0) || lead.asking_price || 0)
-  if (!arv || !pp) return null
+// Capability #19.1, Section 13 — "Path to a BRRRR Deal", rebuilt around the
+// new calculateBrrrrMAO() solver (src/lib/calculations.js). Shows the
+// BRRRR MAO, WHICH of HAT's two requirements is limiting it (Section 10),
+// and plain-language guidance — no "pick one lever" phrasing (Section 12),
+// no lever shown unless the solver actually produced a number for it
+// (Section 14 — never fake precision).
+function BrrrrRealityCheck({ lead }) {
+  const arv  = lead.arv != null ? Number(lead.arv) : null
+  const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
+  const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : (lead.monthly_rent != null ? Number(lead.monthly_rent) : null)
   const holdMonths = lead.hold_months || 6
 
-  const f = computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
-  const cf  = f.monthlyCF
-  const coc = f.coc
+  const result = calculateBrrrrMAO(arv, reno, rent, holdMonths)
 
-  const tier = (cf != null && coc != null && coc >= 8 && cf >= 200) ? 'BUY'
-    : (cf != null && coc != null && coc >= 5 && cf >= 100) ? 'CONDITIONAL'
-    : 'FAIL'
-
-  const isBuy = (arvVal, renoVal, rentVal) => {
-    const r = computeBrrrrBreakdown(pp, arvVal, renoVal, rentVal, holdMonths)
-    return r.monthlyCF != null && r.coc != null && r.monthlyCF >= 200 && r.coc >= 8
-  }
-
-  // Each lever solved independently — everything else held at its current value.
-  const rentThreshold = rent > 0
-    ? bisectThreshold(r => isBuy(arv, reno, r), rent, rent + 3000)
-    : null
-  const renoThreshold = reno > 0 && rent > 0
-    ? bisectThreshold(r => isBuy(arv, r, rent), 0, reno)
-    : null
-  const arvThreshold = rent > 0
-    ? bisectThreshold(a => isBuy(a, reno, rent), arv * 0.5, arv * 2)
-    : null
-
-  const round50 = n => Math.round(n / 50) * 50
-  const round1k = n => Math.round(n / 1000) * 1000
-
-  const cfColor = cf == null ? 'text-[color:var(--color-text-dim)]' : cf >= 200 ? 'text-[color:var(--color-success-text)]' : cf >= 0 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
-  const cocColor = coc == null ? 'text-[color:var(--color-text-dim)]' : coc >= 8 ? 'text-[color:var(--color-success-text)]' : coc >= 5 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+  // Current-scenario numbers at today's actual purchase-price assumption
+  // (lead.mao if set, else asking price) — separate from the MAO solve,
+  // shown so Kevin can compare "where I am" vs "where the ceiling is".
+  const currentPP = lead.mao != null ? Number(lead.mao) : (lead.asking_price != null ? Number(lead.asking_price) : null)
+  const current = (arv && reno != null && rent && currentPP) ? computeBrrrrBreakdown(currentPP, arv, reno, rent, holdMonths) : null
 
   return (
-    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
-      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a Deal — BRRRR ({verdict || tier})</div>
+    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2.5">
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a BRRRR Deal</div>
 
-      <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
-        BRRRR is judged on two things: <strong className="text-[color:var(--color-text)]">Monthly Cash Flow</strong> (rent left over after mortgage, taxes, insurance)
-        and <strong className="text-[color:var(--color-text)]">Cash-on-Cash Return</strong> (that cash flow ÷ the cash you have left in the deal after refinancing). Both must clear their bar together.
-      </p>
-      <ul className="text-[11px] text-[color:var(--color-text-muted)] leading-relaxed space-y-0.5 list-none">
-        <li><strong className="text-[color:var(--color-success-text)]">BUY</strong> — ≥$200/mo cash flow AND ≥8% cash-on-cash. Solid rental, comfortably self-sustaining.</li>
-        <li><strong className="text-[color:var(--color-warn-text)]">CONDITIONAL</strong> — ≥$100/mo AND ≥5% cash-on-cash. Works, but with little cushion for vacancy, repairs, or rent coming in under estimate.</li>
-        <li><strong className="text-[color:var(--color-danger-text)]">FAIL</strong> — below either bar. Not viable as a buy-and-hold rental at these numbers; would need to change rent, ARV, or reno to work (see below).</li>
-      </ul>
-
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Monthly Cash Flow</div>
-          <div className={`text-[14px] font-bold ${cfColor}`}>{cf != null ? fc(cf) + '/mo' : '— (no rent set)'}</div>
-        </div>
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Cash-on-Cash Return</div>
-          <div className={`text-[14px] font-bold ${cocColor}`}>{coc != null ? pct(coc) : '—'}</div>
-        </div>
+      <div className="text-[11px] text-[color:var(--color-text-muted)]">
+        HAT requirements: <strong className="text-[color:var(--color-text)]">positive monthly cash flow</strong> and
+        <strong className="text-[color:var(--color-text)]"> less than {fc(BRRRR_MAX_CASH_LEFT_IN)} cash left in after refinance</strong>.
       </div>
 
-      {rent > 0 ? (
-        <div className="border-t border-[color:var(--color-line)] pt-2 space-y-1.5">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold">To make this a BUY — pick one lever (each shown holding the others as-is):</div>
-
-          {tier === 'BUY' ? (
-            <p className="text-[11px] text-[color:var(--color-success-text)]">Already there — no changes needed.</p>
-          ) : (
-            <>
-              <p className="text-[11px] text-[color:var(--color-accent-text)]">
-                <strong>Rent</strong> would need to reach {rentThreshold != null ? <><strong>{fc(round50(rentThreshold))}/mo</strong> (currently {fc(rent)}/mo — {fc(round50(rentThreshold) - rent)} short)</> : 'a level not realistic to reach'}.
-              </p>
-              <p className="text-[11px] text-[color:var(--color-accent-text)]">
-                <strong>Renovation cost</strong> would need to drop to {renoThreshold != null ? <><strong>{fc(round1k(renoThreshold))}</strong> or less (currently {fc(reno)})</> : reno > 0 ? "no amount fixes this on its own — cash flow is still short even at $0 reno" : "n/a (already $0)"}.
-              </p>
-              <p className="text-[11px] text-[color:var(--color-accent-text)]">
-                <strong>ARV</strong> would need to come in {arvThreshold != null ? <>at <strong>{fc(round1k(arvThreshold))}</strong> {arvThreshold < arv ? 'or lower' : 'or higher'} (currently {fc(arv)})</> : 'at a level not realistic to reach'}.
-                {arvThreshold != null && arvThreshold < arv && ' A lower ARV means a smaller refi loan and payment — better cash flow, but less cash back at refi.'}
-              </p>
-              <p className="text-[10px] text-[color:var(--color-text-dim)] italic pt-1">
-                Purchase price alone doesn't move monthly cash flow here — the refi loan is fixed at 70% of ARV regardless of what you paid — but a lower offer still improves your cash-on-cash return.
-              </p>
-            </>
-          )}
-        </div>
-      ) : (
-        <p className="text-[11px] text-[color:var(--color-warn-text)] border-t border-[color:var(--color-line)] pt-2">
-          No rent estimate is set — cash flow can't be computed. Add a Rent Estimate in Financials, then re-run.
+      {result.mao == null ? (
+        <p className="text-[11.5px] text-[color:var(--color-warn-text)] border-t border-[color:var(--color-line)] pt-2">
+          BRRRR MAO: <strong>NOT READY</strong> — {result.reason}. {rent == null ? 'Add a Rent Estimate in Financials.' : arv == null ? 'Add an ARV in Financials.' : 'Add a renovation cost in Financials.'}
         </p>
+      ) : (
+        <>
+          {current && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Cash Left In (current)</div>
+                <div className={`text-[14px] font-bold ${current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                  {fc(current.totalCashInvested)} {current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? '✓' : '✗'}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Monthly Cash Flow (current)</div>
+                <div className={`text-[14px] font-bold ${current.monthlyCF > 0 ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                  {current.monthlyCF != null ? `${fc(current.monthlyCF)}/mo ${current.monthlyCF > 0 ? '✓' : '✗'}` : '—'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-[color:var(--color-line)] pt-2 grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">BRRRR MAO</div>
+              <div className="text-[16px] font-bold text-[color:var(--color-text)]">{fc(Math.round(result.mao / 100) * 100)}</div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Limiting Factor</div>
+              <div className="text-[13px] font-bold text-[color:var(--color-accent-text)]">
+                {result.limitingFactor === 'CASH_LEFT_IN' ? 'Cash Left In' : 'Cash Flow'}
+              </div>
+            </div>
+          </div>
+          <div className="text-[10.5px] text-[color:var(--color-text-dim)]">
+            At {fc(Math.round(result.mao / 100) * 100)}: cash left in {fc(result.cashLeftInAtMao)}, cash flow {result.cashFlowAtMao != null ? `${fc(result.cashFlowAtMao)}/mo` : '—'}.
+          </div>
+
+          {currentPP != null && currentPP > result.mao && (
+            <p className="text-[11px] text-[color:var(--color-text-muted)]">
+              To make this work: purchase price needs to be ≤ {fc(Math.round(result.mao / 100) * 100)} (currently {fc(currentPP)}), assuming ARV/reno/rent stay the same.
+            </p>
+          )}
+        </>
       )}
     </div>
   )
 }
 
-// Explains a Flip verdict in plain terms and shows exactly what would need to
-// change to cross into BUY — checked one lever at a time (purchase price, ARV,
-// renovation cost), holding the other two at their current values.
-function FlipRealityCheck({ lead, verdict, score }) {
-  const arv  = Number(lead.arv || 0)
-  const reno = Number(lead.renovation_cost ?? 0)
-  const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
-  const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
-  if (!arv || !pp) return null
+// Capability #19.1, Section 12 — "Path to a Flip Deal", rebuilt around
+// calculateFlipMAO() (src/lib/calculations.js) instead of a bisected
+// per-lever price search — Flip MAO is linear in purchase price so the
+// closed-form solve is exact, not approximated. $30K/$40K bar aligned to
+// HAT's actual minimum (Section 6) — a $30,728 deal is no longer labeled
+// CONDITIONAL by a stale $40K rule; "Strong" is descriptive context, not
+// a lower verdict for the acceptable tier.
+function FlipRealityCheck({ lead }) {
+  const arv  = lead.arv != null ? Number(lead.arv) : null
+  const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
+  if (!arv || reno == null) return null
   const holdMonths = lead.hold_months || 6
 
-  const f = computeFlipBreakdown(pp, arv, reno, holdMonths)
-  const profit = f.totalProfit
+  const flipMao = calculateFlipMAO(arv, reno, holdMonths)
+  const currentPP = lead.mao != null ? Number(lead.mao) : (lead.asking_price != null ? Number(lead.asking_price) : null)
+  const current = currentPP != null ? computeFlipBreakdown(currentPP, arv, reno, holdMonths) : null
+  const profit = current?.totalProfit ?? null
 
-  const tier = profit >= 40000 ? 'BUY' : profit >= 30000 ? 'CONDITIONAL' : 'PASS'
-
-  const isBuy = (arvVal, renoVal, ppVal) => computeFlipBreakdown(ppVal, arvVal, renoVal, holdMonths).totalProfit >= 40000
-
-  const ppThreshold   = bisectThreshold(p => isBuy(arv, reno, p), pp * 0.5, pp * 1.5)
-  const arvThreshold  = bisectThreshold(a => isBuy(a, reno, pp), arv * 0.5, arv * 2)
-  const renoThreshold = reno > 0 ? bisectThreshold(r => isBuy(arv, r, pp), 0, reno) : null
-
-  const round1k = n => Math.round(n / 1000) * 1000
-
-  const profitColor = profit >= 40000 ? 'text-[color:var(--color-success-text)]' : profit >= 30000 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
-  const roiColor = f.roi >= 15 ? 'text-[color:var(--color-success-text)]' : f.roi >= 8 ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-danger-text)]'
+  const meetsTarget = profit != null && profit >= FLIP_MIN_PROFIT_TARGET
+  const strong = profit != null && profit >= 40000
+  const profitColor = strong ? 'text-[color:var(--color-success-text)]' : meetsTarget ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'
 
   return (
-    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
-      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a Deal — Flip ({verdict || tier})</div>
+    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2.5">
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a Flip Deal</div>
 
-      <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
-        Flip is judged mainly on <strong className="text-[color:var(--color-text)]">Total Profit</strong> after sale (ARV × 93%, minus the HML loan, holding costs, and cash to close).
-      </p>
-      <ul className="text-[11px] text-[color:var(--color-text-muted)] leading-relaxed space-y-0.5 list-none">
-        <li><strong className="text-[color:var(--color-success-text)]">BUY</strong> — ≥$40,000 profit. Healthy margin, safe to proceed even if costs run a bit over.</li>
-        <li><strong className="text-[color:var(--color-warn-text)]">CONDITIONAL</strong> — $30,000–$39,999 profit. Still clears the minimum bar, but the margin is thin — double-check your reno estimate and ARV comps before committing, since a small overrun could wipe out the profit.</li>
-        <li><strong className="text-[color:var(--color-danger-text)]">PASS</strong> — under $30,000. Not enough cushion for the risk of a flip; look for a lower price or walk away.</li>
-      </ul>
-
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit If Purchased At MAO</div>
-          <div className={`text-[14px] font-bold ${profitColor}`}>{fc(profit)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">ROI ({holdMonths}mo)</div>
-          <div className={`text-[14px] font-bold ${roiColor}`}>{pct(f.roi)}</div>
-        </div>
+      <div className="text-[11px] text-[color:var(--color-text-muted)]">
+        HAT minimum profit target: <strong className="text-[color:var(--color-text)]">{fc(FLIP_MIN_PROFIT_TARGET)}</strong>
       </div>
 
-      <div className="border-t border-[color:var(--color-line)] pt-2 space-y-1.5">
-        <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold">To make this a BUY — pick one lever (each shown holding the others as-is):</div>
+      {current && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Projected Profit (current)</div>
+            <div className={`text-[14px] font-bold ${profitColor}`}>{fc(profit)}</div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Status</div>
+            <div className={`text-[12.5px] font-bold ${profitColor}`}>
+              {strong ? 'STRONG — exceeds target' : meetsTarget ? 'MEETS MINIMUM FLIP TARGET' : `$${(FLIP_MIN_PROFIT_TARGET - profit).toLocaleString()} short of target`}
+            </div>
+          </div>
+        </div>
+      )}
 
-        {tier === 'BUY' ? (
-          <p className="text-[11px] text-[color:var(--color-success-text)]">Already there — no changes needed.</p>
-        ) : (
-          <>
-            <p className="text-[11px] text-[color:var(--color-accent-text)]">
-              <strong>Purchase Price</strong> would need to be {ppThreshold != null ? <><strong>{fc(round1k(ppThreshold))}</strong> or lower (currently {fc(pp)})</> : 'lower than is realistic here'}.
-            </p>
-            <p className="text-[11px] text-[color:var(--color-accent-text)]">
-              <strong>ARV</strong> would need to be {arvThreshold != null ? <><strong>{fc(round1k(arvThreshold))}</strong> or higher (currently {fc(arv)})</> : 'higher than is realistic here'}.
-            </p>
-            <p className="text-[11px] text-[color:var(--color-accent-text)]">
-              <strong>Renovation cost</strong> would need to drop to {renoThreshold != null ? <><strong>{fc(round1k(renoThreshold))}</strong> or less (currently {fc(reno)})</> : reno > 0 ? "no amount fixes this on its own — profit is still short even at $0 reno" : "n/a (already $0)"}.
-            </p>
-          </>
-        )}
+      <div className="border-t border-[color:var(--color-line)] pt-2">
+        <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
+        <div className="text-[16px] font-bold text-[color:var(--color-text)]">{flipMao != null ? fc(Math.round(flipMao / 100) * 100) : '—'}</div>
       </div>
+
+      {!meetsTarget && flipMao != null && (
+        <p className="text-[11px] text-[color:var(--color-text-muted)]">
+          Any ONE of these would bring the deal to HAT's {fc(FLIP_MIN_PROFIT_TARGET)} minimum target, assuming the other assumptions stay unchanged:
+        </p>
+      )}
+      {!meetsTarget && flipMao != null && (() => {
+        const round1k = n => Math.round(n / 1000) * 1000
+        const arvNeeded = calculateFlipMAO(arv, reno, holdMonths, FLIP_MIN_PROFIT_TARGET) != null && currentPP != null
+          ? bisectThreshold(a => computeFlipBreakdown(currentPP, a, reno, holdMonths).totalProfit >= FLIP_MIN_PROFIT_TARGET, arv * 0.5, arv * 2)
+          : null
+        const renoNeeded = reno > 0 && currentPP != null
+          ? bisectThreshold(r => computeFlipBreakdown(currentPP, arv, r, holdMonths).totalProfit >= FLIP_MIN_PROFIT_TARGET, 0, reno)
+          : null
+        return (
+          <div className="space-y-1">
+            {currentPP != null && (
+              <div className="flex items-center justify-between text-[11.5px]">
+                <span className="text-[color:var(--color-text-muted)]">Price — current {fc(currentPP)}</span>
+                <span className="font-semibold text-[color:var(--color-accent-text)]">need ≤ {fc(Math.round(flipMao / 1000) * 1000)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-[11.5px]">
+              <span className="text-[color:var(--color-text-muted)]">ARV — current {fc(arv)}</span>
+              <span className="font-semibold text-[color:var(--color-accent-text)]">{arvNeeded != null ? `need ≥ ${fc(round1k(arvNeeded))}` : 'not reachable at a realistic level'}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11.5px]">
+              <span className="text-[color:var(--color-text-muted)]">Rehab — current {fc(reno)}</span>
+              <span className="font-semibold text-[color:var(--color-accent-text)]">{renoNeeded != null ? `need ≤ ${fc(round1k(renoNeeded))}` : reno > 0 ? 'no amount fixes this alone' : 'n/a (already $0)'}</span>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -353,17 +292,17 @@ function FlipRealityCheck({ lead, verdict, score }) {
 function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
   const [targetProfit, setTargetProfit] = useState('30000')
   const parsed = parseFloat(targetProfit.replace(/[^0-9.]/g, '')) || 0
-  const maxOffer = arv ? maxOfferForProfit(arv, reno, holdMonths, parsed) : null
+  const maxOffer = arv ? calculateFlipMAO(arv, reno, holdMonths, parsed) : null
   const roundedMaxOffer = maxOffer != null ? Math.round(maxOffer / 100) * 100 : null
   const diff = roundedMaxOffer != null ? roundedMaxOffer - currentPP : null
 
   return (
     <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3">
       <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-2">
-        Target Profit → Max Offer
+        Target Profit → Flip MAO
       </div>
       <p className="text-[10.5px] text-[color:var(--color-accent-text)] opacity-80 mb-2 leading-snug">
-        MAO above uses the fixed 75% rule. If you'd accept a lower profit to win the deal, this shows what purchase price that allows instead.
+        Flip MAO above uses HAT's {fc(FLIP_MIN_PROFIT_TARGET)} default target. If you'd accept a different profit to win the deal, this shows what purchase price that allows instead.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex flex-col gap-0.5">
@@ -1202,10 +1141,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       })()}
 
       {hasAnalysis && strategy === 'brrrr' && (
-        <BrrrrRealityCheck lead={lead} verdict={lead.deal_analysis?.verdict} score={lead.deal_analysis?.score} />
+        <BrrrrRealityCheck lead={lead} />
       )}
       {hasAnalysis && strategy !== 'brrrr' && (
-        <FlipRealityCheck lead={lead} verdict={lead.deal_analysis?.verdict} score={lead.deal_analysis?.score} />
+        <FlipRealityCheck lead={lead} />
       )}
 
       {/* Override inputs — shown after analysis is available */}

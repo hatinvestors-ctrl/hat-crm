@@ -395,7 +395,12 @@ function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthl
 
   if (strategyLabel === 'flip') {
     const m = computeFlipMetrics(pp, rv, reno, holdMonths)
-    const verdict = m.totalProfit >= 40000 ? 'BUY' : m.totalProfit >= 30000 ? 'CONDITIONAL' : 'PASS'
+    // Capability #19.1, Section 6 — HAT's minimum acceptable Flip profit is
+    // $30,000 (FLIP_MIN_PROFIT_TARGET in src/lib/calculations.js); a deal
+    // that clears it is BUY, full stop — no longer demoted to CONDITIONAL
+    // by the old $40K bar. Score (continuous, below) still reflects the
+    // difference between an acceptable and an excellent margin.
+    const verdict = m.totalProfit >= 30000 ? 'BUY' : 'PASS'
     const score = Math.max(0, Math.min(100, Math.round(50 + (m.totalProfit - 30000) / 1500)))
     computedBlock = `
 PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
@@ -415,8 +420,11 @@ PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
     jsonDefaults = { verdict, score, profit: Math.round(m.totalProfit), roi: Math.round(m.roi * 10) / 10, annualized_roi: Math.round(m.annualizedRoi * 10) / 10, total_cash_needed: Math.round(m.totalCashNeeded) }
   } else {
     const m = computeBrrrrMetrics(pp, rv, reno, rent, holdMonths)
-    const verdict = m.coc != null && m.coc >= 8 && (m.monthlyCF ?? 0) >= 200 ? 'BUY'
-      : m.coc != null && m.coc >= 5 && (m.monthlyCF ?? 0) >= 100 ? 'CONDITIONAL' : 'PASS'
+    // Capability #19.1, Section 8 — HAT's BRRRR requirement is binary:
+    // positive monthly cash flow AND less than $30K cash left in after
+    // refinance (BRRRR_MAX_CASH_LEFT_IN). Replaces the old CoC-tiered
+    // BUY/CONDITIONAL/PASS bands.
+    const verdict = (m.monthlyCF ?? 0) > 0 && (m.totalCashInvested ?? Infinity) < 30000 ? 'BUY' : 'PASS'
     const score = m.coc != null ? Math.max(0, Math.min(100, Math.round(50 + (m.coc - 6) * 5))) : 20
     computedBlock = `
 PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
