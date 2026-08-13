@@ -18,6 +18,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { computeDealBriefInputHash } from '../../lib/dealBriefInputs'
+import { getArvProvenance, getDecisionMaturity } from '../../lib/arvProvenance'
 
 const REC_THEME = {
   ACT_NOW: { icon: '🔥', bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' },
@@ -133,6 +134,31 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
           <Chip label="Urgency" value={d.urgency?.level} />
         </div>
       </div>
+
+      {/* Capability #16.1 — compact maturity indicator (Section 3/7). Reuses
+          existing Confidence/missing output — no new score. On-market only
+          (ARV/comps concept doesn't apply the same way off-market). */}
+      {!lead.is_distressed && (() => {
+        const maturity = getDecisionMaturity(lead)
+        if (!maturity) return null
+        const prov = getArvProvenance(lead)
+        return (
+          <div className="px-3.5 pb-2 -mt-1 text-[11px] text-[color:var(--color-text-dim)] flex items-center gap-1.5 flex-wrap">
+            {maturity === 'PRELIMINARY' ? (
+              <>
+                <span className="font-bold text-[color:var(--color-warn-text)]">🟡 PRELIMINARY</span>
+                <span>— Missing: {(d.confidence?.missing || []).slice(0, 3).join(' · ') || 'more data'}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-bold text-[color:var(--color-success-text)]">🟢 REFINED</span>
+                {prov.comps_available && <span>— Based on {prov.comps_count} comp{prov.comps_count === 1 ? '' : 's'}</span>}
+                {prov.arv != null && <span>· ARV ${Number(prov.arv).toLocaleString()} ({prov.source === 'AI_COMPS' ? 'AI + comps' : 'manual/unverified'})</span>}
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {isOverridden && d.human_override?.reason && (
         <div className="px-3.5 pb-2 text-[11.5px] text-[color:var(--color-text-dim)]">⚠ {d.human_override.reason}</div>

@@ -11,6 +11,7 @@ import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
 import { isDistressedLead } from '../../lib/distressInfo'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../../lib/leadPriority'
+import { recalculateDecisionV2 } from '../../lib/decisionV2Persistence'
 
 // Parse the AI-computed MAO from the generated notes text ("Our MAO: $X")
 // so lead.mao always matches exactly what the AI Summary shows.
@@ -673,9 +674,19 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         ...(lead.property_type == null && snapshot.property_type != null ? { property_type: snapshot.property_type } : {}),
         ...(lead.days_on_market == null && snapshot.days_on_market != null ? { days_on_market: snapshot.days_on_market } : {}),
       }
+      // Capability #16.1 real finding — this write previously used
+      // `finalArv` (coreResult.computed_arv ?? arvForCore) unconditionally,
+      // which could silently overwrite a manually-set lead.arv if the AI's
+      // own returned computed_arv ever diverged from arvForCore (the value
+      // that already correctly protects a manual entry, per this
+      // function's own comment above: "ARV set in Financials is the single
+      // source of truth"). reRunWithOverrides() already gets this right;
+      // this path now matches it — never overwrite an ARV Kevin already
+      // set, only ever fill it in when it was empty.
+      const arvToWrite = lead.arv ? null : finalArv
       const dbUpdate = {
         ai_notes: fullNotes,
-        ...(finalArv !== null && finalArv !== undefined ? { arv: finalArv } : {}),
+        ...(arvToWrite !== null && arvToWrite !== undefined ? { arv: arvToWrite } : {}),
         ...(finalMao !== null && finalMao !== undefined ? { mao: finalMao } : {}),
         ...backfill,
       }
@@ -687,6 +698,16 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
             if (error) console.warn('starting_offer column not yet added — run migration:', error.message)
           })
         }
+        // Capability #16.1 — this write bypasses useLeadUpdate.js (the hook
+        // #15.5.1 wired for automatic V2 recalculation), so without this
+        // call an improved ARV/MAO from AI+comps would sit in the DB
+        // without decision_v2 ever reflecting it — exactly the gap this
+        // capability closes. Deterministic only, reuses the existing
+        // recalculation architecture; no new engine, no LLM call here.
+        // Awaited (fast, deterministic) so dbUpdate.decision_v2 is fresh
+        // before the onUpdated() call below merges it into UI state.
+        const freshDecision = await recalculateDecisionV2(supabase, { ...lead, ...dbUpdate }, 'PROPERTY_DATA_UPDATE').catch(() => null)
+        if (freshDecision) { dbUpdate.decision_v2 = freshDecision; dbUpdate.decision_v2_updated_at = freshDecision.calculated_at }
       }
 
       setLocalNotes(fullNotes)
@@ -833,6 +854,9 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
             if (error) console.warn('starting_offer column not yet added — run migration:', error.message)
           })
         }
+        // Capability #16.1 — same automatic-recalculation gap fix as runGenerate() above.
+        const freshDecision = await recalculateDecisionV2(supabase, { ...lead, ...supabaseUpdate }, 'PROPERTY_DATA_UPDATE').catch(() => null)
+        if (freshDecision) { supabaseUpdate.decision_v2 = freshDecision; supabaseUpdate.decision_v2_updated_at = freshDecision.calculated_at }
       }
       setLocalNotes(fullNotes)
       const reRunDealAnalysis = lead.deal_analysis ? {
@@ -1008,7 +1032,12 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                 staleness.stale && hasAnalysis ? 'bg-[color:var(--color-warn)]' : 'bg-[color:var(--color-accent)]'
               }`}
             >
-              {!hasAnalysis ? '✦ Run Analysis' : '⚠ Re-run Analysis'}
+              {/* Capability #16.1, Section 8 — a preliminary V2 decision
+                  already exists for this lead before this button is ever
+                  pressed (computed at ingestion/backfill), so "Run
+                  Analysis" implying a first-time analysis would be
+                  misleading. Only reframed when that's actually true. */}
+              {!hasAnalysis ? (lead.decision_v2 ? '✦ Get Comps & Detailed AI' : '✦ Run Analysis') : '⚠ Re-run Analysis'}
             </button>
           ) : (
             <span className="flex items-center gap-2 text-[12px]">

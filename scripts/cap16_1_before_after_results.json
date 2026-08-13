@@ -1,0 +1,142 @@
+[
+  {
+    "before": {
+      "label": "BEFORE",
+      "address": "1012 BECKNER Avenue, Jacksonville, FL 32218ds",
+      "comps": 0,
+      "arv": 400000,
+      "arv_source": "MANUAL_OR_UNVERIFIED",
+      "reno": 50000,
+      "opportunity": 70,
+      "confidence": 90,
+      "recommendation": "ACT_NOW",
+      "next_action": "SEND_OFFER",
+      "maturity": "REFINED"
+    },
+    "after": {
+      "label": "AFTER",
+      "address": "1012 BECKNER Avenue, Jacksonville, FL 32218ds",
+      "comps": 6,
+      "arv": 400000,
+      "arv_source": "AI_COMPS",
+      "reno": 50000,
+      "opportunity": 70,
+      "confidence": 90,
+      "recommendation": "ACT_NOW",
+      "next_action": "SEND_OFFER",
+      "maturity": "REFINED"
+    }
+  },
+  {
+    "before": {
+      "label": "BEFORE",
+      "address": "7859 Denham Rd W",
+      "comps": 0,
+      "arv": null,
+      "arv_source": null,
+      "reno": null,
+      "opportunity": 15,
+      "confidence": 30,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "PRELIMINARY"
+    },
+    "after": {
+      "label": "AFTER",
+      "address": "7859 Denham Rd W",
+      "comps": 0,
+      "arv": null,
+      "arv_source": null,
+      "reno": null,
+      "opportunity": 15,
+      "confidence": 30,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "PRELIMINARY"
+    }
+  },
+  {
+    "before": {
+      "label": "BEFORE",
+      "address": "8321 Old Plank Rd",
+      "comps": 0,
+      "arv": 220000,
+      "arv_source": "MANUAL_OR_UNVERIFIED",
+      "reno": 80000,
+      "opportunity": 38,
+      "confidence": 90,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "REFINED"
+    },
+    "after": {
+      "label": "AFTER",
+      "address": "8321 Old Plank Rd",
+      "comps": 3,
+      "arv": 220000,
+      "arv_source": "AI_COMPS",
+      "reno": 80000,
+      "opportunity": 52,
+      "confidence": 90,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "REFINED"
+    }
+  },
+  {
+    "before": {
+      "label": "BEFORE",
+      "address": "4618 HERCULES Avenue, Jacksonville, FL 32205",
+      "comps": 0,
+      "arv": 240000,
+      "arv_source": "MANUAL_OR_UNVERIFIED",
+      "reno": 41000,
+      "opportunity": 43,
+      "confidence": 90,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "REFINED"
+    },
+    "after": {
+      "label": "AFTER",
+      "address": "4618 HERCULES Avenue, Jacksonville, FL 32205",
+      "comps": 7,
+      "arv": 240000,
+      "arv_source": "AI_COMPS",
+      "reno": 41000,
+      "opportunity": 43,
+      "confidence": 90,
+      "recommendation": "FOLLOW_UP",
+      "next_action": "FOLLOW_UP",
+      "maturity": "REFINED"
+    }
+  },
+  {
+    "before": {
+      "label": "BEFORE",
+      "address": "12186 Pebble Point Dr",
+      "comps": 0,
+      "arv": null,
+      "arv_source": null,
+      "reno": null,
+      "opportunity": 23,
+      "confidence": 45,
+      "recommendation": "PASS",
+      "next_action": "PASS",
+      "maturity": "PRELIMINARY"
+    },
+    "after": {
+      "label": "AFTER",
+      "address": "12186 Pebble Point Dr",
+      "comps": 0,
+      "arv": null,
+      "arv_source": null,
+      "reno": null,
+      "opportunity": 23,
+      "confidence": 45,
+      "recommendation": "PASS",
+      "next_action": "PASS",
+      "maturity": "PRELIMINARY"
+    }
+  }
+]
