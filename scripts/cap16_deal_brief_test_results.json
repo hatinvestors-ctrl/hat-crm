@@ -1,0 +1,375 @@
+[
+  {
+    "address": "1012 BECKNER Avenue, Jacksonville, FL 32218ds",
+    "context": {
+      "address": "1012 BECKNER Avenue, Jacksonville, FL 32218ds",
+      "market_type": "on_market",
+      "source": "mls",
+      "fit": "FIT",
+      "opportunity": 70,
+      "confidence": 90,
+      "urgency": "MEDIUM",
+      "recommendation": "ACT_NOW",
+      "next_best_action": "SEND_OFFER",
+      "strategy": "FLIP",
+      "why": [
+        "Matches HAT Buy Box",
+        "FLIP economics: 35/40",
+        "Ask already at/below MAO",
+        "Preferred HAT geography"
+      ],
+      "risks_missing": [],
+      "asking_price": 239900,
+      "arv": 400000,
+      "renovation_cost": 50000,
+      "rent_estimate": null,
+      "days_on_market": null,
+      "list_price": null,
+      "price_guidance": {
+        "ready": true,
+        "ask": 239900,
+        "mao": 250000,
+        "opening": 239900,
+        "target": 250000,
+        "ceiling": 250000,
+        "strategy": "FLIP"
+      },
+      "lien_amount": null,
+      "owner_name": null,
+      "contact_ready": true,
+      "listing_agent_name": null,
+      "notes": "dfjdsklfjlkdsjflddsffd",
+      "workflow_status": "working_project"
+    },
+    "brief": {
+      "summary": "1012 Beckner Ave is an on-market FLIP opportunity in HAT's preferred geography with strong 35/40 economics. Ask is at MAO; high confidence (90%) and medium urgency warrant immediate offer.",
+      "why": [
+        "Matches HAT Buy Box exactly",
+        "FLIP spread: $50K reno, $400K ARV, $239.9K ask = healthy margin",
+        "Ask price already at/below MAO ($250K ceiling)",
+        "High confidence (90%) and medium urgency",
+        "On-market, contact-ready — no research delay"
+      ],
+      "missing": [
+        "Listing agent name/contact details",
+        "Days on market (competitive pressure unknown)",
+        "Property condition details/rehab scope confirmation",
+        "MLS link or listing URL for full disclosures",
+        "Verification that $50K reno estimate is locked"
+      ],
+      "questions": [
+        "What is the current DOM and any competing offers?",
+        "Can we get the MLS listing URL to review disclosure/inspection reports?",
+        "Is the $50K reno estimate from a walk-through, or preliminary?",
+        "Are there any liens, code violations, or title issues in the public record?",
+        "What is the listing agent's timeline and negotiation posture?"
+      ],
+      "objective": "Submit offer at or below MAO ($250K) today to secure the deal before competing interest.",
+      "message_sms": "Hi — we're interested in 1012 Beckner Ave in Jacksonville. Can we schedule a quick walkthrough and get your thoughts on timeline and terms? Thanks.",
+      "message_email": "Hello,\n\nWe're actively acquiring investment properties in Jacksonville and came across 1012 Beckner Ave. We'd like to schedule a brief property walkthrough at your earliest convenience and discuss your timeline and expectations.\n\nThank you,\nKevin\nHAT Investors",
+      "risk_notes": [
+        "No listing agent name provided — contact discovery required first",
+        "Reno cost is estimate only; scope not yet verified on-site",
+        "ARV of $400K assumes market recovery; confirm comps are recent",
+        "On-market listing may attract other investors; speed is critical"
+      ]
+    }
+  },
+  {
+    "address": "5646 RICKER Road, Jacksonville, FL 32244",
+    "context": {
+      "address": "5646 RICKER Road, Jacksonville, FL 32244",
+      "market_type": "on_market",
+      "source": "other",
+      "fit": "FIT",
+      "opportunity": 15,
+      "confidence": 70,
+      "urgency": "HIGH",
+      "recommendation": "FOLLOW_UP",
+      "next_best_action": "FOLLOW_UP",
+      "strategy": "UNKNOWN",
+      "why": [
+        "Matches HAT Buy Box",
+        "Preferred HAT geography",
+        "Follow-up overdue"
+      ],
+      "risks_missing": [
+        "Renovation cost unknown"
+      ],
+      "asking_price": 195000,
+      "arv": 245000,
+      "renovation_cost": null,
+      "rent_estimate": null,
+      "days_on_market": null,
+      "list_price": null,
+      "price_guidance": {
+        "ready": false,
+        "missing": [
+          "Renovation estimate"
+        ],
+        "next": "ESTIMATE_REHAB"
+      },
+      "lien_amount": null,
+      "owner_name": null,
+      "contact_ready": false,
+      "listing_agent_name": null,
+      "notes": "",
+      "workflow_status": "follow_up"
+    },
+    "brief": {
+      "summary": "5646 Ricker Road is an on-market fit in HAT's preferred geography with a 15% opportunity spread. Follow-up is overdue—this needs contact info and a rehab cost estimate to move forward.",
+      "why": [
+        "Matches HAT Buy Box criteria",
+        "Located in preferred HAT geography",
+        "15% opportunity margin identified",
+        "70% confidence level supports pursuit",
+        "Follow-up action already due"
+      ],
+      "missing": [
+        "Listing agent contact information",
+        "Renovation cost estimate (critical for MAO validation)",
+        "Rent estimate for hold/refi scenarios",
+        "Days on market / pricing momentum"
+      ],
+      "questions": [
+        "Who is the listing agent, and what is their contact info?",
+        "What is the estimated renovation cost to reach the $245k ARV?",
+        "How many days has this been on market?",
+        "What is the estimated monthly rent at stabilized condition?"
+      ],
+      "objective": "Obtain listing agent contact details and commission a rehab cost estimate to validate deal economics before making an offer.",
+      "message_sms": null,
+      "message_email": null,
+      "risk_notes": [
+        "Renovation cost unknown—cannot confirm true opportunity until estimated",
+        "No listing agent identified yet; initial outreach step incomplete",
+        "Confidence at 70%, not higher; verify condition independently",
+        "Contact readiness shows false; research required before outreach"
+      ]
+    }
+  },
+  {
+    "address": "7859 Denham Rd W",
+    "context": {
+      "address": "7859 Denham Rd W",
+      "market_type": "on_market",
+      "source": "redfin_auto",
+      "fit": "FIT",
+      "opportunity": 15,
+      "confidence": 30,
+      "urgency": "HIGH",
+      "recommendation": "FOLLOW_UP",
+      "next_best_action": "FOLLOW_UP",
+      "strategy": "UNKNOWN",
+      "why": [
+        "Matches HAT Buy Box",
+        "Preferred HAT geography",
+        "Follow-up overdue"
+      ],
+      "risks_missing": [
+        "ARV unknown",
+        "Renovation cost unknown",
+        "Property characteristics incomplete"
+      ],
+      "asking_price": 137500,
+      "arv": null,
+      "renovation_cost": null,
+      "rent_estimate": null,
+      "days_on_market": null,
+      "list_price": 137500,
+      "price_guidance": {
+        "ready": false,
+        "missing": [
+          "ARV",
+          "Renovation estimate"
+        ],
+        "next": "VERIFY_ARV"
+      },
+      "lien_amount": null,
+      "owner_name": null,
+      "contact_ready": false,
+      "listing_agent_name": null,
+      "notes": "[ARV ~$170K | MAO ~$47K | Score: 40 MAYBE] Back on market. North Jax (32208 preferred). 2 bed limits ARV. Est reno $50K unknown condition. Spread ~$32K — borderline, negotiate down or verify reno scope. Keywords: back on market.",
+      "workflow_status": "follow_up"
+    },
+    "brief": {
+      "summary": "Back-on-market 2BR on Denham Rd in preferred 32208 area. $137.5K ask with ~$170K estimated ARV creates a $32K spread — tight but workable if renovation scope is verified and price negotiates down.",
+      "why": [
+        "Matches HAT Buy Box and preferred North Jax geography (32208)",
+        "Back on market suggests renewed negotiating window",
+        "Estimated $170K ARV supports deal viability if execution is tight",
+        "HIGH urgency flag and overdue follow-up indicate time sensitivity",
+        "2BR limits ceiling but aligns with known HAT portfolio"
+      ],
+      "missing": [
+        "ARV confirmation (currently estimated ~$170K)",
+        "Renovation scope and cost detail (listed as ~$50K, unverified)",
+        "Actual property condition (photos, inspection, rehab items)",
+        "Listing agent contact info to initiate conversation",
+        "Days on market and reason for relisting"
+      ],
+      "questions": [
+        "Can we pull current MLS photos and listing details to assess actual condition?",
+        "What triggered relisting? Any price reduction opportunity from original ask?",
+        "Who is the listing agent and are they open to investor inquiries?",
+        "Can we get a field walk to validate $50K reno estimate or refine it?",
+        "What comps are supporting the ~$170K ARV in this micro-market?"
+      ],
+      "objective": "Secure listing agent contact, pull full listing details and photos, and assess whether condition supports $50K reno assumption — then decide negotiate-down vs. pass.",
+      "message_sms": null,
+      "message_email": null,
+      "risk_notes": [
+        "Spread is $32K — thin margin for error if renovation exceeds estimate",
+        "ARV and reno cost both unverified; deal viability hinges on accuracy",
+        "Back-on-market status suggests it may have issues or was overpriced initially",
+        "2BR ceiling limits exit strategies (rental, resale, hold)",
+        "No listing agent name available yet — research step required before outreach"
+      ]
+    }
+  },
+  {
+    "address": "12123   HOPKINTON CT",
+    "context": {
+      "address": "12123   HOPKINTON CT",
+      "market_type": "off_market",
+      "source": "lispendens_duval_clerk",
+      "fit": "FIT",
+      "opportunity": 80,
+      "confidence": 100,
+      "urgency": "HIGH",
+      "recommendation": "ACT_NOW",
+      "next_best_action": "CONTACT_OWNER",
+      "strategy": null,
+      "why": [
+        "Matches HAT Buy Box",
+        "Mortgage foreclosure",
+        "Owner identity verified",
+        "Contact available",
+        "Corroborated by multiple independent signals",
+        "Foreclosure filed 2 days ago"
+      ],
+      "risks_missing": [],
+      "asking_price": null,
+      "arv": null,
+      "renovation_cost": null,
+      "rent_estimate": null,
+      "days_on_market": null,
+      "list_price": null,
+      "price_guidance": null,
+      "distress_type": "lis_pendens",
+      "filing_date": "2026-08-11",
+      "absentee_owner": false,
+      "lien_amount": null,
+      "owner_name": "TAYLOR DOUGLAS A JR",
+      "contact_ready": true,
+      "listing_agent_name": null,
+      "notes": "⚠ DISTRESSED OPPORTUNITY — Lis Pendens\nFiled: 2026-08-11\nCase/Instrument: 2026186098\nSource Party: TAYLOR DOUGLAS AUGUSTA JR\nOwner Match: MATCH\nAbsentee Owner: false\nParcel (Duval RE): 168142 5245\nSource: Duval County Public Record (https://or.duvalclerk.com/ (Official Records, Doc Type: LIS PENDENS))",
+      "workflow_status": "triage"
+    },
+    "brief": {
+      "summary": "Lis pendens filed 2 days ago on 12123 Hopkinton Ct — foreclosure in early stage. Owner (Taylor Douglas A Jr) is local and reachable. HIGH urgency window to initiate contact before counsel engagement escalates.",
+      "why": [
+        "Lis pendens filed 2026-08-11 — earliest phase of foreclosure process",
+        "Matches HAT Buy Box (FIT classification)",
+        "Owner identity verified and contact available",
+        "Corroborated by Duval County official records (Doc 2026186098)",
+        "Owner is not absentee — direct communication likely possible"
+      ],
+      "missing": [
+        "Current mortgage balance / lien amount",
+        "Property condition and estimated renovation cost",
+        "ARV and comparable rent estimate",
+        "Whether owner has engaged counsel or loan servicer yet"
+      ],
+      "questions": [
+        "Has owner retained legal representation, or is this still direct-to-owner window?",
+        "What is the current loan balance and timeline to foreclosure sale?",
+        "What is the property condition — occupied, vacant, any known defects?",
+        "Is owner open to a structured solution, or committed to fighting the foreclosure?"
+      ],
+      "objective": "Establish contact with Taylor Douglas A Jr today to determine motivation and readiness for a cash offer before legal escalation.",
+      "message_sms": "Hi Taylor, I'm Kevin with HAT Investors — we work with homeowners facing foreclosure to explore options that avoid court. Have 15 min to talk this week? No pressure.",
+      "message_email": "Subject: Options for 12123 Hopkinton Ct — Fast Conversation\n\nHi Taylor,\n\nI'm Kevin, acquisitions lead at HAT Investors. We specialize in helping homeowners in foreclosure find solutions quickly — including cash purchases that close in days.\n\nI noticed the recent filing on your property and wanted to reach out directly before things move further. If you're open to exploring options, I'd like to have a straightforward conversation with you this week.\n\nLet me know your availability.\n\nKevin\nHAT Investors",
+      "risk_notes": [
+        "Early-stage foreclosure — narrow window before owner counsel engagement",
+        "No asking price, ARV, or lien amount yet — offer strategy undefined until conversation",
+        "Owner motivation unknown — may be actively defending or cooperative",
+        "Contact method not specified (phone/email) — may require research"
+      ]
+    }
+  },
+  {
+    "address": "11226   BUCKNER LN",
+    "context": {
+      "address": "11226   BUCKNER LN",
+      "market_type": "off_market",
+      "source": "liens_duval_clerk",
+      "fit": "POSSIBLE_FIT",
+      "opportunity": 30,
+      "confidence": 70,
+      "urgency": "MEDIUM",
+      "recommendation": "MONITOR",
+      "next_best_action": "MONITOR_PROPERTY",
+      "strategy": null,
+      "why": [
+        "hoa condo lien",
+        "Owner identity verified"
+      ],
+      "risks_missing": [
+        "Contact not found",
+        "Property type unknown"
+      ],
+      "asking_price": null,
+      "arv": null,
+      "renovation_cost": null,
+      "rent_estimate": null,
+      "days_on_market": null,
+      "list_price": null,
+      "price_guidance": null,
+      "distress_type": "recorded_lien",
+      "distress_category": "HOA_CONDO_LIEN",
+      "filing_date": "2026-06-29",
+      "absentee_owner": false,
+      "lien_amount": null,
+      "owner_name": "BELL ANTWANA",
+      "contact_ready": false,
+      "listing_agent_name": null,
+      "notes": "⚠ DISTRESSED OPPORTUNITY — Recorded Lien\nFiled: 2026-06-29\nCase/Instrument: 2026148541\nSource Party: BELL ANTWANA\nOwner Match: MATCH\nAbsentee Owner: false\nParcel (Duval RE): 016387 2130\nLien Type: HOA_CONDO_LIEN\nAmount: Not disclosed\nStatus: Unknown\nSource: Duval County Public Record (https://or.duvalclerk.com/ (Official Records, Doc Type: LIEN))",
+      "workflow_status": "triage"
+    },
+    "brief": {
+      "summary": "HOA condo lien recorded against owner Antwana Bell at 11226 Buckner Ln (Duval parcel 016387-2130). Owner identity confirmed, but contact info and property details remain unverified. Recommendation is MONITOR pending additional research.",
+      "why": [
+        "HOA lien on record (filed 2026-06-29, instrument 2026148541)",
+        "Owner name verified against public record",
+        "Non-absentee owner — direct contact possible if found",
+        "Off-market source — no competing bids or listing pressure",
+        "MEDIUM urgency suggests timeline to act if motivated"
+      ],
+      "missing": [
+        "Current contact information (phone/email/mailing address)",
+        "Property type and condition (condo unit, townhome, or mixed-use)",
+        "Lien amount and HOA arrearage details",
+        "Owner's current occupancy and financial distress level",
+        "Property value, recent sales comps, or ARV estimate"
+      ],
+      "questions": [
+        "Is this a residential condo unit, or mixed-use/commercial condo?",
+        "What is the lien amount and current HOA arrearage status?",
+        "Does Duval County assessor or property appraiser have a mailing address or phone for Antwana Bell?",
+        "Has the HOA initiated foreclosure proceedings, or is this a pre-foreclosure lien?",
+        "Are there any other liens or mortgages recorded against this parcel?"
+      ],
+      "objective": "Locate verified contact information for Antwana Bell and confirm property type and condition before outreach.",
+      "message_sms": null,
+      "message_email": null,
+      "risk_notes": [
+        "Contact not found — cannot reach out until address/phone research is complete",
+        "Lien amount undisclosed — true distress level unknown",
+        "Property type unknown — may not fit HAT's investment criteria",
+        "No timeline on HOA foreclosure — urgency may shift quickly",
+        "Filing date is 2026-06-29 (future date) — verify record currency and accuracy"
+      ]
+    }
+  }
+]

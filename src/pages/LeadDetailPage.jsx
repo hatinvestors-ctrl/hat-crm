@@ -23,6 +23,7 @@ import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { supabase } from '../lib/supabase'
 import { enrichLead } from '../lib/enrichment'
+import AcquisitionCopilot from '../components/lead-detail/AcquisitionCopilot'
 
 function GroupDivider({ label }) {
   return (
@@ -163,6 +164,12 @@ export default function LeadDetailPage() {
           canEdit={canEdit}
           onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
         />
+
+        {/* Capability #16 — AI Acquisition Copilot. Reads lead.decision_v2
+            (already computed elsewhere) — renders nothing if V2 hasn't
+            scored this lead yet. Self-contained: does not duplicate
+            ActionZone/PropertyInfoSection/FinancialSection/DistressBanner. */}
+        <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 
         <LeadStatusPipeline
           lead={lead}
