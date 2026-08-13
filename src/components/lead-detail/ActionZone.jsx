@@ -236,55 +236,20 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
   return (
     <div className={`${accent.bg} border border-[color:var(--color-line)] border-l-4 ${accent.border} rounded-lg p-4`}>
 
-      {/* Header row: label + verdict badge */}
+      {/* Capability #19 — this card's job is ONE thing: "what do I click
+          next?" The verdict badge and its own independently-recomputed
+          ARV/Reno/MAO/Profit snapshot were removed here — that exact
+          information (from the one authoritative source, decision_v2) now
+          lives once, above, in the primary Acquisition Copilot decision
+          header. Showing it twice, computed two different ways, is the
+          "competing decision" problem the mission called out. The left
+          border keeps a quiet color cue from the same verdict, without
+          restating it as text/numbers. */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">
           What now?
         </span>
-        {verdict && (
-          <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${accent.badge}`}>
-            {verdict === 'BUY' ? '✓ BUY' : verdict === 'REJECT' ? '✗ REJECT' : '~ CONDITIONAL'}
-          </span>
-        )}
       </div>
-
-      {/* Deal snapshot — key numbers at a glance */}
-      {(arv || reno || mao || profit != null) && (
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-3 pb-3 border-b border-[color:var(--color-line)]">
-          {arv > 0 && (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">ARV</span>
-              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(arv)}</span>
-            </div>
-          )}
-          {reno > 0 && (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Reno</span>
-              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(reno)}</span>
-            </div>
-          )}
-          {mao > 0 && (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">MAO</span>
-              <span className="text-[13px] font-semibold text-[color:var(--color-text)]">{fmtK(mao)}</span>
-            </div>
-          )}
-          {gap !== null && gap > 0 && (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Gap to drop</span>
-              <span className="text-[13px] font-semibold text-orange-400">{fmtK(gap)}</span>
-            </div>
-          )}
-          {profit != null && (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Est. Profit</span>
-              <span className={`text-[13px] font-semibold ${profit >= 30000 ? 'text-green-400' : profit >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                {profit >= 0 ? fmtK(profit) : `-${fmtK(Math.abs(profit))}`}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Action hint — the key message, bigger and bolder */}
       <p className="text-[14px] font-medium text-[color:var(--color-text)] mb-4 leading-snug">

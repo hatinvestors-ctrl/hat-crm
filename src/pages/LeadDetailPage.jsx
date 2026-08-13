@@ -157,6 +157,16 @@ export default function LeadDetailPage() {
 
         <LeadFlowStepper lead={lead} />
 
+        {/* Capability #19 — this is now THE primary, dominant acquisition
+            decision on the page (mission Section 2/4): recommendation,
+            maturity, Opportunity/Confidence/Urgency, Buy Box context. It
+            reads lead.decision_v2, the one authoritative production engine
+            — moved above ActionZone so nothing renders above it that could
+            read as a competing verdict. ActionZone below keeps only its
+            genuinely unique value (workflow next-step buttons), not its
+            own verdict badge. */}
+        <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
+
         <ActionZone
           lead={lead}
           userId={user.id}
@@ -164,12 +174,6 @@ export default function LeadDetailPage() {
           canEdit={canEdit}
           onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
         />
-
-        {/* Capability #16 — AI Acquisition Copilot. Reads lead.decision_v2
-            (already computed elsewhere) — renders nothing if V2 hasn't
-            scored this lead yet. Self-contained: does not duplicate
-            ActionZone/PropertyInfoSection/FinancialSection/DistressBanner. */}
-        <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 
         <LeadStatusPipeline
           lead={lead}

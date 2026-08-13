@@ -220,7 +220,7 @@ function BrrrrRealityCheck({ lead, verdict, score }) {
 
   return (
     <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
-      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">Why BRRRR {verdict || tier} · Score {score ?? '—'}</div>
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a Deal — BRRRR ({verdict || tier})</div>
 
       <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
         BRRRR is judged on two things: <strong className="text-[color:var(--color-text)]">Monthly Cash Flow</strong> (rent left over after mortgage, taxes, insurance)
@@ -305,7 +305,7 @@ function FlipRealityCheck({ lead, verdict, score }) {
 
   return (
     <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2">
-      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">Why Flip {verdict || tier} · Score {score ?? '—'}</div>
+      <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold">🎯 Path to a Deal — Flip ({verdict || tier})</div>
 
       <p className="text-[11.5px] text-[color:var(--color-text-muted)] leading-relaxed">
         Flip is judged mainly on <strong className="text-[color:var(--color-text)]">Total Profit</strong> after sale (ARV × 93%, minus the HML loan, holding costs, and cash to close).
@@ -318,7 +318,7 @@ function FlipRealityCheck({ lead, verdict, score }) {
 
       <div className="grid grid-cols-2 gap-3 pt-1">
         <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Total Profit</div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit If Purchased At MAO</div>
           <div className={`text-[14px] font-bold ${profitColor}`}>{fc(profit)}</div>
         </div>
         <div>
@@ -1037,7 +1037,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                   pressed (computed at ingestion/backfill), so "Run
                   Analysis" implying a first-time analysis would be
                   misleading. Only reframed when that's actually true. */}
-              {!hasAnalysis ? (lead.decision_v2 ? '✦ Get Comps & Detailed AI' : '✦ Run Analysis') : '⚠ Re-run Analysis'}
+              {!hasAnalysis ? (lead.decision_v2 ? '✦ Get Comps & Detailed AI' : '✦ Run Analysis') : '⚠ Refresh Detailed Analysis'}
             </button>
           ) : (
             <span className="flex items-center gap-2 text-[12px]">
@@ -1115,161 +1115,88 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
-      {/* Capability #2 — Executive Decision Layer. Presentation only: every
-          value here is read from data already parsed/stored elsewhere in
-          this component (priorityInfo from the Smart Lead Prioritization
-          strip below, lead.deal_analysis.profit, lead.starting_offer,
-          lead.mao) — no new AI call, no new calculation. Sits above the
-          existing Verdict/Score/MAO strip and the Smart Lead Prioritization
-          strip so Kevin sees the bottom line first. */}
-      {priorityInfo && (() => {
-        const theme = PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH
-        const displayLabel = PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority
-        const expectedProfit = lead.deal_analysis?.profit
-        return (
-          <div
-            className="mb-3 rounded-lg border-2 overflow-hidden"
-            style={{ borderColor: theme.border, background: theme.bg }}
-          >
-            <div className="px-3 pt-2 text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>
-              Executive Decision
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 divide-x" style={{ borderColor: theme.border }}>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Decision</div>
-                <div className="text-[17px] font-extrabold leading-tight" style={{ color: theme.text }}>{displayLabel}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Expected Profit</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{expectedProfit != null ? fc(expectedProfit) : '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Recommended Offer</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.starting_offer ? fc(lead.starting_offer) : '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Maximum Offer</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.mao ? fc(lead.mao) : '—'}</div>
-              </div>
-              <div className="px-3 py-2 col-span-2 sm:col-span-1">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Next Action</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.nextAction}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Top Opportunities</div>
-                {priorityInfo.reasons.length > 0 ? (
-                  <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
-                    {priorityInfo.reasons.map((r, i) => <li key={i}>✓ {r}</li>)}
-                  </ul>
-                ) : (
-                  <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
-                )}
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
-                <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>
-                  {priorityInfo.biggestRisk ? `⚠ ${priorityInfo.biggestRisk}` : '—'}
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      {hasAnalysis && (() => {
+      {/* Capability #19 — CONSOLIDATION. Before this change, this card
+          stacked THREE separate decision-shaped panels here (Executive
+          Decision / priorityInfo, Verdict-Score-MAO / deal_analysis,
+          Priority-Analysis Score / priorityInfo again) — all derived from
+          the older V1/deal_analysis pipeline, all visually competing with
+          the ONE authoritative decision (decision_v2) that now renders
+          above, in AcquisitionCopilot, before Kevin ever scrolls this far.
+          Merged into ONE compact "Detailed AI Analysis" summary, clearly
+          labeled as supporting intelligence — nothing computed here
+          changed, only how many times it's shown and how prominently.
+          Profit labels now name their scenario explicitly (Section 6):
+          a bare "Profit" next to a "Flip profit ... at MAO" bullet lower
+          on the page read as two different numbers even when they agree. */}
+      {(priorityInfo || hasAnalysis) && (() => {
+        const theme = priorityInfo ? (PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH) : PRIORITY_THEME.WATCH
+        const displayLabel = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority) : null
         const a = lead.deal_analysis
-        // Color follows the Verdict word itself (what people actually read), not the
-        // numeric Score — a "BUY" verdict should never render in an amber/red box.
-        const v = (a.verdict || '').toUpperCase()
-        const theme = v === 'BUY'
-          ? { bg: 'var(--color-success-soft)', border: 'var(--color-success)', text: 'var(--color-success-text)' }
-          : v === 'CONDITIONAL' || v === 'CONDITIONAL APPROVE'
-          ? { bg: 'var(--color-warn-soft)', border: 'var(--color-warn)', text: 'var(--color-warn-text)' }
-          : { bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' }
+        // "Profit at MAO" — analyze-deal.mjs computes deal_analysis.profit
+        // using lead.mao as the purchase price (same convention as
+        // FlipRealityCheck/BrrrrRealityCheck below), so the scenario is
+        // named consistently everywhere it appears on this page.
+        const profitAtMao = a?.profit ?? null
         return (
           <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
-            <div className="grid grid-cols-2 sm:grid-cols-5 divide-x" style={{ borderColor: theme.border }}>
+            <div className="px-3 pt-2 flex items-center justify-between">
+              <span className="text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>
+                Detailed AI Analysis <span className="font-normal opacity-80">(supporting — see decision above)</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
+              {displayLabel && (
+                <div className="px-3 py-2">
+                  <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>AI Read</div>
+                  <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{displayLabel}</div>
+                </div>
+              )}
               <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Verdict</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{a.verdict || '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Score</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{a.score ?? '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>MAO</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.mao ? fc(lead.mao) : '—'}</div>
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Profit at MAO</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{profitAtMao != null ? fc(profitAtMao) : '—'}</div>
               </div>
               <div className="px-3 py-2">
                 <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Starting Offer</div>
                 <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.starting_offer ? fc(lead.starting_offer) : '—'}</div>
               </div>
               <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Profit</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{a.profit != null ? fc(a.profit) : '—'}</div>
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Max Offer (MAO)</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.mao ? fc(lead.mao) : '—'}</div>
               </div>
             </div>
-          </div>
-        )
-      })()}
-
-      {priorityInfo && (() => {
-        const theme = PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH
-        const displayLabel = PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority
-        const isUrgent = priorityInfo.priority === 'HOT'
-        return (
-          <div
-            className="mb-3 rounded-lg border overflow-hidden"
-            style={{ borderColor: theme.border, background: theme.bg, ...(isUrgent ? { borderWidth: 2 } : {}) }}
-          >
-            <div className={`grid grid-cols-2 ${priorityInfo.walkAway != null ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} divide-x`} style={{ borderColor: theme.border }}>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Priority</div>
-                <div className={`font-bold ${isUrgent ? 'text-[16px]' : 'text-[14px]'}`} style={{ color: theme.text }}>
-                  {isUrgent ? '🔥 ' : ''}{displayLabel}
-                </div>
-              </div>
-              <div className="px-3 py-2" title="Analysis Score reflects the current deal analysis. Data Quality reflects how complete the underlying information is.">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Analysis Score</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.confidence != null ? `${priorityInfo.confidence}/100` : '—'}</div>
-                {priorityInfo.dataQuality != null && (
-                  <div className="text-[10px] font-medium opacity-80 mt-0.5" style={{ color: theme.text }}>Data Quality: {priorityInfo.dataQuality}/10</div>
-                )}
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Next Action</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{priorityInfo.nextAction}</div>
-              </div>
-              {priorityInfo.walkAway != null && (
+            {priorityInfo && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
                 <div className="px-3 py-2">
-                  <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Walk Away</div>
-                  <div className="text-[14px] font-bold" style={{ color: theme.text }}>{fc(priorityInfo.walkAway)}</div>
+                  <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Why</div>
+                  {priorityInfo.reasons.length > 0 ? (
+                    <>
+                      <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
+                        {(showReasonDetail ? priorityInfo.rawReasons : priorityInfo.reasons).map((r, i) => <li key={i}>✓ {r}</li>)}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={() => setShowReasonDetail(v => !v)}
+                        className="text-[10px] underline underline-offset-2 mt-1 opacity-70 hover:opacity-100 transition-opacity"
+                        style={{ color: theme.text }}
+                      >
+                        {showReasonDetail ? 'Show summary' : 'View details'}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                  )}
                 </div>
-              )}
-              <div className="px-3 py-2 col-span-2 sm:col-span-1">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>WHY THIS IS WORTH YOUR TIME</div>
-                {priorityInfo.reasons.length > 0 ? (
-                  <>
-                    <ul className="text-[11.5px] font-medium leading-tight mt-0.5 space-y-0.5" style={{ color: theme.text }}>
-                      {(showReasonDetail ? priorityInfo.rawReasons : priorityInfo.reasons).map((r, i) => <li key={i}>• {r}</li>)}
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => setShowReasonDetail(v => !v)}
-                      className="text-[10px] underline underline-offset-2 mt-1 opacity-70 hover:opacity-100 transition-opacity"
-                      style={{ color: theme.text }}
-                    >
-                      {showReasonDetail ? 'Show summary' : 'View details'}
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-[14px] font-bold" style={{ color: theme.text }}>—</div>
-                )}
+                <div className="px-3 py-2">
+                  <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
+                  <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>
+                    {priorityInfo.biggestRisk ? `⚠ ${priorityInfo.biggestRisk}` : '—'}
+                  </div>
+                  {priorityInfo.dataQuality != null && (
+                    <div className="text-[10px] font-medium opacity-70 mt-1" style={{ color: theme.text }}>Data Quality: {priorityInfo.dataQuality}/10</div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )
       })()}
