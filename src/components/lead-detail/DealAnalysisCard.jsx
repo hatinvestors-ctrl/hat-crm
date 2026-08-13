@@ -248,10 +248,27 @@ function FlipRealityCheck({ lead }) {
         </div>
       )}
 
-      <div className="border-t border-[color:var(--color-line)] pt-2">
-        <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
-        <div className="text-[16px] font-bold text-[color:var(--color-text)]">{flipMao != null ? fc(Math.round(flipMao / 100) * 100) : '—'}</div>
+      <div className="border-t border-[color:var(--color-line)] pt-2 grid grid-cols-2 gap-3">
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
+          <div className="text-[16px] font-bold text-[color:var(--color-text)]">{flipMao != null ? fc(Math.round(flipMao / 100) * 100) : '—'}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit At Flip MAO</div>
+          <div className="text-[13px] font-bold text-[color:var(--color-text)]">{flipMao != null ? `≈ ${fc(FLIP_MIN_PROFIT_TARGET)}` : '—'}</div>
+        </div>
       </div>
+
+      {/* Capability #19.2, Section 10 — plain-language distance from Flip
+          MAO, in terms of the CURRENT purchase-price scenario above, not a
+          repeat of the lever list below. */}
+      {currentPP != null && flipMao != null && (
+        <p className="text-[11px] text-[color:var(--color-text-muted)]">
+          {currentPP <= flipMao
+            ? `You are currently ${fc(flipMao - currentPP)} below the maximum supported purchase price.`
+            : `Purchase price needs to decrease by ${fc(currentPP - flipMao)} to reach Flip MAO.`}
+        </p>
+      )}
 
       {!meetsTarget && flipMao != null && (
         <p className="text-[11px] text-[color:var(--color-text-muted)]">
@@ -907,6 +924,23 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
   const priorityInfo = derivePriority(localNotes)
 
+  // Capability #19.2, Section 9 — the existing staleness check (above)
+  // only catches INPUT drift (ARV/reno/strategy changed since the last
+  // run). It can't catch FORMULA drift: this exact AI text was generated
+  // by an older prompt-side MAO/profit formula before Flip MAO existed as
+  // a concept, so its "$X at MAO" language can reference a number that no
+  // longer matches the canonical Flip MAO shown everywhere else on this
+  // page, even though nothing about the property changed. Comparing the
+  // AI text's own "Our MAO: $X" line against today's canonical Flip MAO
+  // catches that case with a concise notice — never editing the historical
+  // text itself.
+  const aiTextMao = parseAiMao(localNotes)
+  const canonicalFlipMaoForStaleness = (lead.arv != null && lead.renovation_cost != null)
+    ? calculateFlipMAO(Number(lead.arv), Number(lead.renovation_cost), lead.hold_months || 6)
+    : null
+  const aiTextMaoStale = strategy !== 'brrrr' && aiTextMao != null && canonicalFlipMaoForStaleness != null
+    && Math.abs(aiTextMao - canonicalFlipMaoForStaleness) > 1000
+
   return (
     <Card title="Deal Analysis" subtitle="Comps, negotiation plan, verdict, and scripts — all from one run">
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-[color:var(--color-line)] mb-3">
@@ -1011,6 +1045,14 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
+      {!staleness.stale && aiTextMaoStale && !generating && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
+          <span className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">
+            ⚠ This AI analysis predates the current Flip MAO calculation ({fc(Math.round(canonicalFlipMaoForStaleness / 100) * 100)}) — figures below may not match. Use "Refresh Detailed Analysis" above for updated numbers.
+          </span>
+        </div>
+      )}
+
       {genError && <p className="mb-3 text-[11.5px] text-[color:var(--color-danger-text)]">⚠ {genError}</p>}
 
       {/* Capability #4 — Opportunity Rediscovery Engine V1. Minimal banner
@@ -1071,11 +1113,21 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         const theme = priorityInfo ? (PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH) : PRIORITY_THEME.WATCH
         const displayLabel = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority) : null
         const a = lead.deal_analysis
-        // "Profit at MAO" — analyze-deal.mjs computes deal_analysis.profit
-        // using lead.mao as the purchase price (same convention as
-        // FlipRealityCheck/BrrrrRealityCheck below), so the scenario is
-        // named consistently everywhere it appears on this page.
-        const profitAtMao = a?.profit ?? null
+        // Capability #19.2 — this cell used to be labeled "Profit at MAO"
+        // but a.profit is computed at whatever purchase price the last AI
+        // run actually used (lead.mao AT THAT TIME) — not necessarily
+        // today's canonical Flip MAO. Relabeled "Projected Profit
+        // (current)" to match Path to a Flip Deal's own "current scenario"
+        // language just below, and "Max Offer (MAO)" (lead.mao, the
+        // legacy/editable stored value) is replaced with the canonical
+        // Flip MAO everything else on this page now shows — see Path to a
+        // Flip Deal for the matching "Profit at Flip MAO" figure.
+        const projectedProfitCurrent = a?.profit ?? null
+        const strategyForMao = strategy === 'brrrr' ? 'brrrr' : 'flip'
+        const holdMonths = lead.hold_months || 6
+        const canonicalMao = strategyForMao === 'brrrr'
+          ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, holdMonths)?.mao ?? null
+          : (lead.arv != null && lead.renovation_cost != null ? calculateFlipMAO(lead.arv, lead.renovation_cost, holdMonths) : null)
         return (
           <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
             <div className="px-3 pt-2 flex items-center justify-between">
@@ -1091,16 +1143,16 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                 </div>
               )}
               <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Profit at MAO</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{profitAtMao != null ? fc(profitAtMao) : '—'}</div>
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Projected Profit (current)</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{projectedProfitCurrent != null ? fc(projectedProfitCurrent) : '—'}</div>
               </div>
               <div className="px-3 py-2">
                 <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Starting Offer</div>
                 <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.starting_offer ? fc(lead.starting_offer) : '—'}</div>
               </div>
               <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Max Offer (MAO)</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.mao ? fc(lead.mao) : '—'}</div>
+                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>{strategyForMao === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{canonicalMao != null ? fc(Math.round(canonicalMao / 100) * 100) : '—'}</div>
               </div>
             </div>
             {priorityInfo && (

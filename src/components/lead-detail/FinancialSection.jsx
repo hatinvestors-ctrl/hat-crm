@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateMAO, calculateFlipProfitAtPrice } from '../../lib/calculations'
+import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
 
@@ -33,9 +33,22 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         </div>
       )}
 
-      {/* ── Section 1: Price story — Ask → Gap → MAO → Starting Offer ── */}
+      {/* ── Section 1: Price story — Ask → Gap → Flip MAO → Starting Offer ──
+          Capability #19.2 — formulaMao is now the canonical Flip MAO
+          (src/lib/calculations.js, same function Path to a Flip Deal /
+          Detailed AI Analysis / Copilot all use), not the old flat
+          75%-of-ARV rule. lead.mao itself is left exactly as-is on edit
+          (see the onSave handlers below) — it's also V2's documented
+          fallback input, and auto-rewriting it to a target-profit-derived
+          number for every future edit would flatten V2's Economics
+          Strength scoring (profit-at-MAO would always land near $30K by
+          construction, regardless of how good the deal actually is).
+          Instead: when a lead's stored MAO differs from canonical Flip
+          MAO, the existing "diverged" detector + ↺ reset button below now
+          compares against the CORRECT canonical number, so Kevin can
+          one-click align it — a human decision, not a silent rewrite. */}
       {lead.asking_price && (lead.arv || lead.mao) && (() => {
-        const formulaMao = calculateMAO(lead.arv, lead.renovation_cost)
+        const formulaMao = calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         const diverged   = formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
         const mao        = storedMao ?? formulaMao
@@ -95,28 +108,34 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   )}
                 </div>
               )}
-              {/* MAO */}
+              {/* Flip MAO */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
                 <div className="flex items-center gap-1 mb-1">
-                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">MAO</div>
-                  <span title={`MAO = 75% × ARV − Reno − $2,450\n= ${formatCurrency(formulaMao)}\n\nClick to edit.`}
+                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">Flip MAO</div>
+                  <span title={`Canonical Flip MAO — the highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit.\n= ${formatCurrency(formulaMao)}\n\nStored Max Offer (below) is separate and editable — click ↺ to reset it to this canonical number.`}
                     className="text-[9px] text-[color:var(--color-text-dim)] cursor-help">ℹ</span>
                   {diverged && canEdit && (
                     <button onClick={() => update({ mao: formulaMao })}
                       className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
-                      title="Reset to formula">↺</button>
+                      title="Reset stored Max Offer to canonical Flip MAO">↺</button>
                   )}
                 </div>
                 <EditableField label="" type="currency" value={lead.mao ?? formulaMao} formatter={formatCurrency}
                   onSave={(v) => update({ mao: v })} disabled={!canEdit}
                   displayClassName="text-[16px] font-bold text-[color:var(--color-accent)]" />
+                {diverged && (
+                  <div className="text-[9px] mt-0.5 text-[color:var(--color-warn-text)]">
+                    Canonical Flip MAO: {formatCurrency(formulaMao)}
+                  </div>
+                )}
                 {(() => {
-                  const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6)
-                  if (profitAtMao == null) return null
-                  const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+                  const displayedMao = lead.mao ?? formulaMao
+                  const profitAtDisplayed = calculateFlipProfitAtPrice(displayedMao, lead.arv, lead.renovation_cost, lead.hold_months || 6)
+                  if (profitAtDisplayed == null) return null
+                  const tone = profitAtDisplayed >= 40000 ? 'var(--color-success-text)' : profitAtDisplayed >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                   return (
-                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="MAO's 75%-of-ARV formula doesn't guarantee a specific profit dollar amount — that depends on ARV size. This shows what buying exactly at MAO would actually net as a flip.">
-                      Flip profit at MAO: ~{formatCurrency(profitAtMao)}
+                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Profit if purchased at the number shown above (stored Max Offer if set, otherwise canonical Flip MAO).">
+                      Profit at this price: ~{formatCurrency(profitAtDisplayed)}
                     </div>
                   )
                 })()}
@@ -140,14 +159,14 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
 
       {/* Fallback hero when no asking price yet: show MAO + Starting Offer plainly */}
       {!(lead.asking_price && (lead.arv || lead.mao)) && (() => {
-        const formulaMao = calculateMAO(lead.arv, lead.renovation_cost)
+        const formulaMao = calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         const diverged   = formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
         return (
           <div className="flex gap-6 mb-5">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">MAO · Max We'd Pay</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO · Max We'd Pay</span>
                 {diverged && canEdit && (
                   <button onClick={() => update({ mao: formulaMao })}
                     className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80">↺ formula</button>
@@ -162,7 +181,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                 const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                 return (
                   <div className="text-[10px] mt-0.5" style={{ color: tone }}>
-                    Flip profit at MAO: ~{formatCurrency(profitAtMao)}
+                    Profit at this price: ~{formatCurrency(profitAtMao)}
                   </div>
                 )
               })()}

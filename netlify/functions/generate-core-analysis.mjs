@@ -8,6 +8,8 @@
 //           asking_price, arv, renovation_cost, mao, rent_estimate, notes } }
 // Returns: { ok, notes: string }
 
+import { calculateFlipMAO, computeFlipBreakdown } from '../../src/lib/calculations.js'
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 const HEADERS = {
@@ -118,9 +120,15 @@ function buildPrompt(lead) {
   const mao  = num(lead.mao)
   const sqft = num(lead.sqft)
 
-  // Pre-compute MAO so the AI never has to estimate it
-  const renoForMao  = reno != null ? reno : 0
-  const computedMao = arv ? Math.round(arv * 0.75 - renoForMao - 2450) : mao
+  // Capability #19.2, Section 6 — pre-compute MAO so the AI never has to
+  // estimate it. Uses the SAME canonical Flip MAO function (src/lib/
+  // calculations.js) the Lead Detail UI's "Flip MAO" badge/Path to a Flip
+  // Deal/Copilot all use, instead of the old flat 75%-of-ARV rule this
+  // file used to compute independently — that mismatch was the exact
+  // "$147,550 here, $148,200 there" contradiction this capability exists
+  // to remove. Falls back to lead.mao only when ARV or reno is unknown
+  // (calculateFlipMAO returns null in that case, same as before).
+  const computedMao = (arv && reno != null) ? Math.round(calculateFlipMAO(arv, reno, 6)) : mao
 
   let computedBlock = ''
   let brrrrResult = null
@@ -145,16 +153,23 @@ function buildPrompt(lead) {
     const allInMao      = buyPrice + reno + hmlMaoCosts
     const cashLeftInMao = allInMao - refi
     const cashflow      = rentEst - loanFactor - 208 - 136   // $136/mo insurance (actual avg from portfolio)
-    const flipNetMao    = arv - (buyPrice + reno) - arv * 0.08
+    // Capability #19.2 — same canonical Flip cost model as calculateFlipMAO
+    // (HML financing, holding costs, 93%-of-ARV sale), not the simplified
+    // "ARV − price − reno − 8%" formula this used to compute independently
+    // — that second formula was the actual source of the "$46,650 at MAO"
+    // text that didn't match the $30,728/$30,000 figures shown elsewhere.
+    const flipNetMao    = computeFlipBreakdown(buyPrice, arv, reno, holdMo).totalProfit
     brrrrResult = { allIn: allInMao, refi, cashLeftIn: cashLeftInMao, cashflow, label: cashLeftInMao < 30000 ? 'GREAT' : cashLeftInMao < 60000 ? 'OK' : 'FAILS' }
-    flipResult  = { allIn: buyPrice + reno, netProfit: flipNetMao, label: flipNetMao >= 40000 ? 'STRONG' : flipNetMao >= 25000 ? 'THIN' : 'FAILS' }
+    // $30,000 is HAT's minimum acceptable Flip profit (FLIP_MIN_PROFIT_TARGET) —
+    // anything at/above it is never "FAILS"; $40K+ is descriptively STRONG.
+    flipResult  = { allIn: buyPrice + reno, netProfit: flipNetMao, label: flipNetMao >= 40000 ? 'STRONG' : flipNetMao >= 30000 ? 'ACCEPTABLE' : 'FAILS' }
 
     // Math AT ASK (reference only — shows why we can't pay full price)
     const hmlAsk      = pp * 0.90 + reno
     const hmlAskCosts = Math.round(hmlAsk * 0.02) + 1500 + Math.round(hmlAsk * 0.12 * (holdMo / 12))
     const allInAsk    = pp + reno + hmlAskCosts
     const cashLeftAsk = allInAsk - refi
-    const flipNetAsk  = arv - (pp + reno) - arv * 0.08
+    const flipNetAsk  = computeFlipBreakdown(pp, arv, reno, holdMo).totalProfit
 
     const pctAboveMaoNum = computedMao ? ((pp - computedMao) / Math.abs(computedMao)) * 100 : 0
     const pctAboveMao    = pctAboveMaoNum.toFixed(1)
@@ -289,7 +304,7 @@ AT ${askBelowMao ? `ASK ${fmt(pp)} [THE DEAL WORKS HERE — this is our primary 
 ${askBelowMao ? '' : `
 AT ASK ${fmt(pp)} [reference only — shows why full price doesn't work]:
   BRRRR: All-in ${fmt(allInAsk)} | Cash left in ${fmt(cashLeftAsk)} → ${cashLeftAsk < 30000 ? 'GREAT' : cashLeftAsk < 60000 ? 'OK' : 'FAILS'}
-  Flip:  Net profit ${fmt(flipNetAsk)} → ${flipNetAsk >= 40000 ? 'STRONG' : flipNetAsk >= 25000 ? 'THIN' : 'FAILS'}`}`
+  Flip:  Net profit ${fmt(flipNetAsk)} → ${flipNetAsk >= 40000 ? 'STRONG' : flipNetAsk >= 30000 ? 'ACCEPTABLE' : 'FAILS'}`}`
 
   } else if (pp && arv && reno == null) {
     // Reno unknown — compute MAX reno budget that makes each strategy work
@@ -302,8 +317,12 @@ AT ASK ${fmt(pp)} [reference only — shows why full price doesn't work]:
     // Simplified: maxRenoBRRRR ≈ (refi - 30000 - pp*0.9*1.085 - 1500) / (1 + 1.085)
     const hmlBaseNoreno = pp * 0.90
     const maxRenoBRRRR  = Math.round((refi - 30000 - hmlBaseNoreno * 1.085 - 1500) / 2.085)
-    // Max reno for Flip: ARV - pp - reno - ARV*0.08 = 25000 → reno = ARV*0.92 - pp - 25000
-    const maxRenoFlip   = Math.round(arv * 0.92 - pp - 25000)
+    // Max reno for Flip — reno unknown yet, so this stays an approximate
+    // reference solve (not the canonical calculateFlipMAO model, which needs
+    // reno as an input, not an output). Capability #19.2: target aligned to
+    // HAT's actual $30,000 minimum, not the old $25,000.
+    // ARV - pp - reno - ARV*0.08 = 30000 → reno = ARV*0.92 - pp - 30000
+    const maxRenoFlip   = Math.round(arv * 0.92 - pp - 30000)
 
     const askBelowZeroMao = computedMao && pp <= computedMao
     const atAskLabel = askBelowZeroMao ? 'MARGINAL' : 'FAILS'
