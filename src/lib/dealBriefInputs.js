@@ -9,7 +9,7 @@
 // the math is.
 
 import { computeStrategy } from './decisionEngineV2.js'
-import { calculateMAO, calculateFlipMAO, calculateBrrrrMAO } from './calculations.js'
+import { calculateMAO, calculateFlipMAO, calculateBrrrrMAO, getEffectiveOffer } from './calculations.js'
 
 // Browser-safe (no node:crypto — this module is imported client-side too).
 // Not cryptographic — just needs to change whenever the input does, for
@@ -81,18 +81,16 @@ export function computePriceGuidance(lead) {
     }
   }
 
-  const gap = ask != null ? Math.max(0, ask - mao) : 0
-  // Conservative, clearly-derived anchor: open 10% of the ask-to-MAO gap
-  // below MAO (never above ask, never below a sane floor), target MAO,
-  // ceiling MAO. Same "anchor near MAO, leave room to meet in the middle"
-  // convention already used elsewhere in this codebase's offer logic
-  // (hat-ai-agents/lib/acquisition-engine.mjs offerEngine()) — not a new
-  // formula invented for this feature.
-  const opening = Math.round((mao - gap * 0.10) / 1000) * 1000
+  // Opening offer — the SAME getEffectiveOffer()/calculateLiveOffer()
+  // function Financials/Detailed Analysis/Path to a Deal all use, so
+  // Copilot's suggested opening always matches "We Offer" everywhere
+  // else. This used to be a separately-invented "10% of the ask-to-MAO
+  // gap" formula that could quietly disagree with the rest of the page.
+  const opening = getEffectiveOffer(lead, mao)
   return {
     ready: true,
     ask, mao,
-    opening: Math.min(opening, ask ?? opening),
+    opening: opening != null ? Math.min(opening, ask ?? opening) : mao,
     target: mao,
     ceiling: mao,
     strategy: strategy.best,
