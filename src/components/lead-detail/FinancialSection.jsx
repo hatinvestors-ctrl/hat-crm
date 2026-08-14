@@ -51,7 +51,11 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         const formulaMao = calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         const diverged   = formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
-        const mao        = storedMao ?? formulaMao
+        // Canonical Flip MAO drives Gap/Starting-Offer math now (matches
+        // Detailed Analysis's own Gap-to-MAO figure in Biggest Risk) —
+        // the stored override only wins when canonical can't be computed
+        // (e.g. renovation cost missing).
+        const mao        = formulaMao ?? storedMao
         const ask        = Number(lead.asking_price)
         const gap        = mao != null ? ask - mao : null
 
@@ -117,34 +121,52 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   )}
                 </div>
               )}
-              {/* Flip MAO */}
+              {/* Flip MAO — CANONICAL number is now always the big, primary
+                  figure (matches Detailed Analysis / Path to a Flip Deal /
+                  Copilot exactly, every time — no more "$127,450 here,
+                  $124,300 there"). The separately-stored, editable
+                  lead.mao only appears as a small secondary line, and only
+                  when it actually diverges — it's kept for V2/legacy
+                  compatibility and Kevin's manual overrides, but it can no
+                  longer LOOK like the authoritative Flip MAO. Real user
+                  reports (2706 Tina Lane, 1012 Beckner Ave) showed the old
+                  "stored value primary, canonical as a caption" layout was
+                  read as a contradiction, not a nuance — swapped. */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
                 <div className="flex items-center gap-1 mb-1">
                   <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">Flip MAO</div>
-                  <span title={`Canonical Flip MAO — the highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit.\n= ${formatCurrency(formulaMao)}\n\nStored Max Offer (below) is separate and editable — click ↺ to reset it to this canonical number.`}
+                  <span title={`The highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit. Same number shown in Detailed Analysis, Path to a Flip Deal, and Copilot.`}
                     className="text-[9px] text-[color:var(--color-text-dim)] cursor-help">ℹ</span>
-                  {diverged && canEdit && (
-                    <button onClick={() => update({ mao: formulaMao })}
-                      className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
-                      title="Reset stored Max Offer to canonical Flip MAO">↺</button>
-                  )}
                 </div>
-                <EditableField label="" type="currency" value={lead.mao ?? formulaMao} formatter={formatCurrency}
-                  onSave={(v) => update({ mao: v })} disabled={!canEdit}
-                  displayClassName="text-[16px] font-bold text-[color:var(--color-accent)]" />
+                <div className="text-[16px] font-bold text-[color:var(--color-accent)]">
+                  {formulaMao != null ? formatCurrency(Math.round(formulaMao / 100) * 100) : '—'}
+                </div>
                 {diverged && (
-                  <div className="text-[9px] mt-0.5 text-[color:var(--color-warn-text)]">
-                    Canonical Flip MAO: {formatCurrency(formulaMao)}
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[9px] text-[color:var(--color-warn-text)]">Stored override:</span>
+                    <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
+                      onSave={(v) => update({ mao: v })} disabled={!canEdit}
+                      displayClassName="text-[10.5px] font-semibold text-[color:var(--color-warn-text)] underline decoration-dotted" />
+                    {canEdit && (
+                      <button onClick={() => update({ mao: null })}
+                        className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
+                        title="Clear stored override — go back to using the canonical Flip MAO everywhere">✕</button>
+                    )}
                   </div>
                 )}
+                {!diverged && canEdit && (
+                  <button onClick={() => { const v = window.prompt('Set a manual Max Offer override (leave blank to cancel):', ''); if (v && !Number.isNaN(Number(v))) update({ mao: Number(v) }) }}
+                    className="text-[8.5px] mt-0.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2">
+                    Set manual override
+                  </button>
+                )}
                 {(() => {
-                  const displayedMao = lead.mao ?? formulaMao
-                  const profitAtDisplayed = calculateFlipProfitAtPrice(displayedMao, lead.arv, lead.renovation_cost, lead.hold_months || 6)
-                  if (profitAtDisplayed == null) return null
-                  const tone = profitAtDisplayed >= 40000 ? 'var(--color-success-text)' : profitAtDisplayed >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+                  const profitAtCanonical = formulaMao != null ? calculateFlipProfitAtPrice(formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6) : null
+                  if (profitAtCanonical == null) return null
+                  const tone = profitAtCanonical >= 40000 ? 'var(--color-success-text)' : 'var(--color-warn-text)'
                   return (
-                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Profit if purchased at the number shown above (stored Max Offer if set, otherwise canonical Flip MAO).">
-                      Profit at this price: ~{formatCurrency(profitAtDisplayed)}
+                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Profit at the canonical Flip MAO shown above — always ≈ HAT's minimum target by construction.">
+                      Profit at this price: ~{formatCurrency(profitAtCanonical)}
                     </div>
                   )
                 })()}
