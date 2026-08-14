@@ -10,10 +10,11 @@ import {
   calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN,
 } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
+import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../lib/dealExplanation'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
 import { isDistressedLead } from '../../lib/distressInfo'
-import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../../lib/leadPriority'
+import { derivePriority } from '../../lib/leadPriority'
 import { recalculateDecisionV2 } from '../../lib/decisionV2Persistence'
 
 // Parse the AI-computed MAO from the generated notes text ("Our MAO: $X")
@@ -119,6 +120,16 @@ async function callFnFull(name, body) {
 // implementation of the canonical Flip/BRRRR cost model, not one per
 // component. Imported above.
 const fc = formatCurrency
+
+// Deal Analysis Clarity capability, Section 11 — deterministic verdict
+// colors, same 4-state vocabulary (STRONG/PASS/WATCH/NO DEAL) for both
+// Flip and BRRRR, never LLM-chosen.
+const VERDICT_THEME = {
+  STRONG:    { bg: 'var(--color-success-soft)', border: 'var(--color-success)', text: 'var(--color-success-text)' },
+  PASS:      { bg: 'var(--color-success-soft)', border: 'var(--color-success)', text: 'var(--color-success-text)' },
+  WATCH:     { bg: 'var(--color-warn-soft)',    border: 'var(--color-warn)',    text: 'var(--color-warn-text)' },
+  'NO DEAL': { bg: 'var(--color-danger-soft)',  border: 'var(--color-danger)',  text: 'var(--color-danger-text)' },
+}
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 
 // Explains a BRRRR verdict in plain terms and shows exactly what would need to
@@ -508,7 +519,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const [generatingScripts, setGeneratingScripts] = useState(false)
   const [competitiveMode, setCompetitiveMode] = useState(false)
   const [aiCompsArv, setAiCompsArv] = useState(null)
-  const [showReasonDetail, setShowReasonDetail] = useState(false) // v1.0.1 — "View details" toggle for Why This Is Worth Your Time
   const [lastArv,  setLastArv]  = useState(lead.arv ? Number(lead.arv) : null)
   const [lastReno, setLastReno] = useState(lead.renovation_cost ? Number(lead.renovation_cost) : null)
   const [refreshingComps, setRefreshingComps] = useState(false)
@@ -922,8 +932,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
     }
   }
 
-  const priorityInfo = derivePriority(localNotes)
-
   // Capability #19.2, Section 9 — the existing staleness check (above)
   // only catches INPUT drift (ARV/reno/strategy changed since the last
   // run). It can't catch FORMULA drift: this exact AI text was generated
@@ -941,8 +949,26 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
   const aiTextMaoStale = strategy !== 'brrrr' && aiTextMao != null && canonicalFlipMaoForStaleness != null
     && Math.abs(aiTextMao - canonicalFlipMaoForStaleness) > 1000
 
+  // Deal Analysis Clarity capability — Flip and BRRRR are ALWAYS both
+  // calculated independently (Section 9's explicit requirement: "Do not
+  // make the selected UI tab determine the underlying strategy
+  // recommendation"). The strategy tab only decides which one's numbers
+  // are shown as the primary summary below.
+  const flipResult = hasAnalysis ? computeFlipResult(lead) : { available: false, reason: 'Run analysis first.' }
+  const brrrrResult = hasAnalysis ? computeBrrrrResult(lead) : { available: false, reason: 'Run analysis first.' }
+  const strategyRecommendation = computeStrategyRecommendation(flipResult, brrrrResult)
+
   return (
     <Card title="Deal Analysis" subtitle="Comps, negotiation plan, verdict, and scripts — all from one run">
+      {hasAnalysis && strategyRecommendation.summary && (
+        <div className="mb-2.5 text-[11.5px]">
+          <span className="font-extrabold text-[color:var(--color-text)]">{strategyRecommendation.summary}</span>
+          <span className="text-[color:var(--color-text-dim)]">
+            {' · '}Flip: {flipResult.available ? flipResult.verdict : '—'}
+            {'  ·  '}BRRRR: {brrrrResult.available ? brrrrResult.verdict : '—'}
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-[color:var(--color-line)] mb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-lg border border-[color:var(--color-line)] overflow-hidden text-[11px] font-bold">
@@ -1096,96 +1122,85 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         </div>
       )}
 
-      {/* Capability #19 — CONSOLIDATION. Before this change, this card
-          stacked THREE separate decision-shaped panels here (Executive
-          Decision / priorityInfo, Verdict-Score-MAO / deal_analysis,
-          Priority-Analysis Score / priorityInfo again) — all derived from
-          the older V1/deal_analysis pipeline, all visually competing with
-          the ONE authoritative decision (decision_v2) that now renders
-          above, in AcquisitionCopilot, before Kevin ever scrolls this far.
-          Merged into ONE compact "Detailed AI Analysis" summary, clearly
-          labeled as supporting intelligence — nothing computed here
-          changed, only how many times it's shown and how prominently.
-          Profit labels now name their scenario explicitly (Section 6):
-          a bare "Profit" next to a "Flip profit ... at MAO" bullet lower
-          on the page read as two different numbers even when they agree. */}
-      {(priorityInfo || hasAnalysis) && (() => {
-        const theme = priorityInfo ? (PRIORITY_THEME[priorityInfo.priority] || PRIORITY_THEME.WATCH) : PRIORITY_THEME.WATCH
-        const displayLabel = priorityInfo ? (PRIORITY_DISPLAY[priorityInfo.priority] || priorityInfo.priority) : null
-        const a = lead.deal_analysis
-        // Capability #19.2 — this cell used to be labeled "Profit at MAO"
-        // but a.profit is computed at whatever purchase price the last AI
-        // run actually used (lead.mao AT THAT TIME) — not necessarily
-        // today's canonical Flip MAO. Relabeled "Projected Profit
-        // (current)" to match Path to a Flip Deal's own "current scenario"
-        // language just below, and "Max Offer (MAO)" (lead.mao, the
-        // legacy/editable stored value) is replaced with the canonical
-        // Flip MAO everything else on this page now shows — see Path to a
-        // Flip Deal for the matching "Profit at Flip MAO" figure.
-        const projectedProfitCurrent = a?.profit ?? null
-        const strategyForMao = strategy === 'brrrr' ? 'brrrr' : 'flip'
-        const holdMonths = lead.hold_months || 6
-        const canonicalMao = strategyForMao === 'brrrr'
-          ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, holdMonths)?.mao ?? null
-          : (lead.arv != null && lead.renovation_cost != null ? calculateFlipMAO(lead.arv, lead.renovation_cost, holdMonths) : null)
+      {/* Capability — Deal Analysis Clarity + Flip/BRRRR Separation.
+          Before this change, "Why"/"Biggest Risk" were parsed out of
+          ai_notes free text (leadPriority.js's derivePriority) — which the
+          AI writes by picking whichever of Flip/BRRRR scores best,
+          independent of the tab Kevin has open. A Flip-tab WHY could
+          describe BRRRR cash flow. Replaced with deterministic,
+          template-built explanations (src/lib/dealExplanation.js) scoped
+          STRICTLY to the selected strategy tab — every number in Why/
+          Biggest Risk comes from the same canonical calculateFlipMAO/
+          calculateBrrrrMAO/computeFlipBreakdown/computeBrrrrBreakdown
+          functions the rest of the page uses. No LLM call, no invented
+          numbers, no cross-strategy leakage. */}
+      {(flipResult.available || brrrrResult.available) && (() => {
+        const activeResult = strategy === 'brrrr' ? brrrrResult : flipResult
+        const theme = VERDICT_THEME[activeResult.verdict] || VERDICT_THEME.WATCH
         return (
           <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
             <div className="px-3 pt-2 flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>
-                Detailed AI Analysis <span className="font-normal opacity-80">(supporting — see decision above)</span>
+                Detailed Analysis — {strategy === 'brrrr' ? 'BRRRR' : 'Flip'} <span className="font-normal opacity-80">(supporting — see decision above)</span>
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
-              {displayLabel && (
-                <div className="px-3 py-2">
-                  <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>AI Read</div>
-                  <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{displayLabel}</div>
-                </div>
-              )}
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Projected Profit (current)</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{projectedProfitCurrent != null ? fc(projectedProfitCurrent) : '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>Starting Offer</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{lead.starting_offer ? fc(lead.starting_offer) : '—'}</div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>{strategyForMao === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
-                <div className="text-[14px] font-bold" style={{ color: theme.text }}>{canonicalMao != null ? fc(Math.round(canonicalMao / 100) * 100) : '—'}</div>
-              </div>
-            </div>
-            {priorityInfo && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
-                <div className="px-3 py-2">
-                  <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Why</div>
-                  {priorityInfo.reasons.length > 0 ? (
-                    <>
-                      <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
-                        {(showReasonDetail ? priorityInfo.rawReasons : priorityInfo.reasons).map((r, i) => <li key={i}>✓ {r}</li>)}
-                      </ul>
-                      <button
-                        type="button"
-                        onClick={() => setShowReasonDetail(v => !v)}
-                        className="text-[10px] underline underline-offset-2 mt-1 opacity-70 hover:opacity-100 transition-opacity"
-                        style={{ color: theme.text }}
-                      >
-                        {showReasonDetail ? 'Show summary' : 'View details'}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
-                  )}
-                </div>
-                <div className="px-3 py-2">
-                  <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
-                  <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>
-                    {priorityInfo.biggestRisk ? `⚠ ${priorityInfo.biggestRisk}` : '—'}
+
+            {activeResult.available ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>AI Read</div>
+                    <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{activeResult.verdict}</div>
                   </div>
-                  {priorityInfo.dataQuality != null && (
-                    <div className="text-[10px] font-medium opacity-70 mt-1" style={{ color: theme.text }}>Data Quality: {priorityInfo.dataQuality}/10</div>
-                  )}
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>
+                      {strategy === 'brrrr' ? 'Cash Left In' : 'Projected Profit'}
+                    </div>
+                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>
+                      {strategy === 'brrrr'
+                        ? (activeResult.cashLeftIn != null ? fc(activeResult.cashLeftIn) : '—')
+                        : (activeResult.projectedProfit != null ? fc(activeResult.projectedProfit) : '—')}
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>
+                      {strategy === 'brrrr' ? 'Cash Flow' : 'Starting Offer'}
+                    </div>
+                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>
+                      {strategy === 'brrrr'
+                        ? (activeResult.monthlyCashFlow != null ? `${fc(activeResult.monthlyCashFlow)}/mo` : '—')
+                        : (lead.starting_offer ? fc(lead.starting_offer) : '—')}
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>{strategy === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>{activeResult.mao != null ? fc(Math.round(activeResult.mao / 100) * 100) : 'Not confirmed'}</div>
+                  </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Why</div>
+                    {activeResult.why.length > 0 ? (
+                      <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
+                        {activeResult.why.map((r, i) => <li key={i}>✓ {r}</li>)}
+                      </ul>
+                    ) : (
+                      <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                    )}
+                  </div>
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
+                    {activeResult.biggestRisk.length > 0 ? (
+                      <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>⚠ {activeResult.biggestRisk[0]}</div>
+                    ) : (
+                      <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="px-3 py-2.5">
+                <div className="text-[12px] font-medium" style={{ color: theme.text }}>⚠ {activeResult.reason}</div>
               </div>
             )}
           </div>
