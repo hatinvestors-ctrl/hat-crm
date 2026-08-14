@@ -7,7 +7,7 @@ import RenoTierPicker from './RenoTierPicker'
 import { supabase } from '../../lib/supabase'
 import {
   formatCurrency, computeFlipBreakdown, computeBrrrrBreakdown, bisectThreshold,
-  calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN,
+  calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, getEffectiveOffer,
 } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../lib/dealExplanation'
@@ -149,10 +149,12 @@ function BrrrrRealityCheck({ lead }) {
 
   const result = calculateBrrrrMAO(arv, reno, rent, holdMonths)
 
-  // Current-scenario numbers at today's actual purchase-price assumption
-  // (lead.mao if set, else asking price) — separate from the MAO solve,
-  // shown so Kevin can compare "where I am" vs "where the ceiling is".
-  const currentPP = lead.mao != null ? Number(lead.mao) : (lead.asking_price != null ? Number(lead.asking_price) : null)
+  // Current-scenario purchase price — the SAME effective-offer function
+  // Financials/Detailed Analysis use (calculations.js), not a separately-
+  // derived lead.mao/asking_price guess. Without this, changing rehab
+  // could move Financials' "We Offer" and Detailed Analysis' numbers
+  // while Path to a Deal kept showing the old price.
+  const currentPP = getEffectiveOffer(lead, result.mao)
   const current = (arv && reno != null && rent && currentPP) ? computeBrrrrBreakdown(currentPP, arv, reno, rent, holdMonths) : null
 
   return (
@@ -228,7 +230,9 @@ function FlipRealityCheck({ lead }) {
   const holdMonths = lead.hold_months || 6
 
   const flipMao = calculateFlipMAO(arv, reno, holdMonths)
-  const currentPP = lead.mao != null ? Number(lead.mao) : (lead.asking_price != null ? Number(lead.asking_price) : null)
+  // Same effective-offer function Financials/Detailed Analysis use — one
+  // "current price" concept across the whole card, not a third guess.
+  const currentPP = getEffectiveOffer(lead, flipMao)
   const current = currentPP != null ? computeFlipBreakdown(currentPP, arv, reno, holdMonths) : null
   const profit = current?.totalProfit ?? null
 
@@ -367,10 +371,13 @@ function FullBreakdownTab({ lead, strategy }) {
   const arv  = Number(lead.arv || 0)
   const reno = Number(lead.renovation_cost ?? 0)
   const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
-  const formulaMao = arv ? Math.round(arv * 0.75 - reno - 2450) : null
-  const pp = Number(lead.mao || formulaMao || lead.asking_price || 0)
   const isFlip = strategy !== 'brrrr'
   const holdMonths = lead.hold_months || 6
+  // Same canonical MAO + effective-offer functions every other card on
+  // this page uses — this tab used to compute its own flat-75%-rule MAO
+  // and prefer stored lead.mao directly, a fourth "current price" concept.
+  const canonicalMao = isFlip ? calculateFlipMAO(arv, reno, holdMonths) : calculateBrrrrMAO(arv, reno, rent, holdMonths)?.mao
+  const pp = Number(getEffectiveOffer(lead, canonicalMao) || 0)
   const f = isFlip ? computeFlipBreakdown(pp, arv, reno, holdMonths) : computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
 
   const Row = ({ label, value, bold, positive, separator, indent }) => (
@@ -1169,7 +1176,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                     <div className="text-[14px] font-bold" style={{ color: theme.text }}>
                       {strategy === 'brrrr'
                         ? (activeResult.monthlyCashFlow != null ? `${fc(activeResult.monthlyCashFlow)}/mo` : '—')
-                        : (lead.starting_offer ? fc(lead.starting_offer) : '—')}
+                        : (activeResult.currentOffer != null ? fc(activeResult.currentOffer) : '—')}
                     </div>
                   </div>
                   <div className="px-3 py-2">

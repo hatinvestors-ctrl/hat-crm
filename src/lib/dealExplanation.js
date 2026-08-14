@@ -17,7 +17,7 @@
 
 import {
   calculateFlipMAO, calculateBrrrrMAO, computeFlipBreakdown, computeBrrrrBreakdown,
-  FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, formatCurrency as fc,
+  FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, formatCurrency as fc, getEffectiveOffer,
 } from './calculations.js'
 
 const THIN_MARGIN = 5000 // within $5K of target = WATCH, not a clean PASS (Section 11)
@@ -28,13 +28,17 @@ export function computeFlipResult(lead) {
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const holdMonths = lead.hold_months || 6
   const ask = lead.asking_price != null ? Number(lead.asking_price) : null
-  const currentOffer = lead.starting_offer != null ? Number(lead.starting_offer)
-    : (lead.mao != null ? Number(lead.mao) : ask)
 
   if (arv == null) return { available: false, reason: 'ARV is missing.' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.' }
 
   const mao = calculateFlipMAO(arv, reno, holdMonths)
+  // Same effective-offer logic FinancialSection uses (calculations.js) —
+  // stored starting_offer when it's still valid, live-recomputed against
+  // canonical Flip MAO when ARV/reno moved since the last AI run. Fixes
+  // "Starting Offer" here reading a stale number after a rehab edit while
+  // Financials' "We Offer" already updated.
+  const currentOffer = getEffectiveOffer(lead, mao) ?? ask
   const profitAtCurrentOffer = currentOffer != null ? computeFlipBreakdown(currentOffer, arv, reno, holdMonths).totalProfit : null
 
   let verdict = 'NO DEAL'
@@ -92,14 +96,16 @@ export function computeBrrrrResult(lead) {
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : null
   const holdMonths = lead.hold_months || 6
-  const currentOffer = lead.starting_offer != null ? Number(lead.starting_offer)
-    : (lead.mao != null ? Number(lead.mao) : (lead.asking_price != null ? Number(lead.asking_price) : null))
 
   if (arv == null) return { available: false, reason: 'ARV is missing.', missingField: 'ARV' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.', missingField: 'renovation cost' }
   if (rent == null) return { available: false, reason: 'BRRRR cannot be confirmed yet — rent estimate is missing.', missingField: 'rent estimate' }
 
   const maoResult = calculateBrrrrMAO(arv, reno, rent, holdMonths)
+  // Same effective-offer logic as Flip (see computeFlipResult) — keeps
+  // BRRRR's cash-left-in/cash-flow figures aligned with whatever
+  // Financials is currently showing, not a stale stored offer.
+  const currentOffer = getEffectiveOffer(lead, maoResult.mao) ?? (lead.asking_price != null ? Number(lead.asking_price) : null)
   const current = currentOffer != null ? computeBrrrrBreakdown(currentOffer, arv, reno, rent, holdMonths) : null
   const cashLeftIn = current ? Math.round(current.totalCashInvested) : null
   const monthlyCashFlow = current?.monthlyCF != null ? Math.round(current.monthlyCF) : null
@@ -131,7 +137,7 @@ export function computeBrrrrResult(lead) {
 
   return {
     available: true, verdict, mao: maoResult.mao, limitingFactor: maoResult.limitingFactor ?? null,
-    rent, cashLeftIn, monthlyCashFlow, coc,
+    currentOffer, rent, cashLeftIn, monthlyCashFlow, coc,
     why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
   }
 }

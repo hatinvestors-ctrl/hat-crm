@@ -173,6 +173,58 @@ function breakdownAt(pp, arv, reno, rent, holdMonths) {
   return { cashLeftInAtMao: Math.round(b.totalCashInvested), cashFlowAtMao: b.monthlyCF != null ? Math.round(b.monthlyCF) : null }
 }
 
+// Capability — "current offer" single source of truth. Before this, two
+// different places computed "the current offer": FinancialSection
+// live-recomputed it whenever ARV/reno changed since the last AI run,
+// while DealAnalysisCard's Detailed Analysis and dealExplanation.js's
+// WHY/Biggest Risk bullets just read the raw stored lead.starting_offer
+// — so a fresh renovation-cost edit could move Financials' "We Offer" but
+// leave Detailed Analysis's "Starting Offer" (and every profit number
+// computed from it) stuck on a stale figure. This is now the ONE place
+// "current offer" is computed; every surface calls it with the same
+// canonical Flip MAO instead of re-deriving its own opinion.
+//
+// Same simplified negotiation-room model FinancialSection always used
+// (no motivation scoring — that's the AI-assisted version): anchor near
+// MAO, floor at 80% of ask, never above 99.5% of MAO, never above ask.
+export function calculateLiveOffer(mao, ask) {
+  if (!mao || !ask) return null
+  if (ask <= mao) return Math.round(ask / 100) * 100
+  const gap = ask - mao
+  const anchor = mao - gap * 0.45
+  const floor = ask * 0.80
+  const raw = Math.max(anchor, floor)
+  return Math.round(Math.min(raw, mao * 0.995) / 100) * 100
+}
+
+// True when lead.starting_offer was computed against ARV/reno values that
+// have since changed — i.e. the stored offer no longer matches today's
+// MAO. Compares against deal_analysis.inputs, the same snapshot
+// useDealStaleness.js already uses for its own staleness check.
+export function isStoredOfferStale(lead) {
+  const inp = lead?.deal_analysis?.inputs
+  if (!inp) return false
+  const aiArv = inp.arv
+  const aiReno = inp.renovation_cost
+  const arvChanged = aiArv != null && Number(lead.arv) !== Number(aiArv)
+  const renoChanged = aiReno !== undefined && Number(lead.renovation_cost || 0) !== Number(aiReno || 0)
+  return arvChanged || renoChanged
+}
+
+// The number every "current offer" / "starting offer" display and every
+// profit-at-current-offer calculation should use — stored offer when it's
+// still valid, live-recomputed (against canonicalMao) when stale or
+// missing. `canonicalMao` should be the strategy-appropriate canonical
+// MAO (calculateFlipMAO or calculateBrrrrMAO's .mao) — never the flat
+// legacy calculateMAO() fallback.
+export function getEffectiveOffer(lead, canonicalMao) {
+  const ask = lead.asking_price != null ? Number(lead.asking_price) : null
+  const stored = lead.starting_offer != null ? Number(lead.starting_offer) : null
+  const stale = isStoredOfferStale(lead)
+  if (stored != null && !stale) return stored
+  return calculateLiveOffer(canonicalMao, ask) ?? stored
+}
+
 export function calculateFlipNetProceeds(arv) {
   const a = num(arv)
   if (!a) return null

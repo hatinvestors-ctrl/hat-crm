@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET } from '../../lib/calculations'
+import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, calculateLiveOffer, isStoredOfferStale } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
 
@@ -59,29 +59,15 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         const ask        = Number(lead.asking_price)
         const gap        = mao != null ? ask - mao : null
 
-        // Live-computed starting offer — updates instantly when ARV/reno/ask changes.
-        // Uses simplified negotiation-room model (no motivation scoring; AI adds that).
-        // Shown when stored value is stale (ARV changed since last AI run) or missing.
-        const liveStartingOffer = (() => {
-          if (!mao || !ask) return null
-          if (ask <= mao) return Math.round(ask / 100) * 100
-          const g = ask - mao
-          const anchor = mao - g * 0.45   // neutral motivation → 45% room factor
-          const floor  = ask * 0.80
-          const raw    = Math.max(anchor, floor)
-          return Math.round(Math.min(raw, mao * 0.995) / 100) * 100
-        })()
-        // Bug fix: this only ever compared ARV against the last AI run's
-        // inputs — a renovation-cost-only edit (which also moves MAO, and
-        // therefore should move Starting Offer) never marked the offer
-        // stale, so "We Offer" silently kept showing a number computed
-        // against the OLD MAO. Now compares both inputs that actually
-        // drive MAO/offer math.
-        const aiArv  = lead.deal_analysis?.inputs?.arv
-        const aiReno = lead.deal_analysis?.inputs?.renovation_cost
-        const arvChanged  = aiArv != null && Number(lead.arv) !== Number(aiArv)
-        const renoChanged = aiReno !== undefined && Number(lead.renovation_cost || 0) !== Number(aiReno || 0)
-        const offerIsStale = arvChanged || renoChanged
+        // Live-computed starting offer — updates instantly when ARV/reno/ask
+        // changes. Uses the SAME calculateLiveOffer()/isStoredOfferStale()
+        // functions (src/lib/calculations.js) that Detailed Analysis and
+        // Path to a Flip Deal now use for their own "current offer" figure
+        // — this used to be a locally-duplicated formula, which is exactly
+        // how Financials' "We Offer" and Detailed Analysis' "Starting
+        // Offer" drifted apart after a renovation-cost edit.
+        const liveStartingOffer = calculateLiveOffer(mao, ask)
+        const offerIsStale = isStoredOfferStale(lead)
         const displayOffer = (offerIsStale || !lead.starting_offer) ? liveStartingOffer : lead.starting_offer
         const pct        = gap != null ? Math.round((gap / ask) * 100) : null
         const dealOk     = gap != null && gap <= 0
