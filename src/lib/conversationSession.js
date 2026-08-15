@@ -59,6 +59,23 @@ export function formatDuration(seconds) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+// ── High-value keyword pre-filter (Capability #22.1, Section 20) ────────
+// Deterministic, zero-cost gate BEFORE any LLM call. A live microphone
+// produces far more utterances than the old manual-paste flow ("okay",
+// "yeah", "mhm" included) — this decides whether an utterance is even
+// worth sending to extraction, without an AI call to make that decision.
+const HIGH_VALUE_KEYWORDS = [
+  'price', 'sell', 'offer', 'timeline', 'tenant', 'repair', 'tax', 'lien',
+  'spouse', 'wife', 'husband', 'think about it', 'too low', 'not interested',
+  'vacant', 'inherit', 'probate', 'divorce', 'foreclosure', 'mortgage',
+  'owe', 'behind', 'need', 'want', 'close', 'move', 'relocat', 'downsiz',
+]
+
+export function hasHighValueSignal(text) {
+  const t = (text || '').toLowerCase()
+  return HIGH_VALUE_KEYWORDS.some(kw => t.includes(kw))
+}
+
 // ── Lightweight conversation stage (Section 12) — heuristic, informational
 // only, never gates functionality. Based on what's been captured, not a
 // hard state machine.

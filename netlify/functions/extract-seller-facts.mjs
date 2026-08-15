@@ -40,7 +40,22 @@ const TIMELINE_KEYS = ['ASAP', '<30_DAYS', '30_60_DAYS', '60_90_DAYS', '90_PLUS_
 const PAIN_KEYS = ['NO_MOTIVATION', 'REPAIRS', 'TAXES', 'TENANT', 'VACANT', 'INHERITED', 'FINANCIAL', 'RELOCATION', 'DIVORCE', 'OTHER']
 const OBJECTION_KEYS = ['TOO_LOW', 'NEED_TO_THINK', 'SPOUSE_PARTNER', 'ANOTHER_OFFER', 'WANTS_RETAIL', 'NOT_READY', 'CALL_LATER', 'PROCESS_CONCERN', 'TRUST_CONCERN', 'TIMING', 'PRICE', 'OTHER']
 
-const SYSTEM_PROMPT = `You extract STRUCTURED FACTS a property seller actually said during a phone call with a real estate acquisitions rep. You do not calculate anything, do not suggest offers or questions, and do not infer psychology beyond what the words support. If the seller didn't say something, leave that field null/empty — never guess.
+// Capability #22.1 — the microphone transcript has NO reliable speaker
+// labels (Web Speech API on a single room mic can't diarize; every
+// segment arrives tagged UNKNOWN). This prompt is the ONLY thing standing
+// between "seller said X" and "the rep proposed X" — a real, explicitly
+// called-out failure mode in the mission (Section 10/18): a rep musing
+// "we could probably be around $150K" must NEVER become the seller's
+// asking price. The model is told to reason from conversational ROLE
+// (who is answering vs. who is proposing/asking), not from a speaker tag
+// that doesn't exist.
+const SYSTEM_PROMPT = `You extract STRUCTURED FACTS from a phone-call transcript between a property SELLER (the homeowner) and a HAT Investors acquisitions rep (Kevin). The transcript has NO speaker labels — you must infer who is talking from context and conversational role:
+- The REP asks questions, proposes numbers on HAT's behalf, and explains HAT's process.
+- The SELLER answers questions, states what THEY want, and describes THEIR property/situation.
+
+CRITICAL RULE: seller_asking_price must ONLY be set when the SELLER states what they want/need/would take for the property (e.g. "I need $175K", "I wouldn't take less than $200K"). If a line reads like the REP proposing a number on HAT's behalf (e.g. "we could probably be around $150K", "our offer would be about $X"), that is a REP OFFER, not a seller fact — put it in hat_offer_mentioned instead, NEVER in seller_asking_price. When genuinely unsure who said a number, leave seller_asking_price null rather than guess.
+
+You do not calculate anything, do not suggest offers or questions, and do not infer psychology beyond what the words support. If the seller didn't say something, leave that field null/empty — never guess.
 
 Return ONLY valid JSON, no markdown fences, no other text, in exactly this shape:
 {
@@ -49,12 +64,13 @@ Return ONLY valid JSON, no markdown fences, no other text, in exactly this shape
   "motivation_notes": string or null (short, only if seller explained WHY, in their own words paraphrased),
   "timeline": one of ${JSON.stringify(TIMELINE_KEYS)} or null,
   "condition_notes": string or null (only concrete condition facts stated),
-  "seller_asking_price": number or null (only if seller stated an actual number),
+  "seller_asking_price": number or null (ONLY the seller's own stated number — see CRITICAL RULE above),
+  "hat_offer_mentioned": number or null (a number the REP proposed on HAT's behalf — informational only, never used for underwriting),
   "decision_makers": string or null (only if seller mentioned another person involved),
   "debt_notes": string or null (only if seller mentioned a balance/lien/mortgage amount or status),
   "new_objection": one of ${JSON.stringify(OBJECTION_KEYS)} or null (only if seller raised a new objection in this segment),
   "last_response_summary": string or null (one short sentence, what the seller just said, factual paraphrase only),
-  "confidence": "high" | "medium" | "low" (your confidence in the extraction overall, e.g. low if the transcript segment is garbled or ambiguous)
+  "confidence": "high" | "medium" | "low" (your confidence in the extraction overall — use "low" whenever speaker attribution for a price/number was ambiguous, or the transcript looks garbled/overlapping)
 }`
 
 export default async (req) => {
@@ -103,6 +119,7 @@ export default async (req) => {
       timeline: TIMELINE_KEYS.includes(parsed.timeline) ? parsed.timeline : null,
       condition_notes: parsed.condition_notes ? String(parsed.condition_notes).slice(0, 300) : null,
       seller_asking_price: typeof parsed.seller_asking_price === 'number' ? parsed.seller_asking_price : null,
+      hat_offer_mentioned: typeof parsed.hat_offer_mentioned === 'number' ? parsed.hat_offer_mentioned : null,
       decision_makers: parsed.decision_makers ? String(parsed.decision_makers).slice(0, 200) : null,
       debt_notes: parsed.debt_notes ? String(parsed.debt_notes).slice(0, 200) : null,
       new_objection: OBJECTION_KEYS.includes(parsed.new_objection) ? parsed.new_objection : null,

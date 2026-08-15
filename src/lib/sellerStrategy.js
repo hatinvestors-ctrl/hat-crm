@@ -32,6 +32,7 @@ const EMPTY_SI = {
   timeline: null,              // 'ASAP' | '<30_DAYS' | '30_60_DAYS' | '60_90_DAYS' | '90_PLUS_DAYS' | 'NO_TIMELINE'
   condition_notes: '',
   seller_asking_price: null,
+  seller_asking_price_history: [], // Capability #22.1, Section 17 — [{value, at}], old values kept when price changes mid-call
   desired_outcome: [],         // e.g. ['MAX_PRICE','FAST_CLOSING','NO_REPAIRS']
   decision_makers: '',
   debt_notes: '',

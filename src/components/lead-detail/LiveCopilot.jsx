@@ -1,26 +1,40 @@
 // src/components/lead-detail/LiveCopilot.jsx
-// Capability #22 — Live Acquisition Copilot workspace.
+// Capability #22 + #22.1 — Live Acquisition Copilot workspace.
 //
-// HONEST SCOPE: no microphone/audio capture. Kevin types or pastes what
-// the seller said; a future STT/telephony integration would feed the
-// same addSegment() call this UI makes, with nothing else here needing
-// to change (src/lib/conversationSession.js documents this contract).
+// #22.1 closes the "Kevin has to type" gap: Web Speech API microphone
+// capture (src/hooks/useSpeechRecognition.js) feeds the SAME
+// addSegment()/transcript session #22 already built — no second
+// pipeline. Manual typing still works as a fallback (mic unsupported,
+// mic error, or Kevin just prefers it).
 //
-// Full-screen focused workspace, NOT the normal CRM page and NOT a chat
-// window — one Seller State strip, one Economics strip, one large ASK
-// NEXT/NEXT MOVE hero, everything else secondary (mission's explicit
-// "1-second glance test").
-import { useEffect, useRef, useState } from 'react'
+// HONEST LIMITATIONS (documented, not hidden): Web Speech API has NO
+// speaker diarization — every result is one undifferentiated stream, sent
+// downstream as speaker=UNKNOWN. Kevin-vs-seller fact protection is
+// handled by extract-seller-facts.mjs reasoning over conversational role
+// (who's asking vs. who's answering), not a speaker label that doesn't
+// exist. Chrome/Edge only.
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { logOutcome } from '../../lib/activityLogger'
-import { createSession, addSegment, getUnprocessedSegments, markExtracted, getDurationSeconds, formatDuration, inferConversationStage } from '../../lib/conversationSession'
+import { useSpeechRecognition, isSpeechRecognitionSupported } from '../../hooks/useSpeechRecognition'
+import {
+  createSession, addSegment, getUnprocessedSegments, markExtracted, getDurationSeconds,
+  formatDuration, inferConversationStage, hasHighValueSignal,
+} from '../../lib/conversationSession'
 import {
   getSellerIntelligence, mergeSellerIntelligence, getSellerSnapshot, getCallObjective,
   getRealTimeEconomics, getNextBestMove, getCallMemory, getWhatChanged, PAIN_POINT_OPTIONS,
 } from '../../lib/sellerStrategy'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
+// Batches consecutive utterances before calling AI — long enough to catch
+// a full sentence/pause, short enough to still feel conversational
+// (mission's "a few seconds, not 20-30" target).
+const ANALYZE_DEBOUNCE_MS = 1400
+// Safety valve: even without a high-value keyword, don't let unanalyzed
+// segments pile up forever during a quiet stretch of small talk.
+const MAX_UNPROCESSED_BEFORE_FORCE = 6
 
 function StatChip({ label, value, tone }) {
   const toneColor = tone === 'good' ? 'var(--color-success-text)' : tone === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text)'
@@ -32,25 +46,53 @@ function StatChip({ label, value, tone }) {
   )
 }
 
+function MicButton({ status, supported, onStart, onPause, onResume, onStop }) {
+  if (!supported) {
+    return <span className="text-[10.5px] text-[color:var(--color-warn-text)]">🎙 Mic not supported in this browser (Chrome/Edge only) — type below instead.</span>
+  }
+  if (status === 'OFF' || status === 'ERROR') {
+    return (
+      <button onClick={onStart} className="text-[12px] font-bold px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-white">
+        🎙 Start Listening
+      </button>
+    )
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${status === 'LISTENING' ? 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]' : 'bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]'}`}>
+        {status === 'LISTENING' ? '● Listening…' : '⏸ Paused'}
+      </span>
+      {status === 'LISTENING' ? (
+        <button onClick={onPause} className="text-[11px] font-semibold px-2 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">Pause</button>
+      ) : (
+        <button onClick={onResume} className="text-[11px] font-semibold px-2 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">Resume</button>
+      )}
+      <button onClick={onStop} className="text-[11px] font-semibold px-2 py-1 rounded border border-[color:var(--color-danger)] text-[color:var(--color-danger-text)]">Stop</button>
+    </div>
+  )
+}
+
 export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated, onClose }) {
   const update = useLeadUpdate(lead, userId, members, onUpdated)
   const [session, setSession] = useState(() => createSession(lead))
   const [input, setInput] = useState('')
-  const [speaker, setSpeaker] = useState('SELLER')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState(null)
-  const [pendingFacts, setPendingFacts] = useState(null) // low-confidence facts awaiting Kevin confirm
+  const [pendingFacts, setPendingFacts] = useState(null)
   const [lastOutcomeActivity, setLastOutcomeActivity] = useState(null)
   const [ended, setEnded] = useState(false)
   const [tick, setTick] = useState(0)
+  const [showTranscript, setShowTranscript] = useState(false)
+  const [consentGiven, setConsentGiven] = useState(false)
+  const [captureFlash, setCaptureFlash] = useState(null) // e.g. "PRICE CAPTURED $175K"
   const scrollRef = useRef(null)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const debounceTimerRef = useRef(null)
 
   const si = getSellerIntelligence(lead)
   const economics = getRealTimeEconomics(lead)
   const nextMove = getNextBestMove(lead, si, economics)
-  const negotiation = economics.bestCeiling != null && economics.ourOffer != null
-    ? { room: economics.bestCeiling - economics.ourOffer }
-    : null
   const callMemory = getCallMemory(lead, lastOutcomeActivity)
   const whatChanged = getWhatChanged(callMemory, economics)
   const stage = inferConversationStage(si)
@@ -72,8 +114,8 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
   }, [lead?.id])
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [session.segments.length])
+    if (showTranscript) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [session.segments.length, showTranscript])
 
   async function applyFacts(facts) {
     const patch = {}
@@ -82,23 +124,28 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     if (facts.motivation_notes) patch.motivation_notes = si.motivation_notes ? `${si.motivation_notes}\n${facts.motivation_notes}` : facts.motivation_notes
     if (facts.timeline) patch.timeline = facts.timeline
     if (facts.condition_notes) patch.condition_notes = si.condition_notes ? `${si.condition_notes}\n${facts.condition_notes}` : facts.condition_notes
-    if (facts.seller_asking_price != null) patch.seller_asking_price = facts.seller_asking_price
-    if (facts.decision_makers) patch.decision_makers = facts.decision_makers
+    // #22.1, Section 17 — changed-price handling: keep history instead of
+    // silently overwriting, so "current" always drives guidance but
+    // "previously stated" stays visible/auditable.
+    if (facts.seller_asking_price != null && facts.seller_asking_price !== si.seller_asking_price) {
+      patch.seller_asking_price = facts.seller_asking_price
+      if (si.seller_asking_price != null) {
+        patch.seller_asking_price_history = [...(si.seller_asking_price_history || []), { value: si.seller_asking_price, at: new Date().toISOString() }]
+      }
+      setCaptureFlash(`PRICE CAPTURED ${fc(facts.seller_asking_price)}`)
+    }
+    if (facts.decision_makers) { patch.decision_makers = facts.decision_makers; setCaptureFlash('DECISION MAKER CAPTURED') }
     if (facts.debt_notes) patch.debt_notes = facts.debt_notes
-    if (facts.new_objection) patch.objections = [...si.objections, facts.new_objection]
+    if (facts.new_objection) { patch.objections = [...si.objections, facts.new_objection]; setCaptureFlash(`OBJECTION: ${facts.new_objection.replace(/_/g, ' ')}`) }
     if (facts.last_response_summary) patch.last_response = facts.last_response_summary
+    if (facts.timeline && !facts.seller_asking_price) setCaptureFlash(`TIMELINE ${facts.timeline.replace(/_/g, ' ')}`)
     if (Object.keys(patch).length === 0) return
     await update({ distress_data: mergeSellerIntelligence(lead, patch) })
+    if (captureFlash) setTimeout(() => setCaptureFlash(null), 3000)
   }
 
-  function addTranscriptSegment() {
-    if (!input.trim()) return
-    setSession(s => addSegment(s, { speaker, text: input }))
-    setInput('')
-  }
-
-  async function analyzeTranscript() {
-    const unprocessed = getUnprocessedSegments(session)
+  const analyzeTranscript = useCallback(async () => {
+    const unprocessed = getUnprocessedSegments(sessionRef.current)
     if (unprocessed.length === 0) return
     setAnalyzing(true)
     setAnalyzeError(null)
@@ -113,19 +160,51 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
       const body = await res.json()
       if (!res.ok || !body.ok) throw new Error(body.error || 'Extraction failed')
       setSession(s => markExtracted(s))
-      // Confidence gate (Section 7) — low confidence needs a one-click confirm, never silently becomes CRM truth.
       if (body.facts.confidence === 'low') {
         setPendingFacts(body.facts)
       } else {
         await applyFacts(body.facts)
       }
     } catch (err) {
-      // AI failure fallback (Section 37) — the call keeps going; existing
-      // facts/economics/manual quick-capture remain fully usable.
-      setAnalyzeError('Could not analyze that segment — you can still capture facts manually below.')
+      // AI failure fallback (Section 22/37) — call keeps going; manual
+      // quick-capture and existing facts remain fully usable.
+      setAnalyzeError('Transcription analysis unavailable right now — you can still capture facts manually below.')
     } finally {
       setAnalyzing(false)
     }
+  }, [si])
+
+  // #22.1, Section 7/20 — automatic analysis. Every finalized mic
+  // utterance is added as a segment; a high-value keyword schedules a
+  // debounced analyze (batches consecutive utterances into one call
+  // instead of firing per sentence), and a safety-valve count forces one
+  // even without a keyword hit so quiet stretches never silently pile up
+  // unanalyzed forever.
+  const scheduleAnalyze = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => { analyzeTranscript() }, ANALYZE_DEBOUNCE_MS)
+  }, [analyzeTranscript])
+
+  const handleFinalUtterance = useCallback((text) => {
+    setSession(s => addSegment(s, { speaker: 'UNKNOWN', text }))
+    const unprocessedCount = getUnprocessedSegments(sessionRef.current).length + 1
+    if (hasHighValueSignal(text) || unprocessedCount >= MAX_UNPROCESSED_BEFORE_FORCE) {
+      scheduleAnalyze()
+    }
+  }, [scheduleAnalyze])
+
+  const mic = useSpeechRecognition(handleFinalUtterance)
+
+  function startListening() {
+    if (!consentGiven) return
+    mic.start()
+  }
+
+  function addManualSegment() {
+    if (!input.trim()) return
+    setSession(s => addSegment(s, { speaker: 'UNKNOWN', text: input }))
+    setInput('')
+    scheduleAnalyze()
   }
 
   function togglePainManual(key) {
@@ -135,18 +214,34 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
 
   return (
     <div className="fixed inset-0 z-50 bg-[color:var(--color-bg)] flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[color:var(--color-line)] shrink-0">
         <div>
           <div className="text-[13px] font-bold text-[color:var(--color-text)]">{lead.owner_name || 'Owner'} · {lead.address}</div>
           <div className="text-[10.5px] text-[color:var(--color-text-dim)]">LIVE {formatDuration(getDurationSeconds(session))} · Stage: {stage}</div>
         </div>
-        <button onClick={onClose} className="text-[12px] font-semibold px-2.5 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">Close</button>
+        <button onClick={() => { mic.stop(); onClose() }} className="text-[12px] font-semibold px-2.5 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">Close</button>
       </div>
 
       {!ended ? (
         <div className="flex-1 overflow-y-auto px-4 py-3 max-w-3xl mx-auto w-full space-y-3">
-          {/* Before You Call / Call Memory */}
+          {/* Consent notice — Section 3, shown before mic activates */}
+          {!consentGiven && (
+            <div className="rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)] px-3 py-2.5">
+              <p className="text-[11.5px] text-[color:var(--color-warn-text)] leading-snug">
+                Starting the microphone will transcribe live audio in this browser to text. You are responsible for complying with applicable call-consent/recording laws for your state and the seller's. No raw audio is stored — only the finalized text transcript, which is used to update this lead's records.
+              </p>
+              <button onClick={() => setConsentGiven(true)} className="mt-1.5 text-[11px] font-bold px-2.5 py-1 rounded bg-[color:var(--color-warn)] text-white">I Understand — Enable Microphone</button>
+            </div>
+          )}
+
+          {/* Mic controls */}
+          <div className="flex items-center justify-between rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
+            <MicButton status={mic.status} supported={isSpeechRecognitionSupported()} onStart={startListening} onPause={mic.pause} onResume={mic.resume} onStop={mic.stop} />
+            {captureFlash && <span className="text-[10.5px] font-bold text-[color:var(--color-accent-text)] animate-pulse">{captureFlash}</span>}
+          </div>
+          {mic.status === 'ERROR' && mic.error && <p className="text-[10.5px] text-[color:var(--color-danger-text)]">🎙 {mic.error}</p>}
+
+          {/* Call Memory */}
           {callMemory && (
             <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
               <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-1">Last Time ({callMemory.daysSince != null ? `${callMemory.daysSince}d ago` : 'unknown'})</div>
@@ -155,14 +250,12 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
                 {callMemory.sellerExpectation != null && <span>Seller wanted {fc(callMemory.sellerExpectation)}. </span>}
                 {callMemory.lastNote && <span>"{callMemory.lastNote}"</span>}
               </div>
-              {whatChanged.length > 0 && (
-                <div className="text-[10.5px] text-[color:var(--color-accent-text)] mt-1">What changed: {whatChanged.join(' ')}</div>
-              )}
+              {whatChanged.length > 0 && <div className="text-[10.5px] text-[color:var(--color-accent-text)] mt-1">What changed: {whatChanged.join(' ')}</div>}
               <div className="text-[11px] font-semibold text-[color:var(--color-text)] mt-1">Today's objective: {getCallObjective(lead)}</div>
             </div>
           )}
 
-          {/* Seller State + Economics strip */}
+          {/* Seller State + Economics */}
           <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
             <div className="grid grid-cols-5 divide-x divide-[color:var(--color-line)] mb-2">
               <StatChip label="Open to Sell" value={si.open_to_sell || 'UNKNOWN'} tone={si.open_to_sell === 'YES' ? 'good' : undefined} />
@@ -171,6 +264,9 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
               <StatChip label="Seller Price" value={fc(si.seller_asking_price)} />
               <StatChip label="Main Pain" value={si.pain_points[0] || '—'} />
             </div>
+            {si.seller_asking_price_history?.length > 0 && (
+              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">Previously stated: {si.seller_asking_price_history.map(h => fc(h.value)).join(' → ')} → <strong>{fc(si.seller_asking_price)}</strong> (changed during call)</div>
+            )}
             <div className="grid grid-cols-4 divide-x divide-[color:var(--color-line)] border-t border-[color:var(--color-line)] pt-2">
               <StatChip label="Our Offer" value={fc(economics.ourOffer)} />
               <StatChip label="Flip Max" value={economics.flipReady ? fc(economics.flipMao) : 'NOT READY'} tone={economics.flipReady ? undefined : 'warn'} />
@@ -182,7 +278,7 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             )}
           </div>
 
-          {/* NEXT MOVE hero — the one thing Kevin should read */}
+          {/* NEXT MOVE hero */}
           <div className="rounded-xl border-2 border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] px-4 py-3.5 text-center">
             <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-1">{nextMove.move}</div>
             {nextMove.ask ? (
@@ -193,7 +289,6 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             {nextMove.note && nextMove.ask && <p className="text-[10.5px] text-[color:var(--color-accent-text)] opacity-80 mt-1">{nextMove.note}</p>}
           </div>
 
-          {/* Low-confidence confirmation (Section 7) */}
           {pendingFacts && (
             <div className="rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)] px-3 py-2">
               <div className="text-[10.5px] font-bold text-[color:var(--color-warn-text)] mb-1">Low-confidence extraction — confirm before saving:</div>
@@ -205,7 +300,6 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             </div>
           )}
 
-          {/* Quick capture */}
           <div className="flex flex-wrap gap-1.5">
             {PAIN_POINT_OPTIONS.map(p => (
               <button key={p.key} onClick={() => togglePainManual(p.key)}
@@ -217,32 +311,36 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             ))}
           </div>
 
-          {/* Transcript */}
+          {/* Transcript — secondary, collapsed by default (Section 11) */}
           <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
-            <div ref={scrollRef} className="max-h-32 overflow-y-auto space-y-1 mb-2">
-              {session.segments.length === 0 ? (
-                <p className="text-[10.5px] text-[color:var(--color-text-faint)] italic">Listening… type or paste what the seller says as the call happens.</p>
-              ) : session.segments.map(seg => (
-                <div key={seg.id} className="text-[11px]"><span className="font-semibold text-[color:var(--color-text-dim)]">{seg.speaker}: </span><span className="text-[color:var(--color-text-muted)]">{seg.text}</span></div>
-              ))}
-            </div>
-            <div className="flex gap-1.5">
-              <select value={speaker} onChange={e => setSpeaker(e.target.value)} className="text-[11px] px-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
-                <option value="SELLER">Seller</option>
-                <option value="KEVIN">Kevin</option>
-              </select>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTranscriptSegment()}
-                placeholder="What did they say?" className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text)]" />
-              <button onClick={addTranscriptSegment} className="text-[11px] font-semibold px-2.5 rounded bg-[color:var(--color-bg)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">Add</button>
-              <button onClick={analyzeTranscript} disabled={analyzing || getUnprocessedSegments(session).length === 0}
-                className="text-[11px] font-bold px-2.5 rounded bg-[color:var(--color-accent)] text-white disabled:opacity-40">
-                {analyzing ? '…' : 'Analyze'}
-              </button>
-            </div>
+            <button onClick={() => setShowTranscript(v => !v)} className="text-[10.5px] font-semibold text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] mb-1.5">
+              {showTranscript ? '▾ Hide Transcript' : '▸ Show Transcript'} ({session.segments.length})
+              {mic.interimText && <span className="italic text-[color:var(--color-text-faint)]"> — "{mic.interimText}"</span>}
+            </button>
+            {showTranscript && (
+              <>
+                <div ref={scrollRef} className="max-h-32 overflow-y-auto space-y-1 mb-2">
+                  {session.segments.length === 0 ? (
+                    <p className="text-[10.5px] text-[color:var(--color-text-faint)] italic">Nothing yet — start listening or type below.</p>
+                  ) : session.segments.map(seg => (
+                    <div key={seg.id} className="text-[11px]"><span className="text-[color:var(--color-text-muted)]">{seg.text}</span></div>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addManualSegment()}
+                    placeholder="Type manually (fallback)…" className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[color:var(--color-text)]" />
+                  <button onClick={addManualSegment} className="text-[11px] font-semibold px-2.5 rounded bg-[color:var(--color-bg)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)]">Add</button>
+                  <button onClick={analyzeTranscript} disabled={analyzing || getUnprocessedSegments(session).length === 0}
+                    className="text-[11px] font-bold px-2.5 rounded bg-[color:var(--color-accent)] text-white disabled:opacity-40">
+                    {analyzing ? '…' : 'Analyze Now'}
+                  </button>
+                </div>
+              </>
+            )}
             {analyzeError && <p className="text-[10.5px] text-[color:var(--color-danger-text)] mt-1">{analyzeError}</p>}
           </div>
 
-          <button onClick={() => setEnded(true)} className="w-full text-[13px] font-bold py-2 rounded-lg bg-[color:var(--color-danger)] text-white">End Call</button>
+          <button onClick={() => { mic.stop(); setEnded(true) }} className="w-full text-[13px] font-bold py-2 rounded-lg bg-[color:var(--color-danger)] text-white">End Call</button>
         </div>
       ) : (
         <EndCallSummary lead={lead} si={si} userId={userId} onSaved={() => { onClose(); }} onDiscard={() => setEnded(false)} />
