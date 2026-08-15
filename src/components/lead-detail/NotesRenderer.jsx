@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { calculateFlipMAO, getEffectiveOffer } from '../../lib/calculations'
 
 const MissingFieldsContext = createContext([])
 const NotesContext = createContext('')
@@ -934,7 +935,12 @@ function RecommendedActionSection({ body }) {
   const computedScore = computeScoreFromText(fullNotes)
   const verdict    = scoreToVerdict(computedScore) || get('Verdict')
   const atMao      = get('At MAO')
-  const gap        = get('Gap') || get('Gap to Close')
+  // Capability — the Gap chip used to read the AI-notes-parsed "Gap:"
+  // line (only fresh right after an analysis run), while the "What this
+  // means" prose independently read lead.mao (the separately-stored,
+  // editable legacy field) — the exact split that produced "$41,857 here,
+  // $47,350 there" on the same card. Both now come from canonicalFlipMao
+  // (below), never parsed AI text.
   const strategy   = get('Strategy')
   const arv        = get('Our ARV')
   const ourMao     = get('Our MAO')
@@ -987,10 +993,18 @@ function RecommendedActionSection({ body }) {
     setLogged(prev => ({ ...prev, [key]: true }))
   }
 
-  // Gap between asking price and MAO — used in verdict text and next steps
+  // Canonical Flip MAO — the SAME function Financials/Detailed Analysis/
+  // Path to a Deal/Copilot all use. Computed once here and reused for
+  // both the gap figure below and consistentMaoValue further down, so
+  // this card can never show two different gaps/MAOs itself.
+  const canonicalFlipMao = (lead?.arv != null && lead?.renovation_cost != null)
+    ? calculateFlipMAO(Number(lead.arv), Number(lead.renovation_cost), lead.hold_months || 6)
+    : null
+
+  // Gap between asking price and canonical Flip MAO — used in verdict text and next steps
   const gapAmt = (() => {
     const ask = lead?.asking_price ? Number(lead.asking_price) : null
-    const mao = lead?.mao          ? Number(lead.mao)          : null
+    const mao = canonicalFlipMao ?? (lead?.mao ? Number(lead.mao) : null)
     if (!ask || !mao || ask <= mao) return null
     return ask - mao
   })()
@@ -1140,19 +1154,29 @@ function RecommendedActionSection({ body }) {
     : { bg: 'var(--color-bg-elev-2)', txt: 'var(--color-text-muted)', bdr: 'var(--color-line)', icon: '📋', label: verdict || '—', what: null, action: null, posture: null }
 
   const maoIsZeroRenoCeiling = /zero.reno ceiling/i.test(ourMao || '')
-  // MAO shown here must match FinancialSection. We read lead.mao which is always kept in sync
-  // with the formula (ARV × 0.75 − Reno − $2,450) by FinancialSection's auto-sync.
-  // Override the AI-text MAO with the stored lead.mao so both sections always agree.
-  const consistentMaoValue = lead?.mao
-    ? `$${Number(lead.mao).toLocaleString()}`
-    : ourMao?.split('←')[0].split('(')[0].trim()
+  // MAO shown here must match Financials/Detailed Analysis/Path to a
+  // Deal — all read canonicalFlipMao now, not the separately-stored
+  // lead.mao (that field stopped being "always kept in sync" once
+  // Financials switched its primary display to the canonical figure).
+  const consistentMaoValue = canonicalFlipMao != null
+    ? `$${(Math.round(canonicalFlipMao / 100) * 100).toLocaleString()}`
+    : (lead?.mao ? `$${Number(lead.mao).toLocaleString()}` : ourMao?.split('←')[0].split('(')[0].trim())
   const priceCards = [
     arv      && { label: 'ARV (from comps)',  value: arv.split('←')[0].trim(),                       accent: false },
     ourMao   && { label: maoIsZeroRenoCeiling ? 'MAO (zero-reno ceiling)' : 'MAO',
                   value: consistentMaoValue,
                   accent: maoIsZeroRenoCeiling ? 'warn' : 'green',
                   sub: maoIsZeroRenoCeiling ? '⚠ actual MAO lower once reno is known' : null },
-    starting && { label: 'Starting Offer',    value: starting.split('←')[0].split('(')[0].trim(),   accent: 'blue' },
+    starting && {
+      label: 'Starting Offer',
+      // Same getEffectiveOffer() every other surface uses — falls back to
+      // the parsed AI text only if canonicalFlipMao isn't computable.
+      value: (() => {
+        const eff = canonicalFlipMao != null ? getEffectiveOffer(lead, canonicalFlipMao) : null
+        return eff != null ? `$${eff.toLocaleString()}` : starting.split('←')[0].split('(')[0].trim()
+      })(),
+      accent: 'blue',
+    },
     maxWalk  && { label: 'Walk-Away Max',     value: maxWalk.split('←')[0].split('(')[0].trim(),     accent: false },
   ].filter(Boolean)
 
@@ -1202,9 +1226,9 @@ function RecommendedActionSection({ body }) {
                 {sellerOdds.dot} Seller: {sellerOdds.label}
               </span>
             )}
-            {gap && (
+            {gapStr && (
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
-                ↕ Gap: {gap.split('(')[0].trim()}
+                ↕ Gap: {gapStr} off ask
               </span>
             )}
           </div>
