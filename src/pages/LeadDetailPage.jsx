@@ -24,6 +24,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { supabase } from '../lib/supabase'
 import { enrichLead } from '../lib/enrichment'
 import AcquisitionCopilot from '../components/lead-detail/AcquisitionCopilot'
+import OffMarketSellerStrategy from '../components/lead-detail/OffMarketSellerStrategy'
 
 function GroupDivider({ label }) {
   return (
@@ -166,6 +167,20 @@ export default function LeadDetailPage() {
             genuinely unique value (workflow next-step buttons), not its
             own verdict badge. */}
         <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
+
+        {/* Off-Market Seller Strategy — renders ONLY for off-market leads
+            (reuses the existing isDistressedLead() detector, no second
+            classification system). For these leads, the seller
+            conversation comes before deal economics (mission's core
+            thesis) — this replaces the on-market ActionZone's role rather
+            than stacking a whole extra page section. */}
+        <OffMarketSellerStrategy
+          lead={lead}
+          userId={user.id}
+          members={members}
+          canEdit={canEdit}
+          onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
+        />
 
         <ActionZone
           lead={lead}
