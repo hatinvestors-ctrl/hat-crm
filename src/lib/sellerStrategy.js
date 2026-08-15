@@ -14,6 +14,8 @@
 // — no second classification system. OFF_MARKET === isDistressedLead(lead).
 
 import { getDistressInfo, isDistressedLead } from './distressInfo.js'
+import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from './dealExplanation.js'
+import { getEffectiveOffer } from './calculations.js'
 
 export function getMarketType(lead) {
   return isDistressedLead(lead) ? 'OFF_MARKET' : 'ON_MARKET'
@@ -412,4 +414,145 @@ export function getCallObjective(lead) {
   if (!si.timeline) return `Understand ${owner}'s timeline if they decided to sell.`
   if (si.seller_asking_price == null) return `Understand what ${owner} would want to walk away with.`
   return `Move toward presenting an offer to ${owner}.`
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Capability #22 — Live Acquisition Copilot additions. Everything below
+// is deterministic (no LLM). Reuses the SAME canonical Flip/BRRRR MAO and
+// strategy-recommendation functions (dealExplanation.js/calculations.js)
+// every other surface in the app already uses — never a new formula, and
+// the MAO guardrail (Section 25/44: "AI cannot recommend an offer above
+// canonical MAO") is enforced structurally here: this function never lets
+// an LLM output touch the offer number at all.
+// ═══════════════════════════════════════════════════════════════════════
+
+// -- Real-time economics (Section 16, 26) --------------------------------
+export function getRealTimeEconomics(lead) {
+  const flip = computeFlipResult(lead)
+  const brrrr = computeBrrrrResult(lead)
+  const rec = computeStrategyRecommendation(flip, brrrr)
+  const si = getSellerIntelligence(lead)
+
+  const flipMao = flip.available ? flip.mao : null
+  const brrrrMao = brrrr.available ? brrrr.mao : null
+  const ourOffer = flip.available ? flip.currentOffer : (brrrr.available ? brrrr.currentOffer : null)
+
+  // Best supported ceiling -- the HIGHER of the two computable MAOs.
+  // Real-data testing (live-call scenario) caught a bug here: gating on
+  // verdict !== 'NO DEAL' meant a lead with no stored offer/asking price
+  // yet (very common mid-call, before anything's been typed into
+  // Financials) showed NO ceiling at all, even though calculateFlipMAO/
+  // calculateBrrrrMAO had already computed a real number -- verdict
+  // depends on a CURRENT OFFER that simply doesn't exist yet on a fresh
+  // call. The ceiling only needs the MAO itself to be computable
+  // (flip.available/brrrr.available), never a fabricated number.
+  const candidates = [
+    flip.available ? { strategy: 'FLIP', mao: flipMao } : null,
+    brrrr.available ? { strategy: 'BRRRR', mao: brrrrMao } : null,
+  ].filter(Boolean)
+  const bestCeiling = candidates.length
+    ? candidates.reduce((a, b) => (b.mao > a.mao ? b : a))
+    : null
+
+  const sellerPrice = si.seller_asking_price ?? null
+  const gap = (sellerPrice != null && bestCeiling) ? sellerPrice - bestCeiling.mao : null
+
+  return {
+    sellerPrice,
+    ourOffer,
+    flipMao, flipReady: flip.available, flipReason: flip.available ? null : flip.reason,
+    brrrrMao, brrrrReady: brrrr.available, brrrrReason: brrrr.available ? null : brrrr.reason,
+    bestCeiling: bestCeiling?.mao ?? null,
+    bestCeilingStrategy: bestCeiling?.strategy ?? null,
+    strategyRecommendation: rec,
+    gap,
+    // Preliminary vs Refined (Section 26, reuses #16.1's own concept --
+    // no new maturity score) -- a strategy is PRELIMINARY whenever its
+    // solver returned "not available" for a data reason.
+    flipMaturity: flip.available ? 'REFINED' : 'PRELIMINARY',
+    brrrrMaturity: brrrr.available ? 'REFINED' : 'PRELIMINARY',
+  }
+}
+
+// -- Negotiation room guidance (Section 18) -- never a target, a bound --
+export function getNegotiationRoomGuidance(economics) {
+  if (economics.ourOffer == null || economics.bestCeiling == null) return null
+  const room = economics.bestCeiling - economics.ourOffer
+  if (room <= 0) return { room: 0, guidance: 'AT CEILING', note: 'Already at the maximum supported price -- no room to move.' }
+  if (room < 5000) return { room, guidance: 'SMALL MOVE', note: `Up to ${room.toLocaleString()} of room, at most.` }
+  if (room < 15000) return { room, guidance: 'NEGOTIATE', note: `${room.toLocaleString()} of supported room to work with.` }
+  return { room, guidance: 'HOLD', note: `${room.toLocaleString()} of room exists -- no need to move yet.` }
+}
+
+// -- Objection -> guidance (Section 20/21/22/23/24) ----------------------
+export const OBJECTION_GUIDANCE = {
+  TOO_LOW: { move: 'UNDERSTAND EXPECTATION', ask: "I understand. Where were you hoping we'd be?", note: 'Do not raise the offer yet -- understand the gap first.' },
+  NEED_TO_THINK: { move: 'FIND THE REAL CONCERN', ask: "Of course. Usually when someone wants to think about it, there's one part they're still unsure about -- is it mainly the price, the timing, or something about the process?", note: 'If they genuinely need time, move to SCHEDULE FOLLOW-UP.' },
+  SPOUSE_PARTNER: { move: 'INCLUDE DECISION MAKER', ask: 'Absolutely. Would it make sense for us to talk together so everyone can ask questions at the same time?', note: 'Never pressure someone to bypass another decision maker.' },
+  ANOTHER_OFFER: { move: 'UNDERSTAND THE OTHER OFFER', ask: "Good to know -- mind if I ask what that offer looks like, so I can see how we compare?", note: 'Compare against canonical MAO before responding -- never auto-outbid.' },
+  WANTS_RETAIL: { move: 'TEST PRIORITIES', ask: "Is getting the highest possible price the main priority, or would a simpler as-is sale also be valuable to you?", note: 'If max price wins, recommend NOT CURRENT INVESTOR FIT rather than pushing.' },
+  NOT_READY: { move: 'RESPECT AND FOLLOW UP LONG-TERM', ask: 'Totally understand -- mind if I check back down the road if anything changes?', note: 'Do not force motivation that isn’t there.' },
+  CALL_LATER: { move: 'SCHEDULE FOLLOW-UP', ask: "No problem -- what's a better time for me to reach you?", note: 'Set a specific date/time, not a vague later.' },
+  PROCESS_CONCERN: { move: 'EXPLAIN THE PROCESS SIMPLY', ask: 'What part of how this would work is on your mind?', note: 'Answer plainly -- no over-promising terms HAT can’t guarantee.' },
+  TRUST_CONCERN: { move: 'BUILD CREDIBILITY', ask: 'Totally fair to ask questions -- what would help you feel comfortable moving forward?', note: 'Never pressure past a trust concern.' },
+  TIMING: { move: 'UNDERSTAND TIMING', ask: "What's driving the timing on your end?", note: null },
+  PRICE: { move: 'UNDERSTAND EXPECTATION', ask: "Where were you hoping we'd be?", note: 'Same as TOO_LOW.' },
+  OTHER: { move: 'LISTEN', ask: 'Tell me more about that.', note: null },
+}
+
+// -- Next Best Move (Section 15) -- combines Next Best Question (existing
+// engine) with objection state and negotiation-room awareness. Still
+// returns exactly ONE move, never a list. --------------------------------
+export function getNextBestMove(lead, si, economics) {
+  const lastObjection = si.objections?.[si.objections.length - 1] || null
+  if (lastObjection && OBJECTION_GUIDANCE[lastObjection]) {
+    const g = OBJECTION_GUIDANCE[lastObjection]
+    return { move: g.move, ask: g.ask, note: g.note, reason: `Seller raised: ${lastObjection.replace(/_/g, ' ')}` }
+  }
+  const nbq = getNextBestQuestion(lead, si)
+  if (!nbq) return { move: 'END RESPECTFULLY', ask: null, note: 'Seller said no -- respect it.', reason: null }
+  if (si.seller_asking_price != null && economics?.bestCeiling != null) {
+    const room = getNegotiationRoomGuidance(economics)
+    if (room && (room.guidance === 'AT CEILING' || room.guidance === 'HOLD')) {
+      return { move: room.guidance === 'AT CEILING' ? 'DO NOT INCREASE YET' : 'HOLD PRICE', ask: nbq, note: room.note, reason: 'Price known -- economics say hold before moving.' }
+    }
+  }
+  return { move: 'ASK NEXT', ask: nbq, note: null, reason: null }
+}
+
+// -- Call memory (Section 29) -- built from REAL lead_activities rows only,
+// never invented. Caller passes in the most recent outcome_logged
+// activity (same shape #17/#18 already use) -- this function never
+// queries the DB itself. ---------------------------------------------------
+export function getCallMemory(lead, lastOutcomeActivity) {
+  if (!lastOutcomeActivity) return null
+  const m = lastOutcomeActivity.metadata || {}
+  const si = getSellerIntelligence(lead)
+  const daysSince = lastOutcomeActivity.created_at
+    ? Math.round((Date.now() - new Date(lastOutcomeActivity.created_at).getTime()) / 86400000)
+    : null
+  return {
+    lastOutcome: m.outcome || null,
+    lastNote: m.note || null,
+    sellerExpectation: m.seller_expectation ?? si.seller_asking_price ?? null,
+    daysSince,
+    followUpDate: lead?.follow_up_date || null,
+    priorSnapshot: m.decision_snapshot || null,
+  }
+}
+
+// Compares the prior decision_snapshot (frozen at last outcome) against
+// today's real-time economics to surface WHAT CHANGED -- never invented,
+// only a diff of two already-computed numbers.
+export function getWhatChanged(callMemory, economicsNow) {
+  if (!callMemory?.priorSnapshot) return []
+  const out = []
+  const prior = callMemory.priorSnapshot
+  if (prior.arv != null && economicsNow.flipMao != null) {
+    out.push(`ARV/MAO have been recalculated since last contact.`)
+  }
+  if (prior.recommendation && economicsNow.strategyRecommendation?.summary) {
+    out.push(`Recommendation was "${prior.recommendation}" last time.`)
+  }
+  return out
 }

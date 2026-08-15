@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import Card from '../ui/Card'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
+import LiveCopilot from './LiveCopilot'
 import {
   getMarketType, getSellerIntelligence, mergeSellerIntelligence, getSellerSnapshot,
   getNextBestQuestion, getRelevantPlaybooks, getRetailVsCashFraming, getCallObjective,
@@ -36,7 +37,7 @@ function Pill({ children, active, onClick, tone = 'neutral' }) {
   )
 }
 
-function OverviewTab({ lead, si, onUpdate, onOpenCall }) {
+function OverviewTab({ lead, si, onUpdate, onOpenCall, onOpenLiveCopilot }) {
   const snapshot = getSellerSnapshot(lead)
   const playbooks = getRelevantPlaybooks(lead)
   const nextQuestion = getNextBestQuestion(lead, si)
@@ -93,6 +94,17 @@ function OverviewTab({ lead, si, onUpdate, onOpenCall }) {
           className="text-[12px] font-bold px-3 py-1.5 rounded-lg text-white bg-[color:var(--color-accent)] hover:opacity-90">
           📞 Start Call
         </button>
+        {/* Capability #22 — Live Acquisition Copilot: full-screen workspace
+            with real-time economics, extraction-assisted seller state, and
+            an End Call summary. The Call Guide tab above stays as the
+            lighter step-through for anyone who doesn't want the live
+            transcript/extraction workflow. */}
+        {onOpenLiveCopilot && (
+          <button type="button" onClick={onOpenLiveCopilot}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-lg border border-[color:var(--color-accent)] text-[color:var(--color-accent-text)] hover:bg-[color:var(--color-accent-soft)]">
+            🎙 Start Live Copilot
+          </button>
+        )}
       </div>
     </div>
   )
@@ -272,6 +284,7 @@ function ScenariosTab() {
 
 export default function OffMarketSellerStrategy({ lead, userId, members, canEdit, onUpdated }) {
   const [tab, setTab] = useState('overview')
+  const [liveCopilotOpen, setLiveCopilotOpen] = useState(false)
   const update = useLeadUpdate(lead, userId, members, onUpdated)
 
   if (getMarketType(lead) !== 'OFF_MARKET') return null
@@ -297,10 +310,17 @@ export default function OffMarketSellerStrategy({ lead, userId, members, canEdit
         ))}
       </div>
 
+      {liveCopilotOpen && (
+        <LiveCopilot
+          lead={lead} userId={userId} members={members} canEdit={canEdit}
+          onUpdated={onUpdated} onClose={() => setLiveCopilotOpen(false)}
+        />
+      )}
+
       {!canEdit ? (
         <OverviewTab lead={lead} si={si} onUpdate={() => {}} onOpenCall={() => {}} />
       ) : tab === 'overview' ? (
-        <OverviewTab lead={lead} si={si} onUpdate={handleUpdate} onOpenCall={() => setTab('call')} />
+        <OverviewTab lead={lead} si={si} onUpdate={handleUpdate} onOpenCall={() => setTab('call')} onOpenLiveCopilot={() => setLiveCopilotOpen(true)} />
       ) : tab === 'call' ? (
         <CallGuideTab lead={lead} si={si} onUpdate={handleUpdate} />
       ) : (
