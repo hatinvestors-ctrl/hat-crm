@@ -563,7 +563,18 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
 
   function handleRun(forceRefreshComps) {
     if (renoMissing) { setShowRenoPicker(true); return }
-    runGenerate(forceRefreshComps, strategy)
+    // Shorten "Refresh Detailed Analysis": once a lead already has an
+    // analysis, only re-run the core numbers that actually depend on
+    // ARV/reno (MAO, profit, verdict) — skip comps (property-value
+    // evidence that doesn't change just because reno moved; refresh it
+    // explicitly via "Refresh Comps" below) and skip the negotiation plan
+    // (now a separate "Update Negotiation Plan" button, since it doesn't
+    // need to change on every ARV/reno tweak either).
+    if (hasAnalysis && lead.arv && !forceRefreshComps) {
+      reRunWithOverrides()
+    } else {
+      runGenerate(forceRefreshComps, strategy)
+    }
   }
 
   function cancelGenerate() {
@@ -802,7 +813,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
       const nonCoreParts  = existingParts.slice(1).join('')
       const timestamp     = `Generated: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n\n`
       const fullNotes     = timestamp + coreNotes + (nonCoreParts ? '\n\n' + nonCoreParts.trim() : '')
-      const hasNego             = /NEGOTIATION PLAN/i.test(localNotes)
       const reRunStartingOffer  = coreResult.computed_starting_offer ?? parseAiStartingOffer(coreNotes)
       const snapshot = parseSnapshotFields(coreNotes)
       const backfill = {
@@ -842,8 +852,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         }
       } : lead.deal_analysis
       onUpdated?.({ ai_notes: fullNotes, ...supabaseUpdate, deal_analysis: reRunDealAnalysis, ...(reRunStartingOffer !== null ? { starting_offer: reRunStartingOffer } : {}) })
-      // Auto-update nego plan in background if one already exists
-      if (hasNego) updateNegoPlan(fullNotes)
+      // Negotiation plan is intentionally NOT auto-refreshed here anymore
+      // — it's a separate LLM call that doesn't need to re-run just
+      // because ARV/reno moved. Kevin can refresh it on demand with the
+      // "Update Negotiation Plan" button when he actually wants that.
     } catch (err) {
       if (!cancelledRef.current) setGenError(err.message || 'Re-run failed.')
     } finally {
@@ -1056,6 +1068,21 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
               </button>
             </span>
           )
+        )}
+
+        {/* Negotiation plan is a separate LLM call from "Refresh Detailed
+            Analysis" now — Kevin asked not to regenerate it on every
+            ARV/reno tweak, since it doesn't need to change just because
+            the numbers moved slightly. Only shown once one already
+            exists (first-time analysis still generates one). */}
+        {canEdit && !generating && /NEGOTIATION PLAN/i.test(localNotes) && (
+          <button
+            onClick={() => updateNegoPlan()}
+            disabled={updatingNego}
+            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+          >
+            {updatingNego ? 'Updating…' : '🤝 Update Negotiation Plan'}
+          </button>
         )}
       </div>
 
