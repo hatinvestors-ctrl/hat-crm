@@ -33,6 +33,10 @@ const EMPTY_SI = {
   condition_notes: '',
   seller_asking_price: null,
   seller_asking_price_history: [], // Capability #22.1, Section 17 — [{value, at}], old values kept when price changes mid-call
+  seller_price_status: null,       // Capability #22.2 — 'FIRM' | 'CONDITIONAL' | null
+  hat_offer_mentioned: null,       // Capability #22.2, Section 11 — a number Kevin floated, never seller's ask
+  hat_offer_type: null,            // 'RANGE_MENTIONED' | 'FORMAL_OFFER' | 'PROBE' | null
+  follow_up_phrase: null,          // Capability #22.2, Section 14/16 — seller's own words, e.g. "Thursday afternoon"
   desired_outcome: [],         // e.g. ['MAX_PRICE','FAST_CLOSING','NO_REPAIRS']
   decision_makers: '',
   debt_notes: '',
@@ -85,15 +89,46 @@ const TIMELINE_LABELS = {
 export function getSellerSnapshot(lead) {
   const si = getSellerIntelligence(lead)
   const motivation = getMotivationLevel(si)
+  const priceStr = si.seller_asking_price != null ? `$${Number(si.seller_asking_price).toLocaleString()}` : 'UNKNOWN'
   return {
     motivation: motivation.level,
     motivationReason: motivation.reason,
     timeline: si.timeline ? (TIMELINE_LABELS[si.timeline] || si.timeline) : 'UNKNOWN',
     condition: si.condition_notes ? 'RECORDED' : 'UNKNOWN',
-    price: si.seller_asking_price != null ? `$${Number(si.seller_asking_price).toLocaleString()}` : 'UNKNOWN',
+    price: priceStr,
+    // Capability #22.2, Section 12 — never imply a conditional/hypothetical
+    // number is an accepted deal.
+    priceStatus: si.seller_price_status || null,
+    priceDisplay: si.seller_price_status === 'CONDITIONAL' ? `~${priceStr} (conditional)` : priceStr,
     decisionMaker: si.decision_makers || 'UNKNOWN',
     debtTitle: si.debt_notes || null,
+    mainPain: getMainPainLabel(si),
   }
+}
+
+// ── Main Pain grouping (Capability #22.2, Section 8) — a real-call finding
+// showed a multi-factor motivation (tenant moved out + vacancy + doesn't
+// want to spend on repairs) flattened into a single narrow "TENANT" chip.
+// Groups related, ACTUALLY-CAPTURED pain points into one grounded label
+// with supporting detail — never invents a category beyond what's in
+// si.pain_points. ────────────────────────────────────────────────────────
+const PAIN_GROUPS = [
+  { label: 'PROPERTY BURDEN', members: ['TENANT', 'VACANT', 'REPAIRS'] },
+  { label: 'FINANCIAL PRESSURE', members: ['FINANCIAL', 'TAXES'] },
+  { label: 'LIFE TRANSITION', members: ['INHERITED', 'DIVORCE', 'RELOCATION'] },
+]
+
+export function getMainPainLabel(si) {
+  if (!si.pain_points?.length) return null
+  for (const group of PAIN_GROUPS) {
+    const matched = si.pain_points.filter(p => group.members.includes(p))
+    if (matched.length >= 2) {
+      return { label: group.label, supporting: matched }
+    }
+  }
+  // Only one signal (or no group matched two+) — show it plainly, no
+  // invented umbrella label.
+  return { label: si.pain_points[0].replace(/_/g, ' '), supporting: si.pain_points }
 }
 
 // ── Next Best Question (Section 27) — one deterministic decision tree ──

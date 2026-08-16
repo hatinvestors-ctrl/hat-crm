@@ -17,10 +17,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { logOutcome } from '../../lib/activityLogger'
+import { resolveFollowUpPhrase } from '../../lib/followUpTiming'
 import { useSpeechRecognition, isSpeechRecognitionSupported } from '../../hooks/useSpeechRecognition'
 import {
   createSession, addSegment, getUnprocessedSegments, markExtracted, getDurationSeconds,
-  formatDuration, inferConversationStage, hasHighValueSignal,
+  formatDuration, inferConversationStage, detectFastSignals,
 } from '../../lib/conversationSession'
 import {
   getSellerIntelligence, mergeSellerIntelligence, getSellerSnapshot, getCallObjective,
@@ -28,12 +29,18 @@ import {
 } from '../../lib/sellerStrategy'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
-// Batches consecutive utterances before calling AI — long enough to catch
-// a full sentence/pause, short enough to still feel conversational
-// (mission's "a few seconds, not 20-30" target).
-const ANALYZE_DEBOUNCE_MS = 1400
-// Safety valve: even without a high-value keyword, don't let unanalyzed
-// segments pile up forever during a quiet stretch of small talk.
+// Capability #22.2, Section 4/5 — two-speed debounce. A FAST-path event
+// (price/decision-maker/objection/follow-up — Layer A's detectFastSignals)
+// gets a short debounce so guidance updates within a couple seconds of a
+// meaningful statement, matching the mission's explicit complaint that
+// "today guidance is still too dependent on larger debounced cycles."
+// Everything else still batches on the slower cycle so a live mic (which
+// produces far more utterances than manual typing ever did) doesn't
+// trigger an LLM call on every "okay"/"yeah".
+const FAST_DEBOUNCE_MS = 600
+const NORMAL_DEBOUNCE_MS = 1800
+// Safety valve: even without a keyword hit, don't let unanalyzed segments
+// pile up forever during a quiet stretch of small talk.
 const MAX_UNPROCESSED_BEFORE_FORCE = 6
 
 function StatChip({ label, value, tone }) {
@@ -91,6 +98,7 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
   const debounceTimerRef = useRef(null)
 
   const si = getSellerIntelligence(lead)
+  const snapshot = getSellerSnapshot(lead)
   const economics = getRealTimeEconomics(lead)
   const nextMove = getNextBestMove(lead, si, economics)
   const callMemory = getCallMemory(lead, lastOutcomeActivity)
@@ -129,16 +137,29 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     // "previously stated" stays visible/auditable.
     if (facts.seller_asking_price != null && facts.seller_asking_price !== si.seller_asking_price) {
       patch.seller_asking_price = facts.seller_asking_price
+      // #22.2, Section 12 — carry status so guidance/UI never implies a
+      // conditional number ("I might consider $170K") is an accepted deal.
+      patch.seller_price_status = facts.seller_price_status || null
       if (si.seller_asking_price != null) {
         patch.seller_asking_price_history = [...(si.seller_asking_price_history || []), { value: si.seller_asking_price, at: new Date().toISOString() }]
       }
-      setCaptureFlash(`PRICE CAPTURED ${fc(facts.seller_asking_price)}`)
+      setCaptureFlash(`PRICE CAPTURED ${fc(facts.seller_asking_price)}${facts.seller_price_status === 'CONDITIONAL' ? ' (conditional)' : ''}`)
+    }
+    // #22.2, Section 11 — a rep-side number is never the seller's price;
+    // kept separately, typed (range/formal offer/probe) for clarity.
+    if (facts.hat_offer_mentioned != null) {
+      patch.hat_offer_mentioned = facts.hat_offer_mentioned
+      patch.hat_offer_type = facts.hat_offer_type || 'RANGE_MENTIONED'
     }
     if (facts.decision_makers) { patch.decision_makers = facts.decision_makers; setCaptureFlash('DECISION MAKER CAPTURED') }
     if (facts.debt_notes) patch.debt_notes = facts.debt_notes
     if (facts.new_objection) { patch.objections = [...si.objections, facts.new_objection]; setCaptureFlash(`OBJECTION: ${facts.new_objection.replace(/_/g, ' ')}`) }
     if (facts.last_response_summary) patch.last_response = facts.last_response_summary
-    if (facts.timeline && !facts.seller_asking_price) setCaptureFlash(`TIMELINE ${facts.timeline.replace(/_/g, ' ')}`)
+    // #22.2, Section 14 — surface the moment a follow-up is mentioned,
+    // resolved to a real date only at End Call (never silently scheduled
+    // mid-call).
+    if (facts.follow_up_phrase) { patch.follow_up_phrase = facts.follow_up_phrase; setCaptureFlash(`FOLLOW-UP: ${facts.follow_up_phrase}`) }
+    if (facts.timeline && !facts.seller_asking_price && !facts.follow_up_phrase) setCaptureFlash(`TIMELINE ${facts.timeline.replace(/_/g, ' ')}`)
     if (Object.keys(patch).length === 0) return
     await update({ distress_data: mergeSellerIntelligence(lead, patch) })
     if (captureFlash) setTimeout(() => setCaptureFlash(null), 3000)
@@ -174,22 +195,30 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     }
   }, [si])
 
-  // #22.1, Section 7/20 — automatic analysis. Every finalized mic
-  // utterance is added as a segment; a high-value keyword schedules a
-  // debounced analyze (batches consecutive utterances into one call
-  // instead of firing per sentence), and a safety-valve count forces one
-  // even without a keyword hit so quiet stretches never silently pile up
-  // unanalyzed forever.
-  const scheduleAnalyze = useCallback(() => {
+  // #22.1/#22.2, Section 4/5/7/20 — two-speed automatic analysis. Every
+  // finalized mic utterance is added as a segment; Layer A's
+  // detectFastSignals() decides the debounce speed:
+  //   - FAST signal (price/decision-maker/objection/follow-up) -> short
+  //     debounce, so guidance updates within a couple seconds.
+  //   - Other high-value content -> normal (still batched) debounce.
+  //   - Nothing notable -> no trigger at all, unless the safety-valve
+  //     count forces one so a quiet stretch never piles up unanalyzed.
+  // A pending FAST call always wins over a pending NORMAL one — never the
+  // other way around, so one urgent signal can't get stuck behind a
+  // slower timer that was already ticking.
+  const scheduleAnalyze = useCallback((ms) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = setTimeout(() => { analyzeTranscript() }, ANALYZE_DEBOUNCE_MS)
+    debounceTimerRef.current = setTimeout(() => { analyzeTranscript() }, ms)
   }, [analyzeTranscript])
 
   const handleFinalUtterance = useCallback((text) => {
     setSession(s => addSegment(s, { speaker: 'UNKNOWN', text }))
     const unprocessedCount = getUnprocessedSegments(sessionRef.current).length + 1
-    if (hasHighValueSignal(text) || unprocessedCount >= MAX_UNPROCESSED_BEFORE_FORCE) {
-      scheduleAnalyze()
+    const { isHighValue, isFast } = detectFastSignals(text)
+    if (isFast) {
+      scheduleAnalyze(FAST_DEBOUNCE_MS)
+    } else if (isHighValue || unprocessedCount >= MAX_UNPROCESSED_BEFORE_FORCE) {
+      scheduleAnalyze(NORMAL_DEBOUNCE_MS)
     }
   }, [scheduleAnalyze])
 
@@ -204,7 +233,8 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     if (!input.trim()) return
     setSession(s => addSegment(s, { speaker: 'UNKNOWN', text: input }))
     setInput('')
-    scheduleAnalyze()
+    const { isFast } = detectFastSignals(input)
+    scheduleAnalyze(isFast ? FAST_DEBOUNCE_MS : NORMAL_DEBOUNCE_MS)
   }
 
   function togglePainManual(key) {
@@ -259,13 +289,21 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
           <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
             <div className="grid grid-cols-5 divide-x divide-[color:var(--color-line)] mb-2">
               <StatChip label="Open to Sell" value={si.open_to_sell || 'UNKNOWN'} tone={si.open_to_sell === 'YES' ? 'good' : undefined} />
-              <StatChip label="Motivation" value={getSellerSnapshot(lead).motivation} />
-              <StatChip label="Timeline" value={getSellerSnapshot(lead).timeline} />
-              <StatChip label="Seller Price" value={fc(si.seller_asking_price)} />
-              <StatChip label="Main Pain" value={si.pain_points[0] || '—'} />
+              <StatChip label="Motivation" value={snapshot.motivation} />
+              <StatChip label="Timeline" value={snapshot.timeline} />
+              <StatChip label="Seller Price" value={snapshot.priceDisplay} tone={snapshot.priceStatus === 'CONDITIONAL' ? 'warn' : undefined} />
+              <StatChip label="Main Pain" value={snapshot.mainPain?.label || '—'} />
             </div>
+            {snapshot.mainPain?.supporting?.length > 1 && (
+              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">Supporting: {snapshot.mainPain.supporting.join(', ')}</div>
+            )}
             {si.seller_asking_price_history?.length > 0 && (
               <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">Previously stated: {si.seller_asking_price_history.map(h => fc(h.value)).join(' → ')} → <strong>{fc(si.seller_asking_price)}</strong> (changed during call)</div>
+            )}
+            {si.hat_offer_mentioned != null && (
+              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">
+                HAT {si.hat_offer_type === 'FORMAL_OFFER' ? 'formal offer' : si.hat_offer_type === 'PROBE' ? 'probed' : 'range mentioned'}: {fc(si.hat_offer_mentioned)} (not the seller's ask)
+              </div>
             )}
             <div className="grid grid-cols-4 divide-x divide-[color:var(--color-line)] border-t border-[color:var(--color-line)] pt-2">
               <StatChip label="Our Offer" value={fc(economics.ourOffer)} />
@@ -351,7 +389,12 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
 
 function EndCallSummary({ lead, si, userId, onSaved, onDiscard }) {
   const [outcome, setOutcome] = useState(si.open_to_sell === 'NO' ? 'not_interested' : 'spoke_follow_up')
-  const [followUpDate, setFollowUpDate] = useState('')
+  // #22.2, Section 16 — pre-fill from the seller's spoken follow-up
+  // phrase, resolved deterministically (never LLM date math) in the
+  // business timezone. If unresolved, leave blank and show why — never
+  // silently schedule a guessed date.
+  const resolvedFollowUp = si.follow_up_phrase ? resolveFollowUpPhrase(si.follow_up_phrase) : null
+  const [followUpDate, setFollowUpDate] = useState(resolvedFollowUp || '')
   const [note, setNote] = useState(si.last_response || '')
   const [saving, setSaving] = useState(false)
 
@@ -391,6 +434,11 @@ function EndCallSummary({ lead, si, userId, onSaved, onDiscard }) {
         <option value="need_more_info">Need More Information</option>
       </select>
       <label className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Follow-Up Date</label>
+      {si.follow_up_phrase && (
+        <p className="text-[10.5px] text-[color:var(--color-text-dim)]">
+          Seller said: "{si.follow_up_phrase}" {resolvedFollowUp ? `→ resolved to ${resolvedFollowUp}` : '— could not resolve to a specific date, please set manually'}
+        </p>
+      )}
       <input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="w-full text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)]" />
       <label className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Note</label>
       <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} className="w-full text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)]" />

@@ -53,7 +53,15 @@ const SYSTEM_PROMPT = `You extract STRUCTURED FACTS from a phone-call transcript
 - The REP asks questions, proposes numbers on HAT's behalf, and explains HAT's process.
 - The SELLER answers questions, states what THEY want, and describes THEIR property/situation.
 
-CRITICAL RULE: seller_asking_price must ONLY be set when the SELLER states what they want/need/would take for the property (e.g. "I need $175K", "I wouldn't take less than $200K"). If a line reads like the REP proposing a number on HAT's behalf (e.g. "we could probably be around $150K", "our offer would be about $X"), that is a REP OFFER, not a seller fact — put it in hat_offer_mentioned instead, NEVER in seller_asking_price. When genuinely unsure who said a number, leave seller_asking_price null rather than guess.
+CRITICAL RULE: seller_asking_price must ONLY be set when the SELLER states what they want/need/would take for the property (e.g. "I need $175K", "I wouldn't take less than $200K"). If a line reads like the REP proposing a number on HAT's behalf (e.g. "we could probably be around $150K", "our offer would be about $X"), that is NOT a seller fact — classify it under hat_offer_mentioned/hat_offer_type instead, NEVER seller_asking_price. When genuinely unsure who said a number, leave seller_asking_price null rather than guess.
+
+hat_offer_type distinguishes what kind of number the REP said, because these mean very different things:
+- "RANGE_MENTIONED" — a loose/hypothetical number the rep floated ("we may be around $145K", "probably somewhere near $X") — NOT a commitment.
+- "FORMAL_OFFER" — the rep clearly, explicitly presented it as an actual offer ("I can offer you $X", "our offer is $X").
+- "PROBE" — the rep tested the seller's flexibility as a question ("would $X be out of the question?", "is $X anywhere close?").
+Only set hat_offer_mentioned/hat_offer_type when the REP said a HAT-side number in the new transcript segment — never invent one.
+
+CRITICAL RULE for seller_price_status: capture whether the seller's stated number sounds FIRM ("I need $X", "I won't take less than $X") or CONDITIONAL ("I might consider $X", "if it closes fast maybe $X", "I could possibly do $X"). Never mark a conditional/hypothetical number as an accepted or firm price.
 
 You do not calculate anything, do not suggest offers or questions, and do not infer psychology beyond what the words support. If the seller didn't say something, leave that field null/empty — never guess.
 
@@ -65,10 +73,13 @@ Return ONLY valid JSON, no markdown fences, no other text, in exactly this shape
   "timeline": one of ${JSON.stringify(TIMELINE_KEYS)} or null,
   "condition_notes": string or null (only concrete condition facts stated),
   "seller_asking_price": number or null (ONLY the seller's own stated number — see CRITICAL RULE above),
+  "seller_price_status": "FIRM" | "CONDITIONAL" | null (only set alongside a new seller_asking_price),
   "hat_offer_mentioned": number or null (a number the REP proposed on HAT's behalf — informational only, never used for underwriting),
+  "hat_offer_type": "RANGE_MENTIONED" | "FORMAL_OFFER" | "PROBE" | null (only set alongside hat_offer_mentioned),
   "decision_makers": string or null (only if seller mentioned another person involved),
   "debt_notes": string or null (only if seller mentioned a balance/lien/mortgage amount or status),
   "new_objection": one of ${JSON.stringify(OBJECTION_KEYS)} or null (only if seller raised a new objection in this segment),
+  "follow_up_phrase": string or null (the seller's own words for when to follow up, e.g. "Thursday afternoon", "next week" — verbatim/near-verbatim, never resolved to a date yourself),
   "last_response_summary": string or null (one short sentence, what the seller just said, factual paraphrase only),
   "confidence": "high" | "medium" | "low" (your confidence in the extraction overall — use "low" whenever speaker attribution for a price/number was ambiguous, or the transcript looks garbled/overlapping)
 }`
@@ -119,10 +130,13 @@ export default async (req) => {
       timeline: TIMELINE_KEYS.includes(parsed.timeline) ? parsed.timeline : null,
       condition_notes: parsed.condition_notes ? String(parsed.condition_notes).slice(0, 300) : null,
       seller_asking_price: typeof parsed.seller_asking_price === 'number' ? parsed.seller_asking_price : null,
+      seller_price_status: ['FIRM', 'CONDITIONAL'].includes(parsed.seller_price_status) ? parsed.seller_price_status : null,
       hat_offer_mentioned: typeof parsed.hat_offer_mentioned === 'number' ? parsed.hat_offer_mentioned : null,
+      hat_offer_type: ['RANGE_MENTIONED', 'FORMAL_OFFER', 'PROBE'].includes(parsed.hat_offer_type) ? parsed.hat_offer_type : null,
       decision_makers: parsed.decision_makers ? String(parsed.decision_makers).slice(0, 200) : null,
       debt_notes: parsed.debt_notes ? String(parsed.debt_notes).slice(0, 200) : null,
       new_objection: OBJECTION_KEYS.includes(parsed.new_objection) ? parsed.new_objection : null,
+      follow_up_phrase: parsed.follow_up_phrase ? String(parsed.follow_up_phrase).slice(0, 100) : null,
       last_response_summary: parsed.last_response_summary ? String(parsed.last_response_summary).slice(0, 200) : null,
       confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'low',
     }
