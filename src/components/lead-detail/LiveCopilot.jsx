@@ -249,7 +249,14 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
           <div className="text-[13px] font-bold text-[color:var(--color-text)]">{lead.owner_name || 'Owner'} · {lead.address}</div>
           <div className="text-[10.5px] text-[color:var(--color-text-dim)]">LIVE {formatDuration(getDurationSeconds(session))} · Stage: {stage}</div>
         </div>
-        <button onClick={() => { mic.stop(); onClose() }} className="text-[12px] font-semibold px-2.5 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">Close</button>
+        <button onClick={() => {
+            // Lead Workspace redesign, Section 9 — a tabbed shell makes an
+            // accidental close more likely than the old single-page layout;
+            // guard against silently discarding a live call/pending facts.
+            const hasActiveWork = !ended && (mic.status === 'LISTENING' || mic.status === 'PAUSED' || !!pendingFacts)
+            if (hasActiveWork && !window.confirm('A call is still active or has unconfirmed facts. Close anyway? Unsaved progress will be lost.')) return
+            mic.stop(); onClose()
+          }} className="text-[12px] font-semibold px-2.5 py-1 rounded border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">Close</button>
       </div>
 
       {!ended ? (

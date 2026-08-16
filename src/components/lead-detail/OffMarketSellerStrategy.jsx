@@ -12,7 +12,6 @@
 import { useState } from 'react'
 import Card from '../ui/Card'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
-import LiveCopilot from './LiveCopilot'
 import {
   getMarketType, getSellerIntelligence, mergeSellerIntelligence, getSellerSnapshot,
   getNextBestQuestion, getRelevantPlaybooks, getRetailVsCashFraming, getCallObjective,
@@ -282,9 +281,13 @@ function ScenariosTab() {
   )
 }
 
-export default function OffMarketSellerStrategy({ lead, userId, members, canEdit, onUpdated }) {
+// Lead Workspace redesign — `onOpenLiveCopilot` now comes from
+// LeadDetailPage (which mounts <LiveCopilot> itself, outside any tab
+// pane) instead of local state here, so switching workspace tabs can
+// never unmount an active call. This component no longer renders
+// <LiveCopilot> at all — it only requests that the parent open it.
+export default function OffMarketSellerStrategy({ lead, userId, members, canEdit, onUpdated, onOpenLiveCopilot }) {
   const [tab, setTab] = useState('overview')
-  const [liveCopilotOpen, setLiveCopilotOpen] = useState(false)
   const update = useLeadUpdate(lead, userId, members, onUpdated)
 
   if (getMarketType(lead) !== 'OFF_MARKET') return null
@@ -310,17 +313,10 @@ export default function OffMarketSellerStrategy({ lead, userId, members, canEdit
         ))}
       </div>
 
-      {liveCopilotOpen && (
-        <LiveCopilot
-          lead={lead} userId={userId} members={members} canEdit={canEdit}
-          onUpdated={onUpdated} onClose={() => setLiveCopilotOpen(false)}
-        />
-      )}
-
       {!canEdit ? (
         <OverviewTab lead={lead} si={si} onUpdate={() => {}} onOpenCall={() => {}} />
       ) : tab === 'overview' ? (
-        <OverviewTab lead={lead} si={si} onUpdate={handleUpdate} onOpenCall={() => setTab('call')} onOpenLiveCopilot={() => setLiveCopilotOpen(true)} />
+        <OverviewTab lead={lead} si={si} onUpdate={handleUpdate} onOpenCall={() => setTab('call')} onOpenLiveCopilot={onOpenLiveCopilot} />
       ) : tab === 'call' ? (
         <CallGuideTab lead={lead} si={si} onUpdate={handleUpdate} />
       ) : (
