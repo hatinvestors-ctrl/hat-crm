@@ -194,7 +194,16 @@ export function calculateLiveOffer(mao, ask) {
   const anchor = mao - gap * 0.45
   const floor = ask * 0.80
   const raw = Math.max(anchor, floor)
-  return Math.round(Math.min(raw, mao * 0.995) / 100) * 100
+  // Bug fix (found via scripts/verify-financial-consistency.mjs) — `mao *
+  // 0.995` was meant as "0.5% below MAO", which only holds when mao is
+  // positive. On a lead where the deal is underwater at any price (ARV <
+  // renovation cost, e.g. bad/placeholder data), MAO itself is negative,
+  // and multiplying a negative number by 0.995 moves it 0.5% TOWARD zero
+  // (i.e. above MAO), silently breaking the "offer never exceeds MAO"
+  // guarantee. `mao - |mao| * 0.005` always moves 0.5% AWAY from zero,
+  // so the cap is below MAO regardless of sign.
+  const cap = mao - Math.abs(mao) * 0.005
+  return Math.round(Math.min(raw, cap) / 100) * 100
 }
 
 // True when lead.starting_offer was computed against ARV/reno values that
