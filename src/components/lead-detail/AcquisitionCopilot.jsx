@@ -19,6 +19,8 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { computeDealBriefInputHash } from '../../lib/dealBriefInputs'
 import { getArvProvenance, getDecisionMaturity } from '../../lib/arvProvenance'
+import { classifyLeadV2 } from '../../pages/ActionCenterPage'
+import { getActionReason } from '../../lib/actionReason'
 
 const REC_THEME = {
   ACT_NOW: { icon: '🔥', bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' },
@@ -84,6 +86,7 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
   const [playbookOpen, setPlaybookOpen] = useState(false)
   const [showSms, setShowSms] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
+  const [whyOpen, setWhyOpen] = useState(false)
 
   const d = lead.decision_v2
   if (!d) return null // nothing to show until V2 has scored this lead at all
@@ -91,6 +94,15 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
   const theme = REC_THEME[d.recommendation] || REC_THEME.MONITOR
   const nextActionLabel = NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action
   const isOverridden = d.next_best_action === 'HUMAN_OVERRIDE'
+
+  // Capability #17.1 — "Why now", derived from the exact same
+  // classifyLeadV2() this lead would land in on the Action Center (single
+  // source of truth — see src/lib/actionReason.js). Not every lead surfaces
+  // there (e.g. MONITOR/PASS), so this can legitimately be null.
+  const classified = classifyLeadV2(lead)
+  const actionReason = classified ? getActionReason(lead, classified) : (isOverridden
+    ? getActionReason(lead, { category: 'ACT_NOW' }) // category unused once human_override short-circuits
+    : null)
 
   const currentHash = computeDealBriefInputHash(lead)
   const brief = lead.deal_brief
@@ -134,6 +146,29 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
           <Chip label="Urgency" value={d.urgency?.level} />
         </div>
       </div>
+
+      {/* Capability #17.1 — "Why now", compact, always visible without a
+          click (mission Section 6). No new large card — just one line
+          under the decision header, with an optional expand for the raw
+          evidence strings behind it. */}
+      {actionReason && (
+        <div className="px-3.5 pb-2 -mt-1">
+          <div className="text-[11.5px] text-[color:var(--color-text)] leading-snug">
+            <span className="font-bold">Why now: </span>
+            {actionReason.reason}
+            {actionReason.evidence?.length > 0 && (
+              <button type="button" onClick={() => setWhyOpen(o => !o)} className="ml-1.5 text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)]">
+                {whyOpen ? 'Hide' : 'ⓘ Why?'}
+              </button>
+            )}
+          </div>
+          {whyOpen && actionReason.evidence?.length > 0 && (
+            <ul className="mt-1 pl-4 list-disc text-[11px] text-[color:var(--color-text-dim)] space-y-0.5">
+              {actionReason.evidence.slice(0, 4).map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Capability #16.1 — compact maturity indicator (Section 3/7). Reuses
           existing Confidence/missing output — no new score. On-market only
