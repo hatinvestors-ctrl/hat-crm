@@ -36,6 +36,20 @@ export function calculateMAO(arv, renovationCost /*, closingCosts, targetProfit 
 export const FLIP_MIN_PROFIT_TARGET = 30000   // Capability #19.1, Section 2 — HAT's default minimum acceptable Flip profit.
 export const BRRRR_MAX_CASH_LEFT_IN = 30000   // Capability #19.1, Section 8 — HAT's default maximum cash left in a BRRRR after refinance.
 
+// Capability — Flip Margin of Safety Explainability, Section 18. These two
+// were previously a bare literal (`40000`) duplicated independently in
+// dealExplanation.js's verdict computation, DealAnalysisCard.jsx's Path to
+// a Flip Deal ("strong" styling), and FinancialSection.jsx's color tones —
+// three copies of the same number that happened to agree today but had no
+// shared source. Consolidated here as the ONE place the Flip STRONG bar
+// and PASS/WATCH thin-margin band live; every other file now imports these
+// instead of repeating the numbers. Canonical Flip MAO formula and the
+// $30,000 minimum target above are UNCHANGED by this — these only affect
+// which of the four already-existing tier labels (STRONG/PASS/WATCH/NO
+// DEAL) a given profit number renders as.
+export const FLIP_STRONG_PROFIT = 40000        // >= this profit at current offer = STRONG
+export const FLIP_PASS_MARGIN = 5000           // >= target + this margin = PASS; between target and target+margin = WATCH (thin)
+
 // Full Flip P&L at a given purchase price — HML financing (90% purchase +
 // 100% reno, 2% points, 1%/mo interest), $2,450 fixed closing costs, taxes
 // $208/mo + insurance $100/mo holding, sale at 93% of ARV. Same formula as

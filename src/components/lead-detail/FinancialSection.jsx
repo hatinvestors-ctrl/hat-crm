@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer } from '../../lib/calculations'
+import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, FLIP_STRONG_PROFIT, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
 
@@ -156,7 +156,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                 {(() => {
                   const profitAtCanonical = formulaMao != null ? calculateFlipProfitAtPrice(formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6) : null
                   if (profitAtCanonical == null) return null
-                  const tone = profitAtCanonical >= 40000 ? 'var(--color-success-text)' : 'var(--color-warn-text)'
+                  const tone = profitAtCanonical >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : 'var(--color-warn-text)'
                   return (
                     <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Profit at the canonical Flip MAO shown above — always ≈ HAT's minimum target by construction.">
                       Profit at this price: ~{formatCurrency(profitAtCanonical)}
@@ -202,7 +202,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               {(() => {
                 const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost)
                 if (profitAtMao == null) return null
-                const tone = profitAtMao >= 40000 ? 'var(--color-success-text)' : profitAtMao >= 30000 ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
+                const tone = profitAtMao >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : profitAtMao >= FLIP_MIN_PROFIT_TARGET ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                 return (
                   <div className="text-[10px] mt-0.5" style={{ color: tone }}>
                     Profit at this price: ~{formatCurrency(profitAtMao)}

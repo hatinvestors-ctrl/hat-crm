@@ -17,10 +17,50 @@
 
 import {
   calculateFlipMAO, calculateBrrrrMAO, computeFlipBreakdown, computeBrrrrBreakdown,
-  FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, formatCurrency as fc, getEffectiveOffer,
+  FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, FLIP_PASS_MARGIN,
+  formatCurrency as fc, getEffectiveOffer,
 } from './calculations.js'
 
-const THIN_MARGIN = 5000 // within $5K of target = WATCH, not a clean PASS (Section 11)
+const THIN_MARGIN = FLIP_PASS_MARGIN // within $5K of target = WATCH, not a clean PASS (Section 11)
+
+// Capability — Flip Margin of Safety Explainability. MAO already IS the
+// price that protects the $30K target (calculateFlipMAO's whole job) —
+// the tier never changes that target. What the tier actually measures is
+// how much room exists between the price being evaluated and that ceiling.
+// One deterministic template per tier, built strictly from numbers
+// computeFlipResult already computed — no new scoring, no LLM.
+function marginOfSafetyExplanation(verdict, priceCushion, profitCushion) {
+  const pc = priceCushion != null ? fc(Math.round(priceCushion)) : null
+  switch (verdict) {
+    case 'STRONG':
+      return {
+        title: 'Healthy margin of safety',
+        why: `The current price is ${pc || 'well'} below Flip MAO, leaving meaningful room for normal underwriting variance — a rehab overrun, a softer ARV, or extra holding time can happen here without the deal falling below HAT's $30,000 minimum.`,
+      }
+    case 'PASS':
+      return {
+        title: 'Some margin of safety',
+        why: `The deal clears HAT's $30,000 target with a reasonable cushion (${pc} below Flip MAO) — not maximum room, but enough to absorb a normal-sized surprise.`,
+      }
+    case 'WATCH':
+      return {
+        title: 'Thin margin of safety',
+        why: `This deal technically meets HAT's $30,000 minimum, but the price is only ${pc} below Flip MAO. A small rehab overrun, a lower ARV, or extra holding cost could push projected profit below target.`,
+      }
+    case 'NO DEAL':
+      if (priceCushion == null) {
+        return { title: 'No price to evaluate', why: 'No asking price or offer is on file yet, so a Flip Margin of Safety can\'t be calculated.' }
+      }
+      return {
+        title: priceCushion < 0 ? 'Over Flip MAO' : 'Below the minimum target',
+        why: priceCushion < 0
+          ? `The current price is ${fc(Math.round(Math.abs(priceCushion)))} ABOVE Flip MAO — it does not support HAT's $30,000 minimum Flip profit at this price.`
+          : `Projected profit at this price is below HAT's $30,000 minimum Flip profit target.`,
+      }
+    default:
+      return { title: '', why: '' }
+  }
+}
 
 // ── FLIP ──────────────────────────────────────────────────────────────
 export function computeFlipResult(lead) {
@@ -43,11 +83,19 @@ export function computeFlipResult(lead) {
 
   let verdict = 'NO DEAL'
   if (profitAtCurrentOffer != null) {
-    if (profitAtCurrentOffer >= 40000) verdict = 'STRONG'
+    if (profitAtCurrentOffer >= FLIP_STRONG_PROFIT) verdict = 'STRONG'
     else if (profitAtCurrentOffer >= FLIP_MIN_PROFIT_TARGET + THIN_MARGIN) verdict = 'PASS'
     else if (profitAtCurrentOffer >= FLIP_MIN_PROFIT_TARGET) verdict = 'WATCH'
     else verdict = 'NO DEAL'
   }
+
+  // Margin of Safety (Section 2) — PRICE cushion (room below the MAO
+  // ceiling) and PROFIT cushion (room above the $30K floor) are related
+  // but NOT identical, since purchase price also moves financing/holding
+  // costs (Section 13) — both are computed and shown, never assumed equal.
+  const priceCushion = (mao != null && currentOffer != null) ? mao - currentOffer : null
+  const profitCushion = profitAtCurrentOffer != null ? profitAtCurrentOffer - FLIP_MIN_PROFIT_TARGET : null
+  const marginOfSafety = { ...marginOfSafetyExplanation(verdict, priceCushion, profitCushion), priceCushion, profitCushion }
 
   const why = []
   const biggestRisk = []
@@ -87,7 +135,28 @@ export function computeFlipResult(lead) {
   return {
     available: true, verdict, mao, currentOffer, projectedProfit: profitAtCurrentOffer,
     targetProfit: FLIP_MIN_PROFIT_TARGET, why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
+    marginOfSafety,
   }
+}
+
+// Section 15 (optional) — downside sensitivity. Reuses computeFlipBreakdown
+// with modified inputs ONLY; no new financial model, no probability claims,
+// just "what does profit become if X changes" using the exact same formula.
+export function computeFlipDownsideSensitivity(lead, flipResult) {
+  if (!flipResult?.available || flipResult.currentOffer == null) return null
+  const arv = lead.arv != null ? Number(lead.arv) : null
+  const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
+  if (arv == null || reno == null) return null
+  const holdMonths = lead.hold_months || 6
+  const pp = flipResult.currentOffer
+
+  const renoOverrun = computeFlipBreakdown(pp, arv, reno + 5000, holdMonths).totalProfit
+  const softerArv = computeFlipBreakdown(pp, arv - 10000, reno, holdMonths).totalProfit
+
+  return [
+    { label: 'Rehab +$5,000', profit: renoOverrun },
+    { label: 'ARV −$10,000', profit: softerArv },
+  ]
 }
 
 // ── BRRRR ─────────────────────────────────────────────────────────────

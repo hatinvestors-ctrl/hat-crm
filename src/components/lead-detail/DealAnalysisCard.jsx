@@ -7,10 +7,11 @@ import RenoTierPicker from './RenoTierPicker'
 import { supabase } from '../../lib/supabase'
 import {
   formatCurrency, computeFlipBreakdown, computeBrrrrBreakdown, bisectThreshold,
-  calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, getEffectiveOffer,
+  calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, getEffectiveOffer,
 } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
-import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../lib/dealExplanation'
+import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, computeFlipDownsideSensitivity } from '../../lib/dealExplanation'
+import { getDecisionMaturity } from '../../lib/arvProvenance'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
 import { isDistressedLead } from '../../lib/distressInfo'
@@ -130,6 +131,21 @@ const VERDICT_THEME = {
   WATCH:     { bg: 'var(--color-warn-soft)',    border: 'var(--color-warn)',    text: 'var(--color-warn-text)' },
   'NO DEAL': { bg: 'var(--color-danger-soft)',  border: 'var(--color-danger)',  text: 'var(--color-danger-text)' },
 }
+// Capability — Flip Margin of Safety Explainability, Section 11. Display
+// text ONLY — the underlying enum value ('PASS', used by VERDICT_RANK,
+// VERDICT_THEME, and every `.verdict === 'PASS'` comparison in
+// dealExplanation.js) is completely unchanged, so nothing that reads the
+// raw verdict breaks. Audited "PASS" is genuinely ambiguous in acquisition
+// language — it can read as "pass on this deal / walk away", the opposite
+// of what it means here ("this deal passes/clears the bar"). This tier is
+// computed live on every render and never written to the database (see
+// computeFlipResult/computeBrrrrResult in dealExplanation.js), so renaming
+// only what's shown carries zero data-migration risk. Deliberately scoped
+// to ONLY this Flip/BRRRR tier — the unrelated `lead.deal_analysis.verdict`
+// (AI-generated, different vocabulary, used by ActionZone.jsx/
+// NotesRenderer.jsx/QuickAnalysisModal.jsx) is a different field and is not
+// touched.
+const VERDICT_DISPLAY_LABEL = { STRONG: 'STRONG', PASS: 'SOLID', WATCH: 'WATCH', 'NO DEAL': 'NO DEAL' }
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 
 // Explains a BRRRR verdict in plain terms and shows exactly what would need to
@@ -216,6 +232,104 @@ function BrrrrRealityCheck({ lead }) {
   )
 }
 
+// Capability — Flip Margin of Safety Explainability. Answers "WHY is this
+// deal STRONG/thin/not working RIGHT NOW", as distinct from FlipRealityCheck
+// below ("Path to a Flip Deal"), which answers "WHAT WOULD NEED TO CHANGE"
+// — deliberately different questions, not duplicated (Section 8). Every
+// number here comes straight from flipResult (computeFlipResult in
+// dealExplanation.js) — no second calculation, no LLM.
+function FlipMarginOfSafety({ lead, flipResult }) {
+  const [whyOpen, setWhyOpen] = useState(false)
+  const [testDownside, setTestDownside] = useState(false)
+  const { verdict, currentOffer, mao, projectedProfit, targetProfit, marginOfSafety } = flipResult
+  if (!marginOfSafety) return null
+  const theme = VERDICT_THEME[verdict] || VERDICT_THEME.WATCH
+  const maturity = getDecisionMaturity(lead)
+  const sensitivity = testDownside ? computeFlipDownsideSensitivity(lead, flipResult) : null
+
+  return (
+    <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
+      <div className="px-3 pt-2.5 flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>Margin of Safety</span>
+        {maturity === 'PRELIMINARY' && (
+          <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)]">
+            🟡 PRELIMINARY — comps/ARV not yet confirmed
+          </span>
+        )}
+      </div>
+
+      {/* Compact economics row (Section 9) — Current Offer | Flip MAO | Cushion | Profit | Target */}
+      <div className="px-3 py-2 grid grid-cols-2 sm:grid-cols-5 gap-y-2 gap-x-1">
+        <div>
+          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Current Offer</div>
+          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{currentOffer != null ? fc(currentOffer) : '—'}</div>
+        </div>
+        <div>
+          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Flip MAO</div>
+          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{mao != null ? fc(Math.round(mao / 100) * 100) : '—'}</div>
+        </div>
+        <div>
+          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Price Cushion</div>
+          <div className="text-[13px] font-bold" style={{ color: theme.text }}>
+            {marginOfSafety.priceCushion != null ? `${marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(marginOfSafety.priceCushion)))}` : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Profit</div>
+          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{projectedProfit != null ? fc(projectedProfit) : '—'}</div>
+        </div>
+        <div>
+          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Target</div>
+          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{fc(targetProfit)}</div>
+        </div>
+      </div>
+
+      {/* Tier + plain-language "why" (Sections 5-7) */}
+      <div className="px-3 pb-2.5 border-t pt-2" style={{ borderColor: theme.border }}>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[12.5px] font-extrabold" style={{ color: theme.text }}>
+            {VERDICT_DISPLAY_LABEL[verdict] || verdict} — {marginOfSafety.title}
+          </span>
+          <button type="button" onClick={() => setWhyOpen(o => !o)} className="text-[10.5px] font-semibold underline opacity-80" style={{ color: theme.text }}>
+            {whyOpen ? 'Hide' : `ⓘ What does ${VERDICT_DISPLAY_LABEL[verdict] || verdict} mean?`}
+          </button>
+        </div>
+        {whyOpen && (
+          <div className="text-[11.5px] mt-1.5 leading-snug" style={{ color: theme.text }}>
+            {marginOfSafety.why}
+            {marginOfSafety.profitCushion != null && (
+              <div className="mt-1 opacity-80">Profit above $30K target: {marginOfSafety.profitCushion >= 0 ? '+' : '−'}{fc(Math.round(Math.abs(marginOfSafety.profitCushion)))} (price cushion and profit cushion can differ — purchase price also moves financing/holding costs).</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Optional downside sensitivity (Section 15) — collapsed by default,
+          reuses computeFlipBreakdown with modified inputs only; no new
+          model, no probability claims. */}
+      {currentOffer != null && lead.arv != null && lead.renovation_cost != null && (
+        <div className="px-3 pb-2.5 border-t pt-2" style={{ borderColor: theme.border }}>
+          <button type="button" onClick={() => setTestDownside(o => !o)} className="text-[10.5px] font-semibold underline opacity-80" style={{ color: theme.text }}>
+            {testDownside ? 'Hide downside test' : 'Test downside'}
+          </button>
+          {sensitivity && (
+            <div className="mt-1.5 space-y-1">
+              {sensitivity.map((s, i) => (
+                <div key={i} className="text-[11px] flex items-center justify-between gap-2" style={{ color: theme.text }}>
+                  <span className="opacity-80">If {s.label}:</span>
+                  <span className="font-bold">
+                    Profit {fc(Math.round(s.profit))} {s.profit >= targetProfit ? '✓ still clears target' : '✗ falls below target'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Capability #19.1, Section 12 — "Path to a Flip Deal", rebuilt around
 // calculateFlipMAO() (src/lib/calculations.js) instead of a bisected
 // per-lever price search — Flip MAO is linear in purchase price so the
@@ -237,7 +351,7 @@ function FlipRealityCheck({ lead }) {
   const profit = current?.totalProfit ?? null
 
   const meetsTarget = profit != null && profit >= FLIP_MIN_PROFIT_TARGET
-  const strong = profit != null && profit >= 40000
+  const strong = profit != null && profit >= FLIP_STRONG_PROFIT
   const profitColor = strong ? 'text-[color:var(--color-success-text)]' : meetsTarget ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'
 
   return (
@@ -983,8 +1097,8 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
         <div className="mb-2.5 text-[11.5px]">
           <span className="font-extrabold text-[color:var(--color-text)]">{strategyRecommendation.summary}</span>
           <span className="text-[color:var(--color-text-dim)]">
-            {' · '}Flip: {flipResult.available ? flipResult.verdict : '—'}
-            {'  ·  '}BRRRR: {brrrrResult.available ? brrrrResult.verdict : '—'}
+            {' · '}Flip: {flipResult.available ? (VERDICT_DISPLAY_LABEL[flipResult.verdict] || flipResult.verdict) : '—'}
+            {'  ·  '}BRRRR: {brrrrResult.available ? (VERDICT_DISPLAY_LABEL[brrrrResult.verdict] || brrrrResult.verdict) : '—'}
           </span>
         </div>
       )}
@@ -1184,7 +1298,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
                   <div className="px-3 py-2">
                     <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>AI Read</div>
-                    <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{activeResult.verdict}</div>
+                    <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{VERDICT_DISPLAY_LABEL[activeResult.verdict] || activeResult.verdict}</div>
                   </div>
                   <div className="px-3 py-2">
                     <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>
@@ -1240,6 +1354,10 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
           </div>
         )
       })()}
+
+      {hasAnalysis && strategy !== 'brrrr' && flipResult.available && (
+        <FlipMarginOfSafety lead={lead} flipResult={flipResult} />
+      )}
 
       {hasAnalysis && strategy === 'brrrr' && (
         <BrrrrRealityCheck lead={lead} />
