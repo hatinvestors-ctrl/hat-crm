@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, calculateLiveOffer, isStoredOfferStale } from '../../lib/calculations'
+import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
 
@@ -68,7 +68,14 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         // Offer" drifted apart after a renovation-cost edit.
         const liveStartingOffer = calculateLiveOffer(mao, ask)
         const offerIsStale = isStoredOfferStale(lead)
-        const displayOffer = (offerIsStale || !lead.starting_offer) ? liveStartingOffer : lead.starting_offer
+        // Bug fix — was reading lead.starting_offer verbatim here whenever
+        // it wasn't stale, same drift this section's own comment above
+        // warns about: an AI-suggested starting_offer can be above the
+        // canonical MAO (a negotiation anchor, not a MAO-aware number),
+        // which showed here as "We Offer" above Detailed Analysis' now-
+        // clamped "Starting Offer" for the exact same lead. getEffectiveOffer
+        // is the one shared, already-clamped source of truth for this value.
+        const displayOffer = getEffectiveOffer(lead, mao) ?? liveStartingOffer
         const pct        = gap != null ? Math.round((gap / ask) * 100) : null
         const dealOk     = gap != null && gap <= 0
         const easy       = gap != null && gap > 0 && pct <= 10

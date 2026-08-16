@@ -221,7 +221,23 @@ export function getEffectiveOffer(lead, canonicalMao) {
   const ask = lead.asking_price != null ? Number(lead.asking_price) : null
   const stored = lead.starting_offer != null ? Number(lead.starting_offer) : null
   const stale = isStoredOfferStale(lead)
-  if (stored != null && !stale) return stored
+  if (stored != null && !stale) {
+    // Bug fix — the AI-suggested starting_offer (analyze-deal's negotiation
+    // anchor, stored verbatim from the LLM's response) was never checked
+    // against the canonical MAO this same analysis computes, so it could
+    // come back ABOVE the maximum HAT would ever pay (e.g. "open high,
+    // negotiate down" reasoning with no MAO awareness) — every downstream
+    // reader (profit-at-offer, the verdict, "Biggest Risk") then silently
+    // evaluated a starting offer HAT itself would never actually extend.
+    // The live-computed branch below already guarantees its result never
+    // exceeds `canonicalMao * 0.995` (calculateLiveOffer); a stored AI
+    // offer gets the same ceiling applied here so "current offer" can
+    // never be a number above what MAO allows, from either source.
+    if (canonicalMao != null && stored > canonicalMao) {
+      return Math.round((canonicalMao * 0.995) / 100) * 100
+    }
+    return stored
+  }
   return calculateLiveOffer(canonicalMao, ask) ?? stored
 }
 
