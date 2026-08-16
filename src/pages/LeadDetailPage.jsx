@@ -49,6 +49,12 @@ export default function LeadDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [activityRefresh, setActivityRefresh] = useState(0)
   const [creatingProject, setCreatingProject] = useState(false)
+  // Bug fix — Deal Analysis's Flip/BRRRR tab was local-only state inside
+  // DealAnalysisCard, so Financials (a sibling section) always showed Flip
+  // MAO even after switching to BRRRR. DealAnalysisCard now reports its
+  // active tab up here via onStrategyChange so Financials' MAO row can
+  // match it. Defaults to 'flip' (same default DealAnalysisCard itself uses).
+  const [dealStrategy, setDealStrategy] = useState('flip')
 
   const handleCreateProject = async () => {
     setCreatingProject(true)
@@ -221,6 +227,7 @@ export default function LeadDetailPage() {
                 userId={user.id}
                 members={members}
                 canEdit={canEdit}
+                strategy={dealStrategy}
                 onUpdated={(updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }}
               />
             </div>
@@ -234,6 +241,7 @@ export default function LeadDetailPage() {
                 userId={user.id}
                 canEdit={canEdit}
                 onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
+                onStrategyChange={setDealStrategy}
               />
               <NotesSection
                 lead={lead}

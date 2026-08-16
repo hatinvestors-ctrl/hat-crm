@@ -2,13 +2,25 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import EditableField from './EditableField'
 import RenoTierPicker from './RenoTierPicker'
-import { formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, FLIP_MIN_PROFIT_TARGET, FLIP_STRONG_PROFIT, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer } from '../../lib/calculations'
+import {
+  formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, calculateBrrrrMAO, computeBrrrrBreakdown,
+  FLIP_MIN_PROFIT_TARGET, FLIP_STRONG_PROFIT, BRRRR_MAX_CASH_LEFT_IN, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer,
+} from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
 
 
-export default function FinancialSection({ lead, userId, members, canEdit, onUpdated }) {
+// Bug fix — this section always computed/labeled a Flip MAO regardless of
+// which strategy tab was active in Deal Analysis below it (real report:
+// 6552 Bartholf Ave — Deal Analysis switched to BRRRR and showed BRRRR MAO
+// $138,100, while Financials kept showing Flip MAO $133,700 for the exact
+// same lead). `strategy` is now passed down from LeadDetailPage, kept in
+// sync with DealAnalysisCard's own tab (see DealAnalysisCard's
+// onStrategyChange). Defaults to 'flip' so nothing changes for a lead
+// where BRRRR was never touched.
+export default function FinancialSection({ lead, userId, members, canEdit, onUpdated, strategy = 'flip' }) {
   const update = useLeadUpdate(lead, userId, members, onUpdated)
+  const isBrrrr = strategy === 'brrrr'
 
   const [showRenoPicker, setShowRenoPicker] = useState(false)
 
@@ -48,14 +60,25 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           compares against the CORRECT canonical number, so Kevin can
           one-click align it — a human decision, not a silent rewrite. */}
       {lead.asking_price && (lead.arv || lead.mao) && (() => {
-        const formulaMao = calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
+        // Strategy-aware canonical MAO — Flip MAO (targets $30K minimum
+        // profit) when the Flip tab is active, BRRRR MAO (targets positive
+        // cash flow + under $30K cash left in) when BRRRR is active. Same
+        // canonical functions Deal Analysis/Path to a Deal use — no second
+        // formula.
+        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6) : null
+        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
-        const diverged   = formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
-        // Canonical Flip MAO drives Gap/Starting-Offer math now (matches
-        // Detailed Analysis's own Gap-to-MAO figure in Biggest Risk) —
-        // the stored override only wins when canonical can't be computed
-        // (e.g. renovation cost missing).
-        const mao        = formulaMao ?? storedMao
+        // "Diverged" (stored lead.mao vs. canonical) is a Flip-only concept
+        // — lead.mao is V2's Flip-formula fallback input; BRRRR MAO has no
+        // stored-override counterpart, so never show a divergence banner
+        // for it (would incorrectly suggest lead.mao is a stale BRRRR MAO).
+        const diverged   = !isBrrrr && formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
+        // Canonical MAO (Flip or BRRRR, per the active tab) drives
+        // Gap/Starting-Offer math now (matches Detailed Analysis's own
+        // Gap-to-MAO figure in Biggest Risk) — the stored lead.mao override
+        // only wins for Flip, and only when canonical can't be computed
+        // (e.g. renovation cost missing); it's a Flip-only field.
+        const mao        = isBrrrr ? formulaMao : (formulaMao ?? storedMao)
         const ask        = Number(lead.asking_price)
         const gap        = mao != null ? ask - mao : null
 
@@ -127,14 +150,19 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   read as a contradiction, not a nuance — swapped. */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
                 <div className="flex items-center gap-1 mb-1">
-                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">Flip MAO</div>
-                  <span title={`The highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit. Same number shown in Detailed Analysis, Path to a Flip Deal, and Copilot.`}
+                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">{isBrrrr ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                  <span title={isBrrrr
+                      ? 'The highest purchase price that still keeps cash left in after refinance under $30,000 (and cash flow positive). Same number shown in Detailed Analysis and Path to a BRRRR Deal.'
+                      : `The highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit. Same number shown in Detailed Analysis, Path to a Flip Deal, and Copilot.`}
                     className="text-[9px] text-[color:var(--color-text-dim)] cursor-help">ℹ</span>
                 </div>
                 <div className="text-[16px] font-bold text-[color:var(--color-accent)]">
                   {formulaMao != null ? formatCurrency(Math.round(formulaMao / 100) * 100) : '—'}
                 </div>
-                {diverged && (
+                {/* lead.mao is a Flip-only stored fallback (also V2's
+                    canonical MAO input) — no equivalent override concept
+                    exists for BRRRR MAO, so these controls only apply to Flip. */}
+                {!isBrrrr && diverged && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <span className="text-[9px] text-[color:var(--color-warn-text)]">Stored override:</span>
                     <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
@@ -147,13 +175,22 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                     )}
                   </div>
                 )}
-                {!diverged && canEdit && (
+                {!isBrrrr && !diverged && canEdit && (
                   <button onClick={() => { const v = window.prompt('Set a manual Max Offer override (leave blank to cancel):', ''); if (v && !Number.isNaN(Number(v))) update({ mao: Number(v) }) }}
                     className="text-[8.5px] mt-0.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2">
                     Set manual override
                   </button>
                 )}
-                {(() => {
+                {isBrrrr ? (() => {
+                  if (formulaMao == null) return null
+                  const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6)
+                  const tone = b.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'var(--color-success-text)' : 'var(--color-warn-text)'
+                  return (
+                    <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Cash left in / cash flow at the canonical BRRRR MAO shown above — by construction, right at HAT's cash-left-in or cash-flow limit.">
+                      Cash left in: ~{formatCurrency(b.totalCashInvested)} · {b.monthlyCF != null ? `${formatCurrency(Math.round(b.monthlyCF))}/mo` : '—'}
+                    </div>
+                  )
+                })() : (() => {
                   const profitAtCanonical = formulaMao != null ? calculateFlipProfitAtPrice(formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6) : null
                   if (profitAtCanonical == null) return null
                   const tone = profitAtCanonical >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : 'var(--color-warn-text)'
@@ -183,24 +220,39 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
 
       {/* Fallback hero when no asking price yet: show MAO + Starting Offer plainly */}
       {!(lead.asking_price && (lead.arv || lead.mao)) && (() => {
-        const formulaMao = calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
+        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6) : null
+        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
-        const diverged   = formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
+        const diverged   = !isBrrrr && formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
+        const displayedMao = isBrrrr ? formulaMao : (lead.mao ?? formulaMao)
         return (
           <div className="flex gap-6 mb-5">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO · Max We'd Pay</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">{isBrrrr ? "BRRRR MAO · Max We'd Pay" : "Flip MAO · Max We'd Pay"}</span>
                 {diverged && canEdit && (
                   <button onClick={() => update({ mao: formulaMao })}
                     className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80">↺ formula</button>
                 )}
               </div>
-              <EditableField label="" type="currency" value={lead.mao ?? formulaMao} formatter={formatCurrency}
-                onSave={(v) => update({ mao: v })} disabled={!canEdit}
-                displayClassName="text-2xl font-bold text-[color:var(--color-accent)]" />
-              {(() => {
-                const profitAtMao = calculateFlipProfitAtPrice(lead.mao ?? formulaMao, lead.arv, lead.renovation_cost)
+              {isBrrrr ? (
+                <div className="text-2xl font-bold text-[color:var(--color-accent)]">{displayedMao != null ? formatCurrency(Math.round(displayedMao / 100) * 100) : '—'}</div>
+              ) : (
+                <EditableField label="" type="currency" value={displayedMao} formatter={formatCurrency}
+                  onSave={(v) => update({ mao: v })} disabled={!canEdit}
+                  displayClassName="text-2xl font-bold text-[color:var(--color-accent)]" />
+              )}
+              {isBrrrr ? (() => {
+                if (formulaMao == null) return null
+                const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6)
+                const tone = b.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'var(--color-success-text)' : 'var(--color-warn-text)'
+                return (
+                  <div className="text-[10px] mt-0.5" style={{ color: tone }}>
+                    Cash left in: ~{formatCurrency(b.totalCashInvested)} · {b.monthlyCF != null ? `${formatCurrency(Math.round(b.monthlyCF))}/mo` : '—'}
+                  </div>
+                )
+              })() : (() => {
+                const profitAtMao = calculateFlipProfitAtPrice(displayedMao, lead.arv, lead.renovation_cost)
                 if (profitAtMao == null) return null
                 const tone = profitAtMao >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : profitAtMao >= FLIP_MIN_PROFIT_TARGET ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                 return (

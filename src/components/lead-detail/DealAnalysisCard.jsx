@@ -628,10 +628,20 @@ function FullBreakdownTab({ lead, strategy }) {
   )
 }
 
-export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
+export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onStrategyChange }) {
   const staleness = useDealStaleness(lead)
 
   const [strategy,    setStrategy]    = useState(lead.deal_analysis?.strategy || 'flip')
+
+  // Bug fix — the Flip/BRRRR tab picked here was local-only state, so
+  // Financials (a sibling section, not a child of this card) kept showing
+  // "Flip MAO" even after Kevin switched this card to BRRRR (real report:
+  // 6552 Bartholf Ave — Detailed Analysis read BRRRR MAO $138,100 while
+  // Financials still showed Flip MAO $133,700 for the same lead). Notify
+  // the parent (LeadDetailPage) of the active strategy on mount and on
+  // every change, WITHOUT converting this into a controlled prop — every
+  // internal read of `strategy` below is unchanged.
+  useEffect(() => { onStrategyChange?.(strategy) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [localNotes,  setLocalNotes]  = useState(lead.ai_notes || '')
   const [generating,  setGenerating]  = useState(false)
   const [phase,       setPhase]       = useState(null)
@@ -1111,6 +1121,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated }) {
                 onClick={() => {
                   if (s === strategy) return
                   setStrategy(s)
+                  onStrategyChange?.(s)
                   if (hasAnalysis) {
                     if (renoMissing) { setShowRenoPicker(true); return }
                     runGenerate(false, s)
