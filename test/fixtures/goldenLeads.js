@@ -14,7 +14,7 @@ const base = (overrides) => ({
   status: 'new_lead',
   is_distressed: false,
   asking_price: null, arv: null, renovation_cost: null, rent_estimate: null,
-  starting_offer: null, mao: null,
+  starting_offer: null, offer_price: null, mao: null,
   follow_up_date: null,
   decision_v2: null,
   deal_analysis: null,
@@ -53,18 +53,25 @@ export const GOLDEN_LEADS = {
   // does the same for the live-computed branch -- so computeFlipResult's
   // OWN verdict is virtually never NO DEAL when MAO is positive; it only
   // occurs at negative/undefined MAO. See RELEASE-READINESS.md Finding #1.)
+  // offer_price = the ACTUAL/SUBMITTED offer (Product Decision, D2) — what
+  // the canonical current-deal evaluation reads. starting_offer is kept
+  // too (the separate RECOMMENDED/"We Offer" negotiation-anchor concept,
+  // MAO-anchored) — both are real, distinct, coexisting fields.
   G04_NO_DEAL: base({
-    address: '4 Golden No Deal Ct', asking_price: 204000, arv: 185000, renovation_cost: 10000, starting_offer: 150000,
+    address: '4 Golden No Deal Ct', asking_price: 204000, arv: 185000, renovation_cost: 10000,
+    offer_price: 150000, starting_offer: 150000,
   }),
 
-  // G05 — OFFER ABOVE MAX BUY explicitly (starting_offer already above canonical MAO)
+  // G05 — OFFER ABOVE MAX BUY explicitly (actual offer already above canonical MAO)
   G05_OFFER_ABOVE_MAX_BUY: base({
-    address: '5 Golden Above Max Buy Ct', asking_price: 130000, arv: 185000, renovation_cost: 10000, starting_offer: 130000,
+    address: '5 Golden Above Max Buy Ct', asking_price: 130000, arv: 185000, renovation_cost: 10000,
+    offer_price: 130000, starting_offer: 130000,
   }),
 
   // G06 — LARGE ASK-TO-MAX-BUY GAP (real-world shape: 7109 Hallock St)
   G06_LARGE_GAP: base({
-    address: '7109 Golden Hallock Analog', asking_price: 204000, arv: 185000, renovation_cost: 10000, starting_offer: 115700,
+    address: '7109 Golden Hallock Analog', asking_price: 204000, arv: 185000, renovation_cost: 10000,
+    offer_price: 115700, starting_offer: 115700,
   }),
 
   // G07 — MISSING ARV

@@ -31,6 +31,8 @@ Run the suite: `npm run test:release`
 
 30 fixtures defined (`test/fixtures/goldenLeads.js`), 17 with direct automated assertions. Full table: [golden-leads.md](./golden-leads.md).
 
+**Update — D1/D2 fixed (Canonical Deal Values, Product Decision):** Action Center (`ActionCenterPage.jsx`) and the Leads table (`LeadsTable.jsx`) now derive Max Buy/projected profit from `computeFlipResult(lead)` at render/classification time, exactly like the Lead Workspace Deal tab — never from `lead.deal_analysis.profit` or legacy `lead.mao`. A field-provenance audit also found `lead.offer_price` (the real ACTUAL/SUBMITTED offer) was never reaching the canonical pipeline's "current price" question; `computeFlipResult`'s `evaluationPrice` now prefers `offer_price`, never `starting_offer` (which remains, correctly, the separate MAO-anchored RECOMMENDED-offer concept). See §3 below.
+
 ## 3. Findings
 
 | ID | Severity | Area | Expected | Actual (before fix) | Reproduction | Fix implemented | Fixed? |

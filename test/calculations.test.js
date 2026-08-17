@@ -204,19 +204,21 @@ describe('Margin of Safety tiers (computeFlipResult verdict)', () => {
   // the real asking price, never silently swapped for the MAO-anchored
   // negotiated offer — a bad current price must read as a bad current
   // price, even while Max Buy (the negotiation opportunity) stays visible.
-  it('FIXED — a real stored offer/asking price above a positive Max Buy now reports NO DEAL at the current price, while Max Buy stays visible for negotiation', () => {
-    const lead = getGoldenLead('G04_NO_DEAL') // asking_price=204000, starting_offer=150000, Max Buy ≈ 118,395
+  it('FIXED — a real ACTUAL/SUBMITTED offer above a positive Max Buy now reports NO DEAL at the current price, while Max Buy stays visible for negotiation', () => {
+    const lead = getGoldenLead('G04_NO_DEAL') // asking_price=204000, offer_price=150000, Max Buy ≈ 118,395
     const r = computeFlipResult(lead)
     expect(r.available).toBe(true)
     expect(r.maoFeasible).toBe(true)
     expect(r.mao).toBeGreaterThan(0)
-    // the current-deal verdict reflects the real evaluated price (the
-    // concrete stored offer, since one is on file), not MAO
-    expect(r.evaluationPrice).toBe(lead.starting_offer)
+    // the current-deal verdict reflects the real evaluated price — the
+    // ACTUAL/SUBMITTED offer (offer_price), never the RECOMMENDED offer
+    // (starting_offer) and never MAO. Product Decision D2.
+    expect(r.evaluationPrice).toBe(lead.offer_price)
+    expect(r.actualOffer).toBe(lead.offer_price)
     expect(r.verdict).toBe('NO DEAL')
     expect(r.projectedProfit).toBeLessThan(FLIP_MIN_PROFIT_TARGET)
     // profit was computed from the real evaluation price, not from MAO
-    const profitAtRealPrice = computeFlipBreakdown(lead.starting_offer, lead.arv, lead.renovation_cost).totalProfit
+    const profitAtRealPrice = computeFlipBreakdown(lead.offer_price, lead.arv, lead.renovation_cost).totalProfit
     expect(r.projectedProfit).toBeCloseTo(profitAtRealPrice, 4)
     // negotiation opportunity: the recommended/negotiated offer is still
     // returned, MAO-anchored, distinct from the (failing) current price

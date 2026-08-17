@@ -33,6 +33,7 @@ const CATEGORY_LABELS = {
   'dataIntegrity.test.js': 'DATA SAFETY',
   'actionCenterClassification.test.js': 'ACTION CENTER CLASSIFICATION (classifyLeadV2)',
   'crossScreenConsistency.test.js': 'CROSS-SCREEN CONSISTENCY',
+  'canonicalDealValues.test.js': 'CANONICAL DEAL VALUES (D1/D2 product decision)',
 }
 
 const byFile = {}

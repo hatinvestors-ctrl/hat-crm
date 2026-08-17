@@ -4,18 +4,20 @@
 //   1. BRRRR was NOT touched by the F1/F2 Flip-verdict-pipeline fix (locks
 //      in that the fix stayed scoped to Flip, as the fix's own commit
 //      claimed).
-//   2. lead.mao (legacy calculateMAO, what LeadsTable.jsx and
-//      ActionCenterPage.jsx display) and the canonical, strategy-specific
-//      Flip Max Buy (calculateFlipMAO, what the Lead Workspace Deal tab
-//      displays after the F1/F2 fix) are DIFFERENT numbers BY DESIGN — see
-//      docs/release-readiness/source-of-truth-inventory.md Finding F3 and
-//      RELEASE-READINESS.md Defect D1. This test locks in that the two
-//      numbers legitimately diverge for the same lead, so a future change
-//      that accidentally makes them silently equal (or accidentally
-//      re-derives one from the other) gets caught, not celebrated.
+//   2. lead.mao (legacy calculateMAO) and the canonical, strategy-specific
+//      Flip Max Buy (calculateFlipMAO) are DIFFERENT numbers BY DESIGN and
+//      the DB column is deliberately left as-is (Finding F3, not dropped
+//      per the Product Decision's explicit "do not drop columns" rule) —
+//      but as of the Canonical Deal Values fix (Defects D1/D2), no
+//      screen displays the legacy value as financial truth anymore:
+//      LeadsTable and Action Center were both migrated to compute
+//      calculateFlipMAO/computeFlipResult fresh, same as the Lead
+//      Workspace Deal tab. This test now locks in the FIXED state: the
+//      two numbers still legitimately diverge in the database, but only
+//      the canonical one is ever shown to a user as "Max Buy."
 import { describe, it, expect } from 'vitest'
 import { calculateMAO, calculateFlipMAO } from '../src/lib/calculations.js'
-import { computeBrrrrResult } from '../src/lib/dealExplanation.js'
+import { computeBrrrrResult, computeFlipResult } from '../src/lib/dealExplanation.js'
 import { getGoldenLead } from './fixtures/goldenLeads.js'
 
 describe('BRRRR is unaffected by the Flip-only F1/F2 fix', () => {
@@ -43,18 +45,20 @@ describe('BRRRR is unaffected by the Flip-only F1/F2 fix', () => {
   })
 })
 
-describe('lead.mao (legacy, shown by LeadsTable/ActionCenterPage) vs canonical Flip Max Buy (shown by Lead Workspace Deal tab) — documented, intentional divergence', () => {
-  it('the two formulas produce DIFFERENT numbers for the same real-world lead shape (Club Duclay analog)', () => {
+describe('lead.mao (legacy, still stored, no longer displayed as financial truth anywhere) vs canonical Flip Max Buy (now shown consistently everywhere)', () => {
+  it('the two formulas still produce DIFFERENT numbers in the database for the same real-world lead shape (Club Duclay analog) — the DB column is intentionally untouched', () => {
     const lead = getGoldenLead('G28_LEGACY_MAO') // arv=270000, reno=50000, stored lead.mao=150050
     const legacyMao = calculateMAO(lead.arv, lead.renovation_cost)
     const canonicalFlipMao = calculateFlipMAO(lead.arv, lead.renovation_cost)
-    expect(legacyMao).toBe(150050) // exactly what LeadsTable/Action Center would show
-    expect(canonicalFlipMao).toBeCloseTo(151868, 0) // exactly what the Deal tab shows post-fix
-    // The whole point of this test: these must NOT be equal — if they ever
-    // become equal by coincidence for one fixture that's fine, but the
-    // FORMULAS must remain independently defined (this assertion is on the
-    // fixture's stored lead.mao, which is the number a user actually sees
-    // in the Leads table today).
+    expect(legacyMao).toBe(150050) // still what's stored in lead.mao — untouched, not dropped
+    expect(canonicalFlipMao).toBeCloseTo(151868, 0) // what every screen now actually displays
     expect(lead.mao).not.toBeCloseTo(canonicalFlipMao, 0)
+  })
+
+  it('computeFlipResult (what every screen now reads) never reads lead.mao at all', () => {
+    const lead = getGoldenLead('G28_LEGACY_MAO')
+    const canonical = computeFlipResult(lead)
+    expect(canonical.mao).not.toBe(lead.mao)
+    expect(canonical.mao).toBeCloseTo(calculateFlipMAO(lead.arv, lead.renovation_cost), 6)
   })
 })

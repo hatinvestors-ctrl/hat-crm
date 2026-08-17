@@ -99,16 +99,33 @@ describe('INPUT CHANGED: asking price (alone, no starting_offer stored)', () => 
   })
 })
 
-describe('INPUT CHANGED: current/starting offer', () => {
+// Product Decision — Canonical Deal Values (D2, see RELEASE-READINESS.md):
+// offer_price (the ACTUAL/SUBMITTED offer) drives the current-deal
+// evaluation; starting_offer (the RECOMMENDED/"We Offer" negotiation
+// anchor) does not. These two describe blocks lock in that separation.
+describe('INPUT CHANGED: actual/submitted offer (offer_price)', () => {
   it('changes projected profit and Margin of Safety without changing Max Buy itself', () => {
     const lead = getGoldenLead('G03_WATCH_FLIP')
     const maoBefore = calculateFlipMAO(lead.arv, lead.renovation_cost)
     const before = computeFlipResult(lead)
-    lead.starting_offer = before.currentOffer - 5000
+    lead.offer_price = before.evaluationPrice - 5000
     const after = computeFlipResult(lead)
     const maoAfter = calculateFlipMAO(lead.arv, lead.renovation_cost)
     expect(maoAfter).toBeCloseTo(maoBefore, 6)
+    expect(after.evaluationPrice).toBe(lead.offer_price)
     expect(after.projectedProfit).toBeGreaterThan(before.projectedProfit)
+  })
+})
+
+describe('INPUT CHANGED: recommended offer (starting_offer) alone', () => {
+  it('does NOT change the current-deal evaluation price or projected profit — only the negotiated/recommended offer', () => {
+    const lead = getGoldenLead('G03_WATCH_FLIP') // no offer_price set — evaluates at asking_price
+    const before = computeFlipResult(lead)
+    lead.starting_offer = 50000 // a wildly different "recommendation" — must not leak into the current-deal question
+    const after = computeFlipResult(lead)
+    expect(after.evaluationPrice).toBe(before.evaluationPrice)
+    expect(after.projectedProfit).toBeCloseTo(before.projectedProfit, 4)
+    expect(after.verdict).toBe(before.verdict)
   })
 })
 

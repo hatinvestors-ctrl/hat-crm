@@ -26,7 +26,29 @@ import { isContactReady } from '../lib/contactEnrichment'
 import { isV2ActionCenter } from '../lib/featureFlags'
 import { classifyFollowUpDate, daysOverdue } from '../lib/followUpTiming'
 import { getActionReason } from '../lib/actionReason'
+import { computeFlipResult } from '../lib/dealExplanation'
 import LogOutcomeModal from '../components/action-center/LogOutcomeModal'
+
+// Product Decision — Canonical Deal Values (see RELEASE-READINESS.md,
+// Defect D1). "Expected Profit"/"Maximum Offer" must reflect the SAME
+// deterministic engine the Lead Workspace Deal tab uses, not
+// lead.deal_analysis.profit (AI-generated, can go stale the moment ARV/
+// reno changes — see isStoredOfferStale) or lead.mao (the legacy flat
+// 0.75xARV formula). computeFlipResult needs no inputs beyond what's
+// already selected below (arv/renovation_cost/asking_price/offer_price/
+// starting_offer) — never persisted, computed fresh at classification
+// time, exactly like the Deal tab does. BRRRR-specific figures (cash left
+// in, cash flow) are intentionally NOT substituted here — Action Center's
+// two headline numbers have always been Flip's dollar profit/Max Buy;
+// widening that to a strategy-dependent number is a UI scope decision the
+// mission for this pass explicitly asked NOT to expand into.
+function canonicalEconomics(lead) {
+  const flip = computeFlipResult(lead)
+  return {
+    expectedProfit: flip.available ? flip.projectedProfit : null,
+    maxOffer: flip.available ? flip.mao : null,
+  }
+}
 
 // Capability #17 — order matches the mission's explicit Today-queue
 // priority (Section 3): OVERDUE, RE-ENGAGE, ACT NOW, FOLLOW UP TODAY,
@@ -127,6 +149,11 @@ function classifyLead(lead, rediscovery) {
   const nextAction = priorityInfo?.nextAction || (isFollowUpStatus ? 'FOLLOW UP' : null)
     || (category === 'OFF_MARKET' ? getNextAction(lead, distressInfo) : null)
   const reason = rediscovery?.reason || priorityInfo?.reasons?.[0] || null
+  // Product Decision — Canonical Deal Values (Defect D1). Computed fresh
+  // from the SAME deterministic engine the Deal tab uses, never from
+  // deal_analysis.profit/lead.mao. Still null (never fabricated) whenever
+  // Flip itself is unavailable (e.g. an off-market lead with no ARV yet).
+  const { expectedProfit, maxOffer } = canonicalEconomics(lead)
 
   return {
     category,
@@ -135,11 +162,8 @@ function classifyLead(lead, rediscovery) {
     nextAction,
     distressed,
     opportunity,
-    // Never fabricated for an off-market lead — both stay null unless the
-    // existing engine already computed them (e.g. Kevin later ran an
-    // analysis on it), per the mission's explicit instruction.
-    expectedProfit: lead.deal_analysis?.profit ?? null,
-    maxOffer: lead.mao ?? null,
+    expectedProfit,
+    maxOffer,
     reason,
     score: priorityInfo?.confidence ?? null,
     rediscoveredAt: rediscovery?.updatedAt || null,
@@ -218,8 +242,9 @@ export function classifyLeadV2(lead) {
       nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
       distressed: false,
       opportunity: null,
-      expectedProfit: lead.deal_analysis?.profit ?? null,
-      maxOffer: lead.mao ?? null,
+      // Product Decision — Canonical Deal Values (Defect D1): computed
+      // fresh from computeFlipResult, never deal_analysis.profit/lead.mao.
+      ...canonicalEconomics(lead),
       reason, // always visible on the card — Section 7's explicit requirement
       score: d.opportunity?.score ?? null,
       rediscoveredAt: null,
@@ -248,8 +273,9 @@ export function classifyLeadV2(lead) {
     nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
     distressed: false, // always renders the generic (non-OFF_MARKET) card layout — see ActionCard
     opportunity: null,
-    expectedProfit: lead.deal_analysis?.profit ?? null,
-    maxOffer: lead.mao ?? null,
+    // Product Decision — Canonical Deal Values (Defect D1): computed
+    // fresh from computeFlipResult, never deal_analysis.profit/lead.mao.
+    ...canonicalEconomics(lead),
     reason: d.why?.[0] || null,
     score: d.opportunity?.score ?? null,
     rediscoveredAt: null,
@@ -471,9 +497,19 @@ export default function ActionCenterPage() {
     async function load() {
       setLoading(true)
 
+      // Product Decision — Canonical Deal Values (Defect D1). arv/
+      // renovation_cost/offer_price/starting_offer are the exact inputs
+      // computeFlipResult() needs to derive Expected Profit/Max Buy fresh
+      // — added so Action Center can stop reading the stale/legacy
+      // deal_analysis.profit and lead.mao fields. mao/deal_analysis are
+      // still selected: deal_analysis remains available for AI
+      // explanation/reasoning text (never as the financial source of
+      // truth), and lead.mao is kept only for any remaining non-financial
+      // reference — Action Center itself no longer reads either for
+      // Expected Profit/Maximum Offer.
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email, decision_v2, acquisition_override')
+        .select('id, address, city, status, ai_notes, mao, asking_price, arv, renovation_cost, offer_price, starting_offer, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email, decision_v2, acquisition_override')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)

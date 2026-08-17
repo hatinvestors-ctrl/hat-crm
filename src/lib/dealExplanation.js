@@ -88,9 +88,11 @@ function marginOfSafetyExplanation({ verdict, priceCushion, profitCushion, maoFe
 // lets one silently stand in for the other:
 //
 //   1. "Does this work at the price actually on the table?" — the CURRENT
-//      DEAL verdict/profit, evaluated at the real asking price (or a real
-//      stored offer when no asking price exists). Never swapped for Max
-//      Buy — a bad current price is reported as a bad current price.
+//      DEAL verdict/profit, evaluated at the real ACTUAL/SUBMITTED offer
+//      (lead.offer_price) when one exists, otherwise the asking price.
+//      Never swapped for Max Buy, and never for the RECOMMENDED offer
+//      (lead.starting_offer/currentOffer, a system suggestion, not a real
+//      price) — a bad current price is reported as a bad current price.
 //   2. "Is there a lower price where this WOULD work?" — Max Buy, computed
 //      independently and always returned (when feasible) so a genuine
 //      negotiation opportunity stays visible even when #1 is NO DEAL.
@@ -104,7 +106,18 @@ export function computeFlipResult(lead) {
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const holdMonths = lead.hold_months || 6
   const ask = lead.asking_price != null ? Number(lead.asking_price) : null
-  const stored = lead.starting_offer != null ? Number(lead.starting_offer) : null
+  // D2 (System Validation Review — Product Decision, see RELEASE-
+  // READINESS.md) — field provenance audit confirmed `lead.offer_price`
+  // and `lead.starting_offer` are NOT duplicates of the same concept:
+  //   - offer_price  = a REAL offer HAT actually submitted/logged (set by
+  //     LeadForm's "Offer Price" field or LogOutcomeModal when an outcome
+  //     records an offer having been made) — the ACTUAL/SUBMITTED offer.
+  //   - starting_offer = the system's negotiation-anchor recommendation
+  //     ("We Offer" in FinancialSection), AI-suggested or manually
+  //     overridden, always clamped to Max Buy — the RECOMMENDED offer.
+  // These must never be conflated. `actualOffer` below is ONLY ever
+  // offer_price, never starting_offer.
+  const actualOffer = lead.offer_price != null ? Number(lead.offer_price) : null
 
   if (arv == null) return { available: false, reason: 'ARV is missing.' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.' }
@@ -118,11 +131,13 @@ export function computeFlipResult(lead) {
   const maoFeasible = rawMao != null && rawMao > 0
   const mao = maoFeasible ? rawMao : null
 
-  // F1 — the CURRENT DEAL question is evaluated at the real, actual price
-  // on the table: a specific stored offer when one has actually been put
-  // in (the most concrete real number in play), otherwise the asking
-  // price. Never Max Buy.
-  const evaluationPrice = stored ?? ask
+  // F1/D2 — the CURRENT DEAL question is evaluated at the real, actual
+  // price on the table: the ACTUAL/SUBMITTED offer (offer_price) when one
+  // has genuinely been made, otherwise the asking price. Never Max Buy,
+  // and never the RECOMMENDED offer (starting_offer/currentOffer below) —
+  // a system-generated negotiation suggestion is not a real price anyone
+  // has actually agreed to pay or offer.
+  const evaluationPrice = actualOffer ?? ask
   const profitAtEvaluationPrice = (evaluationPrice != null && evaluationPrice > 0)
     ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths).totalProfit
     : null
@@ -197,7 +212,7 @@ export function computeFlipResult(lead) {
   }
 
   return {
-    available: true, verdict, mao, maoFeasible, evaluationPrice, currentOffer,
+    available: true, verdict, mao, maoFeasible, evaluationPrice, actualOffer, currentOffer,
     projectedProfit: profitAtEvaluationPrice,
     targetProfit: FLIP_MIN_PROFIT_TARGET, why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
     marginOfSafety,

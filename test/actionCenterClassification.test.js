@@ -10,6 +10,7 @@
 // function. This file closes that gap with real, direct coverage.
 import { describe, it, expect } from 'vitest'
 import { classifyLeadV2 } from '../src/pages/ActionCenterPage.jsx'
+import { computeFlipResult } from '../src/lib/dealExplanation.js'
 import { todayInBusinessTz } from '../src/lib/followUpTiming.js'
 import { getGoldenLead, resolveFollowUpDates } from './fixtures/goldenLeads.js'
 
@@ -104,25 +105,41 @@ describe('classifyLeadV2 — worklist inclusion/exclusion', () => {
   })
 })
 
-describe('classifyLeadV2 — expectedProfit/maxOffer field provenance (documents current behavior — see RELEASE-READINESS.md Defect D1)', () => {
-  // Confirmed by code inspection (System Validation Review, Part 9): Action
-  // Center's "Expected Profit" / "Maximum Offer" read lead.deal_analysis.profit
-  // and lead.mao — the AI-generated deal_analysis figure and the LEGACY flat
-  // 0.75xARV-Reno-2450 formula (calculateMAO) — NOT the canonical, F1/F2-fixed
-  // computeFlipResult(lead).projectedProfit/.mao that the Lead Workspace's
-  // Deal tab shows. This test locks in that this is the CURRENT real
-  // behavior (so a future silent change is caught), not an endorsement.
-  it('expectedProfit reads lead.deal_analysis.profit verbatim, not a live Flip/BRRRR recalculation', () => {
+describe('classifyLeadV2 — expectedProfit/maxOffer field provenance (Defect D1 — FIXED, Product Decision: canonical deal values)', () => {
+  // Was Defect D1 (see RELEASE-READINESS.md): Action Center's "Expected
+  // Profit" / "Maximum Offer" used to read lead.deal_analysis.profit (AI-
+  // generated) and lead.mao (legacy flat formula) — NOT the canonical
+  // computeFlipResult(lead) the Lead Workspace Deal tab shows. FIXED: both
+  // are now derived fresh from computeFlipResult at classification time,
+  // ignoring deal_analysis.profit/lead.mao entirely for these two fields.
+  it('expectedProfit/maxOffer are derived live from computeFlipResult, completely ignoring deal_analysis.profit and lead.mao', () => {
     const lead = {
       status: 'new_lead',
-      arv: 999999, renovation_cost: 1, // if this were canonical-recalculated, profit would be enormous
+      arv: 220000, renovation_cost: 25000, asking_price: 126000, // canonical: profit=$38,230, Max Buy≈$133,677
+      // Deliberately WRONG/stale stored figures — if these leaked through,
+      // the test would see them instead of the canonical numbers below.
       deal_analysis: { profit: 12345, strategy: 'flip' },
       mao: 50000,
       decision_v2: decisionV2({ recommendation: 'ACT_NOW' }),
     }
+    const canonical = computeFlipResult(lead)
     const classified = classifyLeadV2(lead)
-    expect(classified.expectedProfit).toBe(12345)
-    expect(classified.maxOffer).toBe(50000)
+    expect(classified.expectedProfit).toBe(canonical.projectedProfit)
+    expect(classified.expectedProfit).not.toBe(12345) // never the stale AI figure
+    expect(classified.maxOffer).toBe(canonical.mao)
+    expect(classified.maxOffer).not.toBe(50000) // never the legacy lead.mao
+  })
+
+  it('expectedProfit/maxOffer are null (never fabricated, never falling back to stale fields) when Flip itself is unavailable', () => {
+    const lead = {
+      status: 'new_lead',
+      deal_analysis: { profit: 99999 }, // must NOT leak through even as a fallback
+      mao: 88888,
+      decision_v2: decisionV2({ recommendation: 'ACT_NOW' }),
+    }
+    const classified = classifyLeadV2(lead)
+    expect(classified.expectedProfit).toBeNull()
+    expect(classified.maxOffer).toBeNull()
   })
 
   it('expectedProfit/maxOffer are null (never fabricated) when neither field is populated', () => {

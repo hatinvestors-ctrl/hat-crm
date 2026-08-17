@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
-import { formatCurrency, formatDate } from '../../lib/calculations'
+import { formatCurrency, formatDate, calculateFlipMAO } from '../../lib/calculations'
 import { safeTelHref, safeMailtoHref } from '../../lib/urlSafety'
 import { MLS_STATUS_MAP, LEAD_SOURCE_MAP } from '../../lib/constants'
 import { isDistressedLead } from '../../lib/distressInfo'
@@ -95,6 +95,14 @@ export default function LeadsTable({ leads, members = [], workspaceId, sortBy, s
   const renderRow = (lead) => {
     const assignee = memberMap[lead.assigned_to]
     const isSel = selSet.has(lead.id)
+    // Product Decision — Canonical Deal Values (Defect D2, see
+    // RELEASE-READINESS.md). This column used to show the stored
+    // lead.mao (the legacy 0.75xARV-Reno-2450 formula, auto-recalculated
+    // by FinancialSection's own ARV/Reno handlers, sometimes stale/
+    // manually overridden) — a different number than the canonical Flip
+    // Max Buy the Lead Workspace Deal tab shows for the exact same lead.
+    // Computed fresh here, same as the Deal tab, never persisted.
+    const canonicalMao = calculateFlipMAO(lead.arv, lead.renovation_cost)
     return (
       <tr key={lead.id} className={`hover:bg-[color:var(--color-bg-elev-2)] transition-colors group ${lead.is_hot ? 'bg-[oklch(0.22_0.04_25/0.4)]' : ''} ${isSel ? 'bg-[color:var(--color-accent-soft)]' : ''}`}>
         {selectable && (
@@ -146,7 +154,7 @@ export default function LeadsTable({ leads, members = [], workspaceId, sortBy, s
             : (lead.lead_source || '').replace(/_/g, ' ') || '—'}
         </td>
         <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums">{formatCurrency(lead.arv)}</td>
-        <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums font-medium">{formatCurrency(lead.mao)}</td>
+        <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums font-medium">{formatCurrency(canonicalMao)}</td>
         <td className="px-3 py-2.5 text-right text-[color:var(--color-text)] tabular-nums">{formatCurrency(lead.offer_price)}</td>
         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{lead.follow_up_date ? formatDate(lead.follow_up_date) : '—'}</td>
         <td className="px-3 py-2.5 text-[color:var(--color-text-dim)] text-[11.5px]">{formatDate(lead.created_at)}</td>
