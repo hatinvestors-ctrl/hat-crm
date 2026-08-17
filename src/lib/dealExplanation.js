@@ -29,7 +29,7 @@ const THIN_MARGIN = FLIP_PASS_MARGIN // within $5K of target = WATCH, not a clea
 // how much room exists between the price being evaluated and that ceiling.
 // One deterministic template per tier, built strictly from numbers
 // computeFlipResult already computed — no new scoring, no LLM.
-function marginOfSafetyExplanation(verdict, priceCushion, profitCushion) {
+function marginOfSafetyExplanation({ verdict, priceCushion, profitCushion, maoFeasible, mao }) {
   const pc = priceCushion != null ? fc(Math.round(priceCushion)) : null
   switch (verdict) {
     case 'STRONG':
@@ -48,14 +48,33 @@ function marginOfSafetyExplanation(verdict, priceCushion, profitCushion) {
         why: `This deal technically meets HAT's $30,000 minimum, but the price is only ${pc} below Flip MAO. A small rehab overrun, a lower ARV, or extra holding cost could push projected profit below target.`,
       }
     case 'NO DEAL':
+      // F2 — Max Buy at or below $0 means no purchase price makes this
+      // Flip work under current assumptions; this is a distinct case from
+      // "the current price just happens to be too high" (F1) and gets its
+      // own, unambiguous explanation rather than reusing price-cushion
+      // language that doesn't apply when there IS no valid ceiling price.
+      if (!maoFeasible) {
+        return {
+          title: 'Not economically feasible',
+          why: 'Required purchase price is not economically feasible under the current rehab and ARV assumptions.',
+        }
+      }
       if (priceCushion == null) {
         return { title: 'No price to evaluate', why: 'No asking price or offer is on file yet, so a Flip Margin of Safety can\'t be calculated.' }
       }
+      // F1 — the current price doesn't work, but Max Buy (a lower,
+      // realistic price) is still a genuine number worth negotiating
+      // toward. Say both things: the current price fails, AND the
+      // negotiation opportunity is still on the table.
+      if (priceCushion < 0) {
+        return {
+          title: 'No deal at current price',
+          why: `At the current price, this does not support HAT's $30,000 minimum Flip profit. Could work around ${fc(Math.round(mao / 100) * 100)} or below.`,
+        }
+      }
       return {
-        title: priceCushion < 0 ? 'Over Flip MAO' : 'Below the minimum target',
-        why: priceCushion < 0
-          ? `The current price is ${fc(Math.round(Math.abs(priceCushion)))} ABOVE Flip MAO — it does not support HAT's $30,000 minimum Flip profit at this price.`
-          : `Projected profit at this price is below HAT's $30,000 minimum Flip profit target.`,
+        title: 'Below the minimum target',
+        why: `Projected profit at this price is below HAT's $30,000 minimum Flip profit target.`,
       }
     default:
       return { title: '', why: '' }
@@ -63,51 +82,96 @@ function marginOfSafetyExplanation(verdict, priceCushion, profitCushion) {
 }
 
 // ── FLIP ──────────────────────────────────────────────────────────────
+//
+// F1/F2 (Release Readiness findings, see docs/release-readiness/RELEASE-
+// READINESS.md) — this function answers TWO separate questions, and never
+// lets one silently stand in for the other:
+//
+//   1. "Does this work at the price actually on the table?" — the CURRENT
+//      DEAL verdict/profit, evaluated at the real asking price (or a real
+//      stored offer when no asking price exists). Never swapped for Max
+//      Buy — a bad current price is reported as a bad current price.
+//   2. "Is there a lower price where this WOULD work?" — Max Buy, computed
+//      independently and always returned (when feasible) so a genuine
+//      negotiation opportunity stays visible even when #1 is NO DEAL.
+//
+// `currentOffer` keeps its pre-existing meaning: the MAO-anchored
+// NEGOTIATED offer HAT would extend (getEffectiveOffer/calculateLiveOffer)
+// — still useful, still returned, never confused with the real evaluation
+// price above.
 export function computeFlipResult(lead) {
   const arv = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const holdMonths = lead.hold_months || 6
   const ask = lead.asking_price != null ? Number(lead.asking_price) : null
+  const stored = lead.starting_offer != null ? Number(lead.starting_offer) : null
 
   if (arv == null) return { available: false, reason: 'ARV is missing.' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.' }
 
-  const mao = calculateFlipMAO(arv, reno, holdMonths)
-  // Same effective-offer logic FinancialSection uses (calculations.js) —
-  // stored starting_offer when it's still valid, live-recomputed against
-  // canonical Flip MAO when ARV/reno moved since the last AI run. Fixes
-  // "Starting Offer" here reading a stale number after a rehab edit while
-  // Financials' "We Offer" already updated.
-  const currentOffer = getEffectiveOffer(lead, mao) ?? ask
-  const profitAtCurrentOffer = currentOffer != null ? computeFlipBreakdown(currentOffer, arv, reno, holdMonths).totalProfit : null
+  const rawMao = calculateFlipMAO(arv, reno, holdMonths)
+  // F2 — a Max Buy at or below $0 is not a valid acquisition price under
+  // any purchase-price assumption; expose it as unusable (null) rather
+  // than a negative dollar figure a downstream reader (or a clamp) could
+  // evaluate profit against. `rawMao` is kept as a local-only diagnostic,
+  // never returned or fed into any price/profit calculation below.
+  const maoFeasible = rawMao != null && rawMao > 0
+  const mao = maoFeasible ? rawMao : null
+
+  // F1 — the CURRENT DEAL question is evaluated at the real, actual price
+  // on the table: a specific stored offer when one has actually been put
+  // in (the most concrete real number in play), otherwise the asking
+  // price. Never Max Buy.
+  const evaluationPrice = stored ?? ask
+  const profitAtEvaluationPrice = (evaluationPrice != null && evaluationPrice > 0)
+    ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths).totalProfit
+    : null
 
   let verdict = 'NO DEAL'
-  if (profitAtCurrentOffer != null) {
-    if (profitAtCurrentOffer >= FLIP_STRONG_PROFIT) verdict = 'STRONG'
-    else if (profitAtCurrentOffer >= FLIP_MIN_PROFIT_TARGET + THIN_MARGIN) verdict = 'PASS'
-    else if (profitAtCurrentOffer >= FLIP_MIN_PROFIT_TARGET) verdict = 'WATCH'
+  if (profitAtEvaluationPrice != null) {
+    if (profitAtEvaluationPrice >= FLIP_STRONG_PROFIT) verdict = 'STRONG'
+    else if (profitAtEvaluationPrice >= FLIP_MIN_PROFIT_TARGET + THIN_MARGIN) verdict = 'PASS'
+    else if (profitAtEvaluationPrice >= FLIP_MIN_PROFIT_TARGET) verdict = 'WATCH'
     else verdict = 'NO DEAL'
   }
+  // F2 — an infeasible Max Buy means no purchase price meets HAT's target
+  // under current assumptions; the current-price verdict can never read
+  // better than NO DEAL regardless of what the evaluation price produced.
+  if (!maoFeasible) verdict = 'NO DEAL'
 
-  // Margin of Safety (Section 2) — PRICE cushion (room below the MAO
-  // ceiling) and PROFIT cushion (room above the $30K floor) are related
-  // but NOT identical, since purchase price also moves financing/holding
-  // costs (Section 13) — both are computed and shown, never assumed equal.
-  const priceCushion = (mao != null && currentOffer != null) ? mao - currentOffer : null
-  const profitCushion = profitAtCurrentOffer != null ? profitAtCurrentOffer - FLIP_MIN_PROFIT_TARGET : null
-  const marginOfSafety = { ...marginOfSafetyExplanation(verdict, priceCushion, profitCushion), priceCushion, profitCushion }
+  // The negotiated/recommended offer HAT would actually extend — MAO-
+  // anchored, never above Max Buy. Distinct from evaluationPrice above.
+  // Null when Max Buy itself isn't feasible (F2) — there is no valid
+  // offer to recommend on a deal with no working price.
+  const currentOffer = maoFeasible ? (getEffectiveOffer(lead, mao) ?? ask) : null
+
+  // Margin of Safety (Section 2) — PRICE cushion is now measured against
+  // the real evaluation price (F1: can go negative when asking price is
+  // above Max Buy — that's the whole point, it's what makes "no deal at
+  // current price" visible) rather than the already-clamped negotiated
+  // offer, which by construction could never read as "over Max Buy."
+  const priceCushion = (mao != null && evaluationPrice != null) ? mao - evaluationPrice : null
+  const profitCushion = profitAtEvaluationPrice != null ? profitAtEvaluationPrice - FLIP_MIN_PROFIT_TARGET : null
+  const marginOfSafety = {
+    ...marginOfSafetyExplanation({ verdict, priceCushion, profitCushion, maoFeasible, mao }),
+    priceCushion, profitCushion,
+  }
 
   const why = []
   const biggestRisk = []
 
-  if (currentOffer != null && profitAtCurrentOffer != null) {
-    why.push(`At ${fc(currentOffer)}, estimated flip profit is ${fc(profitAtCurrentOffer)}.`)
-    if (profitAtCurrentOffer >= FLIP_MIN_PROFIT_TARGET) {
+  if (!maoFeasible) {
+    biggestRisk.push('Renovation cost is too high relative to ARV — no purchase price makes this Flip work under current assumptions.')
+  }
+
+  if (evaluationPrice != null && profitAtEvaluationPrice != null) {
+    why.push(`At ${fc(evaluationPrice)}, estimated flip profit is ${fc(profitAtEvaluationPrice)}.`)
+    if (profitAtEvaluationPrice >= FLIP_MIN_PROFIT_TARGET) {
       why.push(verdict === 'WATCH'
         ? `HAT minimum is ${fc(FLIP_MIN_PROFIT_TARGET)}, so the deal works — but with little room.`
         : `HAT minimum flip profit is ${fc(FLIP_MIN_PROFIT_TARGET)}, so the deal works.`)
-    } else {
-      why.push(`HAT minimum flip profit is ${fc(FLIP_MIN_PROFIT_TARGET)} — this offer falls short by ${fc(FLIP_MIN_PROFIT_TARGET - profitAtCurrentOffer)}.`)
+    } else if (maoFeasible) {
+      why.push(`HAT minimum flip profit is ${fc(FLIP_MIN_PROFIT_TARGET)} — this price falls short by ${fc(FLIP_MIN_PROFIT_TARGET - profitAtEvaluationPrice)}.`)
     }
   }
   if (mao != null) why.push(`Maximum flip purchase price is ${fc(Math.round(mao / 100) * 100)}.`)
@@ -133,7 +197,8 @@ export function computeFlipResult(lead) {
   }
 
   return {
-    available: true, verdict, mao, currentOffer, projectedProfit: profitAtCurrentOffer,
+    available: true, verdict, mao, maoFeasible, evaluationPrice, currentOffer,
+    projectedProfit: profitAtEvaluationPrice,
     targetProfit: FLIP_MIN_PROFIT_TARGET, why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
     marginOfSafety,
   }

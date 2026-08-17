@@ -192,59 +192,104 @@ describe('Margin of Safety tiers (computeFlipResult verdict)', () => {
     expect(r.verdict).toBe('WATCH')
   })
 
-  it('NO DEAL when evaluated directly at a price above Max Buy (computeFlipBreakdown, bypassing the offer-clamp pipeline)', () => {
-    // Finding (see RELEASE-READINESS.md #1): computeFlipResult's OWN
-    // currentOffer is structurally clamped to <= mao*0.995 by
-    // getEffectiveOffer/calculateLiveOffer, so its own verdict is
-    // virtually never NO DEAL for a positive MAO. NO DEAL is still fully
-    // real and correctly reachable when evaluating profit at an explicit
-    // price above MAO, which is exactly what "the offer needs to come
-    // down" messaging (DealAnalysisCard's Biggest Risk / Path to Deal)
-    // is built on.
+  it('NO DEAL when evaluated directly at a price above Max Buy (computeFlipBreakdown)', () => {
     const lead = getGoldenLead('G04_NO_DEAL')
     const mao = calculateFlipMAO(lead.arv, lead.renovation_cost)
     const profitAboveMao = computeFlipBreakdown(mao + 40000, lead.arv, lead.renovation_cost).totalProfit
     expect(profitAboveMao).toBeLessThan(FLIP_MIN_PROFIT_TARGET)
   })
 
-  it('FINDING: computeFlipResult itself cannot produce NO DEAL for a positive Max Buy — its currentOffer is always clamped at/below Max Buy', () => {
-    const lead = getGoldenLead('G04_NO_DEAL') // starting_offer=150000, well above the ~118K canonical MAO
+  // ── F1 fix regression (see RELEASE-READINESS.md Finding #1) ──────────
+  // computeFlipResult's CURRENT DEAL verdict/profit must be evaluated at
+  // the real asking price, never silently swapped for the MAO-anchored
+  // negotiated offer — a bad current price must read as a bad current
+  // price, even while Max Buy (the negotiation opportunity) stays visible.
+  it('FIXED — a real stored offer/asking price above a positive Max Buy now reports NO DEAL at the current price, while Max Buy stays visible for negotiation', () => {
+    const lead = getGoldenLead('G04_NO_DEAL') // asking_price=204000, starting_offer=150000, Max Buy ≈ 118,395
     const r = computeFlipResult(lead)
+    expect(r.available).toBe(true)
+    expect(r.maoFeasible).toBe(true)
+    expect(r.mao).toBeGreaterThan(0)
+    // the current-deal verdict reflects the real evaluated price (the
+    // concrete stored offer, since one is on file), not MAO
+    expect(r.evaluationPrice).toBe(lead.starting_offer)
+    expect(r.verdict).toBe('NO DEAL')
+    expect(r.projectedProfit).toBeLessThan(FLIP_MIN_PROFIT_TARGET)
+    // profit was computed from the real evaluation price, not from MAO
+    const profitAtRealPrice = computeFlipBreakdown(lead.starting_offer, lead.arv, lead.renovation_cost).totalProfit
+    expect(r.projectedProfit).toBeCloseTo(profitAtRealPrice, 4)
+    // negotiation opportunity: the recommended/negotiated offer is still
+    // returned, MAO-anchored, distinct from the (failing) current price
     expect(r.currentOffer).toBeLessThanOrEqual(r.mao + 1)
-    expect(r.verdict).not.toBe('NO DEAL') // documents the structural finding, not a desired behavior
+    expect(r.marginOfSafety.why).toMatch(/could work around/i)
   })
 
-  it('current offer is NEVER shown above Max Buy — regression for the MAO-clamp fix (getEffectiveOffer)', () => {
+  it('current offer (negotiated/recommended) is NEVER shown above Max Buy — regression for the MAO-clamp (getEffectiveOffer)', () => {
     const lead = getGoldenLead('G05_OFFER_ABOVE_MAX_BUY')
     const r = computeFlipResult(lead)
     expect(r.available).toBe(true)
-    // currentOffer must be clamped to at/below the canonical mao
+    // currentOffer (the negotiated offer) must be clamped to at/below mao
     expect(r.currentOffer).toBeLessThanOrEqual(r.mao + 1) // +1 float tolerance
   })
 
-  it('extreme rehab (negative Max Buy) never crashes, and Max Buy itself is correctly negative', () => {
+  it('a normal profitable Flip (asking price at or below Max Buy) is unaffected by the F1 fix — no regression', () => {
+    const lead = getGoldenLead('G01_STRONG_FLIP') // asking_price=95000, well below Max Buy
+    const r = computeFlipResult(lead)
+    expect(r.evaluationPrice).toBe(lead.asking_price)
+    expect(r.verdict).toBe('STRONG')
+    expect(r.projectedProfit).toBeGreaterThanOrEqual(FLIP_STRONG_PROFIT)
+  })
+
+  it('the existing WATCH scenario is unaffected by the F1 fix — no regression', () => {
+    const lead = getGoldenLead('G03_WATCH_FLIP') // asking_price below Max Buy, thin margin
+    const r = computeFlipResult(lead)
+    expect(r.evaluationPrice).toBe(lead.asking_price)
+    expect(r.verdict).toBe('WATCH')
+  })
+
+  // ── F2 fix regression (see RELEASE-READINESS.md Finding #2) ──────────
+  // A Max Buy at or below $0 must never be treated as a valid purchase
+  // price — no positive profit may be computed from it, and the verdict
+  // must be an unambiguous NO DEAL with a clear "not feasible" reason.
+  it('extreme rehab (negative raw Max Buy) never crashes, and exposed Max Buy is null, not a negative number', () => {
     const lead = getGoldenLead('G29_EXTREME_REHAB')
     expect(() => computeFlipResult(lead)).not.toThrow()
     const r = computeFlipResult(lead)
     expect(r.available).toBe(true)
-    expect(r.mao).toBeLessThan(0)
+    expect(r.maoFeasible).toBe(false)
+    expect(r.mao).toBeNull() // never exposed as a negative dollar figure
   })
 
-  it('FINDING: extreme rehab (negative Max Buy) produces a NEGATIVE currentOffer and a misleadingly reassuring WATCH verdict — see RELEASE-READINESS.md Finding #2', () => {
-    // Real, reproduced behavior (not a desired one): calculateLiveOffer's
-    // cap for a negative MAO still returns a negative dollar figure, and
-    // profit computed at a negative purchase price is trivially positive
-    // in this cost model (you're not really "buying" at a negative
-    // price), so the deal reads as WATCH/"technically works" instead of
-    // clearly signaling "this deal is impossible." Documented, not fixed
-    // in this capability per the mission's explicit no-silent-fix rule
-    // for dealExplanation.js/calculations.js.
+  it('FIXED — extreme rehab (negative Max Buy) is NO DEAL with no positive profit and a clear infeasibility explanation', () => {
     const lead = getGoldenLead('G29_EXTREME_REHAB')
     const r = computeFlipResult(lead)
-    expect(r.mao).toBeLessThan(0)
-    expect(r.currentOffer).toBeLessThan(0)
-    expect(r.projectedProfit).toBeGreaterThan(0) // the misleading part
-    expect(r.verdict).toBe('WATCH') // documents actual behavior, not endorsed
+    expect(r.verdict).toBe('NO DEAL')
+    expect(r.currentOffer).toBeNull() // no valid recommended offer on an infeasible deal
+    expect(r.projectedProfit == null || r.projectedProfit <= 0).toBe(true) // never a positive profit
+    expect(r.marginOfSafety.why).toMatch(/not economically feasible/i)
+    expect(r.biggestRisk.join(' ')).toMatch(/no purchase price makes this flip work/i)
+  })
+
+  it('boundary — Max Buy exactly $0 is treated as infeasible (mao must be strictly > 0), not a valid free acquisition price', () => {
+    // Construct a lead whose renovation cost drives raw Flip MAO to
+    // exactly $0, using the same closed-form formula calculateFlipMAO
+    // itself documents (holdMonths=6, target=$30,000):
+    //   0 = (constant - reno*renoCoeff - target) / ppCoeff
+    //   reno = (constant - target) / renoCoeff
+    const arv = 200000, holdMonths = 6, target = FLIP_MIN_PROFIT_TARGET
+    const renoCoeff = 1.02 + 0.01 * holdMonths
+    const constant = arv * 0.93 - holdMonths * 308 - 2450
+    const reno = (constant - target) / renoCoeff
+    const rawMao = calculateFlipMAO(arv, reno, holdMonths)
+    expect(rawMao).toBeCloseTo(0, 6)
+
+    const lead = { arv, renovation_cost: reno, asking_price: 100000 }
+    const r = computeFlipResult(lead)
+    expect(r.maoFeasible).toBe(false) // 0 is not > 0 — boundary is strict
+    expect(r.mao).toBeNull()
+    expect(r.verdict).toBe('NO DEAL')
+    expect(r.currentOffer).toBeNull()
+    expect(r.projectedProfit == null || r.projectedProfit <= 0).toBe(true)
   })
 })
 
