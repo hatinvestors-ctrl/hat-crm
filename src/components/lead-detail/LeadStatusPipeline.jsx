@@ -81,7 +81,11 @@ export default function LeadStatusPipeline({ lead, members, userId, workspaceId,
     }
   }
 
-  const [gridOpen, setGridOpen] = useState(true)
+  // Phase 2.1, Section 4E — Overview should show "Current Stage: X [Change
+  // status]" compactly by default; the full grid (unchanged below) still
+  // opens on demand. Every status and status-changing action is preserved
+  // — only the default open/closed state changed.
+  const [gridOpen, setGridOpen] = useState(false)
 
   return (
     <div className="bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] rounded-lg px-4 py-3">

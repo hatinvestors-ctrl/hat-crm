@@ -3,7 +3,12 @@ import Card from '../ui/Card'
 import { supabase } from '../../lib/supabase'
 import { formatDateTime } from '../../lib/calculations'
 
-export default function ActivityTimeline({ leadId, refreshKey }) {
+// Phase 2.1 — `maxItems`/`title`/`emptyMessage` are additive, optional
+// props (all default to prior behavior: show everything fetched, "Activity"
+// title, "No activity yet.") so this can be reused as a compact recent-
+// activity strip (e.g. Acquisition tab) without a second fetch/render
+// implementation. No change to what's queried or how events are logged.
+export default function ActivityTimeline({ leadId, refreshKey, maxItems, title = 'Activity', emptyMessage = 'No activity recorded yet. Calls, notes, status changes and follow-ups will appear here.' }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -24,15 +29,17 @@ export default function ActivityTimeline({ leadId, refreshKey }) {
     return () => { cancelled = true }
   }, [leadId, refreshKey])
 
-  if (loading) return <Card title="Activity"><div className="text-[13px] text-[color:var(--color-text-dim)]">Loading…</div></Card>
+  if (loading) return <Card title={title}><div className="text-[13px] text-[color:var(--color-text-dim)]">Loading…</div></Card>
+
+  const visible = maxItems ? items.slice(0, maxItems) : items
 
   return (
-    <Card title="Activity">
+    <Card title={title}>
       {items.length === 0 ? (
-        <div className="text-[13px] text-[color:var(--color-text-dim)] text-center py-4">No activity yet.</div>
+        <div className="text-[13px] text-[color:var(--color-text-dim)] text-center py-4 leading-snug">{emptyMessage}</div>
       ) : (
         <ol className="relative border-l border-[color:var(--color-line)] ml-1.5 space-y-3">
-          {items.map(item => {
+          {visible.map(item => {
             const isComment = item.type === 'comment'
             const isEnrichment = item.type === 'enrichment'
             const isStatusChange = item.type === 'status_change'

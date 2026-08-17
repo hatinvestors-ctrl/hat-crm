@@ -8,7 +8,7 @@ import { useRef } from 'react'
 
 export const WORKSPACE_TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'deal',     label: 'Deal / Underwriting' },
+  { key: 'deal',     label: 'Deal' },
   { key: 'acquisition', label: 'Acquisition' },
   { key: 'ai',       label: 'AI & Comps' },
   { key: 'activity', label: 'Activity' },

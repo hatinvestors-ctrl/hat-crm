@@ -157,7 +157,7 @@ const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 // and plain-language guidance — no "pick one lever" phrasing (Section 12),
 // no lever shown unless the solver actually produced a number for it
 // (Section 14 — never fake precision).
-function BrrrrRealityCheck({ lead }) {
+export function BrrrrRealityCheck({ lead }) {
   const arv  = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : (lead.monthly_rent != null ? Number(lead.monthly_rent) : null)
@@ -238,7 +238,7 @@ function BrrrrRealityCheck({ lead }) {
 // — deliberately different questions, not duplicated (Section 8). Every
 // number here comes straight from flipResult (computeFlipResult in
 // dealExplanation.js) — no second calculation, no LLM.
-function FlipMarginOfSafety({ lead, flipResult }) {
+export function FlipMarginOfSafety({ lead, flipResult }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [testDownside, setTestDownside] = useState(false)
   const { verdict, currentOffer, mao, projectedProfit, targetProfit, marginOfSafety } = flipResult
@@ -337,7 +337,7 @@ function FlipMarginOfSafety({ lead, flipResult }) {
 // HAT's actual minimum (Section 6) — a $30,728 deal is no longer labeled
 // CONDITIONAL by a stale $40K rule; "Strong" is descriptive context, not
 // a lower verdict for the acceptable tier.
-function FlipRealityCheck({ lead }) {
+export function FlipRealityCheck({ lead }) {
   const arv  = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   if (!arv || reno == null) return null
@@ -628,7 +628,7 @@ function FullBreakdownTab({ lead, strategy }) {
   )
 }
 
-export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onStrategyChange }) {
+export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onStrategyChange, hideDecisionSummary = false }) {
   const staleness = useDealStaleness(lead)
 
   const [strategy,    setStrategy]    = useState(lead.deal_analysis?.strategy || 'flip')
@@ -1366,14 +1366,22 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         )
       })()}
 
-      {hasAnalysis && strategy !== 'brrrr' && flipResult.available && (
+      {/* Phase 2.1 — Margin of Safety and Path to a Deal now live as the
+          Deal tab's own decision summary (moved, not duplicated — same
+          exported components, same canonical data). AI & Comps keeps the
+          Detailed Analysis verdict strip above plus comps/notes/Ask AI —
+          "detailed evidence", not the decision summary itself. Guarded by
+          `hideDecisionSummary` so this card still renders them standalone
+          wherever else it might be used (e.g. if never wired into the
+          Deal tab, nothing regresses — default is to show, same as before). */}
+      {!hideDecisionSummary && hasAnalysis && strategy !== 'brrrr' && flipResult.available && (
         <FlipMarginOfSafety lead={lead} flipResult={flipResult} />
       )}
 
-      {hasAnalysis && strategy === 'brrrr' && (
+      {!hideDecisionSummary && hasAnalysis && strategy === 'brrrr' && (
         <BrrrrRealityCheck lead={lead} />
       )}
-      {hasAnalysis && strategy !== 'brrrr' && (
+      {!hideDecisionSummary && hasAnalysis && strategy !== 'brrrr' && (
         <FlipRealityCheck lead={lead} />
       )}
 

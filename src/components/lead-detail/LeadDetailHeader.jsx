@@ -30,49 +30,47 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
     if (data) onUpdated?.(data)
   }
 
+  // Phase 2.1 — property identity (address/city/state/zip) used to render
+  // here AND again in LeadWorkspaceHeader immediately below it (human
+  // review flagged this as the redesign's most visible "layered on top of
+  // the old page" tell). LeadWorkspaceHeader is now the ONE place identity
+  // lives; this bar keeps only what it uniquely owns — hot toggle,
+  // assignment, timestamps, Zillow, Edit/Create Project — as a slim
+  // secondary meta row directly under it.
   return (
-    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 pb-4 border-b border-[color:var(--color-line)]">
-      <div className="min-w-0 flex items-start gap-3">
-        {/* HOT indicator dot — visible to readonly too */}
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 pb-2.5 border-b border-[color:var(--color-line)]">
+      <div className="min-w-0 flex items-center gap-3 flex-wrap">
         {lead.is_hot && (
           <span
-            className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[oklch(0.5_0.22_25)] text-white shadow-[0_0_16px_oklch(0.65_0.22_25/0.6)]"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider bg-[oklch(0.5_0.22_25)] text-white shadow-[0_0_12px_oklch(0.65_0.22_25/0.5)]"
             title="This is a hot lead"
           >
             🔥 Hot
           </span>
         )}
-        <div className="min-w-0">
-          <h1 className="text-[20px] font-semibold text-[color:var(--color-text)] tracking-tight">
-            {lead.address}
-          </h1>
-          <div className="text-[12.5px] text-[color:var(--color-text-muted)] mt-0.5">
-            {[lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')}
-          </div>
-          <div className="text-[11px] text-[color:var(--color-text-dim)] mt-2 flex gap-3 flex-wrap">
-            <span className="flex items-center gap-1">
-              Assigned ·
-              {canAssign ? (
-                <select
-                  value={assigneeValue}
-                  onChange={handleAssigneeChange}
-                  className="bg-transparent border-none text-[color:var(--color-text-muted)] text-[11px] cursor-pointer focus:outline-none hover:text-[color:var(--color-text)] -ml-0.5"
-                >
-                  <option value="">Unassigned</option>
-                  <option value="__all__">🌐 All Members</option>
-                  {members.map(m => (
-                    <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-[color:var(--color-text-muted)]">
-                  {lead.visible_to_all ? '🌐 All Members' : assignee?.full_name || 'Unassigned'}
-                </span>
-              )}
-            </span>
-            <span>Created · {formatDateTime(lead.created_at)}</span>
-            <span>Updated · {formatDateTime(lead.updated_at)}</span>
-          </div>
+        <div className="text-[11px] text-[color:var(--color-text-dim)] flex gap-3 flex-wrap">
+          <span className="flex items-center gap-1">
+            Assigned ·
+            {canAssign ? (
+              <select
+                value={assigneeValue}
+                onChange={handleAssigneeChange}
+                className="bg-transparent border-none text-[color:var(--color-text-muted)] text-[11px] cursor-pointer focus:outline-none hover:text-[color:var(--color-text)] -ml-0.5"
+              >
+                <option value="">Unassigned</option>
+                <option value="__all__">🌐 All Members</option>
+                {members.map(m => (
+                  <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Member'}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[color:var(--color-text-muted)]">
+                {lead.visible_to_all ? '🌐 All Members' : assignee?.full_name || 'Unassigned'}
+              </span>
+            )}
+          </span>
+          <span>Created · {formatDateTime(lead.created_at)}</span>
+          <span>Updated · {formatDateTime(lead.updated_at)}</span>
         </div>
       </div>
 

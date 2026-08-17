@@ -4,7 +4,11 @@ import Input from '../ui/Input'
 import Button from '../ui/Button'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 
-const PLAYBOOKS = {
+// Phase 2.1 — exported (additive only, no behavior change) so Overview's
+// "What Now" summary and Acquisition's "Next Move" can read the SAME
+// per-status hint/actions this component already renders, instead of a
+// second copy (mission Section 14 — no duplicated business logic).
+export const PLAYBOOKS = {
   triage: {
     hint: 'Auto-imported lead — decide whether to bring it into the pipeline.',
     actions: [
@@ -105,7 +109,7 @@ const PLAYBOOKS = {
   },
 }
 
-const DEFAULT_PLAYBOOK = {
+export const DEFAULT_PLAYBOOK = {
   hint: 'Use the status grid below to move this lead forward.',
   actions: [
     { label: 'Schedule Follow-Up', emoji: '📅', variant: 'secondary', patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
@@ -173,7 +177,7 @@ function smartActions(lead, staticActions) {
   return staticActions
 }
 
-function smartHint(lead, staticHint) {
+export function smartHint(lead, staticHint) {
   if (lead.status !== 'new_lead') return staticHint
   const hasArv      = !!lead.arv
   const hasReno     = !!lead.renovation_cost

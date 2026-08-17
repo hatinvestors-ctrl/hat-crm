@@ -7,8 +7,6 @@ import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
 import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard'
-import ContactInfoSection from '../components/lead-detail/ContactInfoSection'
-import ListingAgentCard from '../components/lead-detail/ListingAgentCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import DistressBanner from '../components/lead-detail/DistressBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
@@ -30,6 +28,10 @@ import { getMarketType } from '../lib/sellerStrategy'
 import LeadWorkspaceHeader from '../components/lead-detail/workspace/LeadWorkspaceHeader'
 import LeadWorkspaceTabs from '../components/lead-detail/workspace/LeadWorkspaceTabs'
 import SellerSnapshotStrip from '../components/lead-detail/workspace/SellerSnapshotStrip'
+import DealSnapshotCompact from '../components/lead-detail/workspace/DealSnapshotCompact'
+import TriageOverviewBanner from '../components/lead-detail/workspace/TriageOverviewBanner'
+import DealDecisionCenter from '../components/lead-detail/workspace/DealDecisionCenter'
+import OnMarketAcquisitionWorkspace from '../components/lead-detail/workspace/OnMarketAcquisitionWorkspace'
 
 // Lead Workspace redesign, Phase 2 — SAME ENGINE, SAME COMPONENTS, BETTER
 // WORKSPACE (mission Section 3). Every child component below still
@@ -190,16 +192,19 @@ export default function LeadDetailPage() {
       <div className="px-6 py-4 flex-1 max-w-[1400px] w-full">
         <LeadWorkspaceTabs active={activeTab} onChange={setActiveTab} />
 
-        {/* ══════════════ OVERVIEW — "Should I pursue this, and what now?" ══════════════ */}
+        {/* ══════════════ OVERVIEW — "Should I pursue this, and what now?"
+            Phase 2.1 hierarchy: exceptions → decision (AcquisitionCopilot,
+            already the one dominant decision surface — not duplicated
+            here) → what now (ActionZone) → deal snapshot → seller snapshot
+            (off-market) → compact status. A user should understand the
+            lead within ~5 seconds without scrolling past all of this. ══ */}
         <div id="workspace-panel-overview" role="tabpanel" aria-labelledby="workspace-tab-overview" hidden={activeTab !== 'overview'} className="space-y-4">
           <DistressBanner lead={lead} />
           <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
-          <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
+          {lead.status === 'triage' && <TriageOverviewBanner lead={lead} />}
 
-          {isOffMarket && (
-            <SellerSnapshotStrip lead={lead} onOpenFull={() => setActiveTab('acquisition')} />
-          )}
+          <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 
           <ActionZone
             lead={lead}
@@ -209,9 +214,18 @@ export default function LeadDetailPage() {
             onUpdated={onLeadUpdated}
           />
 
-          {/* LeadStatusPipeline already defaults to its own collapsed
-              (gridOpen=false) state — kept, not rebuilt, so it stays
-              available without dominating Overview. */}
+          {lead.status !== 'triage' && (
+            <DealSnapshotCompact lead={lead} onOpenDeal={() => setActiveTab('deal')} />
+          )}
+
+          {isOffMarket && (
+            <SellerSnapshotStrip lead={lead} onOpenFull={() => setActiveTab('acquisition')} />
+          )}
+
+          {/* LeadStatusPipeline now defaults to its own collapsed
+              (gridOpen=false) state (Phase 2.1) — "Current Stage: X
+              [Change status]" compactly, full grid still opens on demand,
+              every status/action preserved. */}
           <LeadStatusPipeline
             lead={lead}
             members={members}
@@ -222,41 +236,50 @@ export default function LeadDetailPage() {
           />
         </div>
 
-        {/* ══════════════ DEAL / UNDERWRITING — "Do the economics work?" ══════════════
-            Scope decision (Phase 1 Section 15 / Phase 2 Section 15): DealAnalysisCard
-            mixes deterministic economics with AI evidence/comps in one
-            1,483-line component that we are explicitly NOT splitting or
-            duplicating in this phase. It is mounted ONCE, in the AI & Comps
-            tab (below), since it also owns Run/Refresh Analysis. This tab
-            covers underwriting via FinancialSection, which already surfaces
-            the canonical Flip/BRRRR MAO, Price Cushion equivalent ("Gap"),
-            and profit/cash-flow-at-MAO figures — the "important economics on
-            first screen" mission requirement — with a link to the full
-            Detailed Analysis / Margin of Safety / Path to Deal breakdown in
-            AI & Comps for anyone who wants the full picture. */}
+        {/* ══════════════ DEAL — "Do the economics work and what can we pay?"
+            Phase 2.1, Section 6: ANSWER FIRST (DealDecisionCenter — decision
+            strip, Flip/BRRRR comparison, recommended strategy, Margin of
+            Safety, Path to a Deal, all reusing computeFlipResult/
+            computeBrrrrResult/computeStrategyRecommendation), INPUTS SECOND
+            (PropertyInfoSection/FinancialSection, unchanged), details last
+            (link to AI & Comps for Full Breakdown/comps/notes). Margin of
+            Safety and Path to a Deal are MOVED here from DealAnalysisCard,
+            not duplicated (hideDecisionSummary below). ══════════════ */}
         <div id="workspace-panel-deal" role="tabpanel" aria-labelledby="workspace-tab-deal" hidden={activeTab !== 'deal'} className="space-y-4">
-          <PropertyInfoSection
-            lead={lead}
-            userId={user.id}
-            members={members}
-            canEdit={canEdit}
-            onUpdated={onLeadUpdated}
-          />
-          <FinancialSection
-            lead={lead}
-            userId={user.id}
-            members={members}
-            canEdit={canEdit}
-            strategy={dealStrategy}
-            onUpdated={onLeadUpdated}
-          />
+          <div className="-mt-1 mb-1">
+            <div className="text-[11px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Deal Economics &amp; Underwriting</div>
+          </div>
+
+          <DealDecisionCenter lead={lead} />
+
+          <div className="pt-2">
+            <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Property &amp; Assumptions</div>
+            <div className="space-y-4">
+              <PropertyInfoSection
+                lead={lead}
+                userId={user.id}
+                members={members}
+                canEdit={canEdit}
+                onUpdated={onLeadUpdated}
+              />
+              <FinancialSection
+                lead={lead}
+                userId={user.id}
+                members={members}
+                canEdit={canEdit}
+                strategy={dealStrategy}
+                onUpdated={onLeadUpdated}
+              />
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => setActiveTab('ai')}
             className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] hover:border-[color:var(--color-accent)] transition-colors"
           >
             <span className="text-[12.5px] font-medium text-[color:var(--color-text)]">
-              Margin of Safety, Path to a Deal, and Full Breakdown — see AI &amp; Comps
+              Full Breakdown, comps, and detailed AI analysis — see AI &amp; Comps
             </span>
             <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)] shrink-0">Open →</span>
           </button>
@@ -282,7 +305,11 @@ export default function LeadDetailPage() {
           </a>
         </div>
 
-        {/* ══════════════ ACQUISITION — market-type-aware, "how do I move this deal?" ══════════════ */}
+        {/* ══════════════ ACQUISITION — market-type-aware execution workspace.
+            Phase 2.1, Section 7: on-market gets a real negotiation
+            workspace (OnMarketAcquisitionWorkspace) instead of "mostly a
+            Contact tab"; off-market keeps the existing, deliberately
+            different OffMarketSellerStrategy untouched. ══════════════ */}
         <div id="workspace-panel-acquisition" role="tabpanel" aria-labelledby="workspace-tab-acquisition" hidden={activeTab !== 'acquisition'} className="space-y-4">
           {isOffMarket ? (
             <OffMarketSellerStrategy
@@ -294,20 +321,22 @@ export default function LeadDetailPage() {
               onOpenLiveCopilot={() => setLiveCopilotOpen(true)}
             />
           ) : (
-            <>
-              <ContactInfoSection
-                lead={lead}
-                userId={user.id}
-                members={members}
-                canEdit={canEdit}
-                onUpdated={onLeadUpdated}
-              />
-              <ListingAgentCard lead={lead} />
-            </>
+            <OnMarketAcquisitionWorkspace
+              lead={lead}
+              userId={user.id}
+              members={members}
+              canEdit={canEdit}
+              onUpdated={onLeadUpdated}
+              onOpenActivity={() => setActiveTab('activity')}
+            />
           )}
         </div>
 
-        {/* ══════════════ AI & COMPS — "what evidence supports the decision?" ══════════════ */}
+        {/* ══════════════ AI & COMPS — "what evidence supports the decision?"
+            hideDecisionSummary=true: Margin of Safety / Path to a Deal now
+            live in Deal (moved, not duplicated) — this tab keeps the AI
+            Conclusion (Detailed Analysis verdict strip), comps, Full
+            Breakdown, notes, and Ask AI as the deeper evidence layer. ══ */}
         <div id="workspace-panel-ai" role="tabpanel" aria-labelledby="workspace-tab-ai" hidden={activeTab !== 'ai'} className="space-y-4">
           <DealAnalysisCard
             lead={lead}
@@ -315,18 +344,16 @@ export default function LeadDetailPage() {
             canEdit={canEdit}
             onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
             onStrategyChange={setDealStrategy}
+            hideDecisionSummary
           />
           <ReportSection lead={lead} />
         </div>
 
-        {/* ══════════════ ACTIVITY — "what has happened with this lead?" ══════════════ */}
+        {/* ══════════════ ACTIVITY — "what has happened with this lead?"
+            Timeline is the primary content; Notes/Comments/Attachments are
+            the secondary work area around it. ══════════════ */}
         <div id="workspace-panel-activity" role="tabpanel" aria-labelledby="workspace-tab-activity" hidden={activeTab !== 'activity'} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <NotesSection
-              lead={lead}
-              canEdit={canEdit}
-              onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
-            />
             <ActivityTimeline leadId={lead.id} refreshKey={activityRefresh} />
           </div>
           <div className="space-y-4">
@@ -338,6 +365,11 @@ export default function LeadDetailPage() {
                 onPosted={() => setActivityRefresh(v => v + 1)}
               />
             )}
+            <NotesSection
+              lead={lead}
+              canEdit={canEdit}
+              onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
+            />
             <AttachmentsSection leadId={lead.id} userId={user.id} canEdit={canEdit} />
           </div>
         </div>
