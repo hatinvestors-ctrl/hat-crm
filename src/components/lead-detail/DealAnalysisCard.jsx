@@ -145,7 +145,7 @@ const VERDICT_THEME = {
 // (AI-generated, different vocabulary, used by ActionZone.jsx/
 // NotesRenderer.jsx/QuickAnalysisModal.jsx) is a different field and is not
 // touched.
-const VERDICT_DISPLAY_LABEL = { STRONG: 'STRONG', PASS: 'SOLID', WATCH: 'WATCH', 'NO DEAL': 'NO DEAL' }
+export const VERDICT_DISPLAY_LABEL = { STRONG: 'STRONG', PASS: 'SOLID', WATCH: 'WATCH', 'NO DEAL': 'NO DEAL' }
 const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 
 // Explains a BRRRR verdict in plain terms and shows exactly what would need to

@@ -11,14 +11,15 @@ import { PLAYBOOKS, DEFAULT_PLAYBOOK, smartHint } from '../ActionZone'
 import ListingAgentCard from '../ListingAgentCard'
 import ContactInfoSection from '../ContactInfoSection'
 import ActivityTimeline from '../ActivityTimeline'
+import EmptyState from './EmptyState'
+import { getAcquisitionReadiness } from './readiness'
 
 export default function OnMarketAcquisitionWorkspace({ lead, userId, members, canEdit, onUpdated, onOpenActivity }) {
   const flip = computeFlipResult(lead)
   const brrrr = computeBrrrrResult(lead)
   const playbook = PLAYBOOKS[lead.status] || DEFAULT_PLAYBOOK
   const nextMove = smartHint(lead, playbook.hint)
-  const hasAgent = !!(lead.listing_agent_name || lead.listing_agent_phone || lead.listing_agent_email || lead.listing_brokerage)
-  const hasContact = !!(lead.owner_name || lead.phone || lead.email)
+  const { hasAgent, hasContact } = getAcquisitionReadiness(lead)
   const questions = lead.deal_brief?.questions?.slice(0, 4) || []
 
   return (
@@ -68,18 +69,14 @@ export default function OnMarketAcquisitionWorkspace({ lead, userId, members, ca
       {hasAgent ? (
         <ListingAgentCard lead={lead} />
       ) : (
-        <div className="rounded-lg border border-dashed border-[color:var(--color-line)] px-4 py-3 text-[12px] text-[color:var(--color-text-dim)]">
-          No listing agent recorded yet.
-        </div>
+        <EmptyState title="Agent Not Captured" explanation="Add listing-agent details when available." />
       )}
 
       {/* E — Contact + communication actions (unchanged) */}
       {hasContact ? (
         <ContactInfoSection lead={lead} userId={userId} members={members} canEdit={canEdit} onUpdated={onUpdated} />
       ) : (
-        <div className="rounded-lg border border-dashed border-[color:var(--color-line)] px-4 py-3 text-[12px] text-[color:var(--color-text-dim)]">
-          No agent contact recorded yet.
-        </div>
+        <EmptyState title="Contact Not Captured" explanation="Add owner/seller contact details when available." />
       )}
 
       {/* F — Recent negotiation/offer history — reuses ActivityTimeline's

@@ -29,9 +29,9 @@ import LeadWorkspaceHeader from '../components/lead-detail/workspace/LeadWorkspa
 import LeadWorkspaceTabs from '../components/lead-detail/workspace/LeadWorkspaceTabs'
 import SellerSnapshotStrip from '../components/lead-detail/workspace/SellerSnapshotStrip'
 import DealSnapshotCompact from '../components/lead-detail/workspace/DealSnapshotCompact'
-import TriageOverviewBanner from '../components/lead-detail/workspace/TriageOverviewBanner'
 import DealDecisionCenter from '../components/lead-detail/workspace/DealDecisionCenter'
 import OnMarketAcquisitionWorkspace from '../components/lead-detail/workspace/OnMarketAcquisitionWorkspace'
+import { getDealReadiness, getAcquisitionReadiness, getAiReadiness } from '../components/lead-detail/workspace/readiness'
 
 // Lead Workspace redesign, Phase 2 — SAME ENGINE, SAME COMPONENTS, BETTER
 // WORKSPACE (mission Section 3). Every child component below still
@@ -68,6 +68,11 @@ export default function LeadDetailPage() {
   // switch, exactly per the Phase 1 audit's highest-priority finding.
   const [liveCopilotOpen, setLiveCopilotOpen] = useState(false)
   const [logOutcomeOpen, setLogOutcomeOpen] = useState(false)
+  // Final UX Polish, Section 3 — tab readiness labels are DATA-AWARE, not
+  // status-dependent; activityCount is the only one that needs a value
+  // from a child (ActivityTimeline already fetches it, this just surfaces
+  // the count via an additive callback prop — no second query).
+  const [activityCount, setActivityCount] = useState(null)
 
   const handleCreateProject = async () => {
     setCreatingProject(true)
@@ -150,6 +155,18 @@ export default function LeadDetailPage() {
   const isOffMarket = getMarketType(lead) === 'OFF_MARKET'
   const onLeadUpdated = (updated) => { setLead(prev => ({ ...prev, ...updated })); setActivityRefresh(v => v + 1) }
 
+  // Final UX Polish, Section 3 — subtle tab subtitles, purely derived from
+  // data already on the lead (never from lead.status).
+  const dealReadiness = getDealReadiness(lead)
+  const acqReadiness = getAcquisitionReadiness(lead)
+  const aiReadiness = getAiReadiness(lead)
+  const tabReadiness = {
+    deal: dealReadiness.flipReady ? 'Ready' : 'Needs ' + (dealReadiness.missing[0]?.label || 'Info'),
+    acquisition: isOffMarket ? undefined : (acqReadiness.ready ? undefined : 'No Agent'),
+    ai: aiReadiness.hasRun ? undefined : 'Not Run',
+    activity: activityCount != null ? String(activityCount) : undefined,
+  }
+
   return (
     <>
       <Topbar
@@ -185,12 +202,11 @@ export default function LeadDetailPage() {
           dealStrategy={dealStrategy}
           onLogOutcome={() => setLogOutcomeOpen(true)}
           onOpenLiveCopilot={() => setLiveCopilotOpen(true)}
-          onScheduleFollowUp={() => setActiveTab('overview')}
         />
       </div>
 
       <div className="px-6 py-4 flex-1 max-w-[1400px] w-full">
-        <LeadWorkspaceTabs active={activeTab} onChange={setActiveTab} />
+        <LeadWorkspaceTabs active={activeTab} onChange={setActiveTab} readiness={tabReadiness} />
 
         {/* ══════════════ OVERVIEW — "Should I pursue this, and what now?"
             Phase 2.1 hierarchy: exceptions → decision (AcquisitionCopilot,
@@ -202,8 +218,6 @@ export default function LeadDetailPage() {
           <DistressBanner lead={lead} />
           <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
-          {lead.status === 'triage' && <TriageOverviewBanner lead={lead} />}
-
           <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 
           <ActionZone
@@ -214,9 +228,11 @@ export default function LeadDetailPage() {
             onUpdated={onLeadUpdated}
           />
 
-          {lead.status !== 'triage' && (
-            <DealSnapshotCompact lead={lead} onOpenDeal={() => setActiveTab('deal')} />
-          )}
+          {/* DATA-AWARE, not status-dependent (Final UX Polish mandate) —
+              DealSnapshotCompact always renders the same way for every
+              lead, adapting to what data exists rather than branching on
+              lead.status/'triage'. */}
+          <DealSnapshotCompact lead={lead} onOpenDeal={() => setActiveTab('deal')} />
 
           {isOffMarket && (
             <SellerSnapshotStrip lead={lead} onOpenFull={() => setActiveTab('acquisition')} />
@@ -250,7 +266,7 @@ export default function LeadDetailPage() {
             <div className="text-[11px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Deal Economics &amp; Underwriting</div>
           </div>
 
-          <DealDecisionCenter lead={lead} />
+          <DealDecisionCenter lead={lead} onRunAnalysis={() => setActiveTab('ai')} />
 
           <div className="pt-2">
             <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Property &amp; Assumptions</div>
@@ -354,7 +370,7 @@ export default function LeadDetailPage() {
             the secondary work area around it. ══════════════ */}
         <div id="workspace-panel-activity" role="tabpanel" aria-labelledby="workspace-tab-activity" hidden={activeTab !== 'activity'} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <ActivityTimeline leadId={lead.id} refreshKey={activityRefresh} />
+            <ActivityTimeline leadId={lead.id} refreshKey={activityRefresh} onCountLoaded={setActivityCount} />
           </div>
           <div className="space-y-4">
             {canEdit && (

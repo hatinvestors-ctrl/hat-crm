@@ -33,7 +33,14 @@ function Chip({ label, value, tone }) {
   )
 }
 
-export default function LeadWorkspaceHeader({ lead, dealStrategy, onLogOutcome, onOpenLiveCopilot, onScheduleFollowUp }) {
+// Final UX Polish, Section 2 — was 3 competing quick actions (Live
+// Copilot/Schedule Follow-Up/Log Outcome). Schedule Follow-Up is dropped
+// here: Overview's own "What Now" (ActionZone) already surfaces a
+// scheduling action contextually, and Log Outcome's own flow already asks
+// for a follow-up date for most outcomes — keeping it here too was a third
+// near-identical entry point. Down to 1-2 primary actions: Live Copilot
+// (off-market only) + Log Outcome (always).
+export default function LeadWorkspaceHeader({ lead, dealStrategy, onLogOutcome, onOpenLiveCopilot }) {
   const d = lead.decision_v2
   const theme = d ? (REC_THEME[d.recommendation] || REC_THEME.MONITOR) : REC_THEME.MONITOR
   const marketType = getMarketType(lead)
@@ -107,10 +114,6 @@ export default function LeadWorkspaceHeader({ lead, dealStrategy, onLogOutcome, 
               🎙 Live Copilot
             </button>
           )}
-          <button type="button" onClick={onScheduleFollowUp}
-            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">
-            Schedule Follow-Up
-          </button>
           <button type="button" onClick={onLogOutcome}
             className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]">
             Log Outcome

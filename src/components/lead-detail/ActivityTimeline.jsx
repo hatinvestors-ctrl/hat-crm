@@ -8,7 +8,10 @@ import { formatDateTime } from '../../lib/calculations'
 // title, "No activity yet.") so this can be reused as a compact recent-
 // activity strip (e.g. Acquisition tab) without a second fetch/render
 // implementation. No change to what's queried or how events are logged.
-export default function ActivityTimeline({ leadId, refreshKey, maxItems, title = 'Activity', emptyMessage = 'No activity recorded yet. Calls, notes, status changes and follow-ups will appear here.' }) {
+// Final UX Polish — `onCountLoaded` is an additive, optional callback
+// (fires with items.length once loaded) so the Activity tab label can show
+// "Activity · 12" without a second query; unused callers are unaffected.
+export default function ActivityTimeline({ leadId, refreshKey, maxItems, title = 'Activity', emptyMessage = 'No activity recorded yet. Calls, notes, status changes and follow-ups will appear here.', onCountLoaded }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -23,7 +26,7 @@ export default function ActivityTimeline({ leadId, refreshKey, maxItems, title =
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false })
         .limit(100)
-      if (!cancelled) { setItems(data || []); setLoading(false) }
+      if (!cancelled) { setItems(data || []); setLoading(false); onCountLoaded?.((data || []).length) }
     }
     load()
     return () => { cancelled = true }

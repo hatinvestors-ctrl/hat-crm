@@ -14,7 +14,11 @@ export const WORKSPACE_TABS = [
   { key: 'activity', label: 'Activity' },
 ]
 
-export default function LeadWorkspaceTabs({ active, onChange }) {
+// Final UX Polish, Section 3 — `readiness` is an optional { [tabKey]:
+// string } map of subtle subtitles derived from data already on the lead
+// (e.g. "Needs ARV", "No Agent", "Not Run", a count). Purely presentational
+// — no readiness value is computed here, only rendered.
+export default function LeadWorkspaceTabs({ active, onChange, readiness = {} }) {
   const btnRefs = useRef([])
 
   function onKeyDown(e, idx) {
@@ -39,12 +43,15 @@ export default function LeadWorkspaceTabs({ active, onChange }) {
           tabIndex={active === t.key ? 0 : -1}
           onKeyDown={(e) => onKeyDown(e, idx)}
           onClick={() => onChange(t.key)}
-          className="shrink-0 text-[12.5px] font-semibold px-3 py-2 border-b-2 -mb-px transition-colors whitespace-nowrap"
+          className="shrink-0 text-[12.5px] font-semibold px-3 py-2 border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5"
           style={active === t.key
             ? { borderColor: 'var(--color-accent)', color: 'var(--color-accent-text)' }
             : { borderColor: 'transparent', color: 'var(--color-text-dim)' }}
         >
           {t.label}
+          {readiness[t.key] && (
+            <span className="text-[9.5px] font-normal normal-case opacity-60">· {readiness[t.key]}</span>
+          )}
         </button>
       ))}
     </div>
