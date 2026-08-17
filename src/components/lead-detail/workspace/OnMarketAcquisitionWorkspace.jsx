@@ -49,14 +49,22 @@ export default function OnMarketAcquisitionWorkspace({ lead, userId, members, ca
             <div className="text-[13px] font-bold">{flip.available && flip.currentOffer != null ? fc(flip.currentOffer) : 'Not available'}</div>
           </div>
           <div>
-            <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
+            <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Max Buy (Flip)</div>
             <div className="text-[13px] font-bold" style={{ color: 'var(--color-accent-text)' }}>{flip.available ? fc(Math.round(flip.mao / 100) * 100) : 'Not available'}</div>
           </div>
           <div>
-            <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">BRRRR MAO</div>
+            <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Max Buy (BRRRR)</div>
             <div className="text-[13px] font-bold" style={{ color: 'var(--color-accent-text)' }}>{brrrr.available ? fc(Math.round(brrrr.mao / 100) * 100) : 'Not available'}</div>
           </div>
         </div>
+        {/* Part 12 — one-line interpretation, existing values only. Only
+            shown when the gap is genuinely large (>15% of asking price)
+            so it doesn't state the obvious on a near-MAO offer. */}
+        {lead.asking_price != null && flip.available && (lead.asking_price - flip.mao) > lead.asking_price * 0.15 && (
+          <p className="text-[11px] text-[color:var(--color-warn-text)] mt-2.5">
+            Seller is asking {fc(lead.asking_price)} while HAT's Max Buy is {fc(Math.round(flip.mao / 100) * 100)} — a major price reduction would be required.
+          </p>
+        )}
       </div>
 
       {/* 3 — Questions/Talking Points, only if an AI Deal Brief already generated them */}

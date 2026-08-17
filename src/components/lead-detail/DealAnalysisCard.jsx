@@ -656,6 +656,12 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   const [showRenoPicker, setShowRenoPicker] = useState(false)
   const [generatingScripts, setGeneratingScripts] = useState(false)
   const [competitiveMode, setCompetitiveMode] = useState(false)
+  // Last-Mile UX — Override Inputs are power-user controls; collapsed by
+  // default and moved below the AI narrative (Section 9) so they never
+  // interrupt the executive reading path (AI Deal Read -> AI's own
+  // Recommended Action/comps/etc). No analysis behavior changed — only
+  // where/how the same controls are shown.
+  const [overrideOpen, setOverrideOpen] = useState(false)
   const [aiCompsArv, setAiCompsArv] = useState(null)
   const [lastArv,  setLastArv]  = useState(lead.arv ? Number(lead.arv) : null)
   const [lastReno, setLastReno] = useState(lead.renovation_cost ? Number(lead.renovation_cost) : null)
@@ -1411,61 +1417,6 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         <FlipRealityCheck lead={lead} />
       )}
 
-      {/* Override inputs — shown after analysis is available */}
-      {localNotes && !generating && (
-        <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-semibold mb-2">
-            Override Inputs → Re-run Analysis
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Price Drop %</label>
-              <input
-                value={priceDropOverride}
-                onChange={e => setPriceDropOverride(e.target.value)}
-                placeholder="e.g. 18"
-                className="w-20 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 flex-1 min-w-[180px]">
-              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Seller Notes</label>
-              <input
-                value={sellerNotesOverride}
-                onChange={e => setSellerNotesOverride(e.target.value)}
-                placeholder="Estate sale, as-is, motivated, quick close…"
-                className="w-full h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
-              />
-            </div>
-            {/* Competitive Mode toggle */}
-            <div className="flex flex-col gap-0.5 mt-3.5 min-w-[160px]">
-              <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Mode</label>
-              <button
-                onClick={() => setCompetitiveMode(m => !m)}
-                className="h-7 px-2.5 rounded border text-[11px] font-semibold transition-all flex items-center gap-1.5"
-                style={competitiveMode
-                  ? { background: 'var(--color-warn-soft)', borderColor: 'var(--color-warn)', color: 'var(--color-warn-text)' }
-                  : { background: 'var(--color-bg)', borderColor: 'var(--color-line)', color: 'var(--color-text-muted)' }
-                }
-                title="Competitive Mode: anchor closer to asking price to win the contract. Negotiate further during inspection."
-              >
-                <span>{competitiveMode ? '🔥' : '⚡'}</span>
-                {competitiveMode ? 'Competitive ON' : 'Competitive OFF'}
-              </button>
-            </div>
-            {(overrideChanged || competitiveMode) && (
-              <div className="flex flex-col gap-0.5 mt-3.5">
-                <button
-                  onClick={reRunWithOverrides}
-                  className="h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity"
-                >
-                  ↻ Re-run Analysis
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {updatingNego && (
         <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)] text-[11.5px] text-[color:var(--color-warn-text)]">
           <svg className="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">
@@ -1473,6 +1424,16 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
           </svg>
           Updating negotiation plan with new numbers…
+        </div>
+      )}
+
+      {/* Last-Mile UX — a small connecting label so the AI-generated
+          narrative below reads as the NEXT LAYER of the same explanation
+          (deeper AI read on comps/seller signals/market), not a second
+          competing verdict next to the deterministic AI Deal Read above. */}
+      {localNotes && (
+        <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5 mt-1">
+          AI Narrative &amp; Evidence
         </div>
       )}
 
@@ -1510,6 +1471,70 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <p className="text-[13px] text-[color:var(--color-text-dim)]">No AI analysis yet.</p>
           {canEdit && <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Run Analysis</strong> above.</p>}
+        </div>
+      )}
+
+      {/* Override Inputs — moved below the full AI narrative (was
+          previously sandwiched between AI Deal Read and the AI's own
+          Recommended Action/comps, interrupting the executive reading
+          path). Collapsed by default; same controls, same
+          reRunWithOverrides() behavior, zero analysis change. */}
+      {localNotes && !generating && (
+        <div className="mt-3 pt-3 border-t border-[color:var(--color-line)]">
+          <button type="button" onClick={() => setOverrideOpen(o => !o)}
+            className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">
+            {overrideOpen ? '▾' : '▸'} Adjust Analysis
+          </button>
+          {overrideOpen && (
+            <div className="mt-2 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Price Drop %</label>
+                  <input
+                    value={priceDropOverride}
+                    onChange={e => setPriceDropOverride(e.target.value)}
+                    placeholder="e.g. 18"
+                    className="w-20 h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 flex-1 min-w-[180px]">
+                  <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Seller Notes</label>
+                  <input
+                    value={sellerNotesOverride}
+                    onChange={e => setSellerNotesOverride(e.target.value)}
+                    placeholder="Estate sale, as-is, motivated, quick close…"
+                    className="w-full h-7 px-2 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg)] text-[11.5px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+                  />
+                </div>
+                {/* Competitive Mode toggle */}
+                <div className="flex flex-col gap-0.5 mt-3.5 min-w-[160px]">
+                  <label className="text-[9.5px] text-[color:var(--color-text-dim)] uppercase tracking-wider">Mode</label>
+                  <button
+                    onClick={() => setCompetitiveMode(m => !m)}
+                    className="h-7 px-2.5 rounded border text-[11px] font-semibold transition-all flex items-center gap-1.5"
+                    style={competitiveMode
+                      ? { background: 'var(--color-warn-soft)', borderColor: 'var(--color-warn)', color: 'var(--color-warn-text)' }
+                      : { background: 'var(--color-bg)', borderColor: 'var(--color-line)', color: 'var(--color-text-muted)' }
+                    }
+                    title="Competitive Mode: anchor closer to asking price to win the contract. Negotiate further during inspection."
+                  >
+                    <span>{competitiveMode ? '🔥' : '⚡'}</span>
+                    {competitiveMode ? 'Competitive ON' : 'Competitive OFF'}
+                  </button>
+                </div>
+                {(overrideChanged || competitiveMode) && (
+                  <div className="flex flex-col gap-0.5 mt-3.5">
+                    <button
+                      onClick={reRunWithOverrides}
+                      className="h-7 px-3 rounded text-[11.5px] font-semibold bg-[color:var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+                    >
+                      ↻ Re-run Analysis
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>

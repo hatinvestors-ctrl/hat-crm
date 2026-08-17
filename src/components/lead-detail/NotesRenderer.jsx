@@ -163,7 +163,11 @@ function DealScoreSection({ body }) {
     'Data Quality':   { icon: '📋', hint: 'How complete our info is — ARV, reno cost, rent estimate. Low score = re-run after getting better numbers' },
   }
 
-  const [showBreakdown, setShowBreakdown] = useState(true)
+  // Last-Mile UX — Level 3 supporting evidence, collapsed by default so
+  // the executive conclusion (RecommendedActionSection's verdict + "What
+  // this means," rendered above this section) is what Kevin reads first,
+  // not a 6-row score breakdown. Same data, same toggle, just starts closed.
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   return (
     <div className="space-y-3">
