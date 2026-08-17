@@ -29,6 +29,7 @@ import LeadWorkspaceHeader from '../components/lead-detail/workspace/LeadWorkspa
 import LeadWorkspaceTabs from '../components/lead-detail/workspace/LeadWorkspaceTabs'
 import SellerSnapshotStrip from '../components/lead-detail/workspace/SellerSnapshotStrip'
 import DealSnapshotCompact from '../components/lead-detail/workspace/DealSnapshotCompact'
+import DecisionHero from '../components/lead-detail/workspace/DecisionHero'
 import DealDecisionCenter from '../components/lead-detail/workspace/DealDecisionCenter'
 import OnMarketAcquisitionWorkspace from '../components/lead-detail/workspace/OnMarketAcquisitionWorkspace'
 import { getDealReadiness, getAcquisitionReadiness, getAiReadiness } from '../components/lead-detail/workspace/readiness'
@@ -179,10 +180,18 @@ export default function LeadDetailPage() {
         actions={canDelete && <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>}
       />
 
+      {/* HAT Premium Visual Pass, Part 3 — brand identity, sparingly: one
+          small descriptor line, not a logo (none exists in the project —
+          per the mission's own instruction, none is invented), not
+          repeated anywhere else on the page. */}
+      <div className="px-6 pt-3 text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">
+        HAT Investors · Acquisition Intelligence
+      </div>
+
       {/* LeadDetailHeader kept exactly as-is (identity + Edit/Delete/Create
           Project) — unmodified component, just repositioned above the new
           sticky decision header instead of being the only header. */}
-      <div className="px-6 pt-4">
+      <div className="px-6 pt-1.5">
         <LeadDetailHeader
           lead={lead}
           members={members}
@@ -199,7 +208,6 @@ export default function LeadDetailPage() {
       <div className="px-6">
         <LeadWorkspaceHeader
           lead={lead}
-          dealStrategy={dealStrategy}
           onLogOutcome={() => setLogOutcomeOpen(true)}
           onOpenLiveCopilot={() => setLiveCopilotOpen(true)}
         />
@@ -217,6 +225,11 @@ export default function LeadDetailPage() {
         <div id="workspace-panel-overview" role="tabpanel" aria-labelledby="workspace-tab-overview" hidden={activeTab !== 'overview'} className="space-y-4">
           <DistressBanner lead={lead} />
           <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
+
+          {/* HAT Premium Visual Pass, Part 7 — the ONE dominant decision
+              surface. AcquisitionCopilot below is now Deal-Brief-only
+              (its old header duplicated this). */}
+          <DecisionHero lead={lead} />
 
           <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 

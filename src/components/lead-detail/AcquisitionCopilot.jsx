@@ -1,43 +1,24 @@
 // src/components/lead-detail/AcquisitionCopilot.jsx
 // Capability #16 — AI Acquisition Copilot / Deal Brief.
 //
-// UI/UX contract (mission's explicit "no information overload" rules):
-//   1. ONE compact decision header (Recommendation/Next Action/
-//      Opportunity/Confidence/Urgency) — nothing else repeats it.
-//   2. Deal Brief is collapsed by default — one-line AI summary + "Open
-//      Playbook" toggle. Sub-sections inside are compact bullets, not
-//      paragraphs.
-//   3. Never re-displays Property/Financial/Owner data already shown
-//      elsewhere on Lead Detail (PropertyInfoSection/FinancialSection/
-//      DistressBanner) — only references values contextually via AI text.
-//   4. Generation is ALWAYS manual (a click), never automatic — satisfies
-//      Section 9 for every recommendation tier; ACT_NOW/REVIEW_TODAY just
-//      get the button surfaced immediately instead of behind one extra click.
-//   5. Messages (SMS/email) are hidden until explicitly requested, with Copy.
+// HAT Premium Visual Pass — this component's own decision header
+// (Recommendation/Why Now/Opportunity/Confidence/Urgency/Preliminary) was
+// removed in favor of DecisionHero.jsx, Overview's one dominant decision
+// surface (Part 7/8 — "do not visually repeat PASS and System suggests:
+// Pass as two equally visible conclusions"). This component now owns ONLY
+// the AI Deal Brief:
+//   1. Compact by default — one-line AI summary + "Open Playbook" toggle,
+//      and stays small when no brief exists yet (Part 8).
+//   2. Never re-displays Property/Financial/Owner data already shown
+//      elsewhere on Lead Detail — only references values contextually via AI text.
+//   3. Generation is ALWAYS manual (a click), never automatic.
+//   4. Messages (SMS/email) are hidden until explicitly requested, with Copy.
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { computeDealBriefInputHash } from '../../lib/dealBriefInputs'
-import { getArvProvenance, getDecisionMaturity } from '../../lib/arvProvenance'
-import { classifyLeadV2 } from '../../pages/ActionCenterPage'
-import { getActionReason } from '../../lib/actionReason'
 
-const REC_THEME = {
-  ACT_NOW: { icon: '🔥', bg: 'var(--color-danger-soft)', border: 'var(--color-danger)', text: 'var(--color-danger-text)' },
-  REVIEW_TODAY: { icon: '🟠', bg: 'var(--color-warn-soft)', border: 'var(--color-warn)', text: 'var(--color-warn-text)' },
-  RESEARCH: { icon: '🔍', bg: 'var(--color-bg-elev-2)', border: 'var(--color-line)', text: 'var(--color-text)' },
-  FOLLOW_UP: { icon: '🟡', bg: 'var(--color-accent-soft)', border: 'var(--color-accent)', text: 'var(--color-accent-text)' },
-  MONITOR: { icon: '⚪', bg: 'var(--color-bg-elev-2)', border: 'var(--color-line)', text: 'var(--color-text-dim)' },
-  PASS: { icon: '⬜', bg: 'var(--color-bg-elev-2)', border: 'var(--color-line)', text: 'var(--color-text-dim)' },
-}
-const NEXT_ACTION_LABELS = {
-  SEND_OFFER: 'Send Offer', CALL_AGENT: 'Call Agent', CONTACT_OWNER: 'Contact Owner',
-  VERIFY_ARV: 'Verify ARV', VERIFY_CONDITION: 'Verify Condition', RESEARCH_OWNER: 'Research Owner',
-  VERIFY_OWNER: 'Verify Owner', FOLLOW_UP: 'Follow Up', WAIT_FOR_PRICE_DROP: 'Wait for Price Drop',
-  MONITOR_PROPERTY: 'Monitor Property', VERIFY_FLOOD_RISK: 'Verify Flood Risk', VERIFY_TITLE: 'Verify Title',
-  HUMAN_OVERRIDE: 'Human Override — Do Not Pursue', PASS: 'Pass',
-}
-const EASY_GENERATE = ['ACT_NOW', 'REVIEW_TODAY'] // Section 9 — everyone else still gets a manual button, just one click further
+const EASY_GENERATE = ['ACT_NOW', 'REVIEW_TODAY'] // everyone else still gets a manual button, just one click further
 
 function Chip({ label, value }) {
   return <span className="text-[11px] text-[color:var(--color-text-dim)]">{label} <b className="text-[color:var(--color-text)]">{value ?? '—'}</b></span>
@@ -86,36 +67,13 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
   const [playbookOpen, setPlaybookOpen] = useState(false)
   const [showSms, setShowSms] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
-  const [whyOpen, setWhyOpen] = useState(false)
 
   const d = lead.decision_v2
   if (!d) return null // nothing to show until V2 has scored this lead at all
 
-  const theme = REC_THEME[d.recommendation] || REC_THEME.MONITOR
-  const nextActionLabel = NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action
-  const isOverridden = d.next_best_action === 'HUMAN_OVERRIDE'
-
-  // Action-First UX, Part 2 — misleading verdict presentation fix. NO
-  // change to decision_v2/V2 itself: `maturity` already existed (Capability
-  // #16.1, getDecisionMaturity — reuses V2's own Confidence.missing, no
-  // new score) but previously rendered BELOW the bold recommendation
-  // label, so a lead could show a confident "PASS" first and "🟡
-  // PRELIMINARY — Missing: ARV" second. A new user reads the first large
-  // label as the answer. When maturity is PRELIMINARY, the dominant
-  // headline now says so explicitly — the underlying classification
-  // (PASS/MONITOR/etc, still 100% intact) becomes secondary context, not
-  // erased, just no longer visually dominant.
-  const maturity = !lead.is_distressed ? getDecisionMaturity(lead) : null
-  const isPreliminary = maturity === 'PRELIMINARY'
-
-  // Capability #17.1 — "Why now", derived from the exact same
-  // classifyLeadV2() this lead would land in on the Action Center (single
-  // source of truth — see src/lib/actionReason.js). Not every lead surfaces
-  // there (e.g. MONITOR/PASS), so this can legitimately be null.
-  const classified = classifyLeadV2(lead)
-  const actionReason = classified ? getActionReason(lead, classified) : (isOverridden
-    ? getActionReason(lead, { category: 'ACT_NOW' }) // category unused once human_override short-circuits
-    : null)
+  // Decision header (Recommendation/Why Now/Opportunity/Confidence/
+  // Urgency/Preliminary) moved to DecisionHero.jsx — this component only
+  // needs `d.recommendation` now, for the Deal Brief's easy-generate gate.
 
   const currentHash = computeDealBriefInputHash(lead)
   const brief = lead.deal_brief
@@ -143,111 +101,27 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
     }
   }
 
+  // HAT Premium Visual Pass, Part 7/8 — this component's own decision
+  // header (Recommendation/Why Now/Opportunity/Confidence/Urgency/
+  // Preliminary badge) is now owned by DecisionHero.jsx (Overview's one
+  // dominant decision surface). Nothing computed here was deleted — d,
+  // actionReason, maturity are all still derived from the exact same
+  // decision_v2/getActionReason/getDecisionMaturity calls — this component
+  // now renders ONLY the AI Deal Brief, and stays compact when no brief
+  // exists yet (Part 8: "empty AI should not dominate the Overview").
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ borderColor: isPreliminary ? 'var(--color-warn)' : theme.border, background: isPreliminary ? 'var(--color-warn-soft)' : theme.bg }}>
-      {/* ── ONE decision header — Recommendation/Next Action/Opportunity/Confidence/Urgency, nothing else repeated. ── */}
-      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          {isPreliminary ? (
-            <>
-              <div className="text-[15px] font-extrabold text-[color:var(--color-warn-text)]">
-                🟡 Preliminary Review
-              </div>
-              <div className="text-[12px] font-semibold text-[color:var(--color-text)]">
-                Not enough information to evaluate the deal yet.
-              </div>
-              <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">
-                System read: {isOverridden ? 'PASS — Human Override' : d.recommendation.replace(/_/g, ' ')} (subject to change once complete)
-              </div>
-            </>
-          ) : (
-            <div className="text-[15px] font-extrabold" style={{ color: theme.text }}>
-              {theme.icon} {isOverridden ? 'PASS — Human Override' : d.recommendation.replace(/_/g, ' ')}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Chip label="Opportunity" value={d.opportunity?.score} />
-          <Chip label="Confidence" value={d.confidence?.score} />
-          <Chip label="Urgency" value={d.urgency?.level} />
-        </div>
-      </div>
-
-      {/* Action-First UX, Part 3 — this used to also carry its own bold
-          "Next Action" line (d.next_best_action), a SECOND next-step
-          signal competing with ActionZone's "What Now" (the one now
-          made visually dominant in Overview). Not removed — V2's own
-          suggestion is still real information — just demoted to a small
-          secondary chip so there's exactly ONE dominant next action per
-          screen, not two disagreeing-or-redundant ones. */}
-      {!isPreliminary && (
-        <div className="px-3.5 pb-2 -mt-1.5">
-          <span className="text-[10.5px] text-[color:var(--color-text-dim)]">System suggests: <b className="text-[color:var(--color-text)]">{nextActionLabel}</b></span>
-        </div>
-      )}
-
-      {/* Capability #17.1 — "Why now", compact, always visible without a
-          click (mission Section 6). No new large card — just one line
-          under the decision header, with an optional expand for the raw
-          evidence strings behind it. */}
-      {actionReason && (
-        <div className="px-3.5 pb-2 -mt-1">
-          <div className="text-[11.5px] text-[color:var(--color-text)] leading-snug">
-            <span className="font-bold">Why now: </span>
-            {actionReason.reason}
-            {actionReason.evidence?.length > 0 && (
-              <button type="button" onClick={() => setWhyOpen(o => !o)} className="ml-1.5 text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)]">
-                {whyOpen ? 'Hide' : 'ⓘ Why?'}
-              </button>
-            )}
-          </div>
-          {whyOpen && actionReason.evidence?.length > 0 && (
-            <ul className="mt-1 pl-4 list-disc text-[11px] text-[color:var(--color-text-dim)] space-y-0.5">
-              {actionReason.evidence.slice(0, 4).map((e, i) => <li key={i}>{e}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Capability #16.1 — compact maturity indicator (Section 3/7). Reuses
-          existing Confidence/missing output — no new score. On-market only
-          (ARV/comps concept doesn't apply the same way off-market).
-          PRELIMINARY's badge already moved into the headline above (Part
-          2 fix) — this line now only adds the specific missing-field
-          detail, not a second "PRELIMINARY" badge. REFINED is unchanged. */}
-      {!lead.is_distressed && maturity && (() => {
-        const prov = getArvProvenance(lead)
-        return (
-          <div className="px-3.5 pb-2 -mt-1 text-[11px] text-[color:var(--color-text-dim)] flex items-center gap-1.5 flex-wrap">
-            {isPreliminary ? (
-              <span>Missing: {(d.confidence?.missing || []).slice(0, 3).join(' · ') || 'more data'}</span>
-            ) : (
-              <>
-                <span className="font-bold text-[color:var(--color-success-text)]">🟢 REFINED</span>
-                {prov.comps_available && <span>— Based on {prov.comps_count} comp{prov.comps_count === 1 ? '' : 's'}</span>}
-                {prov.arv != null && <span>· ARV ${Number(prov.arv).toLocaleString()} ({prov.source === 'AI_COMPS' ? 'AI + comps' : 'manual/unverified'})</span>}
-              </>
-            )}
-          </div>
-        )
-      })()}
-
-      {isOverridden && d.human_override?.reason && (
-        <div className="px-3.5 pb-2 text-[11.5px] text-[color:var(--color-text-dim)]">⚠ {d.human_override.reason}</div>
-      )}
-
-      {/* ── Collapsed AI summary + Open Playbook ── */}
-      <div className="px-3.5 py-2.5 border-t" style={{ borderColor: theme.border }}>
+    <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+      <div className="px-3.5 py-2.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)] mb-0.5">✨ AI Acquisition Copilot</div>
+            <div className="text-[10.5px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)] mb-0.5">AI Deal Brief</div>
             {brief ? (
               <div className="text-[12.5px] text-[color:var(--color-text)]">
                 {brief.summary}
                 {isStale && <span className="ml-1.5 text-[10px] font-bold text-[color:var(--color-warn-text)]">STALE — data changed</span>}
               </div>
             ) : (
-              <div className="text-[12px] text-[color:var(--color-text-faint)] italic">No brief generated yet.</div>
+              <div className="text-[12px] text-[color:var(--color-text-dim)]">Generate a concise acquisition brief.</div>
             )}
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1">
@@ -273,7 +147,7 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
 
       {/* ── Playbook — everything below is collapsed sub-sections, opened on demand. ── */}
       {playbookOpen && brief && (
-        <div className="px-3.5 py-2.5 border-t space-y-0" style={{ borderColor: theme.border }}>
+        <div className="px-3.5 py-2.5 border-t border-[color:var(--color-line)] space-y-0">
           <SubSection title="Why This Deal" defaultOpen><Bullets items={brief.why} icon="✓" /></SubSection>
           <SubSection title="⚠ Verify / Missing"><Bullets items={[...brief.missing, ...brief.risk_notes]} /></SubSection>
           <SubSection title="Questions to Ask"><Bullets items={brief.questions} /></SubSection>

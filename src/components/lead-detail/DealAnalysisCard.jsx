@@ -247,10 +247,16 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
   const maturity = getDecisionMaturity(lead)
   const sensitivity = testDownside ? computeFlipDownsideSensitivity(lead, flipResult) : null
 
+  // Premium visual pass — amber (or any tier color) previously washed the
+  // ENTIRE container background, so a WATCH-tier deal turned this whole
+  // card amber. Semantic color is now a SIGNAL (left border + tier badge
+  // text), not a background theme; facts (Current Offer/MAO/Cushion/
+  // Profit/Target) render in neutral text, matching Section 5's
+  // fact-vs-judgment distinction. Same data, same verdict, calmer surface.
   return (
-    <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
+    <div className="mb-3 rounded-lg border border-[color:var(--color-line)] border-l-[3px] overflow-hidden bg-[color:var(--color-bg-elev-2)]" style={{ borderLeftColor: theme.border }}>
       <div className="px-3 pt-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>Margin of Safety</span>
+        <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Margin of Safety</span>
         {maturity === 'PRELIMINARY' && (
           <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)]">
             🟡 PRELIMINARY — comps/ARV not yet confirmed
@@ -261,44 +267,45 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
       {/* Compact economics row (Section 9) — Current Offer | Flip MAO | Cushion | Profit | Target */}
       <div className="px-3 py-2 grid grid-cols-2 sm:grid-cols-5 gap-y-2 gap-x-1">
         <div>
-          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Current Offer</div>
-          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{currentOffer != null ? fc(currentOffer) : '—'}</div>
+          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Current Offer</div>
+          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{currentOffer != null ? fc(currentOffer) : '—'}</div>
         </div>
         <div>
-          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Flip MAO</div>
-          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{mao != null ? fc(Math.round(mao / 100) * 100) : '—'}</div>
+          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
+          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{mao != null ? fc(Math.round(mao / 100) * 100) : '—'}</div>
         </div>
         <div>
-          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Price Cushion</div>
-          <div className="text-[13px] font-bold" style={{ color: theme.text }}>
+          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Price Cushion</div>
+          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">
             {marginOfSafety.priceCushion != null ? `${marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(marginOfSafety.priceCushion)))}` : '—'}
           </div>
         </div>
         <div>
-          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Profit</div>
-          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{projectedProfit != null ? fc(projectedProfit) : '—'}</div>
+          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit</div>
+          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{projectedProfit != null ? fc(projectedProfit) : '—'}</div>
         </div>
         <div>
-          <div className="text-[8.5px] uppercase tracking-wider opacity-70" style={{ color: theme.text }}>Target</div>
-          <div className="text-[13px] font-bold" style={{ color: theme.text }}>{fc(targetProfit)}</div>
+          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Target</div>
+          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{fc(targetProfit)}</div>
         </div>
       </div>
 
-      {/* Tier + plain-language "why" (Sections 5-7) */}
-      <div className="px-3 pb-2.5 border-t pt-2" style={{ borderColor: theme.border }}>
+      {/* Tier + plain-language "why" — the ONE place semantic color still
+          leads, since this IS the judgment, not a fact. */}
+      <div className="px-3 pb-2.5 border-t border-[color:var(--color-line)] pt-2">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[12.5px] font-extrabold" style={{ color: theme.text }}>
             {VERDICT_DISPLAY_LABEL[verdict] || verdict} — {marginOfSafety.title}
           </span>
-          <button type="button" onClick={() => setWhyOpen(o => !o)} className="text-[10.5px] font-semibold underline opacity-80" style={{ color: theme.text }}>
+          <button type="button" onClick={() => setWhyOpen(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)]">
             {whyOpen ? 'Hide' : `ⓘ What does ${VERDICT_DISPLAY_LABEL[verdict] || verdict} mean?`}
           </button>
         </div>
         {whyOpen && (
-          <div className="text-[11.5px] mt-1.5 leading-snug" style={{ color: theme.text }}>
+          <div className="text-[11.5px] mt-1.5 leading-snug text-[color:var(--color-text-muted)]">
             {marginOfSafety.why}
             {marginOfSafety.profitCushion != null && (
-              <div className="mt-1 opacity-80">Profit above $30K target: {marginOfSafety.profitCushion >= 0 ? '+' : '−'}{fc(Math.round(Math.abs(marginOfSafety.profitCushion)))} (price cushion and profit cushion can differ — purchase price also moves financing/holding costs).</div>
+              <div className="mt-1 text-[color:var(--color-text-dim)]">Profit above $30K target: {marginOfSafety.profitCushion >= 0 ? '+' : '−'}{fc(Math.round(Math.abs(marginOfSafety.profitCushion)))} (price cushion and profit cushion can differ — purchase price also moves financing/holding costs).</div>
             )}
           </div>
         )}
@@ -308,16 +315,16 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
           reuses computeFlipBreakdown with modified inputs only; no new
           model, no probability claims. */}
       {currentOffer != null && lead.arv != null && lead.renovation_cost != null && (
-        <div className="px-3 pb-2.5 border-t pt-2" style={{ borderColor: theme.border }}>
-          <button type="button" onClick={() => setTestDownside(o => !o)} className="text-[10.5px] font-semibold underline opacity-80" style={{ color: theme.text }}>
+        <div className="px-3 pb-2.5 border-t border-[color:var(--color-line)] pt-2">
+          <button type="button" onClick={() => setTestDownside(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)]">
             {testDownside ? 'Hide downside test' : 'Test downside'}
           </button>
           {sensitivity && (
             <div className="mt-1.5 space-y-1">
               {sensitivity.map((s, i) => (
-                <div key={i} className="text-[11px] flex items-center justify-between gap-2" style={{ color: theme.text }}>
-                  <span className="opacity-80">If {s.label}:</span>
-                  <span className="font-bold">
+                <div key={i} className="text-[11px] flex items-center justify-between gap-2 text-[color:var(--color-text-muted)]">
+                  <span>If {s.label}:</span>
+                  <span className="font-bold text-[color:var(--color-text)]">
                     Profit {fc(Math.round(s.profit))} {s.profit >= targetProfit ? '✓ still clears target' : '✗ falls below target'}
                   </span>
                 </div>
@@ -1296,70 +1303,75 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       {(flipResult.available || brrrrResult.available) && (() => {
         const activeResult = strategy === 'brrrr' ? brrrrResult : flipResult
         const theme = VERDICT_THEME[activeResult.verdict] || VERDICT_THEME.WATCH
+        // Premium visual pass, Part 19/20 — "AI Deal Read," an executive
+        // explanation layer, not an engineering dashboard. Semantic color
+        // now signals only (left border + the AI Read value itself);
+        // surface is neutral so this doesn't compete with the Deal tab's
+        // own hero for visual dominance. Same data, same verdict.
         return (
-          <div className="mb-3 rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
+          <div className="mb-3 rounded-lg border border-[color:var(--color-line)] border-l-[3px] overflow-hidden bg-[color:var(--color-bg-elev-2)]" style={{ borderLeftColor: theme.border }}>
             <div className="px-3 pt-2 flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-widest font-bold opacity-70" style={{ color: theme.text }}>
-                Detailed Analysis — {strategy === 'brrrr' ? 'BRRRR' : 'Flip'} <span className="font-normal opacity-80">(supporting — see decision above)</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">
+                AI Deal Read — {strategy === 'brrrr' ? 'BRRRR' : 'Flip'}
               </span>
             </div>
 
             {activeResult.available ? (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 divide-x" style={{ borderColor: theme.border }}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[color:var(--color-line)]">
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>AI Read</div>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">AI Read</div>
                     <div className="text-[14px] font-bold leading-tight" style={{ color: theme.text }}>{VERDICT_DISPLAY_LABEL[activeResult.verdict] || activeResult.verdict}</div>
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">
                       {strategy === 'brrrr' ? 'Cash Left In' : 'Projected Profit'}
                     </div>
-                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>
+                    <div className="text-[14px] font-bold tabular-nums text-[color:var(--color-text)]">
                       {strategy === 'brrrr'
                         ? (activeResult.cashLeftIn != null ? fc(activeResult.cashLeftIn) : '—')
                         : (activeResult.projectedProfit != null ? fc(activeResult.projectedProfit) : '—')}
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">
                       {strategy === 'brrrr' ? 'Cash Flow' : 'Starting Offer'}
                     </div>
-                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>
+                    <div className="text-[14px] font-bold tabular-nums text-[color:var(--color-text)]">
                       {strategy === 'brrrr'
                         ? (activeResult.monthlyCashFlow != null ? `${fc(activeResult.monthlyCashFlow)}/mo` : '—')
                         : (activeResult.currentOffer != null ? fc(activeResult.currentOffer) : '—')}
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70" style={{ color: theme.text }}>{strategy === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
-                    <div className="text-[14px] font-bold" style={{ color: theme.text }}>{activeResult.mao != null ? fc(Math.round(activeResult.mao / 100) * 100) : 'Not confirmed'}</div>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">{strategy === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                    <div className="text-[14px] font-bold tabular-nums text-[color:var(--color-text)]">{activeResult.mao != null ? fc(Math.round(activeResult.mao / 100) * 100) : 'Not confirmed'}</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t" style={{ borderColor: theme.border }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-x divide-[color:var(--color-line)] border-t border-[color:var(--color-line)]">
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Why</div>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] mb-0.5">Why It Works</div>
                     {activeResult.why.length > 0 ? (
-                      <ul className="text-[11.5px] font-medium leading-tight space-y-0.5" style={{ color: theme.text }}>
+                      <ul className="text-[11.5px] font-medium leading-tight space-y-0.5 text-[color:var(--color-text)]">
                         {activeResult.why.map((r, i) => <li key={i}>✓ {r}</li>)}
                       </ul>
                     ) : (
-                      <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                      <div className="text-[12px] font-medium text-[color:var(--color-text-dim)]">—</div>
                     )}
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest opacity-70 mb-0.5" style={{ color: theme.text }}>Biggest Risk</div>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] mb-0.5">Biggest Risk</div>
                     {activeResult.biggestRisk.length > 0 ? (
-                      <div className="text-[11.5px] font-medium leading-tight" style={{ color: theme.text }}>⚠ {activeResult.biggestRisk[0]}</div>
+                      <div className="text-[11.5px] font-medium leading-tight text-[color:var(--color-warn-text)]">⚠ {activeResult.biggestRisk[0]}</div>
                     ) : (
-                      <div className="text-[12px] font-medium opacity-70" style={{ color: theme.text }}>—</div>
+                      <div className="text-[12px] font-medium text-[color:var(--color-text-dim)]">—</div>
                     )}
                   </div>
                 </div>
               </>
             ) : (
               <div className="px-3 py-2.5">
-                <div className="text-[12px] font-medium" style={{ color: theme.text }}>⚠ {activeResult.reason}</div>
+                <div className="text-[12px] font-medium text-[color:var(--color-text-dim)]">⚠ {activeResult.reason}</div>
               </div>
             )}
           </div>
