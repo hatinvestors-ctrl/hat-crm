@@ -77,13 +77,22 @@ export default function DecisionHero({ lead }) {
           <p className="text-[12.5px] text-[color:var(--color-text)] mt-1 leading-snug">{actionReason.reason}</p>
         )}
 
-        {/* DEAL SAFETY — explicitly separate line from Overall Decision. */}
+        {/* DEAL SAFETY — explicitly separate line from Overall Decision.
+            marginOfSafety.why (Section 5) is the same one-sentence
+            interpretation Margin of Safety itself shows — surfaced here
+            too since Overview should never make Kevin interpret WATCH/
+            STRONG/etc by himself. */}
         {flip.available && (
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Deal Safety</span>
-            <span className="text-[12px] font-bold" style={{ color: DEAL_SAFETY_TONE[flip.verdict] }}>
-              {VERDICT_DISPLAY_LABEL[flip.verdict]} — {flip.marginOfSafety?.title}
-            </span>
+          <div className="mt-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Deal Safety</span>
+              <span className="text-[12px] font-bold" style={{ color: DEAL_SAFETY_TONE[flip.verdict] }}>
+                {VERDICT_DISPLAY_LABEL[flip.verdict]} — {flip.marginOfSafety?.title}
+              </span>
+            </div>
+            {flip.marginOfSafety?.why && (
+              <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-0.5 leading-snug">{flip.marginOfSafety.why}</p>
+            )}
           </div>
         )}
       </div>
@@ -92,7 +101,7 @@ export default function DecisionHero({ lead }) {
       {flip.available && (
         <div className="px-4 py-3 border-t border-[color:var(--color-line)] grid grid-cols-3 gap-3">
           <Metric label="Projected Profit" value={fc(flip.projectedProfit)} tone={flip.projectedProfit >= 30000 ? 'var(--color-success-text)' : 'var(--color-danger-text)'} />
-          <Metric label="Room Below MAO" value={flip.marginOfSafety?.priceCushion != null ? `${flip.marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(flip.marginOfSafety.priceCushion)))}` : '—'} tone={flip.marginOfSafety?.priceCushion >= 0 ? undefined : 'var(--color-danger-text)'} />
+          <Metric label="Room Below Max Buy" value={flip.marginOfSafety?.priceCushion != null ? `${flip.marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(flip.marginOfSafety.priceCushion)))}` : '—'} tone={flip.marginOfSafety?.priceCushion >= 0 ? undefined : 'var(--color-danger-text)'} />
           <Metric label="Max Buy" value={fc(Math.round(flip.mao / 100) * 100)} tone="var(--color-accent-text)" />
         </div>
       )}

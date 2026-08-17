@@ -137,41 +137,51 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   )}
                 </div>
               )}
-              {/* Flip MAO — CANONICAL number is now always the big, primary
-                  figure (matches Detailed Analysis / Path to a Flip Deal /
-                  Copilot exactly, every time — no more "$127,450 here,
-                  $124,300 there"). The separately-stored, editable
-                  lead.mao only appears as a small secondary line, and only
-                  when it actually diverges — it's kept for V2/legacy
-                  compatibility and Kevin's manual overrides, but it can no
-                  longer LOOK like the authoritative Flip MAO. Real user
-                  reports (2706 Tina Lane, 1012 Beckner Ave) showed the old
-                  "stored value primary, canonical as a caption" layout was
-                  read as a contradiction, not a nuance — swapped. */}
+              {/* Max Buy (Flip) — CANONICAL number is now always the big,
+                  primary figure (matches Detailed Analysis / Path to a
+                  Flip Deal / Copilot exactly, every time — no more
+                  "$127,450 here, $124,300 there").
+                  Last-Mile UX investigation finding: the secondary
+                  lead.mao line below was previously labeled "Stored
+                  override," implying a deliberate manual choice. Traced
+                  against real leads (7614 Club Duclay, 7109 Hallock): in
+                  both cases lead.mao exactly equals legacy calculateMAO()
+                  (0.75×ARV − Reno − 2450) for the lead's CURRENT arv/reno
+                  — i.e. it's auto-recalculated by this file's own ARV/Reno
+                  onSave handlers below (lines ~284/298/323), not something
+                  Kevin necessarily typed. The DB has no field to
+                  distinguish "auto-set" from "manually typed" (both write
+                  the same lead.mao column via the "Set manual override"
+                  prompt) — so "override" cannot be asserted as fact.
+                  Relabeled to "Legacy MAO" instead, which is accurate
+                  regardless of origin. This canonical Max Buy figure is
+                  confirmed unaffected either way — profit/verdict/
+                  Margin of Safety/offer generation never read lead.mao at
+                  all (they all call calculateFlipMAO fresh). */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
                 <div className="flex items-center gap-1 mb-1">
-                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">{isBrrrr ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold">{isBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}</div>
                   <span title={isBrrrr
-                      ? 'The highest purchase price that still keeps cash left in after refinance under $30,000 (and cash flow positive). Same number shown in Detailed Analysis and Path to a BRRRR Deal.'
-                      : `The highest purchase price that still nets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit. Same number shown in Detailed Analysis, Path to a Flip Deal, and Copilot.`}
+                      ? 'Maximum purchase price that still keeps cash left in after refinance under $30,000 (and cash flow positive). Same number shown in Detailed Analysis and Path to a BRRRR Deal.'
+                      : `Maximum purchase price that still meets HAT's ${formatCurrency(FLIP_MIN_PROFIT_TARGET)} minimum Flip profit target. Same number shown in Detailed Analysis, Path to a Flip Deal, and Copilot.`}
                     className="text-[9px] text-[color:var(--color-text-dim)] cursor-help">ℹ</span>
                 </div>
                 <div className="text-[16px] font-bold text-[color:var(--color-accent)]">
                   {formulaMao != null ? formatCurrency(Math.round(formulaMao / 100) * 100) : '—'}
                 </div>
-                {/* lead.mao is a Flip-only stored fallback (also V2's
-                    canonical MAO input) — no equivalent override concept
-                    exists for BRRRR MAO, so these controls only apply to Flip. */}
+                {/* lead.mao is a Flip-only legacy field (also V2's own
+                    fallback input) — no equivalent concept exists for
+                    BRRRR MAO, so these controls only apply to Flip. */}
                 {!isBrrrr && diverged && (
                   <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-[9px] text-[color:var(--color-warn-text)]">Stored override:</span>
+                    <span className="text-[9px] text-[color:var(--color-warn-text)]" title="Auto-computed by the older 0.75×ARV formula whenever ARV/Reno is edited — not necessarily a manual choice. Not used by profit, verdict, Margin of Safety, or offer generation.">Legacy MAO:</span>
                     <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
                       onSave={(v) => update({ mao: v })} disabled={!canEdit}
                       displayClassName="text-[10.5px] font-semibold text-[color:var(--color-warn-text)] underline decoration-dotted" />
                     {canEdit && (
                       <button onClick={() => update({ mao: null })}
                         className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
-                        title="Clear stored override — go back to using the canonical Flip MAO everywhere">✕</button>
+                        title="Clear — this legacy value isn't used by Max Buy, profit, or the verdict anywhere on this page.">✕</button>
                     )}
                   </div>
                 )}
@@ -229,7 +239,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
           <div className="flex gap-6 mb-5">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">{isBrrrr ? "BRRRR MAO · Max We'd Pay" : "Flip MAO · Max We'd Pay"}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">{isBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}</span>
                 {diverged && canEdit && (
                   <button onClick={() => update({ mao: formulaMao })}
                     className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80">↺ formula</button>
@@ -264,9 +274,22 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
             </div>
             <div className="min-w-0">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)] mb-0.5">We Offer</div>
-              <EditableField label="" type="currency" value={lead.starting_offer} formatter={formatCurrency}
-                onSave={(v) => update({ starting_offer: v })} disabled={!canEdit}
-                displayClassName="text-2xl font-bold text-[color:var(--color-success-text)]" placeholder="— run AI analysis" />
+              {/* Fix — when nothing (canonical MAO or a stored offer) can
+                  actually be computed yet, this used to render the
+                  instructional placeholder "— run AI analysis" at the
+                  same text-2xl/font-bold/green styling as a real dollar
+                  value, so it visually read as a financial number. Now
+                  shown as plain instructional text instead. */}
+              {lead.starting_offer == null && formulaMao == null ? (
+                <>
+                  <div className="text-[15px] font-semibold text-[color:var(--color-text-dim)]">Not available</div>
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">Complete ARV first</div>
+                </>
+              ) : (
+                <EditableField label="" type="currency" value={lead.starting_offer} formatter={formatCurrency}
+                  onSave={(v) => update({ starting_offer: v })} disabled={!canEdit}
+                  displayClassName="text-2xl font-bold text-[color:var(--color-success-text)]" placeholder="—" />
+              )}
             </div>
           </div>
         )

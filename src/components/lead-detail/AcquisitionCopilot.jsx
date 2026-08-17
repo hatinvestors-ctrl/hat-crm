@@ -158,7 +158,7 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
                   <Chip label="Ask" value={brief.price_guidance.ask ? `$${brief.price_guidance.ask.toLocaleString()}` : NA} />
                   <Chip label="Opening" value={`$${brief.price_guidance.opening.toLocaleString()}`} />
-                  <Chip label={`${brief.price_guidance.strategy || ''} MAO`.trim()} value={`$${brief.price_guidance.target.toLocaleString()}`} />
+                  <Chip label={`Max Buy${brief.price_guidance.strategy ? ` (${brief.price_guidance.strategy})` : ''}`} value={`$${brief.price_guidance.target.toLocaleString()}`} />
                 </div>
               ) : (
                 <div className="text-[12px] text-[color:var(--color-text-dim)]">

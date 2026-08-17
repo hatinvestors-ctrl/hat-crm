@@ -65,7 +65,7 @@ export default function DealSnapshotCompact({ lead, onOpenDeal }) {
         <Cell label="Ask" value={lead.asking_price != null ? fc(lead.asking_price) : 'Not set'} />
         <Cell label="ARV" value={fc(lead.arv)} />
         <Cell label="Current Offer" value={flip.currentOffer != null ? fc(flip.currentOffer) : 'Not set'} />
-        <Cell label={preferBrrrr ? 'BRRRR MAO' : 'Flip MAO'}
+        <Cell label={preferBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}
           value={preferBrrrr ? (brrrr.available ? fc(Math.round(brrrr.mao / 100) * 100) : 'Needs rent') : fc(Math.round(flip.mao / 100) * 100)} />
         <Cell label={preferBrrrr ? 'Cash Flow' : 'Profit'}
           value={preferBrrrr ? (brrrr.available && brrrr.monthlyCashFlow != null ? `${fc(brrrr.monthlyCashFlow)}/mo` : 'Needs rent') : fc(flip.projectedProfit)} />

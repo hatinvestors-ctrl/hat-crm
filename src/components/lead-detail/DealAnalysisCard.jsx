@@ -184,7 +184,7 @@ export function BrrrrRealityCheck({ lead }) {
 
       {result.mao == null ? (
         <p className="text-[11.5px] text-[color:var(--color-warn-text)] border-t border-[color:var(--color-line)] pt-2">
-          BRRRR MAO: <strong>NOT READY</strong> — {result.reason}. {rent == null ? 'Add a Rent Estimate in Financials.' : arv == null ? 'Add an ARV in Financials.' : 'Add a renovation cost in Financials.'}
+          Max Buy (BRRRR): <strong>NOT READY</strong> — {result.reason}. {rent == null ? 'Add a Rent Estimate in Financials.' : arv == null ? 'Add an ARV in Financials.' : 'Add a renovation cost in Financials.'}
         </p>
       ) : (
         <>
@@ -207,7 +207,7 @@ export function BrrrrRealityCheck({ lead }) {
 
           <div className="border-t border-[color:var(--color-line)] pt-2 grid grid-cols-2 gap-3">
             <div>
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">BRRRR MAO</div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Max Buy (BRRRR)</div>
               <div className="text-[16px] font-bold text-[color:var(--color-text)]">{fc(Math.round(result.mao / 100) * 100)}</div>
             </div>
             <div>
@@ -247,12 +247,15 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
   const maturity = getDecisionMaturity(lead)
   const sensitivity = testDownside ? computeFlipDownsideSensitivity(lead, flipResult) : null
 
-  // Premium visual pass — amber (or any tier color) previously washed the
-  // ENTIRE container background, so a WATCH-tier deal turned this whole
-  // card amber. Semantic color is now a SIGNAL (left border + tier badge
-  // text), not a background theme; facts (Current Offer/MAO/Cushion/
-  // Profit/Target) render in neutral text, matching Section 5's
-  // fact-vs-judgment distinction. Same data, same verdict, calmer surface.
+  // Last-Mile UX, Section 6 — this used to repeat a full Current Offer /
+  // Max Buy / Cushion / Profit / Target row that's already visible
+  // immediately above in the Deal Economics Hero (DealDecisionCenter.jsx)
+  // wherever this component is actually mounted. Removed the repeated
+  // row; this section now leads with INTERPRETATION ("how much room for
+  // error do we have") instead of restating the same five numbers. The
+  // one number genuinely new here — profit cushion vs. price cushion,
+  // which can differ — stays, since it isn't shown in the Hero. Downside
+  // testing (functionality) unchanged.
   return (
     <div className="mb-3 rounded-lg border border-[color:var(--color-line)] border-l-[3px] overflow-hidden bg-[color:var(--color-bg-elev-2)]" style={{ borderLeftColor: theme.border }}>
       <div className="px-3 pt-2.5 flex items-center justify-between gap-2 flex-wrap">
@@ -264,49 +267,24 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
         )}
       </div>
 
-      {/* Compact economics row (Section 9) — Current Offer | Flip MAO | Cushion | Profit | Target */}
-      <div className="px-3 py-2 grid grid-cols-2 sm:grid-cols-5 gap-y-2 gap-x-1">
-        <div>
-          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Current Offer</div>
-          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{currentOffer != null ? fc(currentOffer) : '—'}</div>
-        </div>
-        <div>
-          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
-          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{mao != null ? fc(Math.round(mao / 100) * 100) : '—'}</div>
-        </div>
-        <div>
-          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Price Cushion</div>
-          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">
-            {marginOfSafety.priceCushion != null ? `${marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(marginOfSafety.priceCushion)))}` : '—'}
-          </div>
-        </div>
-        <div>
-          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit</div>
-          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{projectedProfit != null ? fc(projectedProfit) : '—'}</div>
-        </div>
-        <div>
-          <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Target</div>
-          <div className="text-[13px] font-bold tabular-nums text-[color:var(--color-text)]">{fc(targetProfit)}</div>
-        </div>
-      </div>
-
-      {/* Tier + plain-language "why" — the ONE place semantic color still
-          leads, since this IS the judgment, not a fact. */}
-      <div className="px-3 pb-2.5 border-t border-[color:var(--color-line)] pt-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[12.5px] font-extrabold" style={{ color: theme.text }}>
-            {VERDICT_DISPLAY_LABEL[verdict] || verdict} — {marginOfSafety.title}
-          </span>
-          <button type="button" onClick={() => setWhyOpen(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)]">
-            {whyOpen ? 'Hide' : `ⓘ What does ${VERDICT_DISPLAY_LABEL[verdict] || verdict} mean?`}
+      {/* Tier + plain-language "why" — visible immediately, no click
+          needed, per the mission's "never make Kevin interpret an
+          important number by himself" principle. */}
+      <div className="px-3 pb-2.5 pt-1">
+        <span className="text-[12.5px] font-extrabold" style={{ color: theme.text }}>
+          {VERDICT_DISPLAY_LABEL[verdict] || verdict} — {marginOfSafety.title}
+        </span>
+        {marginOfSafety.why && (
+          <p className="text-[11.5px] mt-1 leading-snug text-[color:var(--color-text-muted)]">{marginOfSafety.why}</p>
+        )}
+        {marginOfSafety.profitCushion != null && marginOfSafety.priceCushion != null && Math.round(marginOfSafety.profitCushion) !== Math.round(marginOfSafety.priceCushion) && (
+          <button type="button" onClick={() => setWhyOpen(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)] mt-1">
+            {whyOpen ? 'Hide' : 'ⓘ Profit cushion vs. price cushion'}
           </button>
-        </div>
-        {whyOpen && (
-          <div className="text-[11.5px] mt-1.5 leading-snug text-[color:var(--color-text-muted)]">
-            {marginOfSafety.why}
-            {marginOfSafety.profitCushion != null && (
-              <div className="mt-1 text-[color:var(--color-text-dim)]">Profit above $30K target: {marginOfSafety.profitCushion >= 0 ? '+' : '−'}{fc(Math.round(Math.abs(marginOfSafety.profitCushion)))} (price cushion and profit cushion can differ — purchase price also moves financing/holding costs).</div>
-            )}
+        )}
+        {whyOpen && marginOfSafety.profitCushion != null && (
+          <div className="text-[11px] mt-1 text-[color:var(--color-text-dim)]">
+            Profit above the $30K target: {marginOfSafety.profitCushion >= 0 ? '+' : '−'}{fc(Math.round(Math.abs(marginOfSafety.profitCushion)))} — not always the same as the price cushion shown above, since purchase price also moves financing/holding costs.
           </div>
         )}
       </div>
@@ -386,11 +364,11 @@ export function FlipRealityCheck({ lead }) {
 
       <div className="border-t border-[color:var(--color-line)] pt-2 grid grid-cols-2 gap-3">
         <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip MAO</div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Max Buy (Flip)</div>
           <div className="text-[16px] font-bold text-[color:var(--color-text)]">{flipMao != null ? fc(Math.round(flipMao / 100) * 100) : '—'}</div>
         </div>
         <div>
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit At Flip MAO</div>
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Profit At Max Buy</div>
           <div className="text-[13px] font-bold text-[color:var(--color-text)]">{flipMao != null ? `≈ ${fc(FLIP_MIN_PROFIT_TARGET)}` : '—'}</div>
         </div>
       </div>
@@ -402,7 +380,7 @@ export function FlipRealityCheck({ lead }) {
         <p className="text-[11px] text-[color:var(--color-text-muted)]">
           {currentPP <= flipMao
             ? `You are currently ${fc(flipMao - currentPP)} below the maximum supported purchase price.`
-            : `Purchase price needs to decrease by ${fc(currentPP - flipMao)} to reach Flip MAO.`}
+            : `Purchase price needs to decrease by ${fc(currentPP - flipMao)} to reach Max Buy.`}
         </p>
       )}
 
@@ -452,10 +430,10 @@ function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
   return (
     <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3">
       <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-2">
-        Target Profit → Flip MAO
+        Target Profit → Max Buy
       </div>
       <p className="text-[10.5px] text-[color:var(--color-accent-text)] opacity-80 mb-2 leading-snug">
-        Flip MAO above uses HAT's {fc(FLIP_MIN_PROFIT_TARGET)} default target. If you'd accept a different profit to win the deal, this shows what purchase price that allows instead.
+        Max Buy above uses HAT's {fc(FLIP_MIN_PROFIT_TARGET)} default target. If you'd accept a different profit to win the deal, this shows what purchase price that allows instead.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex flex-col gap-0.5">
@@ -1246,7 +1224,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       {!staleness.stale && aiTextMaoStale && !generating && (
         <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
           <span className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">
-            ⚠ This AI analysis predates the current Flip MAO calculation ({fc(Math.round(canonicalFlipMaoForStaleness / 100) * 100)}) — figures below may not match. Use "Refresh Detailed Analysis" above for updated numbers.
+            ⚠ This AI analysis predates the current Max Buy calculation ({fc(Math.round(canonicalFlipMaoForStaleness / 100) * 100)}) — figures below may not match. Use "Refresh Detailed Analysis" above for updated numbers.
           </span>
         </div>
       )}
