@@ -31,6 +31,8 @@ const CATEGORY_LABELS = {
   'followUp.test.js': 'FOLLOW-UP',
   'actionReason.test.js': 'ACTION CENTER EXPLANATIONS',
   'dataIntegrity.test.js': 'DATA SAFETY',
+  'actionCenterClassification.test.js': 'ACTION CENTER CLASSIFICATION (classifyLeadV2)',
+  'crossScreenConsistency.test.js': 'CROSS-SCREEN CONSISTENCY',
 }
 
 const byFile = {}
@@ -55,8 +57,7 @@ console.log(`TOTAL: ${report.numPassedTests}/${report.numTotalTests} PASS`)
 console.log(`BLOCKERS (failed tests): ${report.numFailedTests}`)
 console.log('='.repeat(50))
 console.log('\nNOT COVERED by this automated suite (see docs/release-readiness/RELEASE-READINESS.md):')
-console.log('  - Cross-screen UI consistency (requires browser rendering — not available in this environment)')
-console.log('  - Action Center classifyLeadV2() (lives in a page component with heavy UI imports; tested indirectly via followUpTiming.js/actionReason.js instead)')
+console.log('  - Rendered UI / browser interaction (requires browser rendering — not available in this environment; classifyLeadV2() itself IS directly unit tested)')
 console.log('  - Live Copilot, AI/LLM calls, imports/ingestion, database-integration tests (require live services or a test DB — none provisioned this pass)')
 console.log('  - Manual QA checklist (docs/release-readiness/manual-qa-checklist.md) — requires a human\n')
 
