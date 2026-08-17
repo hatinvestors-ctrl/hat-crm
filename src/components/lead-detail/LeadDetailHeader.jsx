@@ -39,14 +39,19 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
     if (data) onUpdated?.(data)
   }
 
-  // Final UX Polish, Section 2 — was 4 equally-weighted buttons (Create
-  // Project / Mark Hot / Zillow / Edit) competing for attention alongside
-  // the workspace header's own quick actions. "View Project" is the one
-  // genuinely high-value, contextual action here (only shown once a lead
-  // IS a project) and stays visible; everything else — including "Create
-  // Project" before that point — moves into one "More" menu. Property
-  // identity (address/city/zip) lives ONLY in LeadWorkspaceHeader above
-  // this bar (Phase 2.1) — this row keeps just assignment/timestamps + actions.
+  // Action-First UX, Part 9 — header action audit, reconsidered by actual
+  // acquisition workflow frequency (not just visual cleanliness):
+  //   - "View Project" — contextual, high-value, shown only once relevant. VISIBLE.
+  //   - Zillow — a quick external reference check an acquisition agent
+  //     plausibly opens on many leads, every day; zero-risk (just a link).
+  //     Promoted back to VISIBLE.
+  //   - Edit Lead — opens a full form; used less often than a quick Zillow
+  //     glance, and editing individual fields inline (Property/Financials/
+  //     Contact) already covers most day-to-day edits without it. Stays in More.
+  //   - Mark Hot / Create Project — one-time-per-lead actions. Stay in More.
+  // Combined with the sticky header's own Live Copilot/Log Outcome, this
+  // keeps the WHOLE header (both rows) at 2-4 visible actions depending on
+  // lead state, not the 6 that would exist if everything were shown.
   return (
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 pb-2.5 border-b border-[color:var(--color-line)]">
       <div className="min-w-0 flex items-center gap-3 flex-wrap">
@@ -94,6 +99,18 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
           </button>
         )}
 
+        {zillowUrl && (
+          <a
+            href={zillowUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-md bg-[color:var(--color-bg-elev)] border border-[color:var(--color-line)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-accent-text)] hover:border-[color:var(--color-accent)] transition"
+            title="Open this property on Zillow"
+          >
+            Zillow ↗
+          </a>
+        )}
+
         {canEdit && (
           <div className="relative" ref={moreRef}>
             <button
@@ -119,17 +136,6 @@ export default function LeadDetailHeader({ lead, members, canEdit, canAssign, on
                 >
                   🔥 {lead.is_hot ? 'Unmark Hot' : 'Mark Hot'}
                 </button>
-                {zillowUrl && (
-                  <a
-                    href={zillowUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => setMoreOpen(false)}
-                    className="block px-3 py-1.5 text-[12.5px] text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)]"
-                  >
-                    Zillow ↗
-                  </a>
-                )}
                 <button
                   onClick={() => { setMoreOpen(false); onEdit() }}
                   className="w-full text-left px-3 py-1.5 text-[12.5px] text-[color:var(--color-text)] hover:bg-[color:var(--color-bg-elev-2)]"

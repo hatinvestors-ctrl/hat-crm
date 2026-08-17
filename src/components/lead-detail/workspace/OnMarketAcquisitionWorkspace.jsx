@@ -24,13 +24,25 @@ export default function OnMarketAcquisitionWorkspace({ lead, userId, members, ca
 
   return (
     <div className="space-y-4">
-      {/* B — Negotiation Snapshot */}
+      {/* 1 — Next Move: the ONE dominant action on this tab (Part 3/6) —
+          reuses the SAME PLAYBOOKS/smartHint ActionZone's own "Next Best
+          Action" uses, so Acquisition never disagrees with Overview. */}
+      <div className="rounded-lg border-l-4 border border-[color:var(--color-line)] px-4 py-3" style={{ borderLeftColor: 'var(--color-accent)' }}>
+        <div className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1">Next Move</div>
+        <p className="text-[14px] font-bold text-[color:var(--color-text)] leading-snug">{nextMove}</p>
+      </div>
+
+      {/* 2 — Negotiation Position */}
       <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-4 py-3">
-        <div className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Negotiation Snapshot</div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Negotiation Position</div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           <div>
             <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Asking Price</div>
             <div className="text-[13px] font-bold">{lead.asking_price != null ? fc(lead.asking_price) : 'Not available'}</div>
+          </div>
+          <div>
+            <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Starting Offer</div>
+            <div className="text-[13px] font-bold">{lead.starting_offer != null ? fc(lead.starting_offer) : 'Not set'}</div>
           </div>
           <div>
             <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Current Offer</div>
@@ -47,13 +59,7 @@ export default function OnMarketAcquisitionWorkspace({ lead, userId, members, ca
         </div>
       </div>
 
-      {/* C — Next Move */}
-      <div className="rounded-lg border border-[color:var(--color-line)] px-4 py-3">
-        <div className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1">Next Move</div>
-        <p className="text-[13px] font-medium text-[color:var(--color-text)] leading-snug">{nextMove}</p>
-      </div>
-
-      {/* D — Questions/Talking Points, only if an AI Deal Brief already generated them */}
+      {/* 3 — Questions/Talking Points, only if an AI Deal Brief already generated them */}
       {questions.length > 0 && (
         <div className="rounded-lg border border-[color:var(--color-line)] px-4 py-3">
           <div className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Questions To Ask</div>
@@ -65,18 +71,25 @@ export default function OnMarketAcquisitionWorkspace({ lead, userId, members, ca
         </div>
       )}
 
-      {/* A — Listing / Agent (unchanged) */}
+      {/* A — Listing / Agent. Listing-agent fields (unlike Contact below)
+          have no manual-entry UI anywhere in the app today — they're
+          populated only by MLS enrichment (see LeadForm.jsx). Per the
+          mission's explicit instruction, this is stated honestly rather
+          than given a fake "Add Agent" button; the real mechanism (MLS
+          refresh) already lives in Overview's MlsStatusBanner. */}
       {hasAgent ? (
         <ListingAgentCard lead={lead} />
       ) : (
-        <EmptyState title="Agent Not Captured" explanation="Add listing-agent details when available." />
+        <EmptyState title="Listing Agent Needed" explanation="Not yet in MLS enrichment data. Refresh MLS status from Overview, or add it once the listing is found." />
       )}
 
-      {/* E — Contact + communication actions (unchanged) */}
-      {hasContact ? (
-        <ContactInfoSection lead={lead} userId={userId} members={members} canEdit={canEdit} onUpdated={onUpdated} />
-      ) : (
-        <EmptyState title="Contact Not Captured" explanation="Add owner/seller contact details when available." />
+      {/* E — Contact + communication actions. ContactInfoSection's own
+          fields ARE the real "add contact" action (EditableField,
+          click-to-fill) — always mount it rather than swapping in a
+          dead-end empty state with no real action behind it. */}
+      <ContactInfoSection lead={lead} userId={userId} members={members} canEdit={canEdit} onUpdated={onUpdated} />
+      {!hasContact && (
+        <div className="text-[11px] text-[color:var(--color-text-dim)] -mt-2 px-1">Click any field above to add seller/agent contact info.</div>
       )}
 
       {/* F — Recent negotiation/offer history — reuses ActivityTimeline's

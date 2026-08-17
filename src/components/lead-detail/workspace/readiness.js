@@ -12,17 +12,19 @@
 // inline checks drifting apart. This file computes ZERO business values
 // (no MAO, no profit, no score) — it only answers "is X present."
 
+// Action-First UX, Part 7 — "data language → user language." Reasons are
+// phrased as the next thing to DO, not just what field is empty.
 export function getDealReadiness(lead) {
   const missing = []
-  if (!lead.arv) missing.push({ key: 'arv', label: 'ARV', reason: 'Required to calculate Flip and BRRRR economics.' })
-  if (lead.renovation_cost == null) missing.push({ key: 'reno', label: 'Renovation Cost', reason: 'Required to calculate Flip and BRRRR economics.' })
+  if (!lead.arv) missing.push({ key: 'arv', label: 'ARV', reason: 'Run comps or enter it manually to calculate Flip and BRRRR economics.' })
+  if (lead.renovation_cost == null) missing.push({ key: 'reno', label: 'Renovation Cost', reason: 'Enter an estimate to calculate Flip and BRRRR economics.' })
   const flipReady = missing.length === 0
   const brrrrMissing = lead.rent_estimate == null
   return {
     flipReady,
     brrrrReady: flipReady && !brrrrMissing,
     missing,
-    brrrrMissingReason: brrrrMissing ? { key: 'rent', label: 'Rent Estimate', reason: 'Required to evaluate BRRRR.' } : null,
+    brrrrMissingReason: brrrrMissing ? { key: 'rent', label: 'Rent Estimate', reason: 'Add a rent estimate to evaluate BRRRR.' } : null,
   }
 }
 

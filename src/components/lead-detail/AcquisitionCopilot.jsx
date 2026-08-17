@@ -95,6 +95,19 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
   const nextActionLabel = NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action
   const isOverridden = d.next_best_action === 'HUMAN_OVERRIDE'
 
+  // Action-First UX, Part 2 — misleading verdict presentation fix. NO
+  // change to decision_v2/V2 itself: `maturity` already existed (Capability
+  // #16.1, getDecisionMaturity — reuses V2's own Confidence.missing, no
+  // new score) but previously rendered BELOW the bold recommendation
+  // label, so a lead could show a confident "PASS" first and "🟡
+  // PRELIMINARY — Missing: ARV" second. A new user reads the first large
+  // label as the answer. When maturity is PRELIMINARY, the dominant
+  // headline now says so explicitly — the underlying classification
+  // (PASS/MONITOR/etc, still 100% intact) becomes secondary context, not
+  // erased, just no longer visually dominant.
+  const maturity = !lead.is_distressed ? getDecisionMaturity(lead) : null
+  const isPreliminary = maturity === 'PRELIMINARY'
+
   // Capability #17.1 — "Why now", derived from the exact same
   // classifyLeadV2() this lead would land in on the Action Center (single
   // source of truth — see src/lib/actionReason.js). Not every lead surfaces
@@ -131,14 +144,27 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ borderColor: theme.border, background: theme.bg }}>
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: isPreliminary ? 'var(--color-warn)' : theme.border, background: isPreliminary ? 'var(--color-warn-soft)' : theme.bg }}>
       {/* ── ONE decision header — Recommendation/Next Action/Opportunity/Confidence/Urgency, nothing else repeated. ── */}
       <div className="px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-[15px] font-extrabold" style={{ color: theme.text }}>
-            {theme.icon} {isOverridden ? 'PASS — Human Override' : d.recommendation.replace(/_/g, ' ')}
-          </div>
-          <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{nextActionLabel}</div>
+          {isPreliminary ? (
+            <>
+              <div className="text-[15px] font-extrabold text-[color:var(--color-warn-text)]">
+                🟡 Preliminary Review
+              </div>
+              <div className="text-[12px] font-semibold text-[color:var(--color-text)]">
+                Not enough information to evaluate the deal yet.
+              </div>
+              <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">
+                System read: {isOverridden ? 'PASS — Human Override' : d.recommendation.replace(/_/g, ' ')} (subject to change once complete)
+              </div>
+            </>
+          ) : (
+            <div className="text-[15px] font-extrabold" style={{ color: theme.text }}>
+              {theme.icon} {isOverridden ? 'PASS — Human Override' : d.recommendation.replace(/_/g, ' ')}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <Chip label="Opportunity" value={d.opportunity?.score} />
@@ -146,6 +172,19 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
           <Chip label="Urgency" value={d.urgency?.level} />
         </div>
       </div>
+
+      {/* Action-First UX, Part 3 — this used to also carry its own bold
+          "Next Action" line (d.next_best_action), a SECOND next-step
+          signal competing with ActionZone's "What Now" (the one now
+          made visually dominant in Overview). Not removed — V2's own
+          suggestion is still real information — just demoted to a small
+          secondary chip so there's exactly ONE dominant next action per
+          screen, not two disagreeing-or-redundant ones. */}
+      {!isPreliminary && (
+        <div className="px-3.5 pb-2 -mt-1.5">
+          <span className="text-[10.5px] text-[color:var(--color-text-dim)]">System suggests: <b className="text-[color:var(--color-text)]">{nextActionLabel}</b></span>
+        </div>
+      )}
 
       {/* Capability #17.1 — "Why now", compact, always visible without a
           click (mission Section 6). No new large card — just one line
@@ -172,18 +211,16 @@ export default function AcquisitionCopilot({ lead, onUpdated }) {
 
       {/* Capability #16.1 — compact maturity indicator (Section 3/7). Reuses
           existing Confidence/missing output — no new score. On-market only
-          (ARV/comps concept doesn't apply the same way off-market). */}
-      {!lead.is_distressed && (() => {
-        const maturity = getDecisionMaturity(lead)
-        if (!maturity) return null
+          (ARV/comps concept doesn't apply the same way off-market).
+          PRELIMINARY's badge already moved into the headline above (Part
+          2 fix) — this line now only adds the specific missing-field
+          detail, not a second "PRELIMINARY" badge. REFINED is unchanged. */}
+      {!lead.is_distressed && maturity && (() => {
         const prov = getArvProvenance(lead)
         return (
           <div className="px-3.5 pb-2 -mt-1 text-[11px] text-[color:var(--color-text-dim)] flex items-center gap-1.5 flex-wrap">
-            {maturity === 'PRELIMINARY' ? (
-              <>
-                <span className="font-bold text-[color:var(--color-warn-text)]">🟡 PRELIMINARY</span>
-                <span>— Missing: {(d.confidence?.missing || []).slice(0, 3).join(' · ') || 'more data'}</span>
-              </>
+            {isPreliminary ? (
+              <span>Missing: {(d.confidence?.missing || []).slice(0, 3).join(' · ') || 'more data'}</span>
             ) : (
               <>
                 <span className="font-bold text-[color:var(--color-success-text)]">🟢 REFINED</span>

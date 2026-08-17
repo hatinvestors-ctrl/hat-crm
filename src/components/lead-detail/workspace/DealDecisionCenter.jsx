@@ -43,7 +43,7 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
           title="Deal Not Ready"
           explanation={`${readiness.missing.length} input${readiness.missing.length === 1 ? '' : 's'} needed before economics can be calculated.`}
           missing={readiness.missing}
-          action={onRunAnalysis ? { label: 'Get Comps & Detailed AI', onClick: onRunAnalysis } : undefined}
+          action={onRunAnalysis ? { label: 'Run Comps to Estimate ARV →', onClick: onRunAnalysis } : undefined}
         />
         {(lead.asking_price != null || lead.renovation_cost != null || lead.bedrooms) && (
           <div className="rounded-lg border border-[color:var(--color-line)] px-4 py-3">

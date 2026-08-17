@@ -250,8 +250,8 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
           border keeps a quiet color cue from the same verdict, without
           restating it as text/numbers. */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)]">
-          What now?
+        <span className="text-[10.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">
+          Next Best Action
         </span>
       </div>
 
