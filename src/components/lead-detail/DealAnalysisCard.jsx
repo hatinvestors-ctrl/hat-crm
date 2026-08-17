@@ -1344,7 +1344,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">{strategy === 'brrrr' ? 'BRRRR MAO' : 'Flip MAO'}</div>
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)]">Max Buy</div>
                     <div className="text-[14px] font-bold tabular-nums text-[color:var(--color-text)]">{activeResult.mao != null ? fc(Math.round(activeResult.mao / 100) * 100) : 'Not confirmed'}</div>
                   </div>
                 </div>
@@ -1368,6 +1368,20 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
                     )}
                   </div>
                 </div>
+                {/* Recommended Move (Part 11) — phrased directly from the
+                    same mao/currentOffer this strip already displays, not
+                    a new recommendation. Below MAO -> stay under it;
+                    above MAO -> the offer needs to come down. */}
+                {activeResult.mao != null && activeResult.currentOffer != null && (
+                  <div className="px-3 py-2 border-t border-[color:var(--color-line)]">
+                    <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] mb-0.5">Recommended Move</div>
+                    <p className="text-[11.5px] font-medium text-[color:var(--color-text)]">
+                      {activeResult.currentOffer <= activeResult.mao
+                        ? `Stay at or below ${fc(Math.round(activeResult.mao / 100) * 100)}. Preserve additional room through negotiation where possible.`
+                        : `Reduce the offer — currently ${fc(activeResult.currentOffer - activeResult.mao)} above Max Buy.`}
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <div className="px-3 py-2.5">
