@@ -552,7 +552,13 @@ function FullBreakdownTab({ lead, strategy }) {
           <Row label="Title & closing costs" value={fc(f.fixedCosts)} indent />
           <Row label={`Holding (${f.holdMonths} mo × ${fc(f.holdingPerMo)}/mo)`} value={fc(f.totalHolding)} indent />
           <Row separator />
-          <Row label="Total All-In" value={fc(pp + reno + f.points + f.fixedCosts + f.totalHolding)} bold />
+          {/* Objective A (approved All-In fix) — reads the canonical
+              f.allIn field directly instead of an independent UI
+              formula. This row's own arithmetic already matched f.allIn
+              exactly (no down-payment double-count here — that bug was
+              BRRRR-only, below); switched anyway per "UI must not
+              maintain a duplicate formula that happens to agree today." */}
+          <Row label="Total All-In" value={fc(f.allIn)} bold />
         </div>
 
         {/* Flip — Sale & Profit */}
@@ -593,18 +599,27 @@ function FullBreakdownTab({ lead, strategy }) {
             bold
           />
         </div>
-        {/* BRRRR — All-In Cost Summary */}
+        {/* BRRRR — All-In Cost Summary.
+            Objective A (approved fix, see RELEASE-READINESS.md) — this
+            total used to independently sum "pp + reno + downPayment +
+            points + fixedCosts + totalHolding", double-counting the
+            down payment (a FINANCING SPLIT of Purchase Price, not an
+            additional economic cost on top of it — see Part 2's
+            $100K purchase / $90K HML / $10K down example). Now reads
+            the canonical f.allIn field directly. Down Payment is still
+            shown below as an informational financing-split line — it's
+            intentionally excluded from the total it sits above. */}
         <div className="rounded-md bg-[color:var(--color-bg-elev-2)] px-3 py-2">
           <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-1">All-In Cost Summary</div>
           <Row label="Purchase Price" value={fc(pp)} indent />
           <Row label="Renovation" value={fc(reno)} indent />
-          <Row label="Down Payment (10%)" value={fc(f.downPayment)} indent />
+          <Row label="Down Payment (10% — financing split of Purchase Price, not an added cost)" value={fc(f.downPayment)} indent />
           <Row label="HML Points (2% of loan)" value={fc(f.points)} indent />
           <Row label="Title & Closing" value={fc(f.fixedCosts)} indent />
           <Row label={`HML Interest (1%/mo × ${f.holdMonths} months)`} value={fc(f.monthlyPmt * f.holdMonths)} indent />
           <Row label={`Taxes + Insurance (${f.holdMonths} months)`} value={fc((208 + 100) * f.holdMonths)} indent />
           <Row separator />
-          <Row label="Total All-In Cost" value={fc(pp + reno + f.downPayment + f.points + f.fixedCosts + f.totalHolding)} bold />
+          <Row label="Total All-In Cost" value={fc(f.allIn)} bold />
           <Row separator />
           <Row label="Funded by HML Loan" value={`−${fc(f.hmlLoan)}`} indent />
           <Row label="Your Cash Out of Pocket" value={fc(f.totalCashNeeded + f.totalHolding)} />
