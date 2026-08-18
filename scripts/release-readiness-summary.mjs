@@ -34,6 +34,7 @@ const CATEGORY_LABELS = {
   'actionCenterClassification.test.js': 'ACTION CENTER CLASSIFICATION (classifyLeadV2)',
   'crossScreenConsistency.test.js': 'CROSS-SCREEN CONSISTENCY',
   'canonicalDealValues.test.js': 'CANONICAL DEAL VALUES (D1/D2 product decision)',
+  'decisionConsistency.test.js': 'DECISION-FLOW CONSISTENCY (Norfolk QA-01/02/03)',
 }
 
 const byFile = {}

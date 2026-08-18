@@ -322,18 +322,31 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
 // HAT's actual minimum (Section 6) — a $30,728 deal is no longer labeled
 // CONDITIONAL by a stale $40K rule; "Strong" is descriptive context, not
 // a lower verdict for the acceptable tier.
-export function FlipRealityCheck({ lead }) {
+// QA-01 fix (Product Decision — Canonical Deal Values, see RELEASE-
+// READINESS.md): this section used to independently recompute "current"
+// profit using getEffectiveOffer — the MAO-anchored RECOMMENDED offer,
+// always at/below Max Buy by construction — instead of the canonical
+// CURRENT DEAL evaluation (computeFlipResult's evaluationPrice, which
+// follows the real actual/submitted offer or asking price). That mismatch
+// is exactly what let "Path to a Flip Deal" show "MEETS MINIMUM FLIP
+// TARGET" for a lead the Margin of Safety section immediately above it
+// already correctly flagged NO DEAL. `flipResult` is the SAME canonical
+// result the caller already computed (never duplicated) — a fresh
+// computeFlipResult call is only a fallback for a caller that doesn't
+// pass one, so this component still works mounted standalone.
+export function FlipRealityCheck({ lead, flipResult }) {
   const arv  = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   if (!arv || reno == null) return null
   const holdMonths = lead.hold_months || 6
 
-  const flipMao = calculateFlipMAO(arv, reno, holdMonths)
-  // Same effective-offer function Financials/Detailed Analysis use — one
-  // "current price" concept across the whole card, not a third guess.
-  const currentPP = getEffectiveOffer(lead, flipMao)
-  const current = currentPP != null ? computeFlipBreakdown(currentPP, arv, reno, holdMonths) : null
-  const profit = current?.totalProfit ?? null
+  const canonicalFlip = flipResult ?? computeFlipResult(lead)
+  const flipMao = canonicalFlip.available ? canonicalFlip.mao : calculateFlipMAO(arv, reno, holdMonths)
+  // The real CURRENT price this deal is evaluated at — never the
+  // recommended/negotiated offer, never Max Buy.
+  const currentPP = canonicalFlip.available ? canonicalFlip.evaluationPrice : null
+  const profit = canonicalFlip.available ? canonicalFlip.projectedProfit : null
+  const current = profit != null ? { totalProfit: profit } : null
 
   const meetsTarget = profit != null && profit >= FLIP_MIN_PROFIT_TARGET
   const strong = profit != null && profit >= FLIP_STRONG_PROFIT
@@ -1392,7 +1405,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         <BrrrrRealityCheck lead={lead} />
       )}
       {!hideDecisionSummary && hasAnalysis && strategy !== 'brrrr' && (
-        <FlipRealityCheck lead={lead} />
+        <FlipRealityCheck lead={lead} flipResult={flipResult} />
       )}
 
       {updatingNego && (

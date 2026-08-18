@@ -3,6 +3,7 @@ import Modal from '../ui/Modal'
 import Input from '../ui/Input'
 import Button from '../ui/Button'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
+import { computeFlipResult } from '../../lib/dealExplanation'
 
 // Phase 2.1 — exported (additive only, no behavior change) so Overview's
 // "What Now" summary and Acquisition's "Next Move" can read the SAME
@@ -119,26 +120,22 @@ export const DEFAULT_PLAYBOOK = {
 const fmtK  = (n) => n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${Math.round(n)}`
 const fmtFull = (n) => `$${Math.round(n).toLocaleString()}`
 
-function computeProfit(lead) {
-  const arv  = Number(lead.arv || 0)
-  const reno = Number(lead.renovation_cost || 0)
-  const mao  = Number(lead.mao || 0)
-  const pp   = mao || Number(lead.asking_price || 0)
-  if (!arv || !pp) return null
-  const hml         = pp * 0.9 + reno
-  const cashToClose = pp * 0.10 + hml * 0.02 + 2450
-  const holding     = (hml * 0.01 + 208 + 100) * 3
-  return Math.round(arv * 0.93 - hml - holding - cashToClose)
-}
-
-// Determine accent color based on deal state
+// Determine accent color from canonical Flip economics. HAT's existing
+// $0 / $20,000 gap thresholds are UNCHANGED (Product Decision — no
+// threshold tuning in this fix) — only two things changed: the gap is
+// now measured against canonical Flip Max Buy instead of legacy
+// lead.mao, and the AI's own deal_analysis.verdict (BUY/REJECT/
+// CONDITIONAL — a different vocabulary from the deterministic engine's
+// STRONG/PASS/WATCH/NO DEAL) no longer short-circuits the color, since
+// that let this one card simultaneously reflect two independent,
+// occasionally-contradicting sources of truth (QA-02's root cause).
 function accentColor(lead) {
-  const verdict = lead.deal_analysis?.verdict
-  if (verdict === 'BUY') return 'green'
-  const gap = Number(lead.asking_price || 0) - Number(lead.mao || 0)
-  if (verdict === 'REJECT' || gap > 20000) return 'red'
-  if (verdict === 'CONDITIONAL' || (gap > 0 && gap <= 20000)) return 'amber'
-  return 'blue'
+  const flip = computeFlipResult(lead)
+  if (!flip.available || flip.mao == null) return 'blue'
+  const gap = Number(lead.asking_price || 0) - flip.mao
+  if (gap > 20000) return 'red'
+  if (gap > 0) return 'amber'
+  return 'blue' // at or below Max Buy — matches the pre-fix numeric-only fallback
 }
 
 const ACCENT = {
@@ -153,12 +150,18 @@ function smartActions(lead, staticActions) {
 
   const hasArv      = !!lead.arv
   const hasReno     = !!lead.renovation_cost
+  // hasAnalysis is a WORKFLOW gate (has AI been run at least once) —
+  // unchanged by the Canonical Deal Values fix, since that's a milestone
+  // question, not a financial-truth question.
   const hasAnalysis = !!lead.deal_analysis?.verdict
-  const gap         = Number(lead.asking_price || 0) - Number(lead.mao || 0)
+  // QA-02 fix: gap now measured against canonical Flip Max Buy, never
+  // legacy lead.mao.
+  const flip = computeFlipResult(lead)
+  const gap  = (flip.available && flip.mao != null) ? Number(lead.asking_price || 0) - flip.mao : null
 
   // After analysis: primary action depends on gap
   if (hasAnalysis && hasArv && hasReno) {
-    if (gap <= 0) {
+    if (gap != null && gap <= 0) {
       return [
         { label: 'Draft Offer',         emoji: '📝', variant: 'primary',   patch: { status: 'mao_calculated' } },
         { label: 'Schedule Follow-Up',  emoji: '📅', variant: 'secondary', patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
@@ -187,8 +190,14 @@ export function smartHint(lead, staticHint) {
   if (!hasArv)             return 'Enter the After-Repair Value (ARV) so we can calculate MAO and check if this deal works.'
   if (!hasReno)            return 'Add the estimated renovation cost, then run AI Analysis to get your MAO and starting offer.'
   if (!hasAnalysis)        return "Numbers look ready — run AI Analysis to get the verdict, MAO, and Kevin's take on this deal."
-  const gap = Number(lead.asking_price || 0) - Number(lead.mao || 0)
-  if (gap > 0) return `Seller is ${fmtFull(gap)} above MAO. Decide: negotiate, schedule a follow-up, or move on.`
+  // QA-02 fix: gap now measured against canonical Flip Max Buy, never
+  // legacy lead.mao. Label says "Flip Max Buy" explicitly (not the
+  // ambiguous bare "MAO") since this hint is Flip-specific.
+  const flip = computeFlipResult(lead)
+  if (flip.available && flip.mao != null) {
+    const gap = Number(lead.asking_price || 0) - flip.mao
+    if (gap > 0) return `Seller is ${fmtFull(gap)} above Flip Max Buy. Decide: negotiate, schedule a follow-up, or move on.`
+  }
   return 'Numbers check out — ready to draft an offer or schedule a follow-up call with the seller.'
 }
 
@@ -207,14 +216,12 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
   const actions  = smartActions(lead, playbook.actions)
   const color    = accentColor(lead)
   const accent   = ACCENT[color]
-  const verdict  = lead.deal_analysis?.verdict
-  const profit   = computeProfit(lead)
-
-  const arv    = Number(lead.arv || 0)
-  const reno   = Number(lead.renovation_cost || 0)
-  const mao    = Number(lead.mao || 0)
-  const asking = Number(lead.asking_price || 0)
-  const gap    = mao && asking ? asking - mao : null
+  // Note: an unused verdict/profit/arv/reno/mao/gap snapshot (reading
+  // legacy lead.mao and the AI's own deal_analysis.verdict, computed but
+  // never rendered — dead since the "verdict badge... removed" refactor
+  // referenced in the comment above) was removed here during the
+  // Canonical Deal Values audit (QA-02). Nothing in this component's JSX
+  // ever read those six variables.
 
   const runAction = async (action) => {
     if (action.requiresDate) {

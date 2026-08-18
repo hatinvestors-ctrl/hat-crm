@@ -140,7 +140,7 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
           Comps, not duplicated — DealAnalysisCard hides these via
           hideDecisionSummary when mounted in AI & Comps). */}
       <FlipMarginOfSafety lead={lead} flipResult={flip} />
-      <FlipRealityCheck lead={lead} />
+      <FlipRealityCheck lead={lead} flipResult={flip} />
       {readiness.brrrrReady && <BrrrrRealityCheck lead={lead} />}
     </div>
   )

@@ -8,7 +8,8 @@
 //           asking_price, arv, renovation_cost, mao, rent_estimate, notes } }
 // Returns: { ok, notes: string }
 
-import { calculateFlipMAO, computeFlipBreakdown } from '../../src/lib/calculations.js'
+import { calculateFlipMAO, computeFlipBreakdown, computeBrrrrBreakdown } from '../../src/lib/calculations.js'
+import { computeBrrrrResult } from '../../src/lib/dealExplanation.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
@@ -19,7 +20,11 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor writing internal deal notes for HAT Investors. Be declarative, number-driven, opinionated. No hedging.
+// Exported (additive only, no behavior change) so the seller-narrative
+// guardrail (QA-08, RELEASE-READINESS.md) is directly unit-testable.
+export const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor writing internal deal notes for HAT Investors. Be declarative, number-driven, opinionated. No hedging on the NUMBERS — the math is the math.
+
+SELLER BEHAVIOR — NEVER STATE AS FACT: "No hedging" applies to deal math, not to what a real person will do. Never write that the seller "will probably counter," "will likely accept," "will likely move to close," or any similar prediction of seller behavior UNLESS the pre-computed Seller Signals score is at least MODERATE and you cite the specific evidence (estate/probate, price drop %, as-is language, DOM, motivated notes). When Seller Signals are WEAK/baseline (no real evidence), describe the signal strength itself ("weak motivation signals — no estate, price-drop, or as-is evidence found") instead of predicting behavior, and give factual acquisition guidance instead ("start at $X," "do not exceed $Y," "if the seller won't move into range, follow up or pass").
 
 JAX ARV (3/2 renovated): 32208/32219 $160-240K | 32210/32244/32221 $220-320K | 32205/32216 $230-380K | 32211 $155-200K | Clay Co $200-300K
 Adjustments: 2BR -$20K | 4BR +$15K | 1BA only -$20K | <1,000sqft -$15K
@@ -108,7 +113,11 @@ Set Status: [new_lead / contacted / offer_sent / negotiating / dead_lead / follo
 Make Offer: [YES - $[X] / NO / NOT YET]
 Priority:   [HIGH - act today / MEDIUM - this week / LOW - watch]`
 
-function buildPrompt(lead) {
+// Exported (additive only, no behavior change) so the pre-computed deal
+// math feeding the AI prompt — the part that must stay canonical, per
+// the Product Decision in RELEASE-READINESS.md (QA-03) — is directly
+// unit-testable without a live LLM call.
+export function buildPrompt(lead) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')
   const fmt  = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'Unknown'
   const num  = (n) => n != null ? Number(n) : null
@@ -148,28 +157,57 @@ function buildPrompt(lead) {
     const holdMo = 6
 
     // Math AT MAO (what we actually pay)
-    const hmlMao        = buyPrice * 0.90 + reno
-    const hmlMaoCosts   = Math.round(hmlMao * 0.02) + 1500 + Math.round(hmlMao * 0.12 * (holdMo / 12))
-    const allInMao      = buyPrice + reno + hmlMaoCosts
-    const cashLeftInMao = allInMao - refi
-    const cashflow      = rentEst - loanFactor - 208 - 136   // $136/mo insurance (actual avg from portfolio)
+    // Product Decision — Canonical Deal Values (QA-03, see RELEASE-
+    // READINESS.md). BRRRR pre-computation used to evaluate cash left
+    // in/cash flow AT THE FLIP MAO (buyPrice/computedMao) using a
+    // hand-rolled approximation (bucketed refi P&I table, flat $1,500
+    // closing, $136 flat insurance) — a materially different purchase
+    // price AND formula than the canonical Deal tab's BRRRR figures.
+    // This is exactly the "BRRRR at MAO: cash left in $16,652" vs.
+    // canonical "$23,063" contradiction manual QA found. Calls
+    // computeBrrrrResult(lead) DIRECTLY — the exact function the Deal
+    // tab uses — rather than re-deriving BRRRR math from lower-level
+    // helpers, so this can never drift from the canonical evaluation
+    // price/formula again (computeBrrrrResult evaluates cash left in/
+    // cash flow at the RECOMMENDED offer, not at BRRRR's own Max Buy —
+    // reusing it directly, instead of re-implementing that same
+    // convention by hand, is what guarantees the match).
+    const brrrr = computeBrrrrResult(lead)
+    // currentOffer is the SAME price computeBrrrrResult itself evaluated
+    // cashLeftIn/monthlyCashFlow at (the recommended/negotiated offer,
+    // not BRRRR's own Max Buy) — computeBrrrrBreakdown here only supplies
+    // the "all-in" total-cash-needed figure for the 1%-rule text below;
+    // cashLeftIn/cashflow themselves come straight from `brrrr`, never
+    // recomputed, so they can never drift from the canonical value.
+    const brrrrBuyPrice = brrrr.available ? brrrr.currentOffer : null
+    if (brrrr.available && brrrrBuyPrice != null && brrrr.cashLeftIn != null) {
+      const bb = computeBrrrrBreakdown(brrrrBuyPrice, arv, reno, rentEst, holdMo)
+      brrrrResult = {
+        allIn: Math.round(bb.totalCashNeeded + bb.totalHolding),
+        refi: Math.round(bb.refiLoan),
+        cashLeftIn: brrrr.cashLeftIn,
+        cashflow: brrrr.monthlyCashFlow,
+        label: brrrr.verdict === 'STRONG' || brrrr.verdict === 'PASS' ? 'GREAT' : brrrr.verdict === 'WATCH' ? 'OK' : 'FAILS',
+      }
+    }
     // Capability #19.2 — same canonical Flip cost model as calculateFlipMAO
     // (HML financing, holding costs, 93%-of-ARV sale), not the simplified
     // "ARV − price − reno − 8%" formula this used to compute independently
     // — that second formula was the actual source of the "$46,650 at MAO"
     // text that didn't match the $30,728/$30,000 figures shown elsewhere.
-    const flipNetMao    = computeFlipBreakdown(buyPrice, arv, reno, holdMo).totalProfit
-    brrrrResult = { allIn: allInMao, refi, cashLeftIn: cashLeftInMao, cashflow, label: cashLeftInMao < 30000 ? 'GREAT' : cashLeftInMao < 60000 ? 'OK' : 'FAILS' }
+    const flipNetMao    = Math.round(computeFlipBreakdown(buyPrice, arv, reno, holdMo).totalProfit)
     // $30,000 is HAT's minimum acceptable Flip profit (FLIP_MIN_PROFIT_TARGET) —
     // anything at/above it is never "FAILS"; $40K+ is descriptively STRONG.
     flipResult  = { allIn: buyPrice + reno, netProfit: flipNetMao, label: flipNetMao >= 40000 ? 'STRONG' : flipNetMao >= 30000 ? 'ACCEPTABLE' : 'FAILS' }
 
-    // Math AT ASK (reference only — shows why we can't pay full price)
-    const hmlAsk      = pp * 0.90 + reno
-    const hmlAskCosts = Math.round(hmlAsk * 0.02) + 1500 + Math.round(hmlAsk * 0.12 * (holdMo / 12))
-    const allInAsk    = pp + reno + hmlAskCosts
-    const cashLeftAsk = allInAsk - refi
-    const flipNetAsk  = computeFlipBreakdown(pp, arv, reno, holdMo).totalProfit
+    // Math AT ASK (reference only — shows why we can't pay full price).
+    // BRRRR reference figures now use the same canonical
+    // computeBrrrrBreakdown, at the actual asking price, for the same
+    // provenance reason as above.
+    const askBrrrr    = computeBrrrrBreakdown(pp, arv, reno, rentEst, holdMo)
+    const allInAsk    = Math.round(askBrrrr.totalCashNeeded + askBrrrr.totalHolding)
+    const cashLeftAsk = Math.round(askBrrrr.totalCashInvested)
+    const flipNetAsk  = Math.round(computeFlipBreakdown(pp, arv, reno, holdMo).totalProfit)
 
     const pctAboveMaoNum = computedMao ? ((pp - computedMao) / Math.abs(computedMao)) * 100 : 0
     const pctAboveMao    = pctAboveMaoNum.toFixed(1)
@@ -298,9 +336,9 @@ OFFER LADDER (use these exact values — do not adjust):
   Starting Offer (anchor): ${anchorOffer} (${anchorNote})
   Target Price:            ${targetPrice} ${askBelowMao ? '(the asking price — already a deal, do not negotiate below this)' : '(our MAO — the number that makes the deal work)'}
   Max Walk-Away:           ${maxWalkAway} (absolute ceiling — do not pay above this)
-AT ${askBelowMao ? `ASK ${fmt(pp)} [THE DEAL WORKS HERE — this is our primary scenario]` : `MAO ${fmt(buyPrice)} [THIS IS WHAT WE OFFER — base verdict on these numbers]`}:
-  BRRRR: All-in ${fmt(allInMao)} | Refi ${fmt(refi)} | Cash left in ${fmt(cashLeftInMao)} → ${brrrrResult.label} | Cash flow ~$${cashflow}/mo
-  Flip:  All-in ${fmt(buyPrice + reno)} | Net profit ${fmt(flipNetMao)} → ${flipResult.label}
+${askBelowMao ? `AT ASK ${fmt(pp)} [THE DEAL WORKS HERE — this is our primary scenario]:` : 'AT EACH STRATEGY\'S OWN BASIS PRICE [base verdict on these numbers — BRRRR and Flip use DIFFERENT prices below, do not conflate them]:'}
+  BRRRR${askBelowMao ? '' : ` (Max Buy ${fmt(brrrr.mao != null ? Math.round(brrrr.mao) : null)}, evaluated at our recommended offer ${fmt(brrrrBuyPrice)})`}: ${brrrrResult ? `All-in ${fmt(brrrrResult.allIn)} | Refi ${fmt(brrrrResult.refi)} | Cash left in ${fmt(brrrrResult.cashLeftIn)} → ${brrrrResult.label} | Cash flow ~$${brrrrResult.cashflow}/mo` : 'not viable under current rent/ARV/reno assumptions'}
+  Flip${askBelowMao ? '' : ` (evaluated at Flip Max Buy ${fmt(buyPrice)})`}:  All-in ${fmt(buyPrice + reno)} | Net profit ${fmt(flipNetMao)} → ${flipResult.label}
 ${askBelowMao ? '' : `
 AT ASK ${fmt(pp)} [reference only — shows why full price doesn't work]:
   BRRRR: All-in ${fmt(allInAsk)} | Cash left in ${fmt(cashLeftAsk)} → ${cashLeftAsk < 30000 ? 'GREAT' : cashLeftAsk < 60000 ? 'OK' : 'FAILS'}
