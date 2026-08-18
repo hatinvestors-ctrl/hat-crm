@@ -18,7 +18,7 @@
 import {
   calculateFlipMAO, calculateBrrrrMAO, computeFlipBreakdown, computeBrrrrBreakdown,
   FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, FLIP_PASS_MARGIN,
-  formatCurrency as fc, getEffectiveOffer,
+  formatCurrency as fc, getEffectiveOffer, describeCashLeftIn,
 } from './calculations.js'
 
 const THIN_MARGIN = FLIP_PASS_MARGIN // within $5K of target = WATCH, not a clean PASS (Section 11)
@@ -138,9 +138,14 @@ export function computeFlipResult(lead) {
   // a system-generated negotiation suggestion is not a real price anyone
   // has actually agreed to pay or offer.
   const evaluationPrice = actualOffer ?? ask
-  const profitAtEvaluationPrice = (evaluationPrice != null && evaluationPrice > 0)
-    ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths).totalProfit
+  // Phase 2 — Financial Transparency (Part 12, single source of truth).
+  // The full line-item breakdown at the real evaluation price, computed
+  // ONCE here and exposed as-is — a "View Calculation" UI reads this
+  // object directly instead of re-deriving All-In/profit math itself.
+  const evaluationBreakdown = (evaluationPrice != null && evaluationPrice > 0)
+    ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths)
     : null
+  const profitAtEvaluationPrice = evaluationBreakdown ? evaluationBreakdown.totalProfit : null
 
   let verdict = 'NO DEAL'
   if (profitAtEvaluationPrice != null) {
@@ -213,7 +218,7 @@ export function computeFlipResult(lead) {
 
   return {
     available: true, verdict, mao, maoFeasible, evaluationPrice, actualOffer, currentOffer,
-    projectedProfit: profitAtEvaluationPrice,
+    projectedProfit: profitAtEvaluationPrice, breakdown: evaluationBreakdown,
     targetProfit: FLIP_MIN_PROFIT_TARGET, why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
     marginOfSafety,
   }
@@ -271,7 +276,14 @@ export function computeBrrrrResult(lead) {
 
   const why = []
   const biggestRisk = []
-  if (cashLeftIn != null) why.push(`About ${fc(cashLeftIn)} would remain in the deal after refinance.`)
+  if (cashLeftIn != null) {
+    // Part 2/18 — a signed cashLeftIn (approved Issue #4) never renders
+    // as a raw negative dollar figure in narrative text either.
+    const cli = describeCashLeftIn(cashLeftIn)
+    why.push(cli.extracted != null
+      ? `All capital is recovered at refinance, with about ${fc(cli.extracted)} extracted beyond that.`
+      : `About ${cli.display} would remain in the deal after refinance.`)
+  }
   if (monthlyCashFlow != null) {
     why.push(monthlyCashFlow > 0
       ? `At ${fc(rent)} rent, estimated cash flow is ${fc(monthlyCashFlow)}/month.`
@@ -287,6 +299,10 @@ export function computeBrrrrResult(lead) {
   return {
     available: true, verdict, mao: maoResult.mao, limitingFactor: maoResult.limitingFactor ?? null,
     currentOffer, rent, cashLeftIn, monthlyCashFlow, coc,
+    // Phase 2 — Financial Transparency (Part 12). The full canonical
+    // breakdown at the evaluated price — a "View Calculation" UI reads
+    // this directly instead of re-deriving the waterfall itself.
+    breakdown: current,
     why: why.slice(0, 4), biggestRisk: biggestRisk.slice(0, 1),
   }
 }

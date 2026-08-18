@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import {
   formatCurrency, computeFlipBreakdown, computeBrrrrBreakdown, bisectThreshold,
   calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, getEffectiveOffer,
+  describeCashLeftIn,
 } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, computeFlipDownsideSensitivity } from '../../lib/dealExplanation'
@@ -192,9 +193,19 @@ export function BrrrrRealityCheck({ lead }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Cash Left In (current)</div>
-                <div className={`text-[14px] font-bold ${current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
-                  {fc(current.totalCashInvested)} {current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? '✓' : '✗'}
-                </div>
+                {(() => {
+                  const cli = describeCashLeftIn(current.totalCashInvested)
+                  return (
+                    <>
+                      <div className={`text-[14px] font-bold ${current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-danger-text)]'}`}>
+                        {cli.display} {current.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? '✓' : '✗'}
+                      </div>
+                      {cli.extracted != null && (
+                        <div className="text-[10px] text-[color:var(--color-success-text)]">All capital recovered · +{fc(cli.extracted)} extracted</div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Monthly Cash Flow (current)</div>
@@ -602,18 +613,28 @@ function FullBreakdownTab({ lead, strategy }) {
             ? <Row label="Refi Cash Back" value={`−${fc(f.refiCashOut)}`} indent positive />
             : <Row label="Additional Cash at Refi" value={`+${fc(Math.abs(f.refiCashOut))}`} indent />
           }
-          <Row
-            label="Cash Left in Deal (after refi)"
-            value={fc(f.totalCashInvested)}
-            bold
-            positive={f.totalCashInvested === 0}
-          />
+          {(() => {
+            // Part 2/18 — signed Cash Left In (approved Issue #4) never
+            // displays as a raw negative dollar figure; a cash-out-
+            // positive deal shows $0 + "additional cash extracted"
+            // instead, while the canonical f.totalCashInvested value
+            // itself stays signed (verified in test/brrrrFinancialAccuracy.test.js).
+            const cli = describeCashLeftIn(f.totalCashInvested)
+            return (
+              <>
+                <Row label="Cash Left in Deal (after refi)" value={cli.display} bold positive={f.totalCashInvested <= 0} />
+                {cli.extracted != null && (
+                  <Row label="All capital recovered — additional cash extracted" value={`+${fc(cli.extracted)}`} indent positive />
+                )}
+              </>
+            )
+          })()}
         </div>
         {/* BRRRR — Cash Flow */}
         <div>
           <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-1">Monthly Cash Flow (post-refi)</div>
           <Row label="Gross Rent" value={rent > 0 ? fc(rent) : '—'} />
-          <Row label="Refi Mortgage (6.9% / 30yr)" value={`−${fc(f.refiMoPmt)}`} indent />
+          <Row label={`Refi Mortgage (${(f.refiInterestRate * 100).toFixed(1)}% / ${f.amortizationYears}yr)`} value={`−${fc(f.refiMoPmt)}`} indent />
           <Row label="Property Taxes" value="−$208" indent />
           <Row label="Insurance" value="−$100" indent />
           <Row separator />

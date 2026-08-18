@@ -50,6 +50,38 @@ export const BRRRR_MAX_CASH_LEFT_IN = 30000   // Capability #19.1, Section 8 —
 export const FLIP_STRONG_PROFIT = 40000        // >= this profit at current offer = STRONG
 export const FLIP_PASS_MARGIN = 5000           // >= target + this margin = PASS; between target and target+margin = WATCH (thin)
 
+// Phase 2 — BRRRR Financial Accuracy (approved Issue #1, see RELEASE-
+// READINESS.md). HAT's documented canonical BRRRR refinance underwriting
+// assumptions — previously only referenced in comments/other files
+// (decisionEngineV2.js, dealCalculations.js), now the single named
+// source computeBrrrrBreakdown itself uses. NOT a business-policy
+// change: 6.7%/30yr was already the documented canonical figure
+// elsewhere in this codebase — this fixes the ONE place that had
+// silently drifted from it (an undocumented ~6.93% flat-multiplier
+// approximation).
+export const BRRRR_REFI_RATE = 0.067          // HAT's documented canonical BRRRR refi interest rate
+export const BRRRR_REFI_AMORT_YEARS = 30       // HAT's documented canonical BRRRR refi amortization term
+
+// Standard mortgage amortization payment — principal, rate, and term are
+// all explicit inputs (never a hidden/hardcoded multiplier baked into a
+// caller), so a real deal/settings override can flow through later
+// without duplicating this formula. Defaults to HAT's canonical BRRRR
+// refi assumptions above. Returns 0 for a non-positive principal (never
+// NaN/Infinity); a 0% rate falls back to straight-line principal/term
+// (avoids a divide-by-zero in the amortization formula, which is
+// undefined at r=0).
+export function calculateMortgagePayment(principal, annualRate = BRRRR_REFI_RATE, amortYears = BRRRR_REFI_AMORT_YEARS) {
+  const p = num(principal)
+  if (!p || p <= 0) return 0
+  const rate = annualRate != null ? Number(annualRate) : BRRRR_REFI_RATE
+  const years = amortYears != null ? Number(amortYears) : BRRRR_REFI_AMORT_YEARS
+  const n = years * 12
+  const r = rate / 12
+  if (r === 0) return p / n
+  const factor = Math.pow(1 + r, n)
+  return p * (r * factor) / (factor - 1)
+}
+
 // Full Flip P&L at a given purchase price — HML financing (90% purchase +
 // 100% reno, 2% points, 1%/mo interest), $2,450 fixed closing costs, taxes
 // $208/mo + insurance $100/mo holding, sale at 93% of ARV. Same formula as
@@ -68,14 +100,52 @@ export function computeFlipBreakdown(pp, arv, reno, holdMonths = 6) {
   const totalProfit     = saleProceeds - hmlLoan - totalHolding - totalCashNeeded
   const roi             = totalCashNeeded > 0 ? (totalProfit / totalCashNeeded) * 100 : 0
   const annualizedRoi   = holdMonths > 0 ? (roi / holdMonths) * 12 : 0
-  return { hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding, saleProceeds, totalProfit, roi, annualizedRoi, holdMonths }
+  // Phase 2 — Financial Transparency (Part 5/9/12). Total economic project
+  // cost before disposition — purchase + rehab + acquisition closing +
+  // HML financing costs (points) + holding costs — using ONLY costs
+  // already modeled above (never a new expense assumption). Reconciles
+  // exactly: totalProfit === saleProceeds - allIn (verified by
+  // construction and asserted in test/brrrrFinancialAccuracy.test.js).
+  const acquisitionCosts = fixedCosts
+  const financingCosts   = points
+  const allIn            = pp + reno + acquisitionCosts + financingCosts + totalHolding
+  const investorCashContributed = totalCashNeeded + totalHolding
+  return {
+    hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding,
+    saleProceeds, totalProfit, roi, annualizedRoi, holdMonths,
+    purchasePrice: pp, rehab: reno, acquisitionCosts, financingCosts, allIn, investorCashContributed,
+  }
 }
 
 // Full BRRRR P&L at a given purchase price — same HML financing as Flip,
-// refinance at 70% ARV (3% refi closing costs), 30yr/6.9% refi mortgage
-// for post-refi cash flow. Same model FlipRealityCheck/BrrrrRealityCheck
-// already used.
-export function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6) {
+// refinance at 70% ARV, 30yr refi mortgage at HAT's documented canonical
+// rate (BRRRR_REFI_RATE) for post-refi cash flow.
+//
+// Phase 2 — BRRRR Financial Accuracy (approved Issues #1 and #4; see
+// RELEASE-READINESS.md). Two real fixes here, both approved, neither a
+// business-policy change:
+//   #1 refiMoPmt now uses calculateMortgagePayment() — the real 30yr
+//      amortization formula at HAT's documented canonical 6.7% — instead
+//      of an undocumented flat multiplier (0.006607) that implied an
+//      unstated ~6.93% rate.
+//   #4 totalCashInvested ("Cash Left In") no longer clamps a negative
+//      result to $0 inside the calculation. A cash-out-positive BRRRR
+//      (refinance returns MORE than was invested) now correctly reports
+//      a negative number internally — presentation-layer "$0, capital
+//      recovered + $X extracted" framing belongs in the UI, never inside
+//      this financial engine. This was proven with two independently-
+//      built reconciliation methods before being approved (see the
+//      forensic audit report) — both agree exactly once unclamped.
+//
+// refiCostsPct (currently 3%) and the acquisition fixedCosts ($2,450)
+// are Issues #2 and #3 from the same audit — NOT approved for correction
+// this pass, deliberately left unchanged. `opts` only exposes the
+// APPROVED Issue #1 override surface (rate/amortization); it does not
+// add an unapproved override for refi costs.
+export function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6, opts = {}) {
+  const refiInterestRate   = opts.refiInterestRate != null ? Number(opts.refiInterestRate) : BRRRR_REFI_RATE
+  const amortizationYears  = opts.amortizationYears != null ? Number(opts.amortizationYears) : BRRRR_REFI_AMORT_YEARS
+
   const hmlLoan           = pp * 0.90 + reno
   const monthlyPmt        = hmlLoan * 0.01
   const points            = hmlLoan * 0.02
@@ -85,16 +155,48 @@ export function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6
   const holdingPerMo      = monthlyPmt + 208 + 100
   const totalHolding      = holdingPerMo * holdMonths
   const refiLoan          = arv * 0.70
-  const refiCosts         = refiLoan * 0.03
+  const refiCosts         = refiLoan * 0.03   // Issue #2 — estimated/defaulted, NOT approved to change this pass
   const refiCashOut       = refiLoan - refiCosts - hmlLoan - totalHolding
-  const totalCashInvested = refiCashOut >= 0
-    ? Math.max(0, totalCashNeeded - refiCashOut)
-    : totalCashNeeded + Math.abs(refiCashOut)
-  const refiMoPmt         = refiLoan * 0.006607
+  // Issue #4 fix — signed, never clamped inside the engine.
+  const totalCashInvested = totalCashNeeded - refiCashOut
+  // Issue #1 fix — real amortization at the canonical rate, not a flat multiplier.
+  const refiMoPmt         = calculateMortgagePayment(refiLoan, refiInterestRate, amortizationYears)
   const monthlyCF         = monthlyRent > 0 ? monthlyRent - refiMoPmt - 208 - 100 : null
   const annualCF          = monthlyCF != null ? monthlyCF * 12 : null
+  // Part 3 — CoC edge-case handling was ALREADY correct: null whenever
+  // cash left in is <= 0 (never divides by zero or a negative number,
+  // never an artificial huge percentage). Unchanged, just re-verified.
   const coc               = totalCashInvested > 0 && annualCF != null ? (annualCF / totalCashInvested) * 100 : null
-  return { hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding, refiLoan, refiCosts, refiCashOut, totalCashInvested, refiMoPmt, monthlyCF, annualCF, coc, holdMonths }
+  // Phase 2 — Financial Transparency (Part 5/6/12). Additive fields only
+  // — every pre-existing field name/value contract above is preserved.
+  const acquisitionCosts  = fixedCosts
+  const financingCosts    = points
+  const investorPurchaseEquity = downPayment
+  // investorCashContributed folds holding costs into the INVESTOR side of
+  // the ledger (matches the mission's own Section 8/17 waterfall, which
+  // lists "Investor-Paid Holding Costs" as a contribution line, not a
+  // refi deduction) — so netRefiCashReturned below must NOT also
+  // subtract holding costs, or the two would double-count it and the
+  // ledger wouldn't reconcile (caught by test/brrrrFinancialAccuracy.test.js's
+  // exact-reconciliation assertions). `refiCashOut` (the pre-existing
+  // field, holding-inclusive) and `totalCashInvested` are UNCHANGED and
+  // remain the actual calculation Issue #4 fixed — these two new fields
+  // are a presentation-only re-split of the identical economic result.
+  const investorCashContributed = totalCashNeeded + totalHolding
+  const netRefiCashReturned = refiLoan - hmlLoan - refiCosts
+  const allIn             = pp + reno + acquisitionCosts + financingCosts + totalHolding
+  const cashLeftIn        = totalCashInvested > 0 ? totalCashInvested : 0
+  const cashExtracted     = totalCashInvested < 0 ? Math.abs(totalCashInvested) : 0
+  return {
+    hmlLoan, monthlyPmt, points, downPayment, fixedCosts, totalCashNeeded, holdingPerMo, totalHolding,
+    refiLoan, refiCosts, refiCashOut, totalCashInvested, refiMoPmt, monthlyCF, annualCF, coc, holdMonths,
+    // Transparency additions:
+    purchasePrice: pp, rehab: reno, acquisitionCosts, financingCosts, investorPurchaseEquity,
+    investorCashContributed, allIn, cashLeftIn, cashExtracted,
+    refiValue: arv, refiLtvPct: 0.70, grossRefiLoan: refiLoan, hmlPayoff: hmlLoan,
+    netRefiCashReturned, refiInterestRate, amortizationYears,
+    rent: monthlyRent, taxesMonthly: 208, insuranceMonthly: 100, mortgagePayment: refiMoPmt,
+  }
 }
 
 // Generic bisection: finds where evalFn(x) flips from false to true across
@@ -307,6 +409,26 @@ export function formatCurrency(value) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(n)
+}
+
+// Phase 2 — Financial Transparency (Part 2/18, approved Issue #4).
+// Single shared presentation helper for a signed Cash Left In value —
+// the ONE place that turns a negative "cash extracted" result into
+// user-facing copy, so no component reinvents this framing. The
+// canonical engine value (computeBrrrrBreakdown's totalCashInvested)
+// stays signed; this only formats it for display.
+// Returns { display, extracted, allRecovered } — `display` is always a
+// non-negative currency string; `extracted` is the positive dollar
+// amount pulled out beyond 100% capital recovery (null if none);
+// `allRecovered` is true whenever cashLeftIn <= 0 (capital fully back).
+export function describeCashLeftIn(value) {
+  if (value == null || Number.isNaN(Number(value))) return { display: '—', extracted: null, allRecovered: false }
+  const v = Number(value)
+  if (v <= 0) {
+    const extracted = Math.round(Math.abs(v))
+    return { display: formatCurrency(0), extracted: extracted > 0 ? extracted : null, allRecovered: true }
+  }
+  return { display: formatCurrency(v), extracted: null, allRecovered: false }
 }
 
 export function formatNumber(value) {

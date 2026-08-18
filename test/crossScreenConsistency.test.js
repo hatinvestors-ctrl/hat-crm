@@ -21,20 +21,26 @@ import { computeBrrrrResult, computeFlipResult } from '../src/lib/dealExplanatio
 import { getGoldenLead } from './fixtures/goldenLeads.js'
 
 describe('BRRRR is unaffected by the Flip-only F1/F2 fix', () => {
-  it('G10_STRONG_BRRRR matches the documented golden-leads.md value exactly', () => {
+  // Values below reflect the approved Phase 2 BRRRR Financial Accuracy
+  // fixes (Issue #1 real amortization at the canonical 6.7% rate, Issue
+  // #4 unclamped signed Cash Left In) — both these fixtures are now
+  // genuinely cash-out-positive deals (refinance returns more than was
+  // invested), which is exactly the scenario Issue #4 was approved to
+  // stop hiding as a misleading flat $0.
+  it('G10_STRONG_BRRRR matches the post-fix canonical value exactly (cash-out-positive)', () => {
     const lead = getGoldenLead('G10_STRONG_BRRRR')
     const r = computeBrrrrResult(lead)
     expect(r.available).toBe(true)
     expect(r.verdict).toBe('STRONG')
-    expect(Math.round(r.cashLeftIn)).toBe(0)
+    expect(Math.round(r.cashLeftIn)).toBe(-17832) // negative = cash extracted beyond 100% capital recovery
   })
 
-  it('G13_BOTH_WORK BRRRR side matches the documented golden-leads.md value exactly', () => {
+  it('G13_BOTH_WORK BRRRR side matches the post-fix canonical value exactly (cash-out-positive)', () => {
     const lead = getGoldenLead('G13_BOTH_WORK')
     const r = computeBrrrrResult(lead)
     expect(r.available).toBe(true)
     expect(r.verdict).toBe('PASS')
-    expect(Math.round(r.cashLeftIn)).toBe(0)
+    expect(Math.round(r.cashLeftIn)).toBe(-17832)
   })
 
   it('computeBrrrrResult never returns the Flip-only fields introduced by the F1/F2 fix (evaluationPrice, maoFeasible)', () => {

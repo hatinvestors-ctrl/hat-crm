@@ -35,6 +35,7 @@ const CATEGORY_LABELS = {
   'crossScreenConsistency.test.js': 'CROSS-SCREEN CONSISTENCY',
   'canonicalDealValues.test.js': 'CANONICAL DEAL VALUES (D1/D2 product decision)',
   'decisionConsistency.test.js': 'DECISION-FLOW CONSISTENCY (Norfolk QA-01/02/03)',
+  'brrrrFinancialAccuracy.test.js': 'BRRRR FINANCIAL ACCURACY (approved Issues #1/#4)',
 }
 
 const byFile = {}

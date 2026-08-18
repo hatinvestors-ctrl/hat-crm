@@ -79,12 +79,15 @@ describe('Norfolk — QA-01: Path to a Flip Deal current profit matches canonica
 })
 
 describe('Norfolk — QA-03: Deal Score BRRRR pre-computation matches canonical BRRRR', () => {
-  it('canonical BRRRR: cash left in ~$23,063, cash flow ~$48/mo, Max Buy ~$94,671', () => {
+  it('canonical BRRRR: cash left in ~$23,063, cash flow ~$71/mo (post Issue #1 amortization fix), Max Buy ~$94,671', () => {
     const lead = norfolkLead()
     const brrrr = computeBrrrrResult(lead)
     expect(brrrr.available).toBe(true)
     expect(brrrr.cashLeftIn).toBeCloseTo(23063, 0)
-    expect(brrrr.monthlyCashFlow).toBeCloseTo(48, 0)
+    // Issue #1 fix: real 30yr amortization at the canonical 6.7% rate
+    // (was an undocumented ~6.93% flat-multiplier approximation, which
+    // produced $48/mo — see RELEASE-READINESS.md Issue #1).
+    expect(brrrr.monthlyCashFlow).toBeCloseTo(71, 0)
     expect(brrrr.mao).toBeCloseTo(94671, 0)
     expect(brrrr.verdict).toBe('PASS') // displays as "SOLID" — see RELEASE-READINESS.md QA-10 (PRODUCT DECISION REQUIRED)
   })
@@ -102,10 +105,10 @@ describe('Norfolk — QA-03: Deal Score BRRRR pre-computation matches canonical 
     expect(prompt).not.toContain('Cash flow ~$-176/mo')
   })
 
-  it('Cash Flow score bracket is computed from the CANONICAL cash flow ($48/mo -> bracket 2/10), not a stale/independent figure', () => {
+  it('Cash Flow score bracket is computed from the CANONICAL cash flow ($71/mo -> bracket 5/10), not a stale/independent figure', () => {
     const lead = norfolkLead()
     const { prompt } = buildPrompt(lead)
-    expect(prompt).toContain('Cash Flow score: 2/10')
+    expect(prompt).toContain('Cash Flow score: 5/10')
   })
 })
 
