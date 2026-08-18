@@ -37,6 +37,7 @@ const CATEGORY_LABELS = {
   'decisionConsistency.test.js': 'DECISION-FLOW CONSISTENCY (Norfolk QA-01/02/03)',
   'brrrrFinancialAccuracy.test.js': 'BRRRR FINANCIAL ACCURACY (approved Issues #1/#4)',
   'allInAccuracy.test.js': 'ALL-IN ACCURACY (approved Objective A)',
+  'priceClarity.test.js': 'PRICE CLARITY (Seller Gap / Max Buy consistency, Paschal QA)',
 }
 
 const byFile = {}

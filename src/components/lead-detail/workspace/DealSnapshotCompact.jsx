@@ -6,7 +6,7 @@
 // computeFlipResult/computeBrrrrResult/computeStrategyRecommendation
 // (src/lib/dealExplanation.js) the Deal tab and DealAnalysisCard already
 // call — no independent calculation.
-import { formatCurrency as fc } from '../../../lib/calculations'
+import { formatCurrency as fc, roundMaxBuy } from '../../../lib/calculations'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { getDealReadiness } from './readiness'
 
@@ -65,8 +65,11 @@ export default function DealSnapshotCompact({ lead, onOpenDeal }) {
         <Cell label="Ask" value={lead.asking_price != null ? fc(lead.asking_price) : 'Not set'} />
         <Cell label="ARV" value={fc(lead.arv)} />
         <Cell label="Current Offer" value={flip.currentOffer != null ? fc(flip.currentOffer) : 'Not set'} />
+        {/* Cross-screen consistency (Part 8) — same roundMaxBuy helper the
+            Deal tab hero uses, so Overview and Deal never disagree on
+            the actionable Max Buy for the same lead. */}
         <Cell label={preferBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}
-          value={preferBrrrr ? (brrrr.available ? fc(Math.round(brrrr.mao / 100) * 100) : 'Needs rent') : fc(Math.round(flip.mao / 100) * 100)} />
+          value={preferBrrrr ? (brrrr.available ? fc(roundMaxBuy(brrrr.mao)) : 'Needs rent') : fc(roundMaxBuy(flip.mao))} />
         <Cell label={preferBrrrr ? 'Cash Flow' : 'Profit'}
           value={preferBrrrr ? (brrrr.available && brrrr.monthlyCashFlow != null ? `${fc(brrrr.monthlyCashFlow)}/mo` : 'Needs rent') : fc(flip.projectedProfit)} />
         <Cell label="Strategy" value={strategyRec.preferredStrategy !== 'NONE' ? strategyRec.preferredStrategy.replace('BOTH', 'Flip + BRRRR') : 'Not ready'} />

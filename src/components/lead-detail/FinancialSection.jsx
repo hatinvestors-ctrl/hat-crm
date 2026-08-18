@@ -5,6 +5,7 @@ import RenoTierPicker from './RenoTierPicker'
 import {
   formatCurrency, calculateFlipMAO, calculateFlipProfitAtPrice, calculateBrrrrMAO, computeBrrrrBreakdown,
   FLIP_MIN_PROFIT_TARGET, FLIP_STRONG_PROFIT, BRRRR_MAX_CASH_LEFT_IN, calculateLiveOffer, isStoredOfferStale, getEffectiveOffer,
+  roundMaxBuy,
 } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
@@ -23,6 +24,13 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
   const isBrrrr = strategy === 'brrrr'
 
   const [showRenoPicker, setShowRenoPicker] = useState(false)
+  // Price Clarity + Max Buy Consistency (see RELEASE-READINESS.md) —
+  // Legacy MAO used to render inline in the primary Max Buy cell
+  // whenever it diverged from the canonical value, presenting two
+  // competing walk-away numbers in the normal acquisition workflow.
+  // Collapsed by default now; still reachable (not deleted, not
+  // read-only) for diagnostics.
+  const [showLegacyMao, setShowLegacyMao] = useState(false)
 
   const renoMissing          = lead.renovation_cost == null
 
@@ -81,6 +89,14 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         const mao        = isBrrrr ? formulaMao : (formulaMao ?? storedMao)
         const ask        = Number(lead.asking_price)
         const gap        = mao != null ? ask - mao : null
+        // Price Clarity fix — the risk classification (easy/tough/%) below
+        // still uses the raw, unrounded `gap` (unchanged — not a labeling
+        // concern). Only the DOLLAR FIGURE actually shown to the user uses
+        // the same rounded, actionable Max Buy the Deal tab hero shows, so
+        // Financials and the Deal tab never display two different numbers
+        // for the same "gap to Max Buy" concept.
+        const displayMaoForGap = roundMaxBuy(mao)
+        const displayGap = (displayMaoForGap != null && lead.asking_price != null) ? ask - displayMaoForGap : gap
 
         // Live-computed starting offer — updates instantly when ARV/reno/ask
         // changes. Uses the SAME calculateLiveOffer()/isStoredOfferStale()
@@ -128,9 +144,9 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               {gap != null && (
                 <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 border-r border-[color:var(--color-line)]"
                   style={{ background: gapBg }}>
-                  <div className="text-[9px] uppercase tracking-widest font-semibold mb-1" style={{ color: gapColor }}>Gap</div>
+                  <div className="text-[9px] uppercase tracking-widest font-semibold mb-1" style={{ color: gapColor }}>Gap to Max Buy</div>
                   <div className="text-[16px] font-bold" style={{ color: gapColor }}>
-                    {gap <= 0 ? '✓ In budget' : formatCurrency(gap)}
+                    {gap <= 0 ? '✓ In budget' : formatCurrency(displayGap)}
                   </div>
                   {gapLabel && gap > 0 && (
                     <div className="text-[10px] mt-0.5" style={{ color: gapColor }}>{gapLabel}</div>
@@ -167,29 +183,48 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                     className="text-[9px] text-[color:var(--color-text-dim)] cursor-help">ℹ</span>
                 </div>
                 <div className="text-[16px] font-bold text-[color:var(--color-accent)]">
-                  {formulaMao != null ? formatCurrency(Math.round(formulaMao / 100) * 100) : '—'}
+                  {formulaMao != null ? formatCurrency(roundMaxBuy(formulaMao)) : '—'}
                 </div>
                 {/* lead.mao is a Flip-only legacy field (also V2's own
                     fallback input) — no equivalent concept exists for
-                    BRRRR MAO, so these controls only apply to Flip. */}
-                {!isBrrrr && diverged && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-[9px] text-[color:var(--color-warn-text)]" title="Auto-computed by the older 0.75×ARV formula whenever ARV/Reno is edited — not necessarily a manual choice. Not used by profit, verdict, Margin of Safety, or offer generation.">Legacy MAO:</span>
-                    <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
-                      onSave={(v) => update({ mao: v })} disabled={!canEdit}
-                      displayClassName="text-[10.5px] font-semibold text-[color:var(--color-warn-text)] underline decoration-dotted" />
-                    {canEdit && (
-                      <button onClick={() => update({ mao: null })}
-                        className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
-                        title="Clear — this legacy value isn't used by Max Buy, profit, or the verdict anywhere on this page.">✕</button>
+                    BRRRR MAO, so these controls only apply to Flip.
+                    Price Clarity fix — this used to render inline
+                    whenever it diverged from canonical Max Buy, showing
+                    a second, competing walk-away number in the primary
+                    acquisition workflow. Now collapsed behind an
+                    explicit "Legacy data" toggle — still fully
+                    reachable for diagnostics, never the default view,
+                    field not dropped, backward compatible. */}
+                {!isBrrrr && (
+                  <button
+                    type="button"
+                    onClick={() => setShowLegacyMao(o => !o)}
+                    className="text-[8.5px] mt-0.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2"
+                  >
+                    {showLegacyMao ? 'Hide legacy data' : diverged ? 'Legacy data (diverges from Max Buy)' : 'Legacy data'}
+                  </button>
+                )}
+                {!isBrrrr && showLegacyMao && (
+                  <div className="mt-1 pt-1 border-t border-[color:var(--color-line)] w-full">
+                    {diverged ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-[color:var(--color-warn-text)]" title="Auto-computed by the older 0.75×ARV formula whenever ARV/Reno is edited — not necessarily a manual choice. Not used by profit, verdict, Margin of Safety, or offer generation.">Legacy MAO:</span>
+                        <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
+                          onSave={(v) => update({ mao: v })} disabled={!canEdit}
+                          displayClassName="text-[10.5px] font-semibold text-[color:var(--color-warn-text)] underline decoration-dotted" />
+                        {canEdit && (
+                          <button onClick={() => update({ mao: null })}
+                            className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
+                            title="Clear — this legacy value isn't used by Max Buy, profit, or the verdict anywhere on this page.">✕</button>
+                        )}
+                      </div>
+                    ) : canEdit && (
+                      <button onClick={() => { const v = window.prompt('Set a manual Max Offer override (leave blank to cancel):', ''); if (v && !Number.isNaN(Number(v))) update({ mao: Number(v) }) }}
+                        className="text-[8.5px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2">
+                        Set manual override
+                      </button>
                     )}
                   </div>
-                )}
-                {!isBrrrr && !diverged && canEdit && (
-                  <button onClick={() => { const v = window.prompt('Set a manual Max Offer override (leave blank to cancel):', ''); if (v && !Number.isNaN(Number(v))) update({ mao: Number(v) }) }}
-                    className="text-[8.5px] mt-0.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2">
-                    Set manual override
-                  </button>
                 )}
                 {isBrrrr ? (() => {
                   if (formulaMao == null) return null
@@ -234,23 +269,52 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         const diverged   = !isBrrrr && formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
-        const displayedMao = isBrrrr ? formulaMao : (lead.mao ?? formulaMao)
+        // Price Clarity fix — this used to display `lead.mao` (legacy)
+        // ahead of the canonical formula whenever it was set, the exact
+        // "legacy MAO feeds the primary Deal-page number" regression
+        // Part 7 asks to guard against. displayedMao is now ALWAYS the
+        // canonical formula for both strategies; a stored legacy value
+        // is still visible, but only inside the same collapsed "Legacy
+        // data" pattern used in the primary price strip above — never
+        // as the headline itself.
+        const displayedMao = formulaMao
         return (
           <div className="flex gap-6 mb-5">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">{isBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}</span>
-                {diverged && canEdit && (
-                  <button onClick={() => update({ mao: formulaMao })}
-                    className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80">↺ formula</button>
-                )}
               </div>
-              {isBrrrr ? (
-                <div className="text-2xl font-bold text-[color:var(--color-accent)]">{displayedMao != null ? formatCurrency(Math.round(displayedMao / 100) * 100) : '—'}</div>
-              ) : (
-                <EditableField label="" type="currency" value={displayedMao} formatter={formatCurrency}
-                  onSave={(v) => update({ mao: v })} disabled={!canEdit}
-                  displayClassName="text-2xl font-bold text-[color:var(--color-accent)]" />
+              <div className="text-2xl font-bold text-[color:var(--color-accent)]">{displayedMao != null ? formatCurrency(Math.round(displayedMao / 100) * 100) : '—'}</div>
+              {!isBrrrr && (
+                <button
+                  type="button"
+                  onClick={() => setShowLegacyMao(o => !o)}
+                  className="text-[9px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2"
+                >
+                  {showLegacyMao ? 'Hide legacy data' : diverged ? 'Legacy data (diverges from Max Buy)' : 'Legacy data'}
+                </button>
+              )}
+              {!isBrrrr && showLegacyMao && (
+                <div className="mt-1 flex items-center gap-1">
+                  {diverged ? (
+                    <>
+                      <span className="text-[9px] text-[color:var(--color-warn-text)]" title="Auto-computed by the older 0.75×ARV formula whenever ARV/Reno is edited — not necessarily a manual choice. Not used by Max Buy, profit, verdict, or offer generation.">Legacy MAO:</span>
+                      <EditableField label="" type="currency" value={lead.mao} formatter={formatCurrency}
+                        onSave={(v) => update({ mao: v })} disabled={!canEdit}
+                        displayClassName="text-[10.5px] font-semibold text-[color:var(--color-warn-text)] underline decoration-dotted" />
+                      {canEdit && (
+                        <button onClick={() => update({ mao: null })}
+                          className="text-[8px] px-1 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)] border border-[color:var(--color-warn)] hover:opacity-80"
+                          title="Clear — this legacy value isn't used by Max Buy, profit, or the verdict anywhere on this page.">✕</button>
+                      )}
+                    </>
+                  ) : canEdit && (
+                    <button onClick={() => { const v = window.prompt('Set a manual Max Offer override (leave blank to cancel):', ''); if (v && !Number.isNaN(Number(v))) update({ mao: Number(v) }) }}
+                      className="text-[8.5px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2">
+                      Set manual override
+                    </button>
+                  )}
+                </div>
               )}
               {isBrrrr ? (() => {
                 if (formulaMao == null) return null

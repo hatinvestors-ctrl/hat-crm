@@ -12,7 +12,7 @@
 // and FinancialSection already call (computeFlipResult/computeBrrrrResult/
 // computeStrategyRecommendation — src/lib/dealExplanation.js). This file
 // formats and arranges those results; it never recomputes a formula.
-import { formatCurrency as fc, describeCashLeftIn } from '../../../lib/calculations'
+import { formatCurrency as fc, describeCashLeftIn, roundMaxBuy } from '../../../lib/calculations'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { FlipMarginOfSafety, FlipRealityCheck, BrrrrRealityCheck, VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
 import { getDealReadiness } from './readiness'
@@ -72,6 +72,21 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
   const preferBrrrr = strategyRec.preferredStrategy === 'BRRRR' && brrrr.available
   const hero = preferBrrrr ? brrrr : flip
 
+  // Price Clarity + Max Buy Consistency (see RELEASE-READINESS.md) — the
+  // ONE actionable Max Buy shown throughout this hero. The exact
+  // canonical value (flip.mao) is still what every calculation actually
+  // uses; this is presentation rounding only, applied consistently to
+  // every number DERIVED from Max Buy in this component (Seller Gap,
+  // offer-to-Max-Buy room) so the screen never shows two disagreeing
+  // numbers for the same concept.
+  const displayMao = roundMaxBuy(flip.mao)
+  const sellerAsk = lead.asking_price != null ? Number(lead.asking_price) : null
+  // Seller Gap to Max Buy — the difference between what the SELLER is
+  // asking and our Max Buy ceiling. This is NOT the same concept as
+  // "room" between OUR OFFER and Max Buy (MarginVisualization, below) —
+  // that distinction is exactly what was previously mislabeled.
+  const sellerGap = (sellerAsk != null && displayMao != null) ? sellerAsk - displayMao : null
+
   let recReason = strategyRec.reason
   if (!recReason && strategyRec.preferredStrategy === 'BRRRR' && brrrr.available) {
     const cli = describeCashLeftIn(brrrr.cashLeftIn)
@@ -94,9 +109,9 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
           <Metric label="We Offer" value={flip.currentOffer != null ? fc(flip.currentOffer) : 'Not set'} />
           <CalculationDetails
             label="Max Buy"
-            headline={fc(Math.round(flip.mao / 100) * 100)}
+            headline={fc(displayMao)}
             tone="var(--color-accent-text)"
-            definition="The maximum purchase price that still meets HAT's minimum Flip profit target, given current ARV/rehab assumptions."
+            definition="The maximum purchase price that still meets HAT's minimum Flip profit target, given current ARV/rehab assumptions. Rounded to the nearest $100 for the acquisition workflow — every other number on this screen derived from Max Buy uses this same actionable value."
             rows={[
               { label: 'ARV', value: fc(lead.arv) },
               { label: 'Sale proceeds (93% of ARV)', value: fc(Math.round(lead.arv * 0.93)) },
@@ -104,10 +119,30 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
               { label: 'Financing + holding + closing (at Max Buy)', value: 'solved algebraically', indent: true },
               { separator: true },
               { label: 'Target profit (HAT minimum)', value: fc(flip.targetProfit), bold: true },
+              { separator: true },
+              // Part 5 — advanced precision disclosure, only shown when
+              // rounding actually moved the number, never cluttering the
+              // common case where they already agree.
+              ...(displayMao !== Math.round(flip.mao) ? [
+                { label: 'Calculated Max Buy (exact)', value: fc(Math.round(flip.mao)) },
+                { label: 'Actionable Max Buy (used everywhere on this screen)', value: fc(displayMao), bold: true },
+              ] : []),
             ]}
-            assumptionNote="Max Buy is solved so projected profit at that exact price equals HAT's minimum target — it is not itself a separately-modeled cost line."
+            assumptionNote="Max Buy is solved so projected profit at that exact price equals HAT's minimum target — it is not itself a separately-modeled cost line. Displayed and used everywhere as the rounded actionable ceiling."
           />
-          <Metric label="Room" value={flip.marginOfSafety?.priceCushion != null ? `${flip.marginOfSafety.priceCushion < 0 ? '−' : '+'}${fc(Math.round(Math.abs(flip.marginOfSafety.priceCushion)))}` : '—'} tone={flip.marginOfSafety?.priceCushion >= 0 ? undefined : 'var(--color-danger-text)'} />
+          {/* Price Clarity fix — this was labeled "Room" and computed as
+              mao - evaluationPrice (asking price, when no actual offer is
+              on file), which is the SELLER's gap to Max Buy, not the
+              room between OUR OFFER and Max Buy (that's the separate
+              MarginVisualization concept below). Renamed and re-derived
+              from sellerAsk/displayMao — same rounded Max Buy the
+              headline above shows, so this number and Max Buy never
+              disagree. */}
+          <Metric
+            label="Seller Gap to Max Buy"
+            value={sellerGap == null ? '—' : sellerGap <= 0 ? `${fc(0)} — at/below Max Buy` : fc(sellerGap)}
+            tone={sellerGap == null ? undefined : sellerGap <= 0 ? 'var(--color-success-text)' : 'var(--color-danger-text)'}
+          />
           <CalculationDetails
             label="Projected Profit"
             headline={fc(flip.projectedProfit)}
@@ -149,7 +184,7 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
         )}
         {/* Part 12 — margin visualization */}
         <div className="px-4 pb-3">
-          <MarginVisualization currentOffer={flip.currentOffer} mao={flip.mao} />
+          <MarginVisualization currentOffer={flip.currentOffer} mao={displayMao} />
         </div>
         {/* L2 — context, secondary line */}
         <div className="px-4 py-2 border-t border-[color:var(--color-line)] text-[11px] text-[color:var(--color-text-dim)]">

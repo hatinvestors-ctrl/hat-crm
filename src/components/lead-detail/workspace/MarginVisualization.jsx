@@ -26,7 +26,7 @@ export default function MarginVisualization({ currentOffer, mao }) {
       <div className="flex items-center justify-between mt-1">
         <span className="text-[10px] text-[color:var(--color-text-dim)]">Offer {fc(currentOffer)}</span>
         <span className="text-[10px] font-semibold" style={{ color }}>
-          {overMax ? `${fc(Math.abs(cushion))} over Max Buy` : `${fc(cushion)} room to Max Buy`}
+          {overMax ? `${fc(Math.abs(cushion))} over Max Buy` : `${fc(cushion)} room from our offer to Max Buy`}
         </span>
         <span className="text-[10px] text-[color:var(--color-text-dim)]">Max {fc(mao)}</span>
       </div>

@@ -431,6 +431,23 @@ export function describeCashLeftIn(value) {
   return { display: formatCurrency(v), extracted: null, allRecovered: false }
 }
 
+// Price Clarity + Max Buy Consistency (see RELEASE-READINESS.md) — the
+// ONE shared presentation-rounding helper for Max Buy. Several places
+// already rounded the raw calculateFlipMAO/calculateBrrrrMAO output to
+// the nearest $100 independently (DealDecisionCenter's headline,
+// FinancialSection's price strip) — that rounding was applied
+// inconsistently: only to the HEADLINE Max Buy number, never to numbers
+// DERIVED from it (Seller Gap, offer-to-Max-Buy room), which kept
+// re-deriving from the unrounded raw value instead. This is presentation
+// rounding only — it does NOT change the canonical Max Buy formula, and
+// the raw/exact value is still always available from
+// computeFlipResult(lead).mao for calculation-disclosure UI. Returns
+// null if the raw value is null/infeasible — never invents a number.
+export function roundMaxBuy(value) {
+  if (value == null || Number.isNaN(Number(value))) return null
+  return Math.round(Number(value) / 100) * 100
+}
+
 export function formatNumber(value) {
   if (value === null || value === undefined || value === '') return '—'
   const n = Number(value)
