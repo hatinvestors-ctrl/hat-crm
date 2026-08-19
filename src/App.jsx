@@ -22,6 +22,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import ScreenerPage from './pages/ScreenerPage'
 import ActionCenterPage from './pages/ActionCenterPage'
 import AcquisitionIntelligencePage from './pages/AcquisitionIntelligencePage'
+import OffMarketEnginePage from './pages/OffMarketEnginePage'
 
 export default function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="screener" element={<ScreenerPage />} />
         <Route path="action-center" element={<ActionCenterPage />} />
         <Route path="performance" element={<AcquisitionIntelligencePage />} />
+        <Route path="off-market" element={<OffMarketEnginePage />} />
         <Route element={<AdminRoute />}>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />

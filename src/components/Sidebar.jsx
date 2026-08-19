@@ -145,6 +145,13 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
           <span className="text-[color:var(--color-text-dim)]">📊</span>
           <span className="flex-1">Performance</span>
         </NavLink>
+        {/* Off-Market Engine — operational view over the existing
+            distress/off-market lead pipeline (Capability #10.x). Plain
+            emoji icon, same one-line footprint as Performance above. */}
+        <NavLink to={`${base}/off-market`} className={navItemClasses}>
+          <span className="text-[color:var(--color-text-dim)]">🎯</span>
+          <span className="flex-1">Off-Market Engine</span>
+        </NavLink>
         <NavLink to={`${base}/today`} className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">{ICONS.today}</span>
           <span className="flex-1">Today</span>

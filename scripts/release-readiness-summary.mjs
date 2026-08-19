@@ -38,6 +38,7 @@ const CATEGORY_LABELS = {
   'brrrrFinancialAccuracy.test.js': 'BRRRR FINANCIAL ACCURACY (approved Issues #1/#4)',
   'allInAccuracy.test.js': 'ALL-IN ACCURACY (approved Objective A)',
   'priceClarity.test.js': 'PRICE CLARITY (Seller Gap / Max Buy consistency, Paschal QA)',
+  'offMarketDashboard.test.js': 'OFF-MARKET DASHBOARD (funnel/filter aggregation)',
 }
 
 const byFile = {}
