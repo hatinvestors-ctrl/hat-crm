@@ -17,9 +17,27 @@ const HEADERS = {
   'access-control-allow-methods': 'POST,OPTIONS',
 }
 
-const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor providing ARV and rental comp analysis for HAT Investors.
+// Pre-demo consistency & AI-authority fix (Part 8-11) — audit finding:
+// this prompt previously asked the model to write its own "Conservative/
+// Realistic/Optimistic ARV" and a CRM "Confidence Impact" line that could
+// (and, on 8054 Paschal Street, DID) recommend an independent ARV
+// ($185K realistic vs. canonical $220K) and an independent acquisition
+// ceiling ("MAO ≤ $95–105K" vs. canonical Max Buy ~$113,528) — two
+// numbers competing with the canonical engine's authoritative output.
+// The canonical ARV/Max Buy are now passed to the model explicitly (see
+// CANONICAL FINANCIALS in the user prompt below) with an explicit
+// authority contract, and the template itself no longer has a slot for a
+// second point-estimate ARV or a second acquisition ceiling — only an
+// evidence-agreement/conflict read against the canonical numbers.
+// Exported (additive only, no behavior change) so the canonical authority
+// contract (Part 8-11) is directly unit-testable without a live LLM call —
+// same pattern as generate-core-analysis.mjs's SYSTEM_PROMPT export.
+export const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate investor providing market-evidence context for HAT Investors' underwriting.
 
-JAX ARV benchmarks (fully renovated 3/2):
+CANONICAL AUTHORITY CONTRACT — READ FIRST:
+The CANONICAL FINANCIALS block in the prompt (ARV, Max Buy, Projected Profit) is authoritative. Copy those numbers exactly wherever you reference them. Do NOT calculate, restate, or imply a different ARV. Do NOT calculate, restate, or imply a different Max Buy / MAO / acquisition ceiling. Your job is to explain, contextualize, and identify evidence that AGREES or CONFLICTS with the canonical numbers — never to produce a second, competing valuation. If market evidence conflicts with the canonical ARV, say so as a review flag ("Available market context does not strongly support the current $[canonical ARV] ARV — additional comp validation is recommended"), never as a replacement number.
+
+JAX ARV benchmarks (fully renovated 3/2, for evidence context only — NOT a substitute for the canonical ARV above):
 32208/32219: $160–240K | 32210/32244/32221: $220–320K | 32205/32216: $230–380K | 32211: $155–200K | Clay Co: $200–300K
 Adjustments: 2BR −$20K | 4BR +$15K | 1BA only −$20K | <1,000sqft −$15K | CBS/brick +$7K
 
@@ -33,14 +51,12 @@ Include CRM COMPS USED only if historical CRM deals were provided — omit entir
 =====================================
 MARKET COMPS
 =====================================
-Conservative ARV: $[X] — [1 line: worst-case comp basis]
-Realistic ARV:    $[X] — [1 line: most likely outcome, used for deal math]
-Optimistic ARV:   $[X] — [1 line: upside if condition/timing favors]
+Market Range (evidence context, not a replacement ARV): $[low]–$[high] — [1 line: what basis, e.g. ZIP benchmark + bed/bath adjustments]
 COMP: [street or area, ZIP] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe] | [condition]
 Why relevant: [1 sentence]
 COMP: [street or area, ZIP] | [BR/BA] | [sqft] sqft | Sold $[X] | $[X]/sqft | [timeframe] | [condition]
 Why relevant: [1 sentence]
-ARV Conclusion: [1–2 sentences — how comps land on the ARV used, what pushes it higher or lower]
+Evidence Read: [1–2 sentences — does this market evidence AGREE with, or CONFLICT with, the canonical ARV supplied? If it conflicts, phrase it as a review flag, per the Authority Contract above — never as a replacement ARV.]
 
 =====================================
 RENTAL COMPS
@@ -61,10 +77,10 @@ At optimistic rent:   ~$[X]/mo net
 CRM COMPS USED
 =====================================
 [Only if CRM deals were provided. For each relevant past deal:]
-COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Our ARV $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
-How used: [1–2 sentences — what this deal benchmarks for the current property]
-ZIP Pattern: [2–3 sentences — ARV range, reno costs, offer success rate in this ZIP]
-Confidence Impact: [1 sentence — does CRM history increase or decrease ARV confidence?]`
+COMP: [address], ZIP [X] | [BR/BA] | Ask $[X] | Prior HAT ARV Estimate $[X] | Reno $[X] | [offered $X / no offer] | Status: [status]
+How used: [1–2 sentences — what this deal benchmarks for the current property. A past lead's stored ARV is HAT's own prior ESTIMATE, not a verified closed sale — never call it a "comp" or "sold" price.]
+ZIP Pattern: [2–3 sentences — prior ARV estimates and asking-price range seen in this ZIP, reno costs, offer outcomes. Label asking prices as asking prices, not sales.]
+Market Context: [1 sentence — does this internal HAT history AGREE with or CONFLICT WITH the canonical ARV supplied? Never state that it "increases confidence" to a specific dollar figure, and never recommend an alternate acquisition ceiling/MAO — the canonical Max Buy already supplied is authoritative.]`
 
 const ZIP_CLUSTERS = {
   '32208': ['32208','32219','32218'],
@@ -111,7 +127,9 @@ function buildCompsBlock(comps, lead) {
     const size   = [c.bedrooms && `${c.bedrooms}BR`, c.bathrooms && `${c.bathrooms}BA`, c.sqft && `${c.sqft}sqft`].filter(Boolean).join('/')
     const status = (c.status || 'unknown').replace(/_/g, ' ')
     const offer  = c.offer_price ? `offered ${fmt(c.offer_price)}` : 'no offer'
-    let row = `  • ${c.address}, ZIP ${c.zip_code} | ${size} | Ask ${fmt(c.asking_price)} | Our ARV ${fmt(c.arv)} | Reno ${fmt(c.renovation_cost)} | MAO ${fmt(c.mao)} | ${offer} | Status: ${status}`
+    // Part 13 — labeled "Prior HAT ARV Estimate", never "Our ARV"/"comp",
+    // so it can't be read as a verified sale for this different property.
+    let row = `  • ${c.address}, ZIP ${c.zip_code} | ${size} | Ask ${fmt(c.asking_price)} | Prior HAT ARV Estimate ${fmt(c.arv)} | Reno ${fmt(c.renovation_cost)} | MAO ${fmt(c.mao)} | ${offer} | Status: ${status}`
     const verdict   = extractAILine(c.ai_notes, 'Verdict')
     const summary   = extractAILine(c.ai_notes, 'Summary')
     const dealScore = extractAILine(c.ai_notes, 'Total')
@@ -174,9 +192,14 @@ All-in at MAO: ${fmt(mao)} MAO + ${fmt(reno)} reno = ${fmt(allInMAO)} total → 
 Use realistic rent estimate to compute actual 1% rule result for both scenarios.` : ''
 
   const userPrompt = `Property: ${addr} | ${lead.bedrooms || '?'}BR/${lead.bathrooms || '?'}BA | ${lead.sqft || '?'} sqft | ZIP ${lead.zip_code || '?'}
-Ask: ${fmt(pp)} | Our ARV: ${fmt(arv)} | Reno: ${fmt(lead.renovation_cost)} | MAO: ${fmt(mao)}${rentalMathBlock}${compsBlock}
+Ask: ${fmt(pp)}
 
-Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS USED if historical data was provided above.`
+CANONICAL FINANCIALS (authoritative — copy exactly, do not recalculate or restate as a different number):
+ARV: ${fmt(arv)}
+Max Buy (MAO): ${fmt(mao)}
+Renovation Budget: ${fmt(lead.renovation_cost)}${rentalMathBlock}${compsBlock}
+
+Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS USED if historical data was provided above. Every reference to "the ARV" or "Max Buy" in your output must use the CANONICAL FINANCIALS values above exactly.`
 
   const abortCtrl = new AbortController()
   const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)

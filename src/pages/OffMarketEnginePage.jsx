@@ -21,7 +21,7 @@ import { applyLeadVisibility } from '../lib/leadVisibility'
 import { formatCurrency as fc, formatDate } from '../lib/calculations'
 import { computeFlipResult } from '../lib/dealExplanation'
 import {
-  isDistressedLead, getDistressInfo, getOpportunityInfo, fmtDistressType,
+  isDistressedLead, getDistressInfo, getOpportunityInfo, fmtDistressType, getPrimaryDistressLabel,
   fmtOwnerMatch, fmtAbsentee, fmtBuyBoxFit, fmtFilingDate, fmtLienAmount, fmtLienStatus, fmtDistressSource,
 } from '../lib/distressInfo'
 import { DISTRESS_CATEGORY_LABELS } from '../lib/distressScoring'
@@ -29,16 +29,6 @@ import { isContactReady } from '../lib/contactEnrichment'
 import { KPI_DEFINITIONS, annotate, filterBySource, computeFunnel, applyViewFilter } from '../lib/offMarketMetrics'
 
 const SOURCE_FILTERS = Object.keys(DISTRESS_CATEGORY_LABELS).filter(k => k !== 'UNKNOWN')
-
-function KpiCard({ label, value, sub, tone }) {
-  return (
-    <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3 min-w-0">
-      <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
-      <div className="text-[22px] font-extrabold tabular-nums mt-0.5" style={tone ? { color: tone } : undefined}>{value}</div>
-      {sub && <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">{sub}</div>}
-    </div>
-  )
-}
 
 function FunnelStage({ label, value, definition, notTracked }) {
   return (
@@ -111,26 +101,48 @@ function WhyThisLeadPanel({ lead, onClose }) {
           </div>
         )}
 
-        {info && (
-          <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 mb-3 space-y-1">
-            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Distress Record</div>
-            <div className="text-[11.5px]">Type: <strong>{fmtDistressType(info.distress_type)}</strong></div>
-            {info.distress_filing_date && <div className="text-[11.5px]">Filed: {fmtFilingDate(info.distress_filing_date) || info.distress_filing_date}</div>}
-            {info.lien_amount != null && <div className="text-[11.5px]">Amount: {fmtLienAmount(info.lien_amount)}</div>}
-            {info.lien_status && <div className="text-[11.5px]">Status: {fmtLienStatus(info.lien_status)}</div>}
-            <div className="text-[11.5px]">Owner Match: {fmtOwnerMatch(info.owner_match_status)}</div>
-            <div className="text-[11.5px]">Absentee Owner: {fmtAbsentee(info.absentee_owner)}</div>
-            <div className="text-[11.5px] text-[color:var(--color-text-dim)]">Source: {fmtDistressSource(info.distress_source)}</div>
-          </div>
-        )}
+        {(info || opp) && (() => {
+          // Part 3 — ONE canonical headline (matches the table's Signal
+          // column exactly, both call getPrimaryDistressLabel). The
+          // notes-derived filing type (e.g. "Lis Pendens") is real,
+          // additional detail — shown as a separate labeled "Filing:" line
+          // only when it's available AND says something the headline
+          // doesn't already say, never presented as a second, competing
+          // distress type.
+          const headline = getPrimaryDistressLabel(lead)
+          const filingLabel = info?.distress_type ? fmtDistressType(info.distress_type) : null
+          const showFilingLine = filingLabel && filingLabel !== headline
+          return (
+            <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 mb-3 space-y-1">
+              <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Distress</div>
+              {headline && <div className="text-[13px] font-bold">{headline}</div>}
+              {/* Part 8 — hide gracefully rather than showing a "not
+                  disclosed"/"unknown" placeholder row when the underlying
+                  data genuinely isn't available. */}
+              {showFilingLine && <div className="text-[11.5px] text-[color:var(--color-text-dim)]">Filing: {filingLabel}</div>}
+              {info?.distress_filing_date && <div className="text-[11.5px]">Filed: {fmtFilingDate(info.distress_filing_date) || info.distress_filing_date}</div>}
+              {info?.lien_amount != null && Number(info.lien_amount) > 0 && <div className="text-[11.5px]">Amount: {fmtLienAmount(info.lien_amount)}</div>}
+              {info && (info.lien_status === 'active' || info.lien_status === 'Active' || info.lien_status === 'released' || info.lien_status === 'Released') && (
+                <div className="text-[11.5px]">Status: {fmtLienStatus(info.lien_status)}</div>
+              )}
+              {info?.distress_source && <div className="text-[11.5px] text-[color:var(--color-text-dim)]">Source: {fmtDistressSource(info.distress_source)}</div>}
+            </div>
+          )
+        })()}
 
-        <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 mb-3">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Buy Box</div>
-          <div className="text-[12.5px] font-bold">{fmtBuyBoxFit(opp?.buy_box_fit)}</div>
+        <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 mb-3 space-y-1">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Property Fit</div>
+          <div className="text-[11.5px] flex justify-between"><span>Buy Box</span><span className="font-bold">{fmtBuyBoxFit(opp?.buy_box_fit)}</span></div>
+          {info && (info.owner_match_status === 'MATCH' || info.owner_match_status === 'POSSIBLE_MATCH' || info.owner_match_status === 'DIFFERENT') && (
+            <div className="text-[11.5px] flex justify-between"><span>Owner Match</span><span>{fmtOwnerMatch(info.owner_match_status)}</span></div>
+          )}
+          {info && (info.absentee_owner === true || info.absentee_owner === false) && (
+            <div className="text-[11.5px] flex justify-between"><span>Absentee Owner</span><span>{fmtAbsentee(info.absentee_owner)}</span></div>
+          )}
         </div>
 
         <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 mb-3 space-y-1">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Enrichment State</div>
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Contact</div>
           <div className="text-[11.5px] flex justify-between"><span>Owner Identified</span><span>{lead.owner_name ? '✓' : '—'}</span></div>
           <div className="text-[11.5px] flex justify-between"><span>Phone Found</span><span>{lead.phone ? '✓' : '—'}</span></div>
           <div className="text-[11.5px] flex justify-between"><span>Email Found</span><span>{lead.email ? '✓' : '—'}</span></div>
@@ -173,12 +185,20 @@ export default function OffMarketEnginePage() {
   const [sourceFilter, setSourceFilter] = useState(new Set(SOURCE_FILTERS))
   const [viewFilter, setViewFilter] = useState('ALL')
   const [detailLead, setDetailLead] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState(null)
+  const [lastFetchedAt, setLastFetchedAt] = useState(null)
 
-  useEffect(() => {
+  // Part 18 — a single re-fetch function, reused by the initial load and
+  // the "Refresh Dashboard" button. Guards against overlapping concurrent
+  // refreshes (a second click while one is in flight is a no-op). This
+  // only re-runs the SAME read query — it never triggers enrichment or
+  // ingestion, and never writes/duplicates records.
+  const fetchLeads = async ({ isRefresh = false } = {}) => {
     if (!workspaceId) return
-    let cancelled = false
-    async function load() {
-      setLoading(true)
+    if (isRefresh) { if (refreshing) return; setRefreshing(true) } else setLoading(true)
+    setLoadError(null)
+    try {
       let q = supabase
         .from('leads')
         .select('id,address,city,state,zip_code,status,is_distressed,lead_source,notes,distress_data,enrichment_data,owner_name,phone,email,arv,renovation_cost,asking_price,starting_offer,offer_price,bedrooms,bathrooms,sqft,year_built,created_at,updated_at')
@@ -186,18 +206,37 @@ export default function OffMarketEnginePage() {
         .or(`is_distressed.eq.true,lead_source.eq.off_market,notes.ilike.⚠ DISTRESSED OPPORTUNITY%`)
       q = applyLeadVisibility(q, user.id, userRole)
       const { data, error } = await q
-      if (!cancelled && !error) {
-        // isDistressedLead() is the same canonical classifier every other
-        // screen uses — re-checked client-side as the final authority.
-        setLeads((data || []).filter(isDistressedLead))
-        setLoading(false)
-      } else if (!cancelled) {
-        setLoading(false)
-      }
+      if (error) throw error
+      // isDistressedLead() is the same canonical classifier every other
+      // screen uses — re-checked client-side as the final authority.
+      setLeads((data || []).filter(isDistressedLead))
+      setLastFetchedAt(new Date())
+    } catch (err) {
+      setLoadError(err.message || 'Could not load the off-market pipeline. Try refreshing.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    load()
-    return () => { cancelled = true }
+  }
+
+  useEffect(() => {
+    fetchLeads()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, user.id, userRole])
+
+  // Part 2/19 — "Last Pipeline Update" derived ONLY from a real stored
+  // timestamp: the most recent leads.updated_at among the currently
+  // loaded off-market leads. This is a lead-record edit time (enrichment
+  // writes, manual edits, status changes all touch it) — NOT proof a
+  // full ingestion "run" completed at that moment, so it's labeled
+  // accordingly rather than implied to be a run-completion timestamp.
+  const latestLeadUpdate = useMemo(() => {
+    if (leads.length === 0) return null
+    return leads.reduce((max, l) => {
+      const t = l.updated_at ? new Date(l.updated_at) : null
+      return t && (!max || t > max) ? t : max
+    }, null)
+  }, [leads])
 
   const enriched = useMemo(() => annotate(leads), [leads])
   const knownCategories = useMemo(() => new Set(SOURCE_FILTERS), [])
@@ -219,10 +258,40 @@ export default function OffMarketEnginePage() {
     <>
       <Topbar title="Off-Market Engine" breadcrumbs={[{ label: workspace.name }, { label: 'Off-Market Engine' }]} />
       <div className="px-6 py-6 w-full flex-1 space-y-5">
-        <div>
-          <h1 className="text-[20px] font-bold text-[color:var(--color-text)]">Off-Market Engine</h1>
-          <p className="text-[12.5px] text-[color:var(--color-text-dim)] mt-0.5">Find, enrich and prioritize distressed acquisition opportunities.</p>
+        {/* Part 2 — operational header. Every number here is real:
+            offMarketLeads count comes from the same live query as the
+            KPI row below; the timestamp is the MAX(leads.updated_at)
+            among currently-loaded leads — a real record-edit time, never
+            implied to be a completed-ingestion-run timestamp (see
+            comment on latestLeadUpdate above). */}
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-[20px] font-bold text-[color:var(--color-text)]">Off-Market Engine</h1>
+            <p className="text-[12.5px] text-[color:var(--color-text-dim)] mt-0.5">Find, enrich and prioritize distressed acquisition opportunities.</p>
+            {!loading && (
+              <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-1.5">
+                <span className="font-semibold text-[color:var(--color-text)]">{leads.length}</span> active off-market opportunit{leads.length === 1 ? 'y' : 'ies'} in Jacksonville / Duval County
+                {latestLeadUpdate && (
+                  <> · Latest lead data updated: {latestLeadUpdate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {latestLeadUpdate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => fetchLeads({ isRefresh: true })}
+            disabled={refreshing || loading}
+            className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)] disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing…' : '↻ Refresh Dashboard'}
+          </button>
         </div>
+
+        {loadError && (
+          <div className="rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-4 py-2.5 text-[12px] text-[color:var(--color-danger-text)] flex items-center justify-between gap-3">
+            <span>Couldn't load the latest data. {loadError}</span>
+            <button onClick={() => fetchLeads({ isRefresh: true })} className="underline font-semibold shrink-0">Try again</button>
+          </div>
+        )}
 
         {/* Control panel */}
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 space-y-3">
@@ -238,7 +307,7 @@ export default function OffMarketEnginePage() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Distress Sources</div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Active Distress Sources</div>
               <div className="flex gap-2">
                 <button onClick={() => setSourceFilter(new Set(SOURCE_FILTERS))} className="text-[10px] underline text-[color:var(--color-accent-text)]">Select All</button>
                 <button onClick={() => setSourceFilter(new Set())} className="text-[10px] underline text-[color:var(--color-text-dim)]">Clear</button>
@@ -259,15 +328,20 @@ export default function OffMarketEnginePage() {
                   {DISTRESS_CATEGORY_LABELS[key]}
                 </button>
               ))}
-              {/* Part 4 — known conceptually but no active ingestion path
-                  yet (confirmed: no code path currently classifies these
-                  categories) — labeled, not hidden, not pretended active. */}
-              {['Probate', 'Eviction', 'Vacancy', 'Failed / Expired Listing'].map(label => (
-                <span key={label} className="text-[11px] font-semibold px-2.5 h-7 inline-flex items-center rounded-full border border-dashed border-[color:var(--color-line)] text-[color:var(--color-text-faint)]">
-                  {label} · Coming Soon
-                </span>
-              ))}
             </div>
+            {/* Part 4 — visually separated from active sources so the
+                default screen emphasizes what works today; not hidden,
+                not pretended active. */}
+            <details className="mt-2">
+              <summary className="text-[10.5px] text-[color:var(--color-text-dim)] cursor-pointer select-none">Planned sources (not yet active)</summary>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {['Probate', 'Eviction', 'Vacancy', 'Failed / Expired Listing'].map(label => (
+                  <span key={label} className="text-[11px] font-semibold px-2.5 h-7 inline-flex items-center rounded-full border border-dashed border-[color:var(--color-line)] text-[color:var(--color-text-faint)]">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </details>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[color:var(--color-line)]">
@@ -277,18 +351,14 @@ export default function OffMarketEnginePage() {
             </div>
           </div>
 
-          {/* Part 6 — Run Engine. No secure trigger currently exists (see
-              report §6): ingestion runs as one-off Node scripts
-              (scripts/cap14_lien_pipeline.mjs, etc.), not an authenticated
-              API endpoint the browser can safely call. Reporting the gap
-              rather than faking execution. */}
-          <div className="pt-2 border-t border-[color:var(--color-line)]">
-            <button disabled className="px-4 py-2 rounded-lg bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] font-bold text-[13px] cursor-not-allowed border border-[color:var(--color-line)]">
-              RUN LEAD ENGINE — backend trigger not yet exposed
-            </button>
-            <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1">
-              Off-market ingestion runs today as operator-triggered scripts (e.g. <code className="text-[10px]">scripts/cap14_lien_pipeline.mjs</code>), not a browser-safe endpoint. This dashboard reads the live results of those runs — see §6 of the release report for what a safe UI trigger would require.
-            </div>
+          {/* Part 3 — reframed as an intentional, forward-looking state
+              rather than a broken-looking disabled CTA. No developer/
+              script language shown to the user (Part 16). */}
+          <div className="pt-2 border-t border-[color:var(--color-line)] rounded-lg bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Automated Source Runs</div>
+            <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-1">
+              Current off-market data is populated through HAT's connected ingestion jobs. UI-controlled source runs are the next operational step — for now, use <span className="font-semibold text-[color:var(--color-text)]">Refresh Dashboard</span> above to pull in the latest results.
+            </p>
           </div>
         </div>
 
@@ -299,12 +369,15 @@ export default function OffMarketEnginePage() {
           </div>
         ) : (
           <>
-            {/* Funnel — Part 7/29. Raw pre-dedup record counts are not
-                persisted anywhere queryable today, so those two stages
-                say so explicitly rather than inventing a number. */}
+            {/* Part 2 (final polish) — ONE KPI presentation, not two. The
+                funnel communicates progression (properties → fit →
+                enriched → contact ready → high priority) in less vertical
+                space than the funnel-strip + card-grid combo used before,
+                so the lead table sits higher on screen. Definitions come
+                from KPI_DEFINITIONS (offMarketMetrics.js) — short,
+                customer-facing product copy, not implementation detail. */}
             <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-2 py-3 overflow-x-auto">
               <div className="flex items-center divide-x divide-[color:var(--color-line)]">
-                <FunnelStage label="Raw Records" notTracked definition="Pre-dedup source rows — not persisted today" />
                 <FunnelStage label="Unique Properties" value={kpis.offMarketLeads} definition={KPI_DEFINITIONS.offMarketLeads} />
                 <FunnelStage label="Buy-Box Fit" value={kpis.buyBoxFit} definition={KPI_DEFINITIONS.buyBoxFit} />
                 <FunnelStage label="Enriched" value={kpis.enrichedCount} definition={KPI_DEFINITIONS.enriched} />
@@ -313,22 +386,10 @@ export default function OffMarketEnginePage() {
               </div>
             </div>
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <KpiCard label="Off-Market Leads" value={kpis.offMarketLeads} sub="in CRM now" />
-              <KpiCard label="Buy-Box Fit" value={kpis.buyBoxFit} />
-              <KpiCard label="Enriched" value={kpis.enrichedCount} />
-              <KpiCard label="Contact Ready" value={kpis.contactReady} tone="var(--color-success-text)" />
-              <KpiCard label="High Priority" value={kpis.highPriority} tone="var(--color-danger-text)" />
-            </div>
-
-            {/* Run History — Part 9. Honest gap: no run-level table exists
-                today (checked — no off_market_runs equivalent in schema).
-                See report §7 for the proposed minimal schema. */}
-            <div className="rounded-lg border border-dashed border-[color:var(--color-line)] px-4 py-3">
-              <div className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">Run History — not currently tracked</div>
-              <div className="text-[10.5px] text-[color:var(--color-text-faint)] mt-0.5">This workspace doesn't yet persist per-run ingestion results (scanned/imported/skipped counts over time). The table below reflects the CURRENT live state of the off-market pipeline. See the release report for a proposed run-history schema.</div>
-            </div>
+            {/* Part 1 (final polish) — Run History hidden for tomorrow's
+                demo rather than shown as a visible gap (option A, the
+                mission's preferred choice). Nothing here claims run-level
+                tracking exists; it simply isn't shown yet. */}
 
             {/* View filters */}
             <div className="flex flex-wrap gap-1.5">
@@ -378,7 +439,7 @@ export default function OffMarketEnginePage() {
                           <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{lead.city}, {lead.zip_code}</div>
                         </td>
                         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{lead.owner_name || '—'}</td>
-                        <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{opp?.distress_category_label || 'Unknown'}</td>
+                        <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{getPrimaryDistressLabel(lead) || 'Unknown'}</td>
                         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{fmtBuyBoxFit(opp?.buy_box_fit)}</td>
                         <td className="px-3 py-2.5"><ContactStatusBadge lead={lead} /></td>
                         <td className="px-3 py-2.5 text-[11px] text-[color:var(--color-text-dim)]">{formatDate(lead.updated_at)}</td>

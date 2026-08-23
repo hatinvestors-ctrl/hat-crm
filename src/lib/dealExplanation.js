@@ -191,7 +191,14 @@ export function computeFlipResult(lead) {
         ? `HAT minimum is ${fc(FLIP_MIN_PROFIT_TARGET)}, so the deal works — but with little room.`
         : `HAT minimum flip profit is ${fc(FLIP_MIN_PROFIT_TARGET)}, so the deal works.`)
     } else if (maoFeasible) {
-      why.push(`HAT minimum flip profit is ${fc(FLIP_MIN_PROFIT_TARGET)} — this price falls short by ${fc(FLIP_MIN_PROFIT_TARGET - profitAtEvaluationPrice)}.`)
+      // Pre-demo consistency fix (Part 7) — this is a PROFIT shortfall
+      // (target minus projected profit), not a purchase-price gap. The
+      // old wording ("this price falls short by $X") read as if $X were
+      // a dollar amount the PRICE needed to move, which is really the
+      // Seller Gap to Max Buy (marginOfSafety.priceCushion, a different
+      // number). Never blur the two — see FinancialSection/DealAnalysisCard
+      // for where "Seller Gap to Max Buy" is labeled separately.
+      why.push(`Projected profit is ${fc(FLIP_MIN_PROFIT_TARGET - profitAtEvaluationPrice)} below HAT's ${fc(FLIP_MIN_PROFIT_TARGET)} profit target.`)
     }
   }
   if (mao != null) why.push(`Maximum flip purchase price is ${fc(Math.round(mao / 100) * 100)}.`)

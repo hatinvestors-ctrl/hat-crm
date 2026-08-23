@@ -10,12 +10,17 @@ import { isContactReady } from './contactEnrichment.js'
 
 // Part 28 — documented KPI definitions, kept next to the code that
 // computes them.
+// Part 1 (wholesaler-demo final polish) — customer-facing product copy.
+// Kept short on purpose: these render as small captions in the UI. Do not
+// reintroduce implementation details (field names, function names,
+// ingestion/run terminology) here — see git history if the longer,
+// developer-facing versions are needed for internal docs.
 export const KPI_DEFINITIONS = {
-  offMarketLeads: 'Leads currently in the CRM that are flagged distressed/off-market (is_distressed, lead_source=off_market, or the pilot\'s notes marker) — the live pipeline state, not a single ingestion run.',
-  buyBoxFit: 'Leads whose stored buy_box_fit (HAT\'s existing buy-box logic, computed at enrichment time) is FIT.',
-  enriched: 'Leads with any enrichment_data recorded — a property/owner enrichment attempt has been made.',
-  contactReady: 'Leads with at least one usable phone or email on file (isContactReady() — the same definition Action Center uses).',
-  highPriority: 'Leads whose stored Opportunity Score priority tier is HIGH_PRIORITY (score >= 80) — HAT\'s existing scoring, not a new threshold.',
+  offMarketLeads: 'Unique distressed properties currently identified.',
+  buyBoxFit: 'Matches HAT\'s Buy Box criteria.',
+  enriched: 'Property and owner data has been enriched.',
+  contactReady: 'Has a usable phone or email on file.',
+  highPriority: 'Opportunity Score of 80 or higher.',
 }
 
 // Part 29 — "Unique Properties", not "Source Records". Each `leads` row

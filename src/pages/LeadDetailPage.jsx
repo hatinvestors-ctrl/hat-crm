@@ -7,6 +7,7 @@ import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
 import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard'
+import ComplsIntelligenceCard from '../components/lead-detail/workspace/ComplsIntelligenceCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import DistressBanner from '../components/lead-detail/DistressBanner'
 import FinancialSection from '../components/lead-detail/FinancialSection'
@@ -367,6 +368,7 @@ export default function LeadDetailPage() {
             Conclusion (Detailed Analysis verdict strip), comps, Full
             Breakdown, notes, and Ask AI as the deeper evidence layer. ══ */}
         <div id="workspace-panel-ai" role="tabpanel" aria-labelledby="workspace-tab-ai" hidden={activeTab !== 'ai'} className="space-y-4">
+          <ComplsIntelligenceCard lead={lead} />
           <DealAnalysisCard
             lead={lead}
             userId={user.id}

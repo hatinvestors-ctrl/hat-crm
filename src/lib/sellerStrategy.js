@@ -536,14 +536,44 @@ export const OBJECTION_GUIDANCE = {
   OTHER: { move: 'LISTEN', ask: 'Tell me more about that.', note: null },
 }
 
+// -- Objection resolution (Capability #24, Part 7/12/36 "already asked"
+// protection) -- a real defect found while auditing for this capability:
+// getNextBestMove previously surfaced the LAST-LOGGED objection's fixed
+// `ask` forever, even after the seller had already answered it. Concretely,
+// once a TOO_LOW objection is logged, "Where were you hoping we'd be?"
+// kept being recommended even after si.seller_asking_price was captured --
+// exactly the "Kevin repeats a question whose answer is already known"
+// failure mode this capability exists to prevent (test scenario, Part 36).
+// Each entry defines the REAL, already-captured signal that means the
+// objection's fixed question no longer needs asking. Objections with no
+// clean resolution signal are left permanently active (documented, not
+// silently guessed) -- see the Part 40 final report for which ones.
+const OBJECTION_RESOLUTION = {
+  TOO_LOW: (si) => si.seller_asking_price != null,
+  NEED_TO_THINK: (si) => !!si.follow_up_phrase,
+  SPOUSE_PARTNER: (si) => !!si.decision_makers,
+  CALL_LATER: (si) => !!si.follow_up_phrase,
+  PRICE: (si) => si.seller_asking_price != null,
+}
+
+function findActiveObjection(si) {
+  const objections = si.objections || []
+  for (let i = objections.length - 1; i >= 0; i--) {
+    const key = objections[i]
+    const isResolved = OBJECTION_RESOLUTION[key]
+    if (!isResolved || !isResolved(si)) return key
+  }
+  return null
+}
+
 // -- Next Best Move (Section 15) -- combines Next Best Question (existing
 // engine) with objection state and negotiation-room awareness. Still
 // returns exactly ONE move, never a list. --------------------------------
 export function getNextBestMove(lead, si, economics) {
-  const lastObjection = si.objections?.[si.objections.length - 1] || null
-  if (lastObjection && OBJECTION_GUIDANCE[lastObjection]) {
-    const g = OBJECTION_GUIDANCE[lastObjection]
-    return { move: g.move, ask: g.ask, note: g.note, reason: `Seller raised: ${lastObjection.replace(/_/g, ' ')}` }
+  const activeObjection = findActiveObjection(si)
+  if (activeObjection && OBJECTION_GUIDANCE[activeObjection]) {
+    const g = OBJECTION_GUIDANCE[activeObjection]
+    return { move: g.move, ask: g.ask, note: g.note, reason: `Seller raised: ${activeObjection.replace(/_/g, ' ')}` }
   }
   const nbq = getNextBestQuestion(lead, si)
   if (!nbq) return { move: 'END RESPECTFULLY', ask: null, note: 'Seller said no -- respect it.', reason: null }
@@ -554,6 +584,102 @@ export function getNextBestMove(lead, si, economics) {
     }
   }
   return { move: 'ASK NEXT', ask: nbq, note: null, reason: null }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Capability #24 — HAT Acquisition Coach additions. Deterministic only
+// (no LLM) -- Coverage, Deal Guardrail presentation, and price-movement
+// formatting all derive from fields already captured by the existing
+// extract-seller-facts.mjs pipeline. Nothing here invents a fact.
+// ═══════════════════════════════════════════════════════════════════════
+
+// -- Call Coverage (Part 6/18/36) -- the exact 8 dimensions used in the
+// mission's required acceptance test (Part 36's "EXPECTED COVERAGE" list).
+// CAPTURED / PARTIAL / MISSING, computed only from si fields that already
+// exist -- never a new fact, never inferred.
+export const COVERAGE_DIMENSIONS = [
+  { key: 'SELLING_INTEREST', label: 'Selling Interest' },
+  { key: 'MOTIVATION', label: 'Motivation' },
+  { key: 'PAIN', label: 'Pain' },
+  { key: 'CONDITION', label: 'Condition' },
+  { key: 'TIMELINE', label: 'Timeline' },
+  { key: 'PRICE', label: 'Price' },
+  { key: 'DECISION_MAKERS', label: 'Decision Makers' },
+  { key: 'FOLLOW_UP', label: 'Follow-Up' },
+]
+
+function coverageStatus(key, si) {
+  switch (key) {
+    case 'SELLING_INTEREST': return si.open_to_sell != null ? 'CAPTURED' : 'MISSING'
+    case 'MOTIVATION': return (si.pain_points.length > 0 || !!si.motivation_notes) ? 'CAPTURED' : 'MISSING'
+    case 'PAIN': return si.pain_points.length >= 2 ? 'CAPTURED' : si.pain_points.length === 1 ? 'PARTIAL' : 'MISSING'
+    case 'CONDITION': return si.condition_notes ? 'CAPTURED' : 'MISSING'
+    case 'TIMELINE': return si.timeline ? 'CAPTURED' : 'MISSING'
+    case 'PRICE': return si.seller_asking_price != null ? 'CAPTURED' : 'MISSING'
+    case 'DECISION_MAKERS': return si.decision_makers ? 'CAPTURED' : 'MISSING'
+    case 'FOLLOW_UP': return si.follow_up_phrase ? 'CAPTURED' : 'MISSING'
+    default: return 'MISSING'
+  }
+}
+
+export function getCallCoverage(si) {
+  const dims = COVERAGE_DIMENSIONS.map(d => ({ ...d, status: coverageStatus(d.key, si) }))
+  const capturedCount = dims.filter(d => d.status === 'CAPTURED').length
+  return { dimensions: dims, capturedCount, total: dims.length }
+}
+
+// -- "What We Still Need" (Part 8) -- top 1-2 highest-priority missing/
+// partial items only, in a fixed priority order. Resolved items never
+// compete for attention once CAPTURED.
+const STILL_NEEDED_PRIORITY = ['SELLING_INTEREST', 'MOTIVATION', 'PAIN', 'TIMELINE', 'PRICE', 'DECISION_MAKERS', 'CONDITION', 'FOLLOW_UP']
+
+export function getWhatWeStillNeed(si, limit = 2) {
+  const coverage = getCallCoverage(si)
+  const byKey = Object.fromEntries(coverage.dimensions.map(d => [d.key, d]))
+  return STILL_NEEDED_PRIORITY
+    .map(key => byKey[key])
+    .filter(d => d.status !== 'CAPTURED')
+    .slice(0, limit)
+}
+
+// -- Deal Guardrail (Part 14) -- presentation over EXISTING concepts only
+// (Starting Offer is lead.starting_offer, Current Offer is
+// economics.ourOffer via the existing getEffectiveOffer, Max Buy is the
+// existing bestCeiling). Never invents a "Target" concept. Max Buy is
+// NEVER computed here -- always read from economics, which itself only
+// ever calls computeFlipResult/computeBrrrrResult.
+export function getDealGuardrail(lead, si, economics) {
+  const sellerPrice = si.seller_asking_price ?? null
+  const maxBuy = economics.bestCeiling
+  if (maxBuy == null) {
+    const reason = economics.flipReason || economics.brrrrReason || 'ARV and renovation cost are needed to compute Max Buy.'
+    return { maxBuyReady: false, maxBuyReason: reason, startingOffer: lead.starting_offer ?? null, currentOffer: economics.ourOffer, sellerPrice, gap: null }
+  }
+  const gap = sellerPrice != null ? sellerPrice - maxBuy : null
+  return {
+    maxBuyReady: true,
+    maxBuy,
+    maxBuyStrategy: economics.bestCeilingStrategy,
+    startingOffer: lead.starting_offer ?? null,
+    currentOffer: economics.ourOffer,
+    sellerPrice,
+    gap, // positive = seller above Max Buy; negative/zero = at or below
+  }
+}
+
+// -- Seller price movement (Part 15) -- reuses the existing
+// seller_asking_price_history array; never a new price model.
+export function formatPriceMovement(si) {
+  const history = si.seller_asking_price_history || []
+  if (history.length === 0 && si.seller_asking_price == null) return null
+  const values = [...history.map(h => h.value), si.seller_asking_price].filter(v => v != null)
+  if (values.length === 0) return null
+  const fmt = (n) => `$${Math.round(n / 1000)}K`
+  return {
+    chain: values.map(fmt).join(' → '),
+    current: si.seller_asking_price,
+    movedBy: values.length > 1 ? values[values.length - 1] - values[0] : 0,
+  }
 }
 
 // -- Call memory (Section 29) -- built from REAL lead_activities rows only,

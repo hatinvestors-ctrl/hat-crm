@@ -26,7 +26,9 @@ import {
 import {
   getSellerIntelligence, mergeSellerIntelligence, getSellerSnapshot, getCallObjective,
   getRealTimeEconomics, getNextBestMove, getCallMemory, getWhatChanged, PAIN_POINT_OPTIONS,
+  getWhatWeStillNeed, getDealGuardrail, formatPriceMovement,
 } from '../../lib/sellerStrategy'
+import CallReview from './CallReview'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
 // Capability #22.2, Section 4/5 — two-speed debounce. A FAST-path event
@@ -104,6 +106,12 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
   const callMemory = getCallMemory(lead, lastOutcomeActivity)
   const whatChanged = getWhatChanged(callMemory, economics)
   const stage = inferConversationStage(si)
+  // Capability #24 — HAT Acquisition Coach additions (deterministic, see
+  // sellerStrategy.js). "Think a lot, show very little": only the top 1-2
+  // missing dimensions surface live, never the full 8-item checklist.
+  const stillNeeded = getWhatWeStillNeed(si, 2)
+  const guardrail = getDealGuardrail(lead, si, economics)
+  const priceMovement = formatPriceMovement(si)
 
   useEffect(() => {
     const t = setInterval(() => setTick(v => v + 1), 1000)
@@ -246,6 +254,7 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     <div className="fixed inset-0 z-50 bg-[color:var(--color-bg)] flex flex-col">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[color:var(--color-line)] shrink-0">
         <div>
+          <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold">HAT Acquisition Coach</div>
           <div className="text-[13px] font-bold text-[color:var(--color-text)]">{lead.owner_name || 'Owner'} · {lead.address}</div>
           <div className="text-[10.5px] text-[color:var(--color-text-dim)]">LIVE {formatDuration(getDurationSeconds(session))} · Stage: {stage}</div>
         </div>
@@ -292,46 +301,70 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             </div>
           )}
 
-          {/* Seller State + Economics */}
+          {/* ZONE A — Call Stage + Seller State. Compact strip, facts only — unknown stays unknown. */}
           <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
-            <div className="grid grid-cols-5 divide-x divide-[color:var(--color-line)] mb-2">
+            <div className="grid grid-cols-5 divide-x divide-[color:var(--color-line)] mb-1.5">
               <StatChip label="Open to Sell" value={si.open_to_sell || 'UNKNOWN'} tone={si.open_to_sell === 'YES' ? 'good' : undefined} />
               <StatChip label="Motivation" value={snapshot.motivation} />
               <StatChip label="Timeline" value={snapshot.timeline} />
-              <StatChip label="Seller Price" value={snapshot.priceDisplay} tone={snapshot.priceStatus === 'CONDITIONAL' ? 'warn' : undefined} />
-              <StatChip label="Main Pain" value={snapshot.mainPain?.label || '—'} />
+              <StatChip label="Seller Price" value={priceMovement ? priceMovement.chain : snapshot.priceDisplay} tone={snapshot.priceStatus === 'CONDITIONAL' ? 'warn' : undefined} />
+              <StatChip label="Decision" value={si.decision_makers || 'UNKNOWN'} />
             </div>
-            {snapshot.mainPain?.supporting?.length > 1 && (
-              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">Supporting: {snapshot.mainPain.supporting.join(', ')}</div>
-            )}
-            {si.seller_asking_price_history?.length > 0 && (
-              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">Previously stated: {si.seller_asking_price_history.map(h => fc(h.value)).join(' → ')} → <strong>{fc(si.seller_asking_price)}</strong> (changed during call)</div>
-            )}
-            {si.hat_offer_mentioned != null && (
-              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center mb-1.5">
-                HAT {si.hat_offer_type === 'FORMAL_OFFER' ? 'formal offer' : si.hat_offer_type === 'PROBE' ? 'probed' : 'range mentioned'}: {fc(si.hat_offer_mentioned)} (not the seller's ask)
+            {snapshot.mainPain?.label && (
+              <div className="text-[10px] text-[color:var(--color-text-dim)] text-center">
+                Condition: {snapshot.mainPain.label}{snapshot.mainPain.supporting?.length > 1 ? ` (${snapshot.mainPain.supporting.join(', ')})` : ''}
               </div>
             )}
-            <div className="grid grid-cols-4 divide-x divide-[color:var(--color-line)] border-t border-[color:var(--color-line)] pt-2">
-              <StatChip label="Our Offer" value={fc(economics.ourOffer)} />
-              <StatChip label="Flip Max" value={economics.flipReady ? fc(economics.flipMao) : 'NOT READY'} tone={economics.flipReady ? undefined : 'warn'} />
-              <StatChip label="BRRRR Max" value={economics.brrrrReady ? fc(economics.brrrrMao) : 'NOT READY'} tone={economics.brrrrReady ? undefined : 'warn'} />
-              <StatChip label="Best Ceiling" value={economics.bestCeiling != null ? `${fc(economics.bestCeiling)} (${economics.bestCeilingStrategy})` : '—'} tone="good" />
-            </div>
-            {economics.gap != null && (
-              <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5 text-center">Gap to best ceiling: {fc(Math.abs(economics.gap))} {economics.gap > 0 ? 'above' : 'within'}</div>
+            {/* "What We Still Need" (Part 8) — top 1-2 items only, never the full checklist during the call. */}
+            {stillNeeded.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 justify-center mt-1.5 pt-1.5 border-t border-[color:var(--color-line)]">
+                {stillNeeded.map(d => (
+                  <span key={d.key} className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]">⚠ {d.label}</span>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* NEXT MOVE hero */}
+          {/* ZONE B — Next Best Question. The visually dominant element, exactly one. */}
           <div className="rounded-xl border-2 border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] px-4 py-3.5 text-center">
-            <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-1">{nextMove.move}</div>
+            <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold mb-1">Next Best Question</div>
             {nextMove.ask ? (
               <p className="text-[17px] font-bold text-[color:var(--color-accent-text)] leading-snug">"{nextMove.ask}"</p>
             ) : (
               <p className="text-[13px] text-[color:var(--color-accent-text)]">{nextMove.note}</p>
             )}
-            {nextMove.note && nextMove.ask && <p className="text-[10.5px] text-[color:var(--color-accent-text)] opacity-80 mt-1">{nextMove.note}</p>}
+          </div>
+
+          {/* ZONE C — Your Move. One short strategic instruction, separate from the question itself. */}
+          {(nextMove.move || nextMove.note) && (
+            <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3.5 py-2.5">
+              <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-0.5">Your Move</div>
+              <p className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{nextMove.move.replace(/_/g, ' ')}</p>
+              {nextMove.note && <p className="text-[11px] text-[color:var(--color-text-muted)] mt-0.5">{nextMove.note}</p>}
+              {nextMove.reason && <p className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5">{nextMove.reason}</p>}
+            </div>
+          )}
+
+          {/* ZONE D — Deal Guardrail. Only existing canonical concepts; Max Buy always deterministic. */}
+          <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
+            <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-1.5 text-center">Deal Guardrail</div>
+            <div className="grid grid-cols-4 divide-x divide-[color:var(--color-line)]">
+              <StatChip label="Starting Offer" value={fc(guardrail.startingOffer)} />
+              <StatChip label="Current Offer" value={fc(guardrail.currentOffer)} />
+              <StatChip label="Max Buy" value={guardrail.maxBuyReady ? `${fc(guardrail.maxBuy)} (${guardrail.maxBuyStrategy})` : 'NOT READY'} tone={guardrail.maxBuyReady ? 'good' : 'warn'} />
+              <StatChip label="Seller Asking" value={fc(guardrail.sellerPrice)} />
+            </div>
+            {!guardrail.maxBuyReady && <div className="text-[10px] text-[color:var(--color-warn-text)] mt-1.5 text-center">{guardrail.maxBuyReason}</div>}
+            {guardrail.maxBuyReady && guardrail.gap != null && (
+              <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5 text-center">
+                Gap to Max Buy: {fc(Math.abs(guardrail.gap))} {guardrail.gap > 0 ? 'above (seller needs to move down)' : 'at or below Max Buy'}
+              </div>
+            )}
+            {si.hat_offer_mentioned != null && (
+              <div className="text-[10px] text-[color:var(--color-text-dim)] mt-1 text-center">
+                HAT {si.hat_offer_type === 'FORMAL_OFFER' ? 'formal offer' : si.hat_offer_type === 'PROBE' ? 'probed' : 'range mentioned'}: {fc(si.hat_offer_mentioned)} (not the seller's ask)
+              </div>
+            )}
           </div>
 
           {pendingFacts && (
@@ -345,16 +378,22 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
-            {PAIN_POINT_OPTIONS.map(p => (
-              <button key={p.key} onClick={() => togglePainManual(p.key)}
-                className={`text-[10.5px] font-semibold px-2 py-1 rounded-full border transition-colors ${
-                  si.pain_points.includes(p.key) ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-white' : 'bg-[color:var(--color-bg-elev-2)] border-[color:var(--color-line)] text-[color:var(--color-text-muted)]'
-                }`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {/* Progressive disclosure (Part 16/35) — manual capture is a
+              fallback, not a default-visible control competing with the
+              live recommendation. */}
+          <details className="text-[11px]">
+            <summary className="text-[10.5px] font-semibold text-[color:var(--color-text-dim)] cursor-pointer select-none">Manual capture (pain points)</summary>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {PAIN_POINT_OPTIONS.map(p => (
+                <button key={p.key} onClick={() => togglePainManual(p.key)}
+                  className={`text-[10.5px] font-semibold px-2 py-1 rounded-full border transition-colors ${
+                    si.pain_points.includes(p.key) ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-white' : 'bg-[color:var(--color-bg-elev-2)] border-[color:var(--color-line)] text-[color:var(--color-text-muted)]'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </details>
 
           {/* Transcript — secondary, collapsed by default (Section 11) */}
           <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-2.5">
@@ -388,13 +427,13 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
           <button onClick={() => { mic.stop(); setEnded(true) }} className="w-full text-[13px] font-bold py-2 rounded-lg bg-[color:var(--color-danger)] text-white">End Call</button>
         </div>
       ) : (
-        <EndCallSummary lead={lead} si={si} userId={userId} onSaved={() => { onClose(); }} onDiscard={() => setEnded(false)} />
+        <EndCallSummary lead={lead} si={si} session={session} userId={userId} onSaved={() => { onClose(); }} onDiscard={() => setEnded(false)} />
       )}
     </div>
   )
 }
 
-function EndCallSummary({ lead, si, userId, onSaved, onDiscard }) {
+function EndCallSummary({ lead, si, session, userId, onSaved, onDiscard }) {
   const [outcome, setOutcome] = useState(si.open_to_sell === 'NO' ? 'not_interested' : 'spoke_follow_up')
   // #22.2, Section 16 — pre-fill from the seller's spoken follow-up
   // phrase, resolved deterministically (never LLM date math) in the
@@ -433,6 +472,10 @@ function EndCallSummary({ lead, si, userId, onSaved, onDiscard }) {
         <div>Decision makers: {si.decision_makers || 'unknown'}</div>
         <div>Objections: {si.objections?.join(', ') || 'none'}</div>
       </div>
+
+      {/* Capability #24 — optional, best-effort. Never blocks Save & Schedule below. */}
+      {session && <CallReview lead={lead} session={session} si={si} />}
+
       <label className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Outcome</label>
       <select value={outcome} onChange={e => setOutcome(e.target.value)} className="w-full text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)]">
         <option value="spoke_follow_up">Spoke — Follow Up</option>

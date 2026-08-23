@@ -111,13 +111,21 @@ export default function DecisionHero({ lead }) {
           identity; this is where "decision context" belongs. */}
       <div className="px-4 py-2.5 border-t border-[color:var(--color-line)] flex items-center gap-4 flex-wrap">
         <span className="text-[11px] text-[color:var(--color-text-dim)]">Opportunity <b className="text-[color:var(--color-text)]">{d.opportunity?.score ?? '—'}</b></span>
-        <span className="text-[11px] text-[color:var(--color-text-dim)]">Confidence <b className="text-[color:var(--color-text)]">{d.confidence?.score ?? '—'}</b></span>
+        {/* Part 26 (Comps Intelligence audit) — relabeled from a bare
+            "Confidence" to "Data Confidence". This score measures whether
+            the CORE ECONOMIC FIELDS (ARV/renovation/rent) are present and
+            the decision is data-complete (decisionEngineV2.js) — it says
+            nothing about how well-evidenced the ARV VALUE itself is. Left
+            next to the new "ARV Confidence" badge, an unlabeled
+            "Confidence" would have looked like the same concept. No
+            scoring logic changed, only this label. */}
+        <span className="text-[11px] text-[color:var(--color-text-dim)]">Data Confidence <b className="text-[color:var(--color-text)]">{d.confidence?.score ?? '—'}</b></span>
         <span className="text-[11px] text-[color:var(--color-text-dim)]">Urgency <b className="text-[color:var(--color-text)]">{d.urgency?.level ?? '—'}</b></span>
         {maturity && (
           <span className="text-[10px] font-bold uppercase tracking-wide ml-auto" style={{ color: isPreliminary ? 'var(--color-warn-text)' : 'var(--color-success-text)' }}>
             {isPreliminary
               ? `Preliminary — Missing: ${(d.confidence?.missing || []).slice(0, 2).join(' · ') || 'more data'}`
-              : `Refined${prov.comps_available ? ` · ${prov.comps_count} comp${prov.comps_count === 1 ? '' : 's'}` : ''} · Confidence ${d.confidence.score}`}
+              : `Refined${prov.comps_available ? ` · ${prov.comps_count} comp${prov.comps_count === 1 ? '' : 's'}` : ''} · Data Confidence ${d.confidence.score}`}
           </span>
         )}
       </div>

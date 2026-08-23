@@ -5,7 +5,7 @@
 // tests never assert a fabricated number, only real function output.
 import { describe, it, expect } from 'vitest'
 import { dedupeByLeadId, annotate, filterBySource, computeFunnel, applyViewFilter } from '../src/lib/offMarketMetrics.js'
-import { isDistressedLead } from '../src/lib/distressInfo.js'
+import { isDistressedLead, getPrimaryDistressLabel } from '../src/lib/distressInfo.js'
 
 function distressedLead(overrides = {}) {
   return {
@@ -146,6 +146,41 @@ describe('isDistressedLead — the same canonical classifier the dashboard filte
   })
   it('a normal on-market lead is excluded', () => {
     expect(isDistressedLead({ is_distressed: false, notes: 'Normal seller lead' })).toBe(false)
+  })
+})
+
+describe('getPrimaryDistressLabel — single canonical Signal label (final polish Part 3)', () => {
+  // Real-world case found during the wholesaler-demo final polish pass: a
+  // lead had enrichment_data.distress_category = HOA_CONDO_LIEN (the
+  // scoring bucket) while its notes-derived filing was actually a Lis
+  // Pendens (typically a foreclosure/legal action, not an HOA lien) — the
+  // table's Signal column and the "Why This Lead?" panel's headline used
+  // to read two DIFFERENT fields and could show contradictory labels for
+  // the same property. This is a REAL underlying data-quality gap in how
+  // that lead was categorized — not something these tests or this
+  // function correct — but the presentation layer must no longer show two
+  // different answers for "what is this distress signal" on one property.
+  it('prefers the scoring category (distress_category) as the single headline label', () => {
+    const lead = {
+      notes: '⚠ DISTRESSED OPPORTUNITY — Lis Pendens\nFiled: 2026-08-10\n',
+      enrichment_data: { opportunity_score: 72, distress_category: 'HOA_CONDO_LIEN' },
+    }
+    expect(getPrimaryDistressLabel(lead)).toBe('HOA / Condo Lien')
+  })
+  it('falls back to the notes-derived filing type when no scoring category exists', () => {
+    const lead = { notes: '⚠ DISTRESSED OPPORTUNITY — Lis Pendens\nFiled: 2026-08-10\n', enrichment_data: null }
+    expect(getPrimaryDistressLabel(lead)).toBe('Pre-Foreclosure • Lis Pendens')
+  })
+  it('returns null (not "Unknown" or a crash) when neither field is available', () => {
+    expect(getPrimaryDistressLabel({})).toBeNull()
+    expect(getPrimaryDistressLabel(null)).toBeNull()
+  })
+  it('distress_data.distress_category (if present) still wins over enrichment_data — matches getOpportunityInfo\'s own precedence, no new precedence invented here', () => {
+    const lead = {
+      distress_data: { distress_category: 'MORTGAGE_FORECLOSURE' },
+      enrichment_data: { opportunity_score: 85, distress_category: 'HOA_CONDO_LIEN' },
+    }
+    expect(getPrimaryDistressLabel(lead)).toBe('Mortgage Foreclosure')
   })
 })
 

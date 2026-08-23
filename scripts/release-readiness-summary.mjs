@@ -39,6 +39,10 @@ const CATEGORY_LABELS = {
   'allInAccuracy.test.js': 'ALL-IN ACCURACY (approved Objective A)',
   'priceClarity.test.js': 'PRICE CLARITY (Seller Gap / Max Buy consistency, Paschal QA)',
   'offMarketDashboard.test.js': 'OFF-MARKET DASHBOARD (funnel/filter aggregation)',
+  'arvConfidence.test.js': 'COMPS INTELLIGENCE / ARV CONFIDENCE (decision sensitivity + HAT internal evidence)',
+  'aiAuthority.test.js': 'AI AUTHORITY CONTRACT (canonical ARV/Max Buy authority in AI prompts)',
+  'acquisitionCoach.test.js': 'HAT ACQUISITION COACH (conversation stage/coverage/already-asked/Deal Guardrail)',
+  'callCoaching.test.js': 'CALL REVIEW (quote verification, scorecard validation, AI authority)',
 }
 
 const byFile = {}

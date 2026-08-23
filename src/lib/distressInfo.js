@@ -169,6 +169,31 @@ export function getOpportunityInfo(lead) {
   }
 }
 
+// Part 3 (wholesaler-demo final polish) — SINGLE canonical label for "what
+// kind of distress is this", used by every UI surface that needs one line
+// (table Signal column, Why This Lead? headline). Before this function
+// existed, the table read opp.distress_category_label (the scoring
+// category from enrichment_data/distress_data) while the detail panel
+// independently read fmtDistressType(info.distress_type) (parsed from the
+// notes fallback) — two real fields describing the same event, which can
+// legitimately disagree (distress_category is a coarse scoring bucket;
+// distress_type is the specific recorded instrument). Investigation found
+// this actually happening on real leads (e.g. a Lis Pendens filing
+// categorized HOA_CONDO_LIEN instead of MORTGAGE_FORECLOSURE) — a real
+// data-quality gap in the categorization step, not a UI bug, and NOT
+// something this function corrects. This function only picks ONE field as
+// the presentation source of truth (distress_category — it's what scoring/
+// buy-box/funnel already treat as canonical) so every screen agrees with
+// itself, and callers can still show the notes-derived filing type as a
+// clearly-labeled secondary "Filing:" line rather than a competing header.
+export function getPrimaryDistressLabel(lead) {
+  const opp = getOpportunityInfo(lead)
+  if (opp?.distress_category_label) return opp.distress_category_label
+  const info = getDistressInfo(lead)
+  if (info?.distress_type) return fmtDistressType(info.distress_type)
+  return null
+}
+
 export function fmtBuyBoxFit(fit) {
   switch (fit) {
     case 'FIT': return 'Fit'
