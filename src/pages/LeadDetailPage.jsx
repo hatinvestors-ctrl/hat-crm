@@ -414,6 +414,7 @@ export default function LeadDetailPage() {
         <LiveCopilot
           lead={lead}
           userId={user.id}
+          workspaceId={workspaceId}
           members={members}
           canEdit={canEdit}
           onUpdated={onLeadUpdated}

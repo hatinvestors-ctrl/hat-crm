@@ -29,6 +29,7 @@ import {
   getWhatWeStillNeed, getDealGuardrail, formatPriceMovement,
 } from '../../lib/sellerStrategy'
 import CallReview from './CallReview'
+import { buildCallSessionInsert, buildCallSessionFinalizeUpdate } from '../../lib/callSessions'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
 // Capability #22.2, Section 4/5 — two-speed debounce. A FAST-path event
@@ -81,9 +82,15 @@ function MicButton({ status, supported, onStart, onPause, onResume, onStop }) {
   )
 }
 
-export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated, onClose }) {
+export default function LiveCopilot({ lead, userId, workspaceId, members, canEdit, onUpdated, onClose }) {
   const update = useLeadUpdate(lead, userId, members, onUpdated)
-  const [session, setSession] = useState(() => createSession(lead))
+  // Capability #25.1, Part 8 — durable callId/workspaceId/repId captured
+  // at session creation (repId is the AUTHENTICATED caller, never
+  // lead.assigned_to). Kept even if workspaceId is somehow unavailable
+  // (callId still generated) so nothing else in the component breaks —
+  // persistence itself just no-ops without a workspaceId (see
+  // persistCallSession below).
+  const [session, setSession] = useState(() => createSession(lead, { workspaceId, repId: userId }))
   const [input, setInput] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState(null)
@@ -94,6 +101,10 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
   const [showTranscript, setShowTranscript] = useState(false)
   const [consentGiven, setConsentGiven] = useState(false)
   const [captureFlash, setCaptureFlash] = useState(null) // e.g. "PRICE CAPTURED $175K"
+  // Capability #25.1, Part 22 — persistence status, surfaced with a Retry
+  // in the Call Complete screen. Never silently loses the call.
+  const [sessionSaveStatus, setSessionSaveStatus] = useState('idle') // idle | saving | saved | error
+  const [sessionSaveError, setSessionSaveError] = useState(null)
   const scrollRef = useRef(null)
   const sessionRef = useRef(session)
   sessionRef.current = session
@@ -244,6 +255,37 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
     const { isFast } = detectFastSignals(input)
     scheduleAnalyze(isFast ? FAST_DEBOUNCE_MS : NORMAL_DEBOUNCE_MS)
   }
+
+  // Capability #25.1, Part 9/22 — Phase 1 persistence: inserted the moment
+  // End Call is reached, BEFORE outcome/follow-up are known (those are
+  // Phase 2, see finalizeCallSession in EndCallSummary). Idempotent: a
+  // duplicate call (double-click, retry) hits the unique id constraint
+  // and is treated as success, never a duplicate row. No-ops safely if
+  // workspaceId wasn't available (never blocks the call itself — Part 22:
+  // never lose the call flow to a persistence problem).
+  const ensureSessionPersisted = useCallback(async () => {
+    if (sessionSaveStatus === 'saved') return true
+    if (!session.workspaceId) {
+      setSessionSaveStatus('error')
+      setSessionSaveError('No workspace context — call was not saved to history.')
+      return false
+    }
+    setSessionSaveStatus('saving')
+    setSessionSaveError(null)
+    try {
+      const record = buildCallSessionInsert({ identity: session, lead, si, endedAt: new Date().toISOString() })
+      const { error } = await supabase.from('call_sessions').insert(record)
+      // Postgres unique_violation — this exact call was already persisted
+      // (a retry/double-click), not a real failure.
+      if (error && error.code !== '23505') throw error
+      setSessionSaveStatus('saved')
+      return true
+    } catch (err) {
+      setSessionSaveStatus('error')
+      setSessionSaveError(err.message || 'Could not save this call to history.')
+      return false
+    }
+  }, [session, lead, si, sessionSaveStatus])
 
   function togglePainManual(key) {
     const has = si.pain_points.includes(key)
@@ -424,16 +466,21 @@ export default function LiveCopilot({ lead, userId, members, canEdit, onUpdated,
             {analyzeError && <p className="text-[10.5px] text-[color:var(--color-danger-text)] mt-1">{analyzeError}</p>}
           </div>
 
-          <button onClick={() => { mic.stop(); setEnded(true) }} className="w-full text-[13px] font-bold py-2 rounded-lg bg-[color:var(--color-danger)] text-white">End Call</button>
+          <button onClick={() => { mic.stop(); setEnded(true); ensureSessionPersisted() }} className="w-full text-[13px] font-bold py-2 rounded-lg bg-[color:var(--color-danger)] text-white">End Call</button>
         </div>
       ) : (
-        <EndCallSummary lead={lead} si={si} session={session} userId={userId} onSaved={() => { onClose(); }} onDiscard={() => setEnded(false)} />
+        <EndCallSummary
+          lead={lead} si={si} session={session} userId={userId}
+          sessionSaveStatus={sessionSaveStatus} sessionSaveError={sessionSaveError}
+          ensureSessionPersisted={ensureSessionPersisted}
+          onSaved={() => { onClose(); }} onDiscard={() => setEnded(false)}
+        />
       )}
     </div>
   )
 }
 
-function EndCallSummary({ lead, si, session, userId, onSaved, onDiscard }) {
+function EndCallSummary({ lead, si, session, userId, sessionSaveStatus, sessionSaveError, ensureSessionPersisted, onSaved, onDiscard }) {
   const [outcome, setOutcome] = useState(si.open_to_sell === 'NO' ? 'not_interested' : 'spoke_follow_up')
   // #22.2, Section 16 — pre-fill from the seller's spoken follow-up
   // phrase, resolved deterministically (never LLM date math) in the
@@ -456,6 +503,16 @@ function EndCallSummary({ lead, si, session, userId, onSaved, onDiscard }) {
       if (followUpDate) {
         await supabase.from('leads').update({ status: 'follow_up', follow_up_date: followUpDate }).eq('id', lead.id)
       }
+      // Capability #25.1, Part 10 — supplements the existing outcome
+      // system, never replaces it. Phase 2 "finalize once" update: make
+      // sure the row exists (it should already, from End Call — this is
+      // just a safety net if that first attempt failed), then set
+      // outcome/follow_up_date/summary exactly once.
+      const persisted = await ensureSessionPersisted()
+      if (persisted) {
+        const finalize = buildCallSessionFinalizeUpdate({ outcome, followUpDate, note })
+        await supabase.from('call_sessions').update(finalize).eq('id', session.callId)
+      }
       onSaved()
     } finally {
       setSaving(false)
@@ -473,8 +530,17 @@ function EndCallSummary({ lead, si, session, userId, onSaved, onDiscard }) {
         <div>Objections: {si.objections?.join(', ') || 'none'}</div>
       </div>
 
+      {/* Capability #25.1, Part 22 — never silent. Retry never blocks the
+          rest of the Call Complete flow (outcome/follow-up still work). */}
+      {sessionSaveStatus === 'error' && (
+        <div className="rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-3 py-2 text-[11px] text-[color:var(--color-danger-text)] flex items-center justify-between gap-2">
+          <span>Call wasn't saved to history: {sessionSaveError}</span>
+          <button onClick={ensureSessionPersisted} className="underline font-semibold shrink-0">Retry</button>
+        </div>
+      )}
+
       {/* Capability #24 — optional, best-effort. Never blocks Save & Schedule below. */}
-      {session && <CallReview lead={lead} session={session} si={si} />}
+      {session && <CallReview lead={lead} session={session} si={si} ensureSessionPersisted={ensureSessionPersisted} />}
 
       <label className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Outcome</label>
       <select value={outcome} onChange={e => setOutcome(e.target.value)} className="w-full text-[12px] px-2 py-1.5 rounded border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] text-[color:var(--color-text)]">

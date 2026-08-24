@@ -43,6 +43,7 @@ const CATEGORY_LABELS = {
   'aiAuthority.test.js': 'AI AUTHORITY CONTRACT (canonical ARV/Max Buy authority in AI prompts)',
   'acquisitionCoach.test.js': 'HAT ACQUISITION COACH (conversation stage/coverage/already-asked/Deal Guardrail)',
   'callCoaching.test.js': 'CALL REVIEW (quote verification, scorecard validation, AI authority)',
+  'callSessions.test.js': 'PERSISTENT CALL INTELLIGENCE (session identity, snapshot immutability, Calls History filtering)',
 }
 
 const byFile = {}

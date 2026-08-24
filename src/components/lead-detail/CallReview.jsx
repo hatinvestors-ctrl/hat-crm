@@ -1,15 +1,18 @@
 // src/components/lead-detail/CallReview.jsx
 // Capability #24 — HAT Acquisition Coach: post-call "Call Review".
-// Optional, best-effort (Part 30 failure-mode principle applied post-call
-// too — a failed/unavailable review never blocks Save & Schedule). Every
-// coaching moment/strong move shown here has already been independently
-// re-verified against the real transcript (verifyCoachingMoments) — never
-// trusts the model's own claim of a quote.
+// Capability #25.1 — now persists the validated review to call_reviews
+// (one immutable row per call_session_id) once generated. Optional,
+// best-effort at every step (Part 22/30 principles applied post-call too):
+// a failed/unavailable AI call, or a failed DB save, never blocks Save &
+// Schedule, and a DB-save failure never silently loses the already-
+// generated review — it stays visible with a Retry that re-attempts ONLY
+// the save, never a second LLM call.
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getFullTranscriptText } from '../../lib/conversationSession'
 import { getCallCoverage, getDealGuardrail, getRealTimeEconomics } from '../../lib/sellerStrategy'
 import { COACHING_DIMENSIONS, validateScorecard, computeOverallScore, verifyCoachingMoments, verifyStrongMoves } from '../../lib/callCoaching'
+import { buildCallReviewRecord } from '../../lib/callSessions'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
 
@@ -32,10 +35,51 @@ function ScoreRow({ dim, score }) {
   )
 }
 
-export default function CallReview({ lead, session, si }) {
+export default function CallReview({ lead, session, si, ensureSessionPersisted }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [review, setReview] = useState(null)
+  // Capability #25.1 — DB persistence status, separate from AI-generation
+  // status. Retry only re-attempts the save, never regenerates (Part 30:
+  // zero new AI calls from persistence).
+  const [dbSaveStatus, setDbSaveStatus] = useState('idle') // idle | saving | saved | error
+  const [dbSaveError, setDbSaveError] = useState(null)
+
+  async function persistReview(reviewToSave) {
+    if (!session?.callId || !session?.workspaceId) {
+      setDbSaveStatus('error')
+      setDbSaveError('No call session context — review was not saved to history.')
+      return
+    }
+    setDbSaveStatus('saving')
+    setDbSaveError(null)
+    try {
+      if (ensureSessionPersisted) {
+        const ok = await ensureSessionPersisted()
+        if (!ok) throw new Error('The call itself could not be saved, so the review cannot be attached to it.')
+      }
+      const economics = getRealTimeEconomics(lead)
+      const guardrail = getDealGuardrail(lead, si, economics)
+      const record = buildCallReviewRecord({
+        callSessionId: session.callId,
+        workspaceId: session.workspaceId,
+        leadId: lead.id,
+        repId: session.repId,
+        validatedReview: reviewToSave,
+        maxBuySnapshot: guardrail.maxBuyReady ? guardrail.maxBuy : null,
+        sellerPriceSnapshot: guardrail.sellerPrice,
+      })
+      const { error: insertError } = await supabase.from('call_reviews').insert(record)
+      // Postgres unique_violation on call_session_id — a review already
+      // exists for this call (retry after a prior successful save, or a
+      // double-click) — treat as success, never a duplicate row (Part 11).
+      if (insertError && insertError.code !== '23505') throw insertError
+      setDbSaveStatus('saved')
+    } catch (err) {
+      setDbSaveStatus('error')
+      setDbSaveError(err.message || "Call Review generated but couldn't be saved.")
+    }
+  }
 
   async function generate() {
     setLoading(true)
@@ -69,7 +113,7 @@ export default function CallReview({ lead, session, si }) {
         verifyCoachingMoments([missedOpportunity], transcript).length > 0
       ) ? missedOpportunity : null
 
-      setReview({
+      const validated = {
         scores,
         overallScore: computeOverallScore(scores),
         strengths: Array.isArray(body.review?.strengths) ? body.review.strengths.slice(0, 3) : [],
@@ -77,7 +121,12 @@ export default function CallReview({ lead, session, si }) {
         coachingMoments,
         strongMoves,
         sellerOutcomeSummary: body.review?.sellerOutcomeSummary || null,
-      })
+      }
+      setReview(validated)
+      // Persist immediately (Part 11: "The UI and DB should refer to the
+      // same review object") — the SAME validated object just rendered,
+      // never re-derived.
+      await persistReview(validated)
     } catch (err) {
       setError(err.message || 'Call review unavailable right now.')
     } finally {
@@ -117,6 +166,18 @@ export default function CallReview({ lead, session, si }) {
 
       {review && (
         <>
+          {/* Capability #25.1, Part 22 — the review is never lost just
+              because the DB write failed; Retry re-attempts ONLY the save. */}
+          {dbSaveStatus === 'error' && (
+            <div className="rounded border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-2.5 py-2 text-[11px] text-[color:var(--color-danger-text)] flex items-center justify-between gap-2">
+              <span>Call Review generated but couldn't be saved: {dbSaveError}</span>
+              <button onClick={() => persistReview(review)} className="underline font-semibold shrink-0">Retry</button>
+            </div>
+          )}
+          {dbSaveStatus === 'saved' && (
+            <div className="text-[10px] text-[color:var(--color-success-text)]">✓ Saved to Calls History</div>
+          )}
+
           {review.overallScore != null && (
             <div className="text-center py-1">
               <div className="text-[24px] font-extrabold tabular-nums">{review.overallScore} / 100</div>

@@ -23,6 +23,8 @@ import ScreenerPage from './pages/ScreenerPage'
 import ActionCenterPage from './pages/ActionCenterPage'
 import AcquisitionIntelligencePage from './pages/AcquisitionIntelligencePage'
 import OffMarketEnginePage from './pages/OffMarketEnginePage'
+import CallsHistoryPage from './pages/CallsHistoryPage'
+import CallDetailPage from './pages/CallDetailPage'
 
 export default function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -71,6 +73,8 @@ export default function App() {
         <Route path="action-center" element={<ActionCenterPage />} />
         <Route path="performance" element={<AcquisitionIntelligencePage />} />
         <Route path="off-market" element={<OffMarketEnginePage />} />
+        <Route path="coaching/calls" element={<CallsHistoryPage />} />
+        <Route path="coaching/calls/:callId" element={<CallDetailPage />} />
         <Route element={<AdminRoute />}>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />

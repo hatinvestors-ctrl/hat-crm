@@ -19,8 +19,17 @@
 
 let _idCounter = 0
 
-export function createSession(lead) {
+// Capability #25.1, Part 8 — the in-memory session now carries a durable
+// identity from the moment the call starts: a client-generated callId
+// (used as call_sessions.id — see src/lib/callSessions.js), the
+// workspaceId, and repId (the AUTHENTICATED USER who started the call,
+// never derived from lead.assigned_to). Everything else about the session
+// object is unchanged.
+export function createSession(lead, { workspaceId = null, repId = null } = {}) {
   return {
+    callId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `local-${Date.now()}-${++_idCounter}`,
+    workspaceId,
+    repId,
     leadId: lead?.id ?? null,
     startedAt: new Date().toISOString(),
     segments: [],       // { id, speaker: 'SELLER'|'KEVIN'|'UNKNOWN', text, at, confidence }
