@@ -94,7 +94,17 @@ Score this call against the rubric and return the JSON shape exactly as specifie
           max_tokens: 2000,
           temperature: 0,
           system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userPrompt }],
+          // Bug fix (found on first live production test) — an
+          // assistant-turn prefill of "{" is the standard way to force
+          // Claude to start its reply exactly at the JSON object, instead
+          // of a markdown code fence or a sentence of preamble despite the
+          // prompt saying "no prose outside the JSON." Same technique
+          // generate-comps.mjs already uses (prefilled with its first
+          // section header) — not a new pattern.
+          messages: [
+            { role: 'user', content: userPrompt },
+            { role: 'assistant', content: '{' },
+          ],
         }),
         signal: abortCtrl.signal,
       })
@@ -108,10 +118,17 @@ Score this call against the rubric and return the JSON shape exactly as specifie
     }
 
     const data = await resp.json()
-    const raw = data.content?.[0]?.text?.trim() || ''
+    const continuation = data.content?.[0]?.text?.trim() || ''
+    // The prefilled "{" isn't echoed back by the API, so it must be
+    // re-added before parsing. Still defensively strip markdown fences and
+    // extract the outermost {...} in case the model adds anything else
+    // around it (same defensive parse extract-seller-facts.mjs already uses).
+    const raw = '{' + continuation
     let review
     try {
-      review = JSON.parse(raw)
+      const cleaned = raw.replace(/```json\s*|```/g, '').trim()
+      const m = cleaned.match(/\{[\s\S]*\}/)
+      review = JSON.parse(m ? m[0] : cleaned)
     } catch {
       return new Response(JSON.stringify({ ok: false, error: 'Call review response was not valid JSON.' }), { status: 502, headers: HEADERS })
     }
