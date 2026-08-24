@@ -123,11 +123,28 @@ export default function LiveCopilot({ lead, userId, workspaceId, members, canEdi
   const stillNeeded = getWhatWeStillNeed(si, 2)
   const guardrail = getDealGuardrail(lead, si, economics)
   const priceMovement = formatPriceMovement(si)
+  // Capability #25.2, Part 6 — one compact read at call start, never
+  // re-fetched mid-call, never a panel. Must NOT destabilize Next Best
+  // Question — it is display-only here, not fed into nextMove.
+  const [activeFocusTitle, setActiveFocusTitle] = useState(null)
 
   useEffect(() => {
     const t = setInterval(() => setTick(v => v + 1), 1000)
     return () => clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    if (session.workspaceId && session.repId) {
+      supabase.from('coaching_focuses').select('title')
+        .eq('workspace_id', session.workspaceId).eq('rep_id', session.repId).eq('status', 'ACTIVE')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setActiveFocusTitle(data?.title || null) })
+        .catch(() => { /* silent — never blocks the call, Part 18 */ })
+    }
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.workspaceId, session.repId])
 
   useEffect(() => {
     let cancelled = false
@@ -363,6 +380,12 @@ export default function LiveCopilot({ lead, userId, workspaceId, members, canEdi
                 {stillNeeded.map(d => (
                   <span key={d.key} className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]">⚠ {d.label}</span>
                 ))}
+              </div>
+            )}
+            {/* Capability #25.2, Part 6/22 — one compact line, nothing more. */}
+            {activeFocusTitle && (
+              <div className="text-[10px] text-center mt-1.5 pt-1.5 border-t border-[color:var(--color-line)] text-[color:var(--color-text-dim)]">
+                <span className="uppercase tracking-wider font-bold">Coaching Focus</span> · {activeFocusTitle}
               </div>
             )}
           </div>

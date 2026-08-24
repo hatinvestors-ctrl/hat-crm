@@ -23,6 +23,8 @@ export default function CallDetailPage() {
   const { workspace, members } = useOutletContext()
   const [call, setCall] = useState(null)
   const [review, setReview] = useState(null)
+  const [coachingEval, setCoachingEval] = useState(null) // this call's evaluation of the focus that was active going in
+  const [currentFocus, setCurrentFocus] = useState(null) // the rep's active focus AS OF NOW (may differ from the one evaluated)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
 
@@ -32,9 +34,9 @@ export default function CallDetailPage() {
       setLoading(true)
       setLoadError(null)
       try {
-        // Two separate reads (not a join) — keeps this page simple and
-        // makes the "no review yet" case an explicit, honest null rather
-        // than a join artifact.
+        // Separate reads (not one giant join) — keeps this page simple and
+        // makes "no review yet" / "no coaching evaluation yet" explicit,
+        // honest nulls rather than join artifacts.
         const { data: session, error: sErr } = await supabase
           .from('call_sessions').select('*, leads(address,city,state,zip_code)').eq('id', callId).maybeSingle()
         if (sErr) throw sErr
@@ -42,7 +44,20 @@ export default function CallDetailPage() {
         const { data: reviewRow, error: rErr } = await supabase
           .from('call_reviews').select('*').eq('call_session_id', callId).maybeSingle()
         if (rErr) throw rErr
-        if (!cancelled) { setCall(session); setReview(reviewRow || null) }
+
+        // Capability #25.2 — this call's adherence evaluation (if any focus
+        // was active going into this call) + the join to that focus row so
+        // the title/skill can be shown alongside the result.
+        const { data: evalRow } = await supabase
+          .from('coaching_focus_evaluations')
+          .select('*, coaching_focuses(title,skill_key)')
+          .eq('call_session_id', callId).maybeSingle()
+        const { data: focusRow } = await supabase
+          .from('coaching_focuses').select('title,skill_key,status')
+          .eq('workspace_id', session.workspace_id).eq('rep_id', session.rep_id).eq('status', 'ACTIVE')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+        if (!cancelled) { setCall(session); setReview(reviewRow || null); setCoachingEval(evalRow || null); setCurrentFocus(focusRow || null) }
       } catch (err) {
         if (!cancelled) setLoadError(err.message || 'Could not load this call.')
       } finally {
@@ -181,6 +196,29 @@ export default function CallDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Capability #25.2, Part 22 — minimal, not a dashboard. */}
+        {(coachingEval || currentFocus) && (
+          <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-2">Coaching</div>
+            <div className="space-y-1.5">
+              {coachingEval?.coaching_focuses && (
+                <>
+                  <div className="text-[11.5px]"><span className="text-[color:var(--color-text-dim)]">Previous Focus:</span> {coachingEval.coaching_focuses.title}</div>
+                  <div className="text-[11.5px]">
+                    Adherence: <strong className={coachingEval.result === 'APPLIED' ? 'text-[color:var(--color-success-text)]' : coachingEval.result === 'NOT_APPLIED' ? 'text-[color:var(--color-danger-text)]' : ''}>
+                      {coachingEval.result.replace(/_/g, ' ')}{coachingEval.result === 'APPLIED' ? ' ✓' : ''}
+                    </strong>
+                  </div>
+                  {coachingEval.why && <div className="text-[11px] text-[color:var(--color-text-dim)]">Why: {coachingEval.why}</div>}
+                </>
+              )}
+              {currentFocus && (
+                <div className="text-[11.5px] pt-1.5 border-t border-[color:var(--color-line)]"><span className="text-[color:var(--color-text-dim)]">Current Coaching Focus:</span> <strong>{currentFocus.title}</strong></div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
