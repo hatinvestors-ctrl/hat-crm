@@ -14,8 +14,19 @@
 // the only safeguard.
 //
 // POST /.netlify/functions/generate-call-review
-// body: { transcript: string, sellerIntelligence: object, canonical: { maxBuy, maxBuyStrategy, sellerPrice, currentOffer } }
-// Returns: { ok, review: { scores: [{key, score, why}], strengths: [...], missedOpportunity: {...}, coachingMoments: [...], strongMoves: [...], sellerOutcomeSummary: string } }
+// body: { transcript: string, sellerIntelligence: object, canonical: { maxBuy, maxBuyStrategy, sellerPrice, currentOffer }, activeFocus?: { skillKey, title, recommendation } }
+// Returns: { ok, review: { scores: [{key, score, why}], strengths: [...], missedOpportunity: {...}, coachingMoments: [...], strongMoves: [...], sellerOutcomeSummary: string, primaryCoachingFocus: {...}, focusAdherence: {...}|null } }
+//
+// Capability #25.2 — extends #24's output with a `primaryCoachingFocus`
+// suggestion (always) and a `focusAdherence` evaluation (only when the
+// caller passes `activeFocus`, i.e. the rep already has one). BOTH are
+// treated as untrusted AI CLAIMS by the caller — src/lib/coachingMemory.js
+// deterministically validates skill_key against the real rubric and
+// requires verifiable transcript evidence for any adherence result other
+// than NOT_APPLICABLE, exactly the same distrust-by-default pattern
+// callCoaching.js already applies to coachingMoments/strongMoves. The
+// SYSTEM never asks the model "is this rep improving" — that's computed
+// from persisted history in coachingMemory.js, never here.
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
@@ -42,6 +53,10 @@ SCORING RULE: Score based on observable rep BEHAVIOR against the rubric below, n
 Score exactly these 9 dimensions, 0-10 each, each with a one-sentence "why" citing what actually happened in the transcript:
 OPENING_RAPPORT, MOTIVATION_DISCOVERY, PAIN_DEPTH, PROPERTY_DISCOVERY, TIMELINE, PRICE_DISCOVERY, DECISION_MAKERS, NEGOTIATION, COMMITMENT
 
+PRIMARY COACHING FOCUS — always include one. It must be behavioral, actionable, observable in a future call, and narrow enough to measure (bad: "be better at sales"; good: "when the seller reveals pain, ask at least one follow-up question before moving to condition or price"). skillKey MUST be one of the 9 dimension keys above — the single dimension this focus most directly targets.
+
+FOCUS ADHERENCE — ONLY if an ACTIVE COACHING FOCUS is supplied in the prompt below. Determine whether THIS call's transcript shows the rep applying that specific focus. First decide opportunityExisted (true/false): did a moment in THIS transcript actually create a chance to apply the focus? If false, result MUST be "NOT_APPLICABLE" — never penalize a rep for a situation that never arose. If true, result MUST be one of "APPLIED" / "PARTIALLY_APPLIED" / "NOT_APPLIED", backed by an EXACT verbatim quote (sellerQuote and/or repQuote) from THIS transcript — the same no-paraphrase, no-invention rule as the evidence contract above. If no ACTIVE COACHING FOCUS is supplied, omit focusAdherence entirely (set it to null).
+
 Write EXACTLY this JSON shape and nothing else — no markdown, no prose outside the JSON:
 {
   "scores": [{"key": "OPENING_RAPPORT", "score": 0, "why": "..."}, ... all 9 keys],
@@ -49,23 +64,29 @@ Write EXACTLY this JSON shape and nothing else — no markdown, no prose outside
   "missedOpportunity": {"summary": "...", "sellerQuote": "...", "repQuote": "...", "betterQuestion": "...", "why": "..."},
   "coachingMoments": [{"sellerQuote": "...", "repQuote": "...", "coach": "...", "betterQuestion": "...", "why": "..."}],
   "strongMoves": [{"sellerQuote": "...", "repQuote": "...", "why": "..."}],
-  "sellerOutcomeSummary": "1-2 sentences, facts only, no speculation beyond the transcript"
+  "sellerOutcomeSummary": "1-2 sentences, facts only, no speculation beyond the transcript",
+  "primaryCoachingFocus": {"skillKey": "...", "title": "...", "recommendation": "...", "exampleQuestions": ["...", "..."]},
+  "focusAdherence": {"opportunityExisted": true, "result": "APPLIED", "why": "...", "sellerQuote": "...", "repQuote": "..."}
 }
 
-Max 3 strengths, max 3 coachingMoments, max 3 strongMoves. Exactly 1 missedOpportunity (the single highest-value improvement, not a list of criticisms).`
+Max 3 strengths, max 3 coachingMoments, max 3 strongMoves. Exactly 1 missedOpportunity (the single highest-value improvement, not a list of criticisms). Exactly 1 primaryCoachingFocus. focusAdherence is null when no active focus was supplied.`
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS })
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: HEADERS })
 
   const body = await req.json().catch(() => ({}))
-  const { transcript, sellerIntelligence = {}, canonical = {} } = body
+  const { transcript, sellerIntelligence = {}, canonical = {}, activeFocus = null } = body
 
   if (!transcript || !transcript.trim()) {
     return new Response(JSON.stringify({ ok: false, error: 'transcript required' }), { status: 400, headers: HEADERS })
   }
 
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'Unknown'
+
+  const activeFocusBlock = activeFocus
+    ? `\nACTIVE COACHING FOCUS (evaluate adherence against this in THIS transcript):\nSkill: ${activeFocus.skillKey}\nTitle: ${activeFocus.title}\nRecommendation: ${activeFocus.recommendation}\n`
+    : '\nACTIVE COACHING FOCUS: none — this rep has no prior focus yet. Set focusAdherence to null.\n'
 
   const userPrompt = `CANONICAL FINANCIALS (authoritative — copy exactly, never recalculate):
 Max Buy: ${fmt(canonical.maxBuy)}${canonical.maxBuyStrategy ? ` (${canonical.maxBuyStrategy})` : ''}
@@ -74,8 +95,8 @@ Seller Asking Price: ${fmt(canonical.sellerPrice)}
 
 CAPTURED SELLER INTELLIGENCE (for context only, do not restate as if it were the transcript):
 ${JSON.stringify(sellerIntelligence)}
-
-TRANSCRIPT:
+${activeFocusBlock}
+TRANSCRIPT (full call — use it as a whole to understand sequencing, not just isolated lines):
 ${transcript}
 
 Score this call against the rubric and return the JSON shape exactly as specified.`
