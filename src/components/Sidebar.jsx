@@ -152,11 +152,10 @@ export default function Sidebar({ workspace, userRole, userId, profile, onSignOu
           <span className="text-[color:var(--color-text-dim)]">🎯</span>
           <span className="flex-1">Off-Market Engine</span>
         </NavLink>
-        {/* Capability #25.1 — Persistent Call Intelligence. Points straight
-            at Calls (the only real content in V1) rather than a "Coaching"
-            landing page with empty Team/Agent tabs — Part 21: avoid fake
-            future navigation. */}
-        <NavLink to={`${base}/coaching/calls`} className={navItemClasses}>
+        {/* Capability #25.3 — HAT Coaching Center now has real content
+            across Team/Agents/Calls, so this points at the Coaching Center
+            shell (defaults to Team) rather than straight to Calls. */}
+        <NavLink to={`${base}/coaching`} className={navItemClasses}>
           <span className="text-[color:var(--color-text-dim)]">🎧</span>
           <span className="flex-1">Coaching</span>
         </NavLink>

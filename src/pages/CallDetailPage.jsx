@@ -5,11 +5,12 @@
 // implying a full transcript exists when V1 deliberately doesn't persist one).
 import { useEffect, useState } from 'react'
 import { useParams, useOutletContext, Link } from 'react-router-dom'
-import Topbar from '../components/Topbar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import { supabase } from '../lib/supabase'
 import { formatCurrency as fc, formatDate } from '../lib/calculations'
 import { COACHING_DIMENSIONS } from '../lib/callCoaching'
+
+const NUANCE_LABEL = { GOOD_BUT_EARLY: 'Good execution, wrong timing (too early)', GOOD_BUT_LATE: 'Good execution, wrong timing (too late)', MIXED: 'Real positives, real problems' }
 
 function formatDuration(seconds) {
   if (seconds == null) return '—'
@@ -20,7 +21,7 @@ function formatDuration(seconds) {
 
 export default function CallDetailPage() {
   const { callId } = useParams()
-  const { workspace, members } = useOutletContext()
+  const { members } = useOutletContext()
   const [call, setCall] = useState(null)
   const [review, setReview] = useState(null)
   const [coachingEval, setCoachingEval] = useState(null) // this call's evaluation of the focus that was active going in
@@ -70,22 +71,17 @@ export default function CallDetailPage() {
 
   const repName = (repId) => members?.find(m => m.user_id === repId)?.profiles?.full_name || 'Unknown'
 
-  if (loading) return (<><Topbar title="Call Detail" breadcrumbs={[{ label: workspace.name }, { label: 'Coaching' }, { label: 'Calls' }]} /><div className="p-6"><LoadingSpinner label="Loading call…" /></div></>)
+  if (loading) return <LoadingSpinner label="Loading call…" />
   if (loadError || !call) return (
-    <>
-      <Topbar title="Call Detail" breadcrumbs={[{ label: workspace.name }, { label: 'Coaching' }, { label: 'Calls' }]} />
-      <div className="px-6 py-6">
-        <div className="rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-[12px] text-[color:var(--color-danger-text)]">{loadError || 'Call not found.'}</div>
-        <Link to="../coaching/calls" className="text-[12px] font-semibold underline text-[color:var(--color-accent-text)] mt-3 inline-block">← Back to Calls</Link>
-      </div>
-    </>
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-4 py-3 text-[12px] text-[color:var(--color-danger-text)]">{loadError || 'Call not found.'}</div>
+      <Link to=".." className="text-[12px] font-semibold underline text-[color:var(--color-accent-text)] inline-block">← Back to Calls</Link>
+    </div>
   )
 
   return (
-    <>
-      <Topbar title="Call Detail" breadcrumbs={[{ label: workspace.name }, { label: 'Coaching' }, { label: 'Calls' }]} />
-      <div className="px-6 py-6 w-full flex-1 max-w-2xl space-y-4">
-        <Link to="../coaching/calls" className="text-[11.5px] font-semibold underline text-[color:var(--color-accent-text)]">← Back to Calls</Link>
+    <div className="w-full max-w-2xl space-y-4">
+      <Link to=".." className="text-[11.5px] font-semibold underline text-[color:var(--color-accent-text)]">← Back to Calls</Link>
 
         {/* CALL SUMMARY */}
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4">
@@ -116,6 +112,42 @@ export default function CallDetailPage() {
             )}
           </div>
         )}
+
+        {/* EXECUTIVE COACHING SUMMARY (Capability #25.3B, Part 14) — mirrors
+            CallReview.jsx's always-visible summary, reading from already-
+            fetched review/currentFocus state rather than live component state. */}
+        {review && (() => {
+          const biggestWin = review.strengths?.[0] || null
+          const biggestMiss = review.missed_opportunity?.summary || null
+          const dealImpactMove = review.strong_moves?.find(m => m.nuance === 'GOOD_BUT_EARLY' || m.nuance === 'GOOD_BUT_LATE' || m.nuance === 'MIXED') || null
+          return (
+            <div className="rounded-lg border-2 border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-4 space-y-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent-text)] font-bold">Executive Coaching Summary</div>
+              {review.overall_score != null && (
+                <div className="text-center pb-1">
+                  <div className="text-[24px] font-extrabold tabular-nums">{review.overall_score} / 100</div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{review.overall_score >= 80 ? 'Strong Call' : review.overall_score >= 60 ? 'Solid Call' : 'Needs Work'}</div>
+                </div>
+              )}
+              {biggestWin && (
+                <div className="text-[11.5px]"><span className="font-bold text-[color:var(--color-success-text)]">Biggest Win:</span> ✓ {biggestWin}</div>
+              )}
+              {biggestMiss && (
+                <div className="text-[11.5px]"><span className="font-bold text-[color:var(--color-warn-text)]">Biggest Miss:</span> ⚠ {biggestMiss}</div>
+              )}
+              {dealImpactMove && (
+                <div className="text-[11.5px]">
+                  <span className="font-bold text-[color:var(--color-warn-text)]">Deal Impact:</span> ⚠ {dealImpactMove.why} <span className="text-[10px] text-[color:var(--color-text-dim)]">({NUANCE_LABEL[dealImpactMove.nuance]})</span>
+                </div>
+              )}
+              {currentFocus && (
+                <div className="text-[11.5px] pt-1.5 border-t border-[color:var(--color-accent)]">
+                  <span className="font-bold">Current Coaching Focus:</span> 🎯 <strong>{currentFocus.title}</strong>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* CALL REVIEW */}
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4">
@@ -188,9 +220,15 @@ export default function CallDetailPage() {
                   ))}
                 </div>
               )}
-              {review.max_buy_snapshot != null && (
-                <div className="border-t border-[color:var(--color-line)] pt-2 text-[10.5px] text-[color:var(--color-text-dim)]">
-                  Max Buy at time of call: <strong className="text-[color:var(--color-text)]">{fc(review.max_buy_snapshot)}</strong> — a frozen snapshot; the lead's current Max Buy may differ today.
+              {(review.max_buy_snapshot != null || review.seller_price_snapshot != null) && (
+                <div className="border-t border-[color:var(--color-line)] pt-2 space-y-0.5">
+                  <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Deal Context (frozen at call time)</div>
+                  {review.max_buy_snapshot != null && (
+                    <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Max Buy: <strong className="text-[color:var(--color-text)]">{fc(review.max_buy_snapshot)}</strong> — the lead's current Max Buy may differ today.</div>
+                  )}
+                  {review.seller_price_snapshot != null && (
+                    <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Seller Price: <strong className="text-[color:var(--color-text)]">{fc(review.seller_price_snapshot)}</strong></div>
+                  )}
                 </div>
               )}
             </div>
@@ -220,6 +258,5 @@ export default function CallDetailPage() {
           </div>
         )}
       </div>
-    </>
   )
 }

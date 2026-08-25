@@ -43,10 +43,20 @@ describe('verifyCoachingMoments — Part 24, never a fake coaching moment reache
   it('drops a moment with no quote at all (nothing to verify against)', () => {
     expect(verifyCoachingMoments([{ coach: 'Vague criticism with no evidence.' }], TRANSCRIPT)).toHaveLength(0)
   })
-  it('caps at 3 even if the model returns more', () => {
+  it('caps at 3 even if the model returns more DISTINCT moments (genuinely different quotes, not duplicates)', () => {
+    const moments = [
+      { sellerQuote: "I'm tired of dealing with it", coach: 'a' },
+      { repQuote: 'What kind of repairs?', coach: 'b' },
+      { sellerQuote: 'The kitchen is old and the roof may need replacement', coach: 'c' },
+      { sellerQuote: 'I probably need at least 175', coach: 'd' },
+      { repQuote: 'How did you arrive at 175?', coach: 'e' },
+    ]
+    expect(verifyCoachingMoments(moments, TRANSCRIPT)).toHaveLength(3)
+  })
+  it('dedupes true duplicates BEFORE applying the cap (Capability #25.3A) — 5 identical moments collapse to 1, not 3', () => {
     const real = { sellerQuote: "I'm tired of dealing with it", coach: 'x' }
     const moments = Array.from({ length: 5 }, () => ({ ...real }))
-    expect(verifyCoachingMoments(moments, TRANSCRIPT)).toHaveLength(3)
+    expect(verifyCoachingMoments(moments, TRANSCRIPT)).toHaveLength(1)
   })
   it('non-array input never crashes, returns empty', () => {
     expect(verifyCoachingMoments(null, TRANSCRIPT)).toEqual([])

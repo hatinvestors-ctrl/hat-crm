@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getFullTranscriptText } from '../../lib/conversationSession'
 import { getCallCoverage, getDealGuardrail, getRealTimeEconomics } from '../../lib/sellerStrategy'
-import { COACHING_DIMENSIONS, validateScorecard, computeOverallScore, verifyCoachingMoments, verifyStrongMoves } from '../../lib/callCoaching'
+import { COACHING_DIMENSIONS, validateScorecard, computeOverallScore, verifyCoachingMoments, verifyStrongMoves, resolveCoachingConsistency } from '../../lib/callCoaching'
 import { buildCallReviewRecord } from '../../lib/callSessions'
 import {
   validateCoachingFocusSuggestion, validateAdherenceEvaluation, computeAdoptionRate, computeTrend,
@@ -30,9 +30,114 @@ function ScoreRow({ dim, score }) {
         <span className="text-[12px] font-bold tabular-nums text-[color:var(--color-text)]">{score.score}/10</span>
       </button>
       {open && (
-        <div className="mt-1 text-[10.5px] text-[color:var(--color-text-dim)]">
-          <div className="font-semibold uppercase tracking-wide text-[9px] mb-0.5">Why this score</div>
-          {score.why}
+        <div className="mt-1 text-[10.5px] text-[color:var(--color-text-dim)] space-y-1">
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-[9px] mb-0.5">Why this score</div>
+            {score.why}
+          </div>
+          {/* Capability #25.3A, Part 5/6 — CAPTURED (deterministic coverage)
+              and SCORE (qualitative depth) are independent by design; a low
+              score on a captured topic is explained here, never implied to
+              be a contradiction. */}
+          {score.captured && (
+            <div>
+              <div className="font-semibold uppercase tracking-wide text-[9px] mb-0.5 text-[color:var(--color-success-text)]">✓ Captured</div>
+              {score.captured}
+            </div>
+          )}
+          {score.missing && (
+            <div>
+              <div className="font-semibold uppercase tracking-wide text-[9px] mb-0.5 text-[color:var(--color-warn-text)]">✕ Depth/execution missing</div>
+              {score.missing}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const NUANCE_LABEL = { GOOD_BUT_EARLY: 'Good execution, wrong timing (too early)', GOOD_BUT_LATE: 'Good execution, wrong timing (too late)', MIXED: 'Real positives, real problems' }
+
+function QuoteLine({ label, quote, evidenceQuality }) {
+  if (!quote) return null
+  return (
+    <div>
+      <span className="font-semibold">{label}:</span> "{quote}"
+      {evidenceQuality === 'UNCERTAIN' && <span className="ml-1.5 text-[9.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ Low-confidence transcript segment</span>}
+    </div>
+  )
+}
+
+// Capability #25.3A, Part 11 — collapsed by default. The 9 dimension
+// breakdowns, full strengths list, missed-opportunity detail, coaching
+// moments, and strong moves all live here — real detail, just not
+// competing with the Executive Summary for the manager's first glance.
+function FullCoachingReviewDetail({ review }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-[color:var(--color-line)] pt-2">
+      <button onClick={() => setOpen(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text-muted)]">
+        {open ? 'Hide Full Coaching Review' : 'View Full Coaching Review'}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {review.scores.length > 0 && (
+            <div>
+              {COACHING_DIMENSIONS.map(dim => (
+                <ScoreRow key={dim.key} dim={dim} score={review.scores.find(s => s.key === dim.key)} />
+              ))}
+            </div>
+          )}
+
+          {review.strengths.length > 0 && (
+            <div className="border-t border-[color:var(--color-line)] pt-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-1">What You Did Well</div>
+              <ul className="space-y-0.5">
+                {review.strengths.map((s, i) => <li key={i} className="text-[11.5px] text-[color:var(--color-success-text)]">✓ {s}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {review.missedOpportunity && (
+            <div className="border-t border-[color:var(--color-line)] pt-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-warn-text)] font-bold mb-1">Biggest Missed Opportunity</div>
+              <p className="text-[11.5px] text-[color:var(--color-text)]">{review.missedOpportunity.summary}</p>
+              {review.missedOpportunity.betterQuestion && (
+                <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1">Better question: "{review.missedOpportunity.betterQuestion}"</p>
+              )}
+            </div>
+          )}
+
+          {review.coachingMoments.length > 0 && (
+            <div className="border-t border-[color:var(--color-line)] pt-2 space-y-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Coach This Moment</div>
+              {review.coachingMoments.map((m, i) => (
+                <div key={i} className="rounded border border-[color:var(--color-line)] px-2 py-1.5 text-[11px] space-y-0.5">
+                  <QuoteLine label="Seller" quote={m.sellerQuote} evidenceQuality={m.evidenceQuality} />
+                  <QuoteLine label="Kevin" quote={m.repQuote} evidenceQuality={m.evidenceQuality} />
+                  <div className="text-[color:var(--color-text-dim)]">Coach: {m.coach}</div>
+                  {m.betterQuestion && <div className="text-[color:var(--color-accent-text)]">Better: "{m.betterQuestion}"</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {review.strongMoves.length > 0 && (
+            <div className="border-t border-[color:var(--color-line)] pt-2 space-y-2">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Strong Move</div>
+              {review.strongMoves.map((m, i) => (
+                <div key={i} className="rounded border border-[color:var(--color-success)] px-2 py-1.5 text-[11px] space-y-0.5">
+                  {m.nuance && m.nuance !== 'STRONG' && m.nuance !== 'GOOD' && (
+                    <div className="text-[9.5px] font-bold text-[color:var(--color-warn-text)]">{NUANCE_LABEL[m.nuance] || m.nuance}</div>
+                  )}
+                  <QuoteLine label="Seller" quote={m.sellerQuote} evidenceQuality={m.evidenceQuality} />
+                  <QuoteLine label="Kevin" quote={m.repQuote} evidenceQuality={m.evidenceQuality} />
+                  <div className="text-[color:var(--color-success-text)]">{m.why}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -118,6 +223,18 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
         const mastery = computeMasteryEligibility({ applicableCount: adoption.applicableCount, adoptionRate: adoption.rate, dimensionTrend: trend.status })
         const action = decideFocusAction({ masteryEligible: mastery.eligible })
 
+        // Capability #25.3A, Part 8 — "IMPROVEMENT: 2/10 → 6/10" ONLY when
+        // both real numbers exist (the focus's own source call's score,
+        // and this call's score for the same skill). Never fabricated —
+        // if the source call has no score for this skill, this stays null
+        // and the UI shows nothing rather than a guessed number.
+        let skillBefore = null
+        if (activeFocusBefore.source_call_id) {
+          const { data: sourceReview } = await supabase.from('call_reviews').select('dimension_scores').eq('call_session_id', activeFocusBefore.source_call_id).maybeSingle()
+          skillBefore = sourceReview?.dimension_scores?.find(s => s.key === activeFocusBefore.skill_key)?.score ?? null
+        }
+        const skillAfter = dimensionScores?.find(s => s.key === activeFocusBefore.skill_key)?.score ?? null
+
         let currentFocus = activeFocusBefore
         if (action === 'RESOLVE_MASTERED') {
           await supabase.from('coaching_focuses').update({ status: 'RESOLVED', resolution: 'MASTERED', resolved_at: new Date().toISOString() }).eq('id', activeFocusBefore.id)
@@ -133,7 +250,7 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
           }
         }
 
-        return { previousFocus: activeFocusBefore, evaluation, adoption, trend, mastery, currentFocus, resolved: action === 'RESOLVE_MASTERED' }
+        return { previousFocus: activeFocusBefore, evaluation, adoption, trend, mastery, currentFocus, resolved: action === 'RESOLVE_MASTERED', skillBefore, skillAfter }
       }
 
       // No active focus existed yet — this is the rep's first reviewed
@@ -221,12 +338,19 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
       // model output directly (Part 21/24).
       const scores = validateScorecard(body.review?.scores)
       const coachingMoments = verifyCoachingMoments(body.review?.coachingMoments, transcript)
-      const strongMoves = verifyStrongMoves(body.review?.strongMoves, transcript)
       const missedOpportunity = body.review?.missedOpportunity
       const missedOpportunityVerified = missedOpportunity && (
         (!missedOpportunity.sellerQuote && !missedOpportunity.repQuote) ||
         verifyCoachingMoments([missedOpportunity], transcript).length > 0
       ) ? missedOpportunity : null
+      // Capability #25.3A, Part 7 — a Strong Move is never allowed to
+      // flatly praise the same rep quote a coaching moment/missed
+      // opportunity elsewhere criticizes; forces nuance to MIXED when that
+      // happens. Deterministic, no second AI call.
+      const strongMoves = resolveCoachingConsistency({
+        strongMoves: verifyStrongMoves(body.review?.strongMoves, transcript),
+        coachingMoments, missedOpportunity: missedOpportunityVerified,
+      })
 
       const validated = {
         scores,
@@ -259,6 +383,12 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
   }
 
   const coverage = getCallCoverage(si)
+  // Capability #25.3A, Part 8 — Executive Coaching Summary. Derived
+  // entirely from the SAME validated `review`/`coaching` objects already
+  // computed above — no re-derivation, no new AI call.
+  const biggestWin = review?.strengths?.[0] || null
+  const biggestMiss = review?.missedOpportunity?.summary || null
+  const dealImpactMove = review?.strongMoves?.find(m => m.nuance === 'GOOD_BUT_EARLY' || m.nuance === 'GOOD_BUT_LATE' || m.nuance === 'MIXED') || null
 
   return (
     <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-3">
@@ -291,7 +421,8 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
       {review && (
         <>
           {/* Capability #25.1, Part 22 — the review is never lost just
-              because the DB write failed; Retry re-attempts ONLY the save. */}
+              because the DB write failed; Retry re-attempts ONLY the save.
+              Part 11 — save/retry/error states are NEVER collapsed. */}
           {dbSaveStatus === 'error' && (
             <div className="rounded border border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] px-2.5 py-2 text-[11px] text-[color:var(--color-danger-text)] flex items-center justify-between gap-2">
               <span>Call Review generated but couldn't be saved: {dbSaveError}</span>
@@ -302,103 +433,70 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
             <div className="text-[10px] text-[color:var(--color-success-text)]">✓ Saved to Calls History</div>
           )}
 
-          {review.overallScore != null && (
-            <div className="text-center py-1">
-              <div className="text-[24px] font-extrabold tabular-nums">{review.overallScore} / 100</div>
-              <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{review.overallScore >= 80 ? 'Strong Call' : review.overallScore >= 60 ? 'Solid Call' : 'Needs Work'}</div>
+          {/* Capability #25.3A, Part 8/11 — EXECUTIVE COACHING SUMMARY.
+              Always open, no toggle — this is the decision-making content. */}
+          <div className="rounded-lg border-2 border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] p-3 space-y-2">
+            {review.overallScore != null && (
+              <div className="text-center pb-1">
+                <div className="text-[26px] font-extrabold tabular-nums">{review.overallScore} / 100</div>
+                <div className="text-[10.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{review.overallScore >= 80 ? 'Strong Call' : review.overallScore >= 60 ? 'Solid Call' : 'Needs Work'}</div>
+              </div>
+            )}
+            {biggestWin && (
+              <div className="text-[11.5px]"><span className="font-bold text-[color:var(--color-success-text)]">Biggest Win:</span> ✓ {biggestWin}</div>
+            )}
+            {biggestMiss && (
+              <div className="text-[11.5px]"><span className="font-bold text-[color:var(--color-warn-text)]">Biggest Miss:</span> ⚠ {biggestMiss}</div>
+            )}
+            {dealImpactMove && (
+              <div className="text-[11.5px]">
+                <span className="font-bold text-[color:var(--color-warn-text)]">Deal Impact:</span> ⚠ {dealImpactMove.why} <span className="text-[10px] text-[color:var(--color-text-dim)]">({NUANCE_LABEL[dealImpactMove.nuance]})</span>
+              </div>
+            )}
+            {coaching?.currentFocus && (
+              <div className="text-[11.5px] pt-1 border-t border-[color:var(--color-accent)]">
+                <span className="font-bold">{coaching.resolved ? 'New' : 'Next'} Coaching Focus:</span> 🎯 <strong>{coaching.currentFocus.title}</strong>
+                <div className="text-[10.5px] text-[color:var(--color-text-muted)] mt-0.5">{coaching.currentFocus.recommendation}</div>
+              </div>
+            )}
+          </div>
+
+          {/* PREVIOUS FOCUS ADHERENCE (Part 10) — highly visible, separate
+              from the summary card so it reads as evidence, not opinion. */}
+          {coachingError && <p className="text-[10.5px] text-[color:var(--color-text-dim)]">Coaching memory unavailable for this call: {coachingError}</p>}
+          {coaching?.previousFocus && (
+            <div className="rounded-lg border border-[color:var(--color-line)] px-3 py-2.5 space-y-1">
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Previous Coaching Focus</div>
+              <div className="text-[12px] font-bold">{coaching.previousFocus.title}</div>
+              {coaching.evaluation && (
+                <>
+                  <div className="text-[11.5px]">
+                    Result this call: <strong className={coaching.evaluation.result === 'APPLIED' ? 'text-[color:var(--color-success-text)]' : coaching.evaluation.result === 'NOT_APPLIED' ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-text)]'}>
+                      {coaching.evaluation.result === 'APPLIED' ? '✓ APPLIED' : coaching.evaluation.result === 'NOT_APPLIED' ? '✕ NOT APPLIED' : coaching.evaluation.result.replace(/_/g, ' ')}
+                    </strong>
+                  </div>
+                  {coaching.evaluation.why && <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{coaching.evaluation.result === 'NOT_APPLIED' ? 'Reason' : 'Evidence'}: {coaching.evaluation.why}</div>}
+                  <QuoteLine label="Seller" quote={coaching.evaluation.sellerQuote} />
+                  <QuoteLine label="Kevin" quote={coaching.evaluation.repQuote} />
+                </>
+              )}
+              {/* Part 8 — real before/after only when both numbers exist. */}
+              {coaching.skillBefore != null && coaching.skillAfter != null && (
+                <div className="text-[11px] text-[color:var(--color-text-dim)]">Improvement: {coaching.skillBefore}/10 → {coaching.skillAfter}/10</div>
+              )}
+              {coaching.resolved && <div className="text-[10.5px] text-[color:var(--color-success-text)]">✓ Focus mastered — promoted to a new focus above.</div>}
+              {coaching.trend && coaching.trend.status !== 'INSUFFICIENT_DATA' && (
+                <div className="text-[10px] text-[color:var(--color-text-dim)]">Learning signal: {coaching.previousFocus.skill_key.replace(/_/g, ' ')} {coaching.trend.status.toLowerCase()}{coaching.mastery && !coaching.mastery.eligible ? ' · insufficient evidence for mastery' : ''}</div>
+              )}
             </div>
           )}
 
           {review.sellerOutcomeSummary && (
-            <div className="text-[11.5px] text-[color:var(--color-text-muted)] border-t border-[color:var(--color-line)] pt-2">{review.sellerOutcomeSummary}</div>
+            <div className="text-[11.5px] text-[color:var(--color-text-muted)]">{review.sellerOutcomeSummary}</div>
           )}
 
-          {/* Capability #25.2, Part 22 — minimal by design. Previous focus
-              + this call's adherence + current focus + a one-line trend
-              signal. No chart, no history table, no dashboard here. */}
-          {coachingError && <p className="text-[10.5px] text-[color:var(--color-text-dim)] border-t border-[color:var(--color-line)] pt-2">Coaching memory unavailable for this call: {coachingError}</p>}
-          {coaching && (
-            <div className="border-t border-[color:var(--color-line)] pt-2 space-y-1.5">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Coaching</div>
-              {coaching.previousFocus && (
-                <>
-                  <div className="text-[11.5px]"><span className="text-[color:var(--color-text-dim)]">Previous Focus:</span> {coaching.previousFocus.title}</div>
-                  {coaching.evaluation && (
-                    <div className="text-[11.5px]">
-                      Adherence: <strong className={coaching.evaluation.result === 'APPLIED' ? 'text-[color:var(--color-success-text)]' : coaching.evaluation.result === 'NOT_APPLIED' ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-text)]'}>
-                        {coaching.evaluation.result.replace(/_/g, ' ')}{coaching.evaluation.result === 'APPLIED' ? ' ✓' : ''}
-                      </strong>
-                      {coaching.evaluation.why && <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Why: {coaching.evaluation.why}</div>}
-                    </div>
-                  )}
-                </>
-              )}
-              {coaching.currentFocus && (
-                <div className="text-[11.5px]"><span className="text-[color:var(--color-text-dim)]">{coaching.resolved ? 'New' : 'Current'} Coaching Focus:</span> <strong>{coaching.currentFocus.title}</strong></div>
-              )}
-              {coaching.resolved && <div className="text-[10.5px] text-[color:var(--color-success-text)]">✓ Previous focus mastered — promoted to a new focus.</div>}
-              {coaching.trend && coaching.trend.status !== 'INSUFFICIENT_DATA' && (
-                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Learning signal: {coaching.previousFocus.skill_key.replace(/_/g, ' ')} {coaching.trend.status.toLowerCase()}{coaching.mastery && !coaching.mastery.eligible ? ' · insufficient evidence for mastery' : ''}</div>
-              )}
-              {coaching.trend && coaching.trend.status === 'INSUFFICIENT_DATA' && (
-                <div className="text-[10.5px] text-[color:var(--color-text-dim)]">Learning signal: not enough reviewed calls yet to show a trend.</div>
-              )}
-            </div>
-          )}
-
-          {review.scores.length > 0 && (
-            <div className="border-t border-[color:var(--color-line)] pt-1">
-              {COACHING_DIMENSIONS.map(dim => (
-                <ScoreRow key={dim.key} dim={dim} score={review.scores.find(s => s.key === dim.key)} />
-              ))}
-            </div>
-          )}
-
-          {review.strengths.length > 0 && (
-            <div className="border-t border-[color:var(--color-line)] pt-2">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-1">What You Did Well</div>
-              <ul className="space-y-0.5">
-                {review.strengths.map((s, i) => <li key={i} className="text-[11.5px] text-[color:var(--color-success-text)]">✓ {s}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {review.missedOpportunity && (
-            <div className="border-t border-[color:var(--color-line)] pt-2">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-warn-text)] font-bold mb-1">Biggest Missed Opportunity</div>
-              <p className="text-[11.5px] text-[color:var(--color-text)]">{review.missedOpportunity.summary}</p>
-              {review.missedOpportunity.betterQuestion && (
-                <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1">Better question: "{review.missedOpportunity.betterQuestion}"</p>
-              )}
-            </div>
-          )}
-
-          {review.coachingMoments.length > 0 && (
-            <div className="border-t border-[color:var(--color-line)] pt-2 space-y-2">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Coach This Moment</div>
-              {review.coachingMoments.map((m, i) => (
-                <div key={i} className="rounded border border-[color:var(--color-line)] px-2 py-1.5 text-[11px] space-y-0.5">
-                  {m.sellerQuote && <div><span className="font-semibold">Seller:</span> "{m.sellerQuote}"</div>}
-                  {m.repQuote && <div><span className="font-semibold">Kevin:</span> "{m.repQuote}"</div>}
-                  <div className="text-[color:var(--color-text-dim)]">Coach: {m.coach}</div>
-                  {m.betterQuestion && <div className="text-[color:var(--color-accent-text)]">Better: "{m.betterQuestion}"</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {review.strongMoves.length > 0 && (
-            <div className="border-t border-[color:var(--color-line)] pt-2 space-y-2">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Strong Move</div>
-              {review.strongMoves.map((m, i) => (
-                <div key={i} className="rounded border border-[color:var(--color-success)] px-2 py-1.5 text-[11px] space-y-0.5">
-                  {m.sellerQuote && <div><span className="font-semibold">Seller:</span> "{m.sellerQuote}"</div>}
-                  {m.repQuote && <div><span className="font-semibold">Kevin:</span> "{m.repQuote}"</div>}
-                  <div className="text-[color:var(--color-success-text)]">{m.why}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Part 11 — everything else is progressive disclosure. */}
+          <FullCoachingReviewDetail review={review} />
         </>
       )}
     </div>

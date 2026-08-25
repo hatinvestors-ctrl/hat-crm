@@ -32,20 +32,127 @@ export function quoteAppearsInTranscript(quote, transcriptText) {
 // reaches the UI.
 export function verifyCoachingMoments(moments, transcriptText) {
   if (!Array.isArray(moments)) return []
-  return moments.filter(m => {
+  const verified = moments.filter(m => {
     const sellerOk = !m.sellerQuote || quoteAppearsInTranscript(m.sellerQuote, transcriptText)
     const repOk = !m.repQuote || quoteAppearsInTranscript(m.repQuote, transcriptText)
     // Require AT LEAST one real quote anchoring the moment — a coaching
     // moment with zero verifiable transcript evidence is dropped entirely.
     const hasAnyQuote = !!m.sellerQuote || !!m.repQuote
     return hasAnyQuote && sellerOk && repOk
-  }).slice(0, 3) // Part 24 — up to 3, never a dump of criticisms
+  })
+  // Capability #25.3A, Part 4 — tag each surviving moment with a
+  // deterministic transcript-quality signal on its own evidence, so the UI
+  // can visibly flag "low-confidence transcript segment" rather than
+  // present a fragile fragment with the same confidence as a clean quote.
+  const tagged = verified.map(m => ({
+    ...m,
+    evidenceQuality: worseQuality(assessTranscriptQuality(m.sellerQuote), assessTranscriptQuality(m.repQuote)),
+  }))
+  // Part 3 — distinct coaching insights only; near-identical moments
+  // (same underlying quote pair) collapse to one, keeping the more
+  // complete entry. Deterministic, no second AI call.
+  return dedupeCoachingMoments(tagged).slice(0, 3) // Part 24 — up to 3, never a dump of criticisms
 }
 
 // Same verification for "strong move" recognition (Part 25) — reuses the
 // identical rule, no second philosophy.
 export function verifyStrongMoves(moves, transcriptText) {
-  return verifyCoachingMoments(moves, transcriptText)
+  const verified = verifyCoachingMoments(moves, transcriptText)
+  // Capability #25.3A, Part 7 — validate the AI's own nuance classification
+  // (an untrusted claim, same posture as every other AI field here) and
+  // default to the safest, most literal reading when absent/invalid.
+  return verified.map(m => ({ ...m, nuance: VALID_NUANCE.has(m.nuance) ? m.nuance : 'STRONG' }))
+}
+
+// ── Deduplication (Part 2/3) — deterministic, no AI. ────────────────────
+function normalizeQuote(q) { return q ? normalize(q) : null }
+
+// Two moments are the "same insight" if they share a normalized seller
+// quote OR a normalized rep quote — the real defect observed (same wife/
+// decision-maker moment surfaced twice from slightly different framing
+// text, but anchored to the identical underlying quote). Keeps whichever
+// entry has more complete fields (both quotes > one quote; longer
+// explanation as a tiebreaker) rather than arbitrarily the first.
+export function dedupeCoachingMoments(moments) {
+  if (!Array.isArray(moments)) return []
+  const kept = []
+  for (const m of moments) {
+    const sq = normalizeQuote(m.sellerQuote)
+    const rq = normalizeQuote(m.repQuote)
+    const dupIndex = kept.findIndex(k => (sq && normalizeQuote(k.sellerQuote) === sq) || (rq && normalizeQuote(k.repQuote) === rq))
+    if (dupIndex === -1) {
+      kept.push(m)
+    } else {
+      const existing = kept[dupIndex]
+      const completeness = (x) => (x.sellerQuote ? 1 : 0) + (x.repQuote ? 1 : 0) + ((x.coach || x.why || '').length > (existing.coach || existing.why || '').length ? 0.5 : 0)
+      if (completeness(m) > completeness(existing)) kept[dupIndex] = m
+    }
+  }
+  return kept
+}
+
+// Same-value dedup for a flat list of category codes (Part 2) — e.g.
+// si.objections. Order-preserving, keeps first occurrence.
+export function dedupeObjections(objections) {
+  if (!Array.isArray(objections)) return []
+  return [...new Set(objections)]
+}
+
+// ── Transcript quality (Part 4) — NO real per-segment STT confidence
+// exists anywhere in this codebase today (audited: useSpeechRecognition.js
+// never passes a `confidence` value into addSegment(), even though
+// conversationSession.js's segment shape has always had the field). Per
+// explicit instruction: do NOT fabricate a numeric confidence. This is a
+// conservative, deliberately narrow heuristic over objective, defensible
+// signals only — it flags UNCERTAIN more readily than it should ever
+// claim RELIABLE with false confidence. A future capability that wires
+// the Web Speech API's own `result[0].confidence` through addSegment()
+// should replace this heuristic outright, not layer on top of it.
+// (?<![$\d.,]) — excludes the "000" in "$175,000" from being independently
+// matched as a bare number: without the comma in this exclusion set, the
+// thousands group after the comma looked like its own unit-less number.
+const BARE_NUMBER_NO_UNIT = /(?<![$\d.,])\b\d{1,3}\b(?!\s*(%|percent|days?|months?|years?|k\b|thousand|,\d{3}))/i
+const MIN_WORDS_FOR_CONTEXT = 4
+
+export function assessTranscriptQuality(text) {
+  if (!text) return 'RELIABLE' // nothing to assess, never a false alarm
+  const words = text.trim().split(/\s+/)
+  // Signal A: a short fragment carrying a bare, unit-less number is the
+  // exact shape of the real corruption observed ("my wife 14", "one 40")
+  // — a real number would normally carry a unit/currency/date context.
+  if (words.length <= 8 && BARE_NUMBER_NO_UNIT.test(text)) return 'UNCERTAIN'
+  // Signal B: too short to carry real conversational context at all.
+  if (words.length < MIN_WORDS_FOR_CONTEXT) return 'UNCERTAIN'
+  return 'RELIABLE'
+}
+
+function worseQuality(a, b) {
+  if (a === 'UNCERTAIN' || b === 'UNCERTAIN') return 'UNCERTAIN'
+  return 'RELIABLE'
+}
+
+// ── Contradiction protection (Part 7) — deterministic, no AI call. A
+// Strong Move is never allowed to silently praise the exact same quote a
+// Missed Opportunity/coaching moment elsewhere criticizes — if that
+// happens, the nuance is forced to MIXED so the UI can present it as
+// "good execution, wrong timing" instead of two flatly contradictory
+// verdicts on the same behavior. ─────────────────────────────────────────
+const VALID_NUANCE = new Set(['GOOD', 'GOOD_BUT_EARLY', 'GOOD_BUT_LATE', 'MIXED', 'STRONG'])
+
+export function resolveCoachingConsistency({ strongMoves = [], coachingMoments = [], missedOpportunity = null }) {
+  const criticizedQuotes = new Set([
+    ...coachingMoments.flatMap(m => [normalizeQuote(m.repQuote), normalizeQuote(m.sellerQuote)]),
+    normalizeQuote(missedOpportunity?.repQuote), normalizeQuote(missedOpportunity?.sellerQuote),
+  ].filter(Boolean))
+
+  return strongMoves.map(move => {
+    const repQ = normalizeQuote(move.repQuote)
+    const sameQuoteCriticizedElsewhere = repQ && criticizedQuotes.has(repQ)
+    if (sameQuoteCriticizedElsewhere && move.nuance === 'STRONG') {
+      return { ...move, nuance: 'MIXED' }
+    }
+    return move
+  })
 }
 
 // Scored dimensions (Part 19/20) — the exact 9 from the mission brief.
@@ -73,11 +180,25 @@ export const COACHING_DIMENSIONS = [
 export function validateScorecard(rawScores) {
   if (!Array.isArray(rawScores)) return []
   const validKeys = new Set(COACHING_DIMENSIONS.map(d => d.key))
-  return rawScores.filter(s =>
-    s && validKeys.has(s.key) &&
-    Number.isFinite(s.score) && s.score >= 0 && s.score <= 10 &&
-    typeof s.why === 'string' && s.why.trim().length > 0
-  )
+  return rawScores
+    .filter(s =>
+      s && validKeys.has(s.key) &&
+      Number.isFinite(s.score) && s.score >= 0 && s.score <= 10 &&
+      typeof s.why === 'string' && s.why.trim().length > 0
+    )
+    // Capability #25.3A, Part 5/6 — optional, additive fields. A dimension
+    // that was CAPTURED (per the separate, deterministic coverage engine)
+    // but still scores low is not a contradiction — `captured`/`missing`
+    // let the model say what was captured vs. what depth/execution was
+    // missing, WITHOUT coverage ever influencing the score itself (they
+    // remain two independent computations, per the mission's explicit
+    // rule). Old reviews without these fields still render fine — both
+    // are optional and the UI falls back to `why` alone.
+    .map(s => ({
+      key: s.key, score: s.score, why: s.why,
+      captured: typeof s.captured === 'string' && s.captured.trim() ? s.captured.trim().slice(0, 200) : null,
+      missing: typeof s.missing === 'string' && s.missing.trim() ? s.missing.trim().slice(0, 200) : null,
+    }))
 }
 
 export function computeOverallScore(validatedScores) {

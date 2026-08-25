@@ -45,6 +45,9 @@ const CATEGORY_LABELS = {
   'callCoaching.test.js': 'CALL REVIEW (quote verification, scorecard validation, AI authority)',
   'callSessions.test.js': 'PERSISTENT CALL INTELLIGENCE (session identity, snapshot immutability, Calls History filtering)',
   'coachingMemory.test.js': 'CONTINUOUS COACHING INTELLIGENCE (adherence, adoption, trend, mastery, focus continuity)',
+  'coachingAnalytics.test.js': 'HAT COACHING CENTER (team pulse, agent status, attention rules, trends)',
+  'callReviewQuality.test.js': 'CALL REVIEW QUALITY (objection/moment dedup, transcript quality, contradiction protection)',
+  'offmarketControlCenter.test.js': 'OFF-MARKET ENGINE CONTROL CENTER (criteria clamping, DocTypes honesty contract, HTTP surface)',
 }
 
 const byFile = {}

@@ -25,6 +25,10 @@ import AcquisitionIntelligencePage from './pages/AcquisitionIntelligencePage'
 import OffMarketEnginePage from './pages/OffMarketEnginePage'
 import CallsHistoryPage from './pages/CallsHistoryPage'
 import CallDetailPage from './pages/CallDetailPage'
+import CoachingLayout from './pages/CoachingLayout'
+import CoachingTeamPage from './pages/CoachingTeamPage'
+import CoachingAgentsPage from './pages/CoachingAgentsPage'
+import CoachingAgentProfilePage from './pages/CoachingAgentProfilePage'
 
 export default function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -73,8 +77,14 @@ export default function App() {
         <Route path="action-center" element={<ActionCenterPage />} />
         <Route path="performance" element={<AcquisitionIntelligencePage />} />
         <Route path="off-market" element={<OffMarketEnginePage />} />
-        <Route path="coaching/calls" element={<CallsHistoryPage />} />
-        <Route path="coaching/calls/:callId" element={<CallDetailPage />} />
+        <Route path="coaching" element={<CoachingLayout />}>
+          <Route index element={<Navigate to="team" replace />} />
+          <Route path="team" element={<CoachingTeamPage />} />
+          <Route path="agents" element={<CoachingAgentsPage />} />
+          <Route path="agents/:repId" element={<CoachingAgentProfilePage />} />
+          <Route path="calls" element={<CallsHistoryPage />} />
+          <Route path="calls/:callId" element={<CallDetailPage />} />
+        </Route>
         <Route element={<AdminRoute />}>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />

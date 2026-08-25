@@ -9,6 +9,7 @@
 // Only structured facts + the already quote-verified coaching snippets
 // from Capability #24's guardrails (verifyCoachingMoments/verifyStrongMoves).
 import { getCallCoverage, formatPriceMovement } from './sellerStrategy.js'
+import { dedupeObjections } from './callCoaching.js'
 
 // Called once per Live Copilot session, at session creation — NOT at End
 // Call. repId/workspaceId are captured at the moment the call starts
@@ -51,7 +52,10 @@ export function buildCallSessionInsert({ identity, lead, si, endedAt }) {
     seller_price_initial: movement ? (si.seller_asking_price_history?.[0]?.value ?? movement.current ?? null) : null,
     seller_price_final: si.seller_asking_price ?? null,
     seller_price_movement: movement ? movement.movedBy : null,
-    objections: si.objections?.length ? si.objections : null,
+    // Part 2 — defensive second pass: dedupe again at persistence time
+    // even though LiveCopilot.jsx now dedupes at the source, so any other
+    // future caller of this builder can't reintroduce the same defect.
+    objections: si.objections?.length ? dedupeObjections(si.objections) : null,
     coverage_snapshot: getCallCoverage(si),
   }
 }

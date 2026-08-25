@@ -27,6 +27,7 @@ import {
 import { DISTRESS_CATEGORY_LABELS } from '../lib/distressScoring'
 import { isContactReady } from '../lib/contactEnrichment'
 import { KPI_DEFINITIONS, annotate, filterBySource, computeFunnel, applyViewFilter } from '../lib/offMarketMetrics'
+import ControlCenter from '../components/off-market/ControlCenter'
 
 const SOURCE_FILTERS = Object.keys(DISTRESS_CATEGORY_LABELS).filter(k => k !== 'UNKNOWN')
 
@@ -188,6 +189,8 @@ export default function OffMarketEnginePage() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const [lastFetchedAt, setLastFetchedAt] = useState(null)
+  const [tab, setTab] = useState('CONTROL_CENTER')
+  const [newRunLeadIds, setNewRunLeadIds] = useState(new Set())
 
   // Part 18 — a single re-fetch function, reused by the initial load and
   // the "Refresh Dashboard" button. Guards against overlapping concurrent
@@ -243,8 +246,22 @@ export default function OffMarketEnginePage() {
   const bySource = useMemo(() => filterBySource(enriched, sourceFilter, knownCategories), [enriched, sourceFilter, knownCategories])
   const kpis = useMemo(() => computeFunnel(bySource), [bySource])
   const viewFiltered = useMemo(() => applyViewFilter(bySource, viewFilter), [bySource, viewFilter])
+  // Part 11 — "records created in this run" filter. Page-local (not a
+  // reusable classification rule), so it stays here rather than touching
+  // the shared offMarketMetrics.js filter logic.
+  const runFiltered = useMemo(
+    () => (viewFilter === 'NEW_FROM_RUN' ? viewFiltered.filter(({ lead }) => newRunLeadIds.has(lead.id)) : viewFiltered),
+    [viewFiltered, viewFilter, newRunLeadIds]
+  )
 
-  const sorted = useMemo(() => [...viewFiltered].sort((a, b) => (b.opp?.opportunity_score ?? -1) - (a.opp?.opportunity_score ?? -1)), [viewFiltered])
+  const sorted = useMemo(() => [...runFiltered].sort((a, b) => (b.opp?.opportunity_score ?? -1) - (a.opp?.opportunity_score ?? -1)), [runFiltered])
+
+  const handleViewNewLeads = (ids) => {
+    setNewRunLeadIds(new Set(ids))
+    setViewFilter(ids.length ? 'NEW_FROM_RUN' : 'ALL')
+    setTab('LEADS')
+    fetchLeads({ isRefresh: true })
+  }
 
   const toggleSource = (key) => {
     setSourceFilter(prev => {
@@ -257,6 +274,31 @@ export default function OffMarketEnginePage() {
   return (
     <>
       <Topbar title="Off-Market Engine" breadcrumbs={[{ label: workspace.name }, { label: 'Off-Market Engine' }]} />
+      <div className="px-6 pt-4">
+        <div className="flex gap-1 border-b border-[color:var(--color-line)]">
+          {[{ key: 'CONTROL_CENTER', label: 'Control Center' }, { key: 'LEADS', label: 'Leads' }].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 h-9 text-[13px] font-semibold border-b-2 -mb-px transition-colors ${
+                tab === t.key
+                  ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)]'
+                  : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'CONTROL_CENTER' && (
+        <div className="px-6 py-6 w-full flex-1">
+          <ControlCenter workspaceId={workspaceId} onViewNewLeads={handleViewNewLeads} />
+        </div>
+      )}
+
+      {tab === 'LEADS' && (
       <div className="px-6 py-6 w-full flex-1 space-y-5">
         {/* Part 2 — operational header. Every number here is real:
             offMarketLeads count comes from the same live query as the
@@ -399,6 +441,7 @@ export default function OffMarketEnginePage() {
                 { key: 'CONTACT_READY', label: 'Contact Ready' },
                 { key: 'BUY_BOX_MATCH', label: 'Buy Box Match' },
                 { key: 'NEEDS_ENRICHMENT', label: 'Needs Enrichment' },
+                ...(newRunLeadIds.size > 0 ? [{ key: 'NEW_FROM_RUN', label: `New From Last Run (${newRunLeadIds.size})` }] : []),
               ].map(f => (
                 <button
                   key={f.key}
@@ -459,6 +502,7 @@ export default function OffMarketEnginePage() {
           </>
         )}
       </div>
+      )}
       {detailLead && <WhyThisLeadPanel lead={detailLead} onClose={() => setDetailLead(null)} />}
     </>
   )

@@ -50,20 +50,24 @@ Every coaching moment and every strong move you identify MUST include an EXACT q
 
 SCORING RULE: Score based on observable rep BEHAVIOR against the rubric below, never on whether the seller ultimately agreed to sell or accepted a price. A rep can run a strong call that doesn't produce a deal.
 
-Score exactly these 9 dimensions, 0-10 each, each with a one-sentence "why" citing what actually happened in the transcript:
+Score exactly these 9 dimensions, 0-10 each, each with a one-sentence "why" citing what actually happened in the transcript. IMPORTANT — "captured" vs. "score" are DIFFERENT questions: a topic can be captured (the rep got SOME information on it) while still scoring low (the rep never went deep, never explored consequence/impact, or explored it only superficially before moving on). When that happens, you MUST fill in "captured" (what information was actually obtained) and "missing" (what depth/execution was absent) so a low score next to a captured topic is never presented as a contradiction — it is a real, explainable distinction. Leave captured/missing as empty strings only when there's nothing meaningful to add beyond "why".
 OPENING_RAPPORT, MOTIVATION_DISCOVERY, PAIN_DEPTH, PROPERTY_DISCOVERY, TIMELINE, PRICE_DISCOVERY, DECISION_MAKERS, NEGOTIATION, COMMITMENT
+
+STRONG MOVE NUANCE — every strongMove needs a "nuance" classification: "STRONG" (unqualified good execution), "GOOD_BUT_EARLY" (the individual behavior was good, but it happened before enough groundwork — e.g. asking price before understanding motivation/pain), "GOOD_BUT_LATE" (good behavior that came too late to matter as much as it could have), "MIXED" (real positives and real problems in the same moment), "GOOD" (solid, unremarkable). CRITICAL: if you also flag a coachingMoment or the missedOpportunity criticizing the SAME rep quote or the same underlying behavior, the strongMove for that behavior must NOT be plain "STRONG" — use "GOOD_BUT_EARLY"/"GOOD_BUT_LATE"/"MIXED" instead, so the review never praises and criticizes the identical behavior without explaining the nuance.
 
 PRIMARY COACHING FOCUS — always include one. It must be behavioral, actionable, observable in a future call, and narrow enough to measure (bad: "be better at sales"; good: "when the seller reveals pain, ask at least one follow-up question before moving to condition or price"). skillKey MUST be one of the 9 dimension keys above — the single dimension this focus most directly targets.
 
 FOCUS ADHERENCE — ONLY if an ACTIVE COACHING FOCUS is supplied in the prompt below. Determine whether THIS call's transcript shows the rep applying that specific focus. First decide opportunityExisted (true/false): did a moment in THIS transcript actually create a chance to apply the focus? If false, result MUST be "NOT_APPLICABLE" — never penalize a rep for a situation that never arose. If true, result MUST be one of "APPLIED" / "PARTIALLY_APPLIED" / "NOT_APPLIED", backed by an EXACT verbatim quote (sellerQuote and/or repQuote) from THIS transcript — the same no-paraphrase, no-invention rule as the evidence contract above. If no ACTIVE COACHING FOCUS is supplied, omit focusAdherence entirely (set it to null).
 
+DISTINCT INSIGHTS ONLY — each coachingMoment must be about a DIFFERENT moment/topic. Do not report the same underlying exchange (same seller statement, same rep response) as two separate coaching moments even if you'd phrase the coaching note slightly differently each time.
+
 Write EXACTLY this JSON shape and nothing else — no markdown, no prose outside the JSON:
 {
-  "scores": [{"key": "OPENING_RAPPORT", "score": 0, "why": "..."}, ... all 9 keys],
+  "scores": [{"key": "OPENING_RAPPORT", "score": 0, "why": "...", "captured": "...", "missing": "..."}, ... all 9 keys],
   "strengths": ["...", "..."],
   "missedOpportunity": {"summary": "...", "sellerQuote": "...", "repQuote": "...", "betterQuestion": "...", "why": "..."},
   "coachingMoments": [{"sellerQuote": "...", "repQuote": "...", "coach": "...", "betterQuestion": "...", "why": "..."}],
-  "strongMoves": [{"sellerQuote": "...", "repQuote": "...", "why": "..."}],
+  "strongMoves": [{"sellerQuote": "...", "repQuote": "...", "why": "...", "nuance": "STRONG"}],
   "sellerOutcomeSummary": "1-2 sentences, facts only, no speculation beyond the transcript",
   "primaryCoachingFocus": {"skillKey": "...", "title": "...", "recommendation": "...", "exampleQuestions": ["...", "..."]},
   "focusAdherence": {"opportunityExisted": true, "result": "APPLIED", "why": "...", "sellerQuote": "...", "repQuote": "..."}

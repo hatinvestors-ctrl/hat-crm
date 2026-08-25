@@ -30,6 +30,7 @@ import {
 } from '../../lib/sellerStrategy'
 import CallReview from './CallReview'
 import { buildCallSessionInsert, buildCallSessionFinalizeUpdate } from '../../lib/callSessions'
+import { dedupeObjections } from '../../lib/callCoaching'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
 // Capability #22.2, Section 4/5 — two-speed debounce. A FAST-path event
@@ -189,7 +190,15 @@ export default function LiveCopilot({ lead, userId, workspaceId, members, canEdi
     }
     if (facts.decision_makers) { patch.decision_makers = facts.decision_makers; setCaptureFlash('DECISION MAKER CAPTURED') }
     if (facts.debt_notes) patch.debt_notes = facts.debt_notes
-    if (facts.new_objection) { patch.objections = [...si.objections, facts.new_objection]; setCaptureFlash(`OBJECTION: ${facts.new_objection.replace(/_/g, ' ')}`) }
+    // Capability #25.3A, Part 2 — real observed defect: the same
+    // objection (e.g. SPOUSE_PARTNER) could be appended twice when the
+    // extraction model re-flagged an already-logged objection from a
+    // later utterance. Dedupe at the source so it never enters
+    // seller_intelligence duplicated in the first place.
+    if (facts.new_objection && !si.objections.includes(facts.new_objection)) {
+      patch.objections = dedupeObjections([...si.objections, facts.new_objection])
+      setCaptureFlash(`OBJECTION: ${facts.new_objection.replace(/_/g, ' ')}`)
+    }
     if (facts.last_response_summary) patch.last_response = facts.last_response_summary
     // #22.2, Section 14 — surface the moment a follow-up is mentioned,
     // resolved to a real date only at End Call (never silently scheduled
