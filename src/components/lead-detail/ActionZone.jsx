@@ -211,6 +211,13 @@ export default function ActionZone({ lead, userId, members, canEdit, onUpdated }
 
   if (!canEdit) return null
 
+  // Compact Triage Decision Bar V1 — the 'triage' playbook now renders as
+  // its own compact bar (TriageDecisionBar.jsx) higher in the Lead
+  // Workspace, between Lead Essentials and the tabs. Skip here so it's
+  // never duplicated in Overview. Every other status's playbook is
+  // completely unchanged.
+  if (lead.status === 'triage') return null
+
   const playbook = PLAYBOOKS[lead.status] || DEFAULT_PLAYBOOK
   const hint     = smartHint(lead, playbook.hint)
   const actions  = smartActions(lead, playbook.actions)

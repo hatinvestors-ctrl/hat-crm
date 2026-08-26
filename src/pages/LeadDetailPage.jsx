@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
 import ActionZone from '../components/lead-detail/ActionZone'
+import TriageDecisionBar from '../components/lead-detail/TriageDecisionBar'
 import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
 import NotesSection from '../components/lead-detail/NotesSection'
@@ -241,6 +242,23 @@ export default function LeadDetailPage() {
           onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
           onRequestEnrich={() => setEnrichConfirmOpen(true)}
         />
+
+        {/* Compact Triage Decision Bar V1 — a lightweight workflow gate,
+            not another analysis card. Renders only while lead.status ===
+            'triage' (auto-imported, not yet decided); disappears the
+            instant the lead is promoted/rejected/dismissed. Placed here,
+            above the tabs, so the decision is seen early without adding a
+            full-width card into Overview (removed from ActionZone below). */}
+        <div className="mt-3">
+          <TriageDecisionBar
+            lead={lead}
+            userId={user.id}
+            members={members}
+            canEdit={canEdit}
+            onUpdated={onLeadUpdated}
+          />
+        </div>
+
         <LeadWorkspaceTabs active={activeTab} onChange={setActiveTab} readiness={tabReadiness} />
 
         {/* ══════════════ OVERVIEW — "Should I pursue this, and what now?"

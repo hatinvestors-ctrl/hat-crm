@@ -57,6 +57,7 @@ const CATEGORY_LABELS = {
   'leadIntelligenceExplainability.test.js': 'LEAD INTELLIGENCE EXPLAINABILITY (real Ventnor contact-status bug fix, Opportunity/Confidence/Urgency tooltips, 85-vs-70 disambiguation)',
   'callReviewParser.test.js': 'CALL REVIEW JSON HARDENING (real production truncation bug, balanced-brace extraction, safe diagnostic logging, max_tokens fix)',
   'callReviewAbort.test.js': 'CALL REVIEW ABORT HANDLING (real "operation was aborted" incident, missing timeout config fix, error classification, idempotency)',
+  'triageDecisionBar.test.js': 'COMPACT TRIAGE DECISION BAR (presentation/placement only — reused playbook, no duplicate control, button hierarchy)',
 }
 
 const byFile = {}
