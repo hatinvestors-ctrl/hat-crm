@@ -55,6 +55,7 @@ const CATEGORY_LABELS = {
   'distressNextAction.test.js': 'DISTRESS NEXT ACTION STATE (owner/contact/workflow hierarchy, real Ventnor regression)',
   'leadWorkspacePolish.test.js': 'LEAD WORKSPACE FINAL UX POLISH (clickable Next Action, single enrichment path, contact status wording, distress card compaction)',
   'leadIntelligenceExplainability.test.js': 'LEAD INTELLIGENCE EXPLAINABILITY (real Ventnor contact-status bug fix, Opportunity/Confidence/Urgency tooltips, 85-vs-70 disambiguation)',
+  'callReviewParser.test.js': 'CALL REVIEW JSON HARDENING (real production truncation bug, balanced-brace extraction, safe diagnostic logging, max_tokens fix)',
 }
 
 const byFile = {}

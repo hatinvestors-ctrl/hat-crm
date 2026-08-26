@@ -28,6 +28,8 @@
 // SYSTEM never asks the model "is this rep improving" — that's computed
 // from persisted history in coachingMemory.js, never here.
 
+import { parseCallReviewResponse, fmtParseErrorForUser } from '../../src/lib/callReviewParser.js'
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 const HEADERS = {
@@ -116,7 +118,15 @@ Score this call against the rubric and return the JSON shape exactly as specifie
         headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2000,
+          // Part 3 — real production bug: max_tokens was sized for #24's
+          // original schema and never increased despite #25.2
+          // (primaryCoachingFocus + focusAdherence, two new objects) and
+          // #25.3A (captured/missing on all 9 dimension scores, nuance on
+          // every strong move) — a rich, high-coverage call's real output
+          // is estimated at 1400-1900+ tokens against the old 2000 ceiling.
+          // Doubled with real margin; see docs/acquisition-coach/ for the
+          // full incident writeup.
+          max_tokens: 4096,
           temperature: 0,
           system: SYSTEM_PROMPT,
           // Bug fix (found on first live production test) — an
@@ -144,20 +154,27 @@ Score this call against the rubric and return the JSON shape exactly as specifie
 
     const data = await resp.json()
     const continuation = data.content?.[0]?.text?.trim() || ''
+    const stopReason = data.stop_reason
     // The prefilled "{" isn't echoed back by the API, so it must be
-    // re-added before parsing. Still defensively strip markdown fences and
-    // extract the outermost {...} in case the model adds anything else
-    // around it (same defensive parse extract-seller-facts.mjs already uses).
+    // re-added before parsing — parseCallReviewResponse() (src/lib/
+    // callReviewParser.js) does the rest: strips markdown fences,
+    // brace-balance-scans for a complete JSON object (correctly
+    // distinguishing genuine truncation from a normal malformed
+    // response), and parses. Pure/unit-tested, no behavior duplicated here.
     const raw = '{' + continuation
-    let review
-    try {
-      const cleaned = raw.replace(/```json\s*|```/g, '').trim()
-      const m = cleaned.match(/\{[\s\S]*\}/)
-      review = JSON.parse(m ? m[0] : cleaned)
-    } catch {
-      return new Response(JSON.stringify({ ok: false, error: 'Call review response was not valid JSON.' }), { status: 502, headers: HEADERS })
+    const parsed = parseCallReviewResponse(raw, stopReason)
+
+    if (!parsed.ok) {
+      // Diagnostic logging (Part 2/6 gap fix) — safe: counts/codes/stop
+      // reason only, NEVER the transcript or the model's actual text
+      // (which could contain seller PII). This is the exact gap that made
+      // the original production failure unrecoverable from logs.
+      console.error('[generate-call-review] parse failure', {
+        code: parsed.code, stopReason, continuationLength: continuation.length, detail: parsed.detail,
+      })
+      return new Response(JSON.stringify({ ok: false, code: parsed.code, error: fmtParseErrorForUser(parsed.code) }), { status: 502, headers: HEADERS })
     }
-    return new Response(JSON.stringify({ ok: true, review }), { status: 200, headers: HEADERS })
+    return new Response(JSON.stringify({ ok: true, review: parsed.review }), { status: 200, headers: HEADERS })
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
   }
