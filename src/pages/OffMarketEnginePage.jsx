@@ -25,9 +25,19 @@ import {
   fmtOwnerMatch, fmtAbsentee, fmtBuyBoxFit, fmtFilingDate, fmtLienAmount, fmtLienStatus, fmtDistressSource,
 } from '../lib/distressInfo'
 import { DISTRESS_CATEGORY_LABELS } from '../lib/distressScoring'
-import { isContactReady } from '../lib/contactEnrichment'
+import { getContactStatus, fmtContactStatus, getEnrichmentRecommendation } from '../lib/contactEnrichment'
+import { runContactEnrichmentBatch, summarizeEnrichmentResults } from '../lib/enrichmentRun'
 import { KPI_DEFINITIONS, annotate, filterBySource, computeFunnel, applyViewFilter } from '../lib/offMarketMetrics'
 import ControlCenter from '../components/off-market/ControlCenter'
+import EnrichContactsModal from '../components/off-market/EnrichContactsModal'
+
+const CONTACT_STATUS_TONE = {
+  CONTACT_READY: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+  MATCH_NEEDS_REVIEW: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  ENRICHMENT_ERROR: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]',
+  NO_MATCH: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]',
+  NEEDS_ENRICHMENT: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)]',
+}
 
 const SOURCE_FILTERS = Object.keys(DISTRESS_CATEGORY_LABELS).filter(k => k !== 'UNKNOWN')
 
@@ -45,17 +55,20 @@ function FunnelStage({ label, value, definition, notTracked }) {
   )
 }
 
+// Section 9 — ONE canonical contact status (getContactStatus), no
+// second/conflicting "Contact Ready" definition.
 function ContactStatusBadge({ lead }) {
-  const ready = isContactReady(lead)
-  const attempted = lead.enrichment_data && Object.keys(lead.enrichment_data).length > 0
-  if (ready) {
-    const parts = []
+  const status = getContactStatus(lead)
+  const parts = []
+  if (status === 'CONTACT_READY') {
     if (lead.phone) parts.push('1 phone')
     if (lead.email) parts.push('1 email')
-    return <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">CONTACT READY{parts.length ? ` · ${parts.join(', ')}` : ''}</span>
   }
-  if (attempted) return <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-warn-soft)] text-[color:var(--color-warn-text)]">ENRICHMENT PENDING</span>
-  return <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">NO CONTACT</span>
+  return (
+    <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${CONTACT_STATUS_TONE[status]}`}>
+      {fmtContactStatus(status).toUpperCase()}{parts.length ? ` · ${parts.join(', ')}` : ''}
+    </span>
+  )
 }
 
 function PriorityChip({ opportunity }) {
@@ -191,6 +204,12 @@ export default function OffMarketEnginePage() {
   const [lastFetchedAt, setLastFetchedAt] = useState(null)
   const [tab, setTab] = useState('CONTROL_CENTER')
   const [newRunLeadIds, setNewRunLeadIds] = useState(new Set())
+  // Section 3/7 — Contact Enrichment selection + batch run state.
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [confirmingEnrich, setConfirmingEnrich] = useState(false)
+  const [enrichRunning, setEnrichRunning] = useState(false)
+  const [enrichResults, setEnrichResults] = useState(null) // per-lead results, in progress or final
+  const [enrichSummary, setEnrichSummary] = useState(null)
 
   // Part 18 — a single re-fetch function, reused by the initial load and
   // the "Refresh Dashboard" button. Guards against overlapping concurrent
@@ -263,6 +282,59 @@ export default function OffMarketEnginePage() {
     fetchLeads({ isRefresh: true })
   }
 
+  // Section 14 — Control Center's "Review & Enrich Contacts". Opens Leads
+  // filtered to this run and pre-selects the recommended subset — never
+  // bills automatically, selection alone never triggers a paid call.
+  const handleReviewAndEnrich = async (ids) => {
+    handleViewNewLeads(ids)
+  }
+
+  // Recommended set (Section 4) — computed from whatever's currently
+  // visible in the table, using the SAME annotate()'d opp object the table
+  // itself renders from. Recomputed after every fetch/enrichment refresh.
+  const recommendedIds = useMemo(() => {
+    const idSet = new Set()
+    for (const { lead, opp } of sorted) {
+      if (getEnrichmentRecommendation(lead, opp).recommended) idSet.add(lead.id)
+    }
+    return idSet
+  }, [sorted])
+
+  // Auto-preselect recommended leads once, right after a Control Center
+  // "Review & Enrich Contacts" hand-off lands on this filtered view —
+  // never on ordinary page load (only when newRunLeadIds is freshly set).
+  useEffect(() => {
+    if (newRunLeadIds.size > 0 && viewFilter === 'NEW_FROM_RUN' && recommendedIds.size > 0) {
+      setSelectedIds(new Set([...recommendedIds].filter(id => newRunLeadIds.has(id))))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newRunLeadIds])
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const selectAllVisible = () => setSelectedIds(new Set(sorted.map(({ lead }) => lead.id)))
+  const selectRecommended = () => setSelectedIds(new Set(recommendedIds))
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const runEnrichment = async () => {
+    setEnrichRunning(true)
+    setEnrichResults([])
+    const ids = [...selectedIds]
+    const finalResults = await runContactEnrichmentBatch(ids, {
+      onProgress: (partial) => setEnrichResults(partial),
+    })
+    setEnrichResults(finalResults)
+    setEnrichSummary(summarizeEnrichmentResults(finalResults))
+    setEnrichRunning(false)
+    setConfirmingEnrich(false)
+    fetchLeads({ isRefresh: true })
+  }
+
   const toggleSource = (key) => {
     setSourceFilter(prev => {
       const next = new Set(prev)
@@ -294,7 +366,7 @@ export default function OffMarketEnginePage() {
 
       {tab === 'CONTROL_CENTER' && (
         <div className="px-6 py-6 w-full flex-1">
-          <ControlCenter workspaceId={workspaceId} onViewNewLeads={handleViewNewLeads} />
+          <ControlCenter workspaceId={workspaceId} onViewNewLeads={handleViewNewLeads} onReviewAndEnrich={handleReviewAndEnrich} />
         </div>
       )}
 
@@ -457,12 +529,60 @@ export default function OffMarketEnginePage() {
               ))}
             </div>
 
+            {/* Section 3 — selection bar. Disabled action when nothing is
+                selected; selecting a row never bills anything by itself. */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3 text-[11.5px] text-[color:var(--color-text-dim)]">
+                <button onClick={selectAllVisible} className="font-semibold underline text-[color:var(--color-accent-text)]">Select All</button>
+                <button onClick={selectRecommended} disabled={recommendedIds.size === 0} className="font-semibold underline text-[color:var(--color-accent-text)] disabled:opacity-40 disabled:no-underline">
+                  Select Recommended{recommendedIds.size > 0 ? ` (${recommendedIds.size})` : ''}
+                </button>
+                {selectedIds.size > 0 && <button onClick={clearSelection} className="underline text-[color:var(--color-text-dim)]">Clear</button>}
+                {selectedIds.size > 0 && <span>{selectedIds.size} selected</span>}
+              </div>
+              <div className="text-right">
+                <button
+                  onClick={() => setConfirmingEnrich(true)}
+                  disabled={selectedIds.size === 0}
+                  className="px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-white font-bold text-[12px] hover:opacity-90 disabled:opacity-40"
+                >
+                  Enrich Contacts
+                </button>
+                <div className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5">Phone &amp; email lookup</div>
+              </div>
+            </div>
+
+            {enrichSummary && (
+              <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-3.5 space-y-2">
+                <div className="text-[12.5px] font-bold text-[color:var(--color-success-text)]">CONTACT ENRICHMENT COMPLETE</div>
+                <div className="text-[11.5px] text-[color:var(--color-text-dim)]">{enrichSummary.total} selected</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+                  <div><span className="font-bold">{enrichSummary.contactReady}</span> Contact Ready</div>
+                  <div><span className="font-bold">{enrichSummary.noMatch}</span> No Match</div>
+                  <div><span className="font-bold">{enrichSummary.alreadyEnriched}</span> Already Enriched</div>
+                  <div><span className="font-bold">{enrichSummary.errors}</span> Errors</div>
+                </div>
+                <div className="text-[11px] text-[color:var(--color-text-dim)]">Phones Found: {enrichSummary.phonesFound} · Emails Found: {enrichSummary.emailsFound}</div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setViewFilter('CONTACT_READY'); setEnrichSummary(null); setEnrichResults(null); clearSelection() }}
+                    disabled={enrichSummary.contactReady === 0}
+                    className="px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-white font-bold text-[11.5px] hover:opacity-90 disabled:opacity-40"
+                  >
+                    View Contact-Ready Leads
+                  </button>
+                  <button onClick={() => { setEnrichSummary(null); setEnrichResults(null) }} className="text-[11px] font-semibold underline text-[color:var(--color-text-dim)]">Dismiss</button>
+                </div>
+              </div>
+            )}
+
             {/* Lead table */}
             <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
                   <thead className="border-b border-[color:var(--color-line)]">
                     <tr>
+                      <th className="px-3 h-9 w-px"><input type="checkbox" checked={sorted.length > 0 && selectedIds.size === sorted.length} onChange={() => (selectedIds.size === sorted.length ? clearSelection() : selectAllVisible())} /></th>
                       <th className="px-3 h-9 text-left text-[10.5px] font-medium uppercase tracking-wider text-[color:var(--color-text-dim)]">Priority</th>
                       <th className="px-3 h-9 text-left text-[10.5px] font-medium uppercase tracking-wider text-[color:var(--color-text-dim)]">Property</th>
                       <th className="px-3 h-9 text-left text-[10.5px] font-medium uppercase tracking-wider text-[color:var(--color-text-dim)]">Owner</th>
@@ -474,8 +594,11 @@ export default function OffMarketEnginePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[color:var(--color-line)]">
-                    {sorted.map(({ lead, opp }) => (
+                    {sorted.map(({ lead, opp }) => {
+                      const enrichRow = enrichResults?.find(r => r.leadId === lead.id)
+                      return (
                       <tr key={lead.id} className="hover:bg-[color:var(--color-bg-elev-2)] transition-colors">
+                        <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)} /></td>
                         <td className="px-3 py-2.5"><PriorityChip opportunity={opp} /></td>
                         <td className="px-3 py-2.5">
                           <div className="font-medium text-[color:var(--color-text)]">{lead.address}</div>
@@ -484,14 +607,18 @@ export default function OffMarketEnginePage() {
                         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{lead.owner_name || '—'}</td>
                         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{getPrimaryDistressLabel(lead) || 'Unknown'}</td>
                         <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">{fmtBuyBoxFit(opp?.buy_box_fit)}</td>
-                        <td className="px-3 py-2.5"><ContactStatusBadge lead={lead} /></td>
+                        <td className="px-3 py-2.5">
+                          {enrichRow ? (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">{enrichRow.outcome}</span>
+                          ) : <ContactStatusBadge lead={lead} />}
+                        </td>
                         <td className="px-3 py-2.5 text-[11px] text-[color:var(--color-text-dim)]">{formatDate(lead.updated_at)}</td>
                         <td className="px-3 py-2.5 text-right whitespace-nowrap">
                           <button onClick={() => setDetailLead(lead)} className="text-[11px] font-semibold underline text-[color:var(--color-accent-text)] mr-2">Why This Lead?</button>
                           <Link to={`../leads/${lead.id}`} className="text-[11px] font-semibold underline text-[color:var(--color-text-muted)]">Open →</Link>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -502,6 +629,14 @@ export default function OffMarketEnginePage() {
           </>
         )}
       </div>
+      )}
+      {confirmingEnrich && (
+        <EnrichContactsModal
+          count={selectedIds.size}
+          running={enrichRunning}
+          onCancel={() => setConfirmingEnrich(false)}
+          onConfirm={runEnrichment}
+        />
       )}
       {detailLead && <WhyThisLeadPanel lead={detailLead} onClose={() => setDetailLead(null)} />}
     </>

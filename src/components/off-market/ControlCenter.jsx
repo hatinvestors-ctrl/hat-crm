@@ -42,7 +42,7 @@ function FunnelRow({ label, value, dim }) {
   )
 }
 
-export default function ControlCenter({ workspaceId, onViewNewLeads, onOpenActionCenter }) {
+export default function ControlCenter({ workspaceId, onViewNewLeads, onOpenActionCenter, onReviewAndEnrich }) {
   const [dateRange, setDateRange] = useState(30)
   const [customDays, setCustomDays] = useState(30)
   const [maxRecords, setMaxRecords] = useState(10)
@@ -259,6 +259,15 @@ export default function ControlCenter({ workspaceId, onViewNewLeads, onOpenActio
               disabled={!result.createdLeads?.length}
               className="px-3 py-2 rounded-lg bg-[color:var(--color-accent)] text-white font-bold text-[12px] hover:opacity-90 disabled:opacity-40">
               VIEW NEW LEADS
+            </button>
+            {/* Section 14 — optional next step, never triggers billing
+                itself. Opens Leads filtered to this run; recommended
+                leads (real criteria, computed there against full lead
+                data) are preselected, nothing is auto-enriched. */}
+            <button onClick={() => onReviewAndEnrich?.(result.createdLeads?.map(l => l.id) || [])}
+              disabled={!result.createdLeads?.length}
+              className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] font-semibold text-[12px] text-[color:var(--color-text-muted)] disabled:opacity-40">
+              REVIEW &amp; ENRICH CONTACTS
             </button>
             <Link to="../../action-center" onClick={() => onOpenActionCenter?.()}
               className="px-3 py-2 rounded-lg border border-[color:var(--color-line)] font-semibold text-[12px] text-[color:var(--color-text-muted)]">

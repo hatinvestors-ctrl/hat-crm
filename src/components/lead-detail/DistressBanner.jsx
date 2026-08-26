@@ -10,18 +10,34 @@
 // applied yet — same information either way, this component doesn't care
 // which path supplied it.
 
+import { useState } from 'react'
 import {
   getDistressInfo, getWhyHereReasons, getNextAction, getOpportunityInfo, fmtBuyBoxFit,
   fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
   fmtLienAmount, fmtLienStatus,
 } from '../../lib/distressInfo'
 import { fmtContactMatch } from '../../lib/contactEnrichment'
+import { runContactEnrichmentBatch } from '../../lib/enrichmentRun'
+import EnrichContactsModal from '../off-market/EnrichContactsModal'
 
-export default function DistressBanner({ lead }) {
+export default function DistressBanner({ lead, onRefresh }) {
+  const [confirming, setConfirming] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [errorMsg, setErrorMsg] = useState(null)
   if (!lead) return null
   const info = getDistressInfo(lead)
   const opp = getOpportunityInfo(lead)
   if (!info) return null
+
+  const runSingleEnrichment = async () => {
+    setRunning(true)
+    setErrorMsg(null)
+    const [result] = await runContactEnrichmentBatch([lead.id])
+    setRunning(false)
+    setConfirming(false)
+    if (result?.outcome === 'ERROR') setErrorMsg(result.error || 'Enrichment failed.')
+    onRefresh?.()
+  }
 
   const owner = lead.owner_name || info.current_owner
   const whyHere = getWhyHereReasons(lead, info)
@@ -154,9 +170,29 @@ export default function DistressBanner({ lead }) {
             )}
           </div>
         ) : (
-          <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic">Not found yet</div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic">Not found yet</div>
+            {/* Section 11 — single-lead action. Same confirmation modal,
+                same runContactEnrichmentBatch() call the batch flow uses —
+                one path to a paid request, not two. */}
+            <button
+              onClick={() => setConfirming(true)}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-900/30 shrink-0"
+            >
+              Enrich Contact
+            </button>
+          </div>
         )}
+        {errorMsg && <div className="text-[11px] text-[color:var(--color-danger-text)] mt-1.5">{errorMsg}</div>}
       </div>
+      {confirming && (
+        <EnrichContactsModal
+          count={1}
+          running={running}
+          onCancel={() => setConfirming(false)}
+          onConfirm={runSingleEnrichment}
+        />
+      )}
     </div>
   )
 }

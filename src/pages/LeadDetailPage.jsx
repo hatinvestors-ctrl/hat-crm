@@ -224,7 +224,7 @@ export default function LeadDetailPage() {
             (off-market) → compact status. A user should understand the
             lead within ~5 seconds without scrolling past all of this. ══ */}
         <div id="workspace-panel-overview" role="tabpanel" aria-labelledby="workspace-tab-overview" hidden={activeTab !== 'overview'} className="space-y-4">
-          <DistressBanner lead={lead} />
+          <DistressBanner lead={lead} onRefresh={load} />
           <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
           {/* HAT Premium Visual Pass, Part 7 — the ONE dominant decision

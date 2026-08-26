@@ -48,6 +48,7 @@ const CATEGORY_LABELS = {
   'coachingAnalytics.test.js': 'HAT COACHING CENTER (team pulse, agent status, attention rules, trends)',
   'callReviewQuality.test.js': 'CALL REVIEW QUALITY (objection/moment dedup, transcript quality, contradiction protection)',
   'offmarketControlCenter.test.js': 'OFF-MARKET ENGINE CONTROL CENTER (criteria clamping, DocTypes honesty contract, HTTP surface)',
+  'contactEnrichment.test.js': 'OFF-MARKET CONTACT ENRICHMENT (recommendation criteria, contact status, batch summary, no-auto-bill safety)',
 }
 
 const byFile = {}
