@@ -66,12 +66,27 @@ export function isContactReady(lead) {
 /**
  * @typedef {'CONTACT_READY'|'NEEDS_ENRICHMENT'|'NO_MATCH'|'MATCH_NEEDS_REVIEW'|'ENRICHMENT_ERROR'} ContactStatus
  */
+// Fix (Lead Intelligence Explainability pass) — real bug found auditing
+// 10940 Ventnor Ave: this previously required BOTH contact_ui_status ===
+// 'CONTACT NEEDED' AND skip_trace_status === 'NO_MATCH' to report
+// NO_MATCH. But skip_trace_status only ever becomes 'NO_MATCH' when the
+// provider returned ZERO candidate people at all
+// (netlify/functions/batchdata-enrich.mjs) — when the provider DOES
+// return people but none can be safely matched to the owner (Ventnor's
+// real case), skip_trace_status stays 'SUCCESS' and contact_ui_status
+// becomes 'CONTACT NEEDED' (the function's own else-branch, set whenever
+// contactMatchStatus isn't VERIFIED/LIKELY/AMBIGUOUS). The old extra
+// condition silently failed for that real, common case and fell through
+// to NEEDS_ENRICHMENT ("NOT ENRICHED") even though a real attempt had
+// already happened — exactly backwards. contact_ui_status === 'CONTACT
+// NEEDED' is already the correct, complete signal on its own; the
+// redundant check is removed, no new field/model introduced.
 export function getContactStatus(lead) {
   if (isContactReady(lead)) return 'CONTACT_READY'
   const uiStatus = lead?.enrichment_data?.contact_ui_status
   if (uiStatus === 'ENRICHMENT TEMPORARILY UNAVAILABLE') return 'ENRICHMENT_ERROR'
   if (uiStatus === 'MATCH NEEDS REVIEW') return 'MATCH_NEEDS_REVIEW'
-  if (uiStatus === 'CONTACT NEEDED' && lead?.enrichment_data?.skip_trace_status === 'NO_MATCH') return 'NO_MATCH'
+  if (uiStatus === 'CONTACT NEEDED') return 'NO_MATCH'
   return 'NEEDS_ENRICHMENT'
 }
 

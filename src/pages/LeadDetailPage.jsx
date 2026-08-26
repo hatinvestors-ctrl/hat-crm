@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom'
 import Topbar from '../components/Topbar'
-import LeadDetailHeader from '../components/lead-detail/LeadDetailHeader'
 import ActionZone from '../components/lead-detail/ActionZone'
 import LeadStatusPipeline from '../components/lead-detail/LeadStatusPipeline'
 import PropertyInfoSection from '../components/lead-detail/PropertyInfoSection'
@@ -10,6 +9,7 @@ import DealAnalysisCard from '../components/lead-detail/DealAnalysisCard'
 import ComplsIntelligenceCard from '../components/lead-detail/workspace/ComplsIntelligenceCard'
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import DistressBanner from '../components/lead-detail/DistressBanner'
+import LeadEssentialsBar from '../components/lead-detail/LeadEssentialsBar'
 import FinancialSection from '../components/lead-detail/FinancialSection'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
@@ -28,6 +28,8 @@ import LogOutcomeModal from '../components/action-center/LogOutcomeModal'
 import { getMarketType } from '../lib/sellerStrategy'
 import LeadWorkspaceHeader from '../components/lead-detail/workspace/LeadWorkspaceHeader'
 import LeadWorkspaceTabs from '../components/lead-detail/workspace/LeadWorkspaceTabs'
+import EnrichContactsModal from '../components/off-market/EnrichContactsModal'
+import { runContactEnrichmentBatch } from '../lib/enrichmentRun'
 import SellerSnapshotStrip from '../components/lead-detail/workspace/SellerSnapshotStrip'
 import DealSnapshotCompact from '../components/lead-detail/workspace/DealSnapshotCompact'
 import DecisionHero from '../components/lead-detail/workspace/DecisionHero'
@@ -122,6 +124,22 @@ export default function LeadDetailPage() {
 
   useEffect(() => { load() }, [leadId])
 
+  // Final UX polish pass, Part 2 — ONE canonical single-lead enrichment
+  // execution path, shared by LeadEssentialsBar's "Enrich Contact" and
+  // DistressBanner's clickable Next Action ("Retry Contact"). Both only
+  // ever call onRequestEnrich() to open this SAME confirmation modal —
+  // neither triggers BatchData directly, and there is no second call site
+  // for runContactEnrichmentBatch anywhere else on this page.
+  const [enrichConfirmOpen, setEnrichConfirmOpen] = useState(false)
+  const [enrichRunning, setEnrichRunning] = useState(false)
+  const runSingleEnrichment = async () => {
+    setEnrichRunning(true)
+    await runContactEnrichmentBatch([leadId])
+    setEnrichRunning(false)
+    setEnrichConfirmOpen(false)
+    load()
+  }
+
   // Auto-refresh MLS status if it's stale (>1h since last check).
   // Silent background call — skipped entirely when MLS is paused workspace-wide.
   useEffect(() => {
@@ -189,11 +207,15 @@ export default function LeadDetailPage() {
         HAT Investors · Acquisition Intelligence
       </div>
 
-      {/* LeadDetailHeader kept exactly as-is (identity + Edit/Delete/Create
-          Project) — unmodified component, just repositioned above the new
-          sticky decision header instead of being the only header. */}
-      <div className="px-6 pt-1.5">
-        <LeadDetailHeader
+      {/* Visual QA fix pass, Part 1 — HEADER CONSOLIDATION. What used to
+          be two stacked bars (LeadDetailHeader + LeadWorkspaceHeader) is
+          now ONE sticky identity header. All prior functionality
+          (Assigned, Created/Updated, Hot toggle, View Project, Zillow,
+          More menu, Live Copilot, Log Outcome) is preserved — just
+          consolidated so the address is never split from the rest of the
+          lead's identity. EditLeadModal (setEditOpen) still exists below. */}
+      <div className="px-6">
+        <LeadWorkspaceHeader
           lead={lead}
           members={members}
           canEdit={canEdit}
@@ -203,18 +225,22 @@ export default function LeadDetailPage() {
           onCreateProject={handleCreateProject}
           creatingProject={creatingProject}
           workspaceId={workspaceId}
-        />
-      </div>
-
-      <div className="px-6">
-        <LeadWorkspaceHeader
-          lead={lead}
           onLogOutcome={() => setLogOutcomeOpen(true)}
           onOpenLiveCopilot={() => setLiveCopilotOpen(true)}
         />
       </div>
 
       <div className="px-6 py-4 flex-1 max-w-[1400px] w-full">
+        {/* LEVEL 1 — Lead Essentials (Part 3/8/9). Visible regardless of
+            active tab; not a replacement for the tabs below it. */}
+        <LeadEssentialsBar
+          lead={lead}
+          userId={user.id}
+          members={members}
+          canEdit={canEdit}
+          onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
+          onRequestEnrich={() => setEnrichConfirmOpen(true)}
+        />
         <LeadWorkspaceTabs active={activeTab} onChange={setActiveTab} readiness={tabReadiness} />
 
         {/* ══════════════ OVERVIEW — "Should I pursue this, and what now?"
@@ -224,7 +250,7 @@ export default function LeadDetailPage() {
             (off-market) → compact status. A user should understand the
             lead within ~5 seconds without scrolling past all of this. ══ */}
         <div id="workspace-panel-overview" role="tabpanel" aria-labelledby="workspace-tab-overview" hidden={activeTab !== 'overview'} className="space-y-4">
-          <DistressBanner lead={lead} onRefresh={load} />
+          <DistressBanner lead={lead} onRequestEnrich={() => setEnrichConfirmOpen(true)} />
           <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
           {/* HAT Premium Visual Pass, Part 7 — the ONE dominant decision
@@ -453,6 +479,15 @@ export default function LeadDetailPage() {
         confirmLabel="Delete Lead"
         loading={deleting}
       />
+
+      {enrichConfirmOpen && (
+        <EnrichContactsModal
+          count={1}
+          running={enrichRunning}
+          onCancel={() => setEnrichConfirmOpen(false)}
+          onConfirm={runSingleEnrichment}
+        />
+      )}
     </>
   )
 }

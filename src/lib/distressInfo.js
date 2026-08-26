@@ -10,6 +10,10 @@
 // DistressBadge, Inbox filter, Leads filter, Action Center) calls this ONE
 // function so they never disagree with each other.
 
+import { getContactStatus } from './contactEnrichment.js'
+import { getLastAttemptSummary } from './enrichmentResult.js'
+import { STATUS_MAP } from './constants.js'
+
 const NOTES_MARKER = '⚠ DISTRESSED OPPORTUNITY'
 
 function parseNotesBlock(notes) {
@@ -119,10 +123,43 @@ export function getWhyHereReasons(lead, info) {
 }
 
 // ── Section 4: Next Action — conservative, no outreach ever recommended ──
+//
+// Fix (Visual QA pass) — the real bug: once owner_match_status === 'MATCH',
+// EVERY lead fell through to the same literal 'Research Owner' fallback,
+// even leads whose owner research was already done and only contact
+// enrichment remained (10940 Ventnor Ave: owner MATCH, enrichment
+// attempted, no safe contact — showed "Research Owner", implying
+// unfinished work that was actually complete).
+//
+// Deterministic state hierarchy, using ONLY fields/functions that already
+// exist — no new workflow model, no new query:
+//   1. No owner_name                              -> 'Verify Property'
+//   2. owner_match_status known and not MATCH      -> 'Verify Owner'
+//   3. A later acquisition workflow state already exists (lead.status is
+//      anything past the pre-contact triage/monitor stage) -> defer to
+//      that EXISTING status label (STATUS_MAP) rather than sending the
+//      user backward into contact enrichment they've already moved past.
+//   4. Owner MATCH (or unknown-but-not-rejected), Contact Ready
+//      (getContactStatus — canonical, unchanged)     -> 'Contact Seller'
+//   5. Owner MATCH, an enrichment attempt exists but found no safe
+//      contact (getLastAttemptSummary — canonical, unchanged) -> 'Retry Contact'
+//   6. Owner MATCH, no attempt yet                  -> 'Enrich Contact'
+const PRE_CONTACT_STATUSES = ['triage', 'monitor']
+
 export function getNextAction(lead, info) {
   if (!lead?.owner_name) return 'Verify Property'
   if (info?.owner_match_status && info.owner_match_status !== 'MATCH') return 'Verify Owner'
-  return 'Research Owner'
+
+  // Section 6 — a later acquisition state already exists; never send the
+  // user backward into "go enrich/contact" once the pipeline has moved on.
+  if (lead?.status && !PRE_CONTACT_STATUSES.includes(lead.status)) {
+    return STATUS_MAP?.[lead.status]?.label || null
+  }
+
+  const contactStatus = getContactStatus(lead)
+  if (contactStatus === 'CONTACT_READY') return 'Contact Seller'
+  if (getLastAttemptSummary(lead)) return 'Retry Contact'
+  return 'Enrich Contact'
 }
 
 export function fmtParcel(parcelId) {

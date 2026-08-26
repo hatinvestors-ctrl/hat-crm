@@ -51,6 +51,10 @@ const CATEGORY_LABELS = {
   'contactEnrichment.test.js': 'OFF-MARKET CONTACT ENRICHMENT (recommendation criteria, contact status, batch summary, no-auto-bill safety)',
   'contactProfile.test.js': 'RICH SKIP TRACE CONTACT PROFILE (multi-phone/email dedupe, associated people, non-destructive merge, no-inference safety)',
   'enrichmentResult.test.js': 'SKIP TRACE RESULT EXPLAINABILITY (real Ventnor/Woodstone regression, provider-called vs skipped, deterministic reason codes)',
+  'leadEssentials.test.js': 'LEAD WORKSPACE ESSENTIALS & QUICK EDIT (canonical field sourcing, quick-edit save path, deal output reuse, contact summary)',
+  'distressNextAction.test.js': 'DISTRESS NEXT ACTION STATE (owner/contact/workflow hierarchy, real Ventnor regression)',
+  'leadWorkspacePolish.test.js': 'LEAD WORKSPACE FINAL UX POLISH (clickable Next Action, single enrichment path, contact status wording, distress card compaction)',
+  'leadIntelligenceExplainability.test.js': 'LEAD INTELLIGENCE EXPLAINABILITY (real Ventnor contact-status bug fix, Opportunity/Confidence/Urgency tooltips, 85-vs-70 disambiguation)',
 }
 
 const byFile = {}

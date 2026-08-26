@@ -9,64 +9,72 @@
 // pilot's own fixed-format notes block when the #10 migration hasn't been
 // applied yet — same information either way, this component doesn't care
 // which path supplied it.
+//
+// Visual QA fix pass (Lead Essentials V1, Part 4/5) — CONTACT DUPLICATION
+// REMOVED. Owner Contact / Contact Intelligence / NO SAFE MATCH / Enrich
+// Contact all now live exclusively in LeadEssentialsBar.jsx (Level 1,
+// visible on every tab) — showing them here too meant the same contact
+// state appeared twice on one screen. This card now focuses on what's
+// UNIQUE to distress/opportunity intelligence: distress type, filing
+// date, owner identity, owner-match verification, source, property fit,
+// opportunity score/priority, and next action — "why this lead matters,"
+// not a repeat of the lead record.
+//
+// Final UX polish pass, Part 2/3 — Next Action is now CLICKABLE when the
+// existing workflow already has a safe executable action for it (only
+// 'Retry Contact'/'Enrich Contact' — both trigger onRequestEnrich, the
+// SAME confirm-modal + runContactEnrichmentBatch() LeadEssentialsBar
+// uses, lifted to LeadDetailPage so there is exactly one execution path).
+// Every other Next Action stays informational — no invented behavior.
+// Also compacted (~25% shorter): tighter padding, merged rows.
 
-import { useState } from 'react'
 import {
   getDistressInfo, getWhyHereReasons, getNextAction, getOpportunityInfo, fmtBuyBoxFit,
   fmtOwnerMatch, fmtAbsentee, fmtDistressType, fmtDistressSource, fmtParcel, fmtFilingDate,
   fmtLienAmount, fmtLienStatus,
 } from '../../lib/distressInfo'
-import { fmtContactMatch } from '../../lib/contactEnrichment'
-import { runContactEnrichmentBatch } from '../../lib/enrichmentRun'
-import { getLastAttemptSummary } from '../../lib/enrichmentResult'
-import EnrichContactsModal from '../off-market/EnrichContactsModal'
-import ContactIntelligenceCard from './ContactIntelligenceCard'
+import InfoTooltip from '../ui/InfoTooltip'
 
-export default function DistressBanner({ lead, onRefresh }) {
-  const [confirming, setConfirming] = useState(false)
-  const [running, setRunning] = useState(false)
-  const [errorMsg, setErrorMsg] = useState(null)
+const ACTIONABLE_NEXT_ACTIONS = new Set(['Retry Contact', 'Enrich Contact'])
+
+export default function DistressBanner({ lead, onRequestEnrich }) {
   if (!lead) return null
   const info = getDistressInfo(lead)
   const opp = getOpportunityInfo(lead)
   if (!info) return null
-  const lastAttempt = getLastAttemptSummary(lead)
-
-  const runSingleEnrichment = async () => {
-    setRunning(true)
-    setErrorMsg(null)
-    const [result] = await runContactEnrichmentBatch([lead.id])
-    setRunning(false)
-    setConfirming(false)
-    if (result?.outcome === 'ERROR') setErrorMsg(result.error || 'Enrichment failed.')
-    onRefresh?.()
-  }
 
   const owner = lead.owner_name || info.current_owner
   const whyHere = getWhyHereReasons(lead, info)
   const nextAction = getNextAction(lead, info)
   const parcel = fmtParcel(info.parcel_id || lead.enrichment_data?.parcel_id)
+  const isActionable = ACTIONABLE_NEXT_ACTIONS.has(nextAction) && !!onRequestEnrich
 
   return (
     <div className="rounded-lg border border-amber-300/70 bg-amber-50 dark:bg-amber-950/25 dark:border-amber-800/70 overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-amber-300/50 dark:border-amber-800/50 flex items-center justify-between gap-3 flex-wrap">
+      <div className="px-3.5 py-2 border-b border-amber-300/50 dark:border-amber-800/50 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-[13px] font-bold text-amber-800 dark:text-amber-300">⚠ OFF-MARKET OPPORTUNITY</div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700/80 dark:text-amber-400/80">
+          <div className="text-[12.5px] font-bold text-amber-800 dark:text-amber-300">⚠ OFF-MARKET OPPORTUNITY</div>
+          <div className="text-[10.5px] font-semibold uppercase tracking-wide text-amber-700/80 dark:text-amber-400/80">
             {fmtDistressType(info.distress_type)}
           </div>
         </div>
         {nextAction && (
           <div className="text-right shrink-0">
             <div className="text-[9px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">Next Action</div>
-            <div className="text-[13px] font-bold text-amber-800 dark:text-amber-300">{nextAction}</div>
+            {isActionable ? (
+              <button onClick={onRequestEnrich} className="text-[13px] font-bold text-amber-800 dark:text-amber-300 hover:underline">
+                {nextAction} →
+              </button>
+            ) : (
+              <div className="text-[13px] font-bold text-amber-800 dark:text-amber-300">{nextAction}</div>
+            )}
           </div>
         )}
       </div>
 
       {/* Fact grid */}
-      <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-[12.5px]">
+      <div className="px-3.5 py-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-[12px]">
         <Fact label="Filed" value={fmtFilingDate(info.distress_filing_date)} />
         <Fact label="Owner" value={owner} />
         <Fact label="Owner Match" value={info.owner_match_status ? fmtOwnerMatch(info.owner_match_status) : null} />
@@ -91,12 +99,28 @@ export default function DistressBanner({ lead, onRefresh }) {
           (opp is null for anything not yet reprocessed — degrades cleanly
           to the #10.1 layout below). */}
       {opp && (
-        <div className="px-4 py-2.5 border-t border-amber-300/40 dark:border-amber-800/40 grid grid-cols-3 gap-3">
+        <div className="px-3.5 py-2 border-t border-amber-300/40 dark:border-amber-800/40 grid grid-cols-3 gap-3">
           <Fact label="Distress Type" value={opp.distress_category_label} />
           <Fact label="Property Fit" value={fmtBuyBoxFit(opp.buy_box_fit)} />
           <div>
-            <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">Opportunity</div>
-            <div className="text-amber-900 dark:text-amber-200 font-bold">
+            {/* Explainability V1, Part 10 — labeled distinctly from ACT
+                NOW's "Opportunity" (a different score, decisionEngineV2.js)
+                so the two never look contradictory. Same real
+                opportunity_why/opportunity_missing (computeOpportunityScore,
+                distressScoring.js) already computed for this lead —
+                nothing new derived. */}
+            <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold inline-flex items-center">
+              Off-Market Priority Score
+              <InfoTooltip
+                title="Off-Market Priority Score"
+                definition="How strongly this sourced off-market lead deserves acquisition attention — based on distress signal quality, property fit, owner verification, and available lead signals. Scale (this scoring function's real thresholds): 80–100 High Priority · 60–79 Review · 40–59 Research · below 40 Low Priority."
+                thisLead={`${opp.opportunity_score}/100 — ${opp.opportunity_priority?.label}`}
+                reasons={opp.opportunity_why}
+                missing={opp.opportunity_missing}
+                note="Different from ACT NOW's Opportunity score below: Priority ranks sourced leads for review; Opportunity evaluates the acquisition once you're looking at it. Two real, separate scores — not a contradiction."
+              />
+            </div>
+            <div className="text-amber-900 dark:text-amber-200 font-bold text-[12.5px]">
               {opp.opportunity_score}/100 — {opp.opportunity_priority?.label}
             </div>
           </div>
@@ -107,107 +131,32 @@ export default function DistressBanner({ lead, onRefresh }) {
           from #10.1's simpler "why here" list once a lead has been scored,
           so nothing is shown twice. */}
       {opp ? (
-        <div className="px-4 pb-3 pt-1 border-t border-amber-300/40 dark:border-amber-800/40 space-y-1.5">
+        <div className="px-3.5 pb-2 pt-1 border-t border-amber-300/40 dark:border-amber-800/40 space-y-1">
           {opp.opportunity_why.length > 0 && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
               {opp.opportunity_why.map(reason => (
-                <span key={reason} className="text-[12px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
+                <span key={reason} className="text-[11.5px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
               ))}
             </div>
           )}
           {opp.opportunity_missing.length > 0 && (
-            <div className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
-              <span className="font-semibold uppercase tracking-wide text-[9.5px] mr-1">Missing:</span>
+            <div className="text-[10.5px] text-amber-700/80 dark:text-amber-400/80">
+              <span className="font-semibold uppercase tracking-wide text-[9px] mr-1">Missing:</span>
               {opp.opportunity_missing.join(' • ')}
             </div>
           )}
         </div>
       ) : whyHere.length > 0 && (
-        <div className="px-4 pb-3 pt-1 border-t border-amber-300/40 dark:border-amber-800/40">
-          <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-1">
+        <div className="px-3.5 pb-2 pt-1 border-t border-amber-300/40 dark:border-amber-800/40">
+          <div className="text-[9px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold mb-0.5">
             Why This Property Is Here
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
             {whyHere.map(reason => (
-              <span key={reason} className="text-[12px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
+              <span key={reason} className="text-[11.5px] text-amber-800 dark:text-amber-300">✓ {reason}</span>
             ))}
           </div>
         </div>
-      )}
-
-      {/* Capability #10.3 — Owner Contact. Never invented: shows real
-          phone/email only when a legitimate source actually returned one
-          (leads.phone/leads.email — the same existing columns every other
-          lead type already uses, reused rather than a new contact table).
-          "Not found yet" is the honest, expected state today — no paid
-          skip-trace provider is connected (see delivery report). */}
-      <div className="px-4 py-2.5 border-t border-amber-300/40 dark:border-amber-800/40">
-        <div className="flex items-center justify-between mb-1">
-          <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">
-            Owner Contact
-          </div>
-          {/* Capability #10.5 — compact, honest status. Never shows a raw
-              HTTP/provider error to Kevin (mission Section 15). */}
-          {lead.enrichment_data?.contact_ui_status === 'ENRICHMENT TEMPORARILY UNAVAILABLE' && (
-            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">
-              Enrichment Temporarily Unavailable
-            </span>
-          )}
-          {lead.enrichment_data?.contact_ui_status === 'MATCH NEEDS REVIEW' && (
-            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-              Match Needs Review
-            </span>
-          )}
-        </div>
-        {lead.enrichment_data?.contact_profile ? (
-          <ContactIntelligenceCard lead={lead} />
-        ) : (lead.phone || lead.email) ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[12.5px]">
-            <Fact label="Phone" value={lead.phone} />
-            <Fact label="Email" value={lead.email} />
-            <Fact label="Contact Match" value={fmtContactMatch(lead.enrichment_data?.contact_match_status)} />
-            <Fact label="Contact Source" value={lead.enrichment_data?.contact_source} />
-            {/* Capability #10.4 — DNC preserved for visibility only; never
-                used anywhere to decide or gate outreach (no outreach exists
-                in this codebase at all). */}
-            {lead.enrichment_data?.contact_dnc != null && (
-              <Fact label="DNC" value={lead.enrichment_data.contact_dnc ? 'Yes — Do Not Call' : 'No'} />
-            )}
-          </div>
-        ) : (
-          <div>
-            {lastAttempt ? (
-              <div className="mb-2">
-                <div className="text-[11.5px] font-bold text-amber-800 dark:text-amber-300">NO SAFE MATCH</div>
-                <div className="text-[10.5px] text-amber-700/70 dark:text-amber-400/70 mt-0.5">
-                  Last attempt: {new Date(lastAttempt.attemptedAt).toLocaleDateString()}
-                  {lastAttempt.ownerSearched && <> · Owner searched: {lastAttempt.ownerSearched}</>}
-                </div>
-                <div className="text-[11.5px] text-[color:var(--color-text-muted)] mt-1">{lastAttempt.humanReason}</div>
-              </div>
-            ) : (
-              <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic mb-2">Not found yet</div>
-            )}
-            {/* Section 11 — single-lead action. Same confirmation modal,
-                same runContactEnrichmentBatch() call the batch flow uses —
-                one path to a paid request, not two. */}
-            <button
-              onClick={() => setConfirming(true)}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-900/30"
-            >
-              {lastAttempt ? 'Retry Enrich Contact' : 'Enrich Contact'}
-            </button>
-          </div>
-        )}
-        {errorMsg && <div className="text-[11px] text-[color:var(--color-danger-text)] mt-1.5">{errorMsg}</div>}
-      </div>
-      {confirming && (
-        <EnrichContactsModal
-          count={1}
-          running={running}
-          onCancel={() => setConfirming(false)}
-          onConfirm={runSingleEnrichment}
-        />
       )}
     </div>
   )
@@ -217,8 +166,8 @@ function Fact({ label, value }) {
   if (!value) return null
   return (
     <div className="min-w-0">
-      <div className="text-[9.5px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">{label}</div>
-      <div className="text-amber-900 dark:text-amber-200 font-medium truncate" title={String(value)}>{value}</div>
+      <div className="text-[9px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 font-semibold">{label}</div>
+      <div className="text-amber-900 dark:text-amber-200 font-medium truncate text-[12px]" title={String(value)}>{value}</div>
     </div>
   )
 }

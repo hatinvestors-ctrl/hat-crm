@@ -13,8 +13,8 @@ function fmtPhone(p) {
   return formatPhone(p.raw || p.number) + (p.type ? ` — ${p.type}` : '')
 }
 
-export default function ContactIntelligenceCard({ lead }) {
-  const [expanded, setExpanded] = useState(false)
+export default function ContactIntelligenceCard({ lead, defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const profile = lead?.enrichment_data?.contact_profile
   if (!profile) return null // caller falls back to the plain Fact grid
 

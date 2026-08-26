@@ -18,6 +18,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
+import InfoTooltip from '../../ui/InfoTooltip'
 
 const REC_THEME = {
   ACT_NOW:      { text: 'var(--color-danger-text)',  border: 'var(--color-danger)' },
@@ -110,7 +111,22 @@ export default function DecisionHero({ lead }) {
           global header (Part 6) so the header stays purely property
           identity; this is where "decision context" belongs. */}
       <div className="px-4 py-2.5 border-t border-[color:var(--color-line)] flex items-center gap-4 flex-wrap">
-        <span className="text-[11px] text-[color:var(--color-text-dim)]">Opportunity <b className="text-[color:var(--color-text)]">{d.opportunity?.score ?? '—'}</b></span>
+        {/* Lead Intelligence Explainability V1 — each ⓘ shows the SAME
+            deterministic reasons/missing arrays decisionEngineV2.js
+            already computes and persists in decision_v2 (computeOffMarketOpportunity/
+            computeOnMarketOpportunity, computeConfidence, computeUrgency
+            all already return {reasons}/{missing} — reused verbatim here,
+            never reconstructed or re-derived). No new scoring, no AI call. */}
+        <span className="text-[11px] text-[color:var(--color-text-dim)] inline-flex items-center">
+          Opportunity <b className="text-[color:var(--color-text)] ml-1">{d.opportunity?.score ?? '—'}</b>
+          <InfoTooltip
+            title="Opportunity"
+            definition="How attractive this lead currently looks as an acquisition opportunity."
+            thisLead={d.opportunity?.score}
+            reasons={d.opportunity?.reasons}
+            note="Different from Off-Market Priority Score: Priority ranks sourced leads for review; Opportunity evaluates the acquisition opportunity. Two real, separate scores — not a contradiction."
+          />
+        </span>
         {/* Part 26 (Comps Intelligence audit) — relabeled from a bare
             "Confidence" to "Data Confidence". This score measures whether
             the CORE ECONOMIC FIELDS (ARV/renovation/rent) are present and
@@ -119,8 +135,25 @@ export default function DecisionHero({ lead }) {
             next to the new "ARV Confidence" badge, an unlabeled
             "Confidence" would have looked like the same concept. No
             scoring logic changed, only this label. */}
-        <span className="text-[11px] text-[color:var(--color-text-dim)]">Data Confidence <b className="text-[color:var(--color-text)]">{d.confidence?.score ?? '—'}</b></span>
-        <span className="text-[11px] text-[color:var(--color-text-dim)]">Urgency <b className="text-[color:var(--color-text)]">{d.urgency?.level ?? '—'}</b></span>
+        <span className="text-[11px] text-[color:var(--color-text-dim)] inline-flex items-center">
+          Data Confidence <b className="text-[color:var(--color-text)] ml-1">{d.confidence?.score ?? '—'}</b>
+          <InfoTooltip
+            title="Data Confidence"
+            definition="How complete and reliable the information behind this decision is — NOT whether this is a good deal, and not the same as the ARV Confidence badge (which grades comp evidence)."
+            thisLead={d.confidence?.score}
+            reasons={d.confidence?.reasons}
+            missing={d.confidence?.missing}
+          />
+        </span>
+        <span className="text-[11px] text-[color:var(--color-text-dim)] inline-flex items-center">
+          Urgency <b className="text-[color:var(--color-text)] ml-1">{d.urgency?.level ?? '—'}</b>
+          <InfoTooltip
+            title="Urgency"
+            definition="How time-sensitive this lead currently appears, based on filing/listing timing signals — tells the team how quickly to act, not how good the deal is."
+            thisLead={d.urgency?.level}
+            reasons={d.urgency?.reasons}
+          />
+        </span>
         {maturity && (
           <span className="text-[10px] font-bold uppercase tracking-wide ml-auto" style={{ color: isPreliminary ? 'var(--color-warn-text)' : 'var(--color-success-text)' }}>
             {isPreliminary
