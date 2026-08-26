@@ -1,14 +1,16 @@
 // src/lib/enrichmentRun.js
-// Capability — Off-Market Contact Enrichment V1. A thin CLIENT-SIDE
-// orchestrator over the EXISTING single-lead netlify/functions/
-// batchdata-enrich.mjs endpoint — no new backend function, no duplicated
-// BatchData/preflight/dedupe/wrong-unit logic. Calls the same endpoint
-// exactly once per selected lead, strictly SEQUENTIALLY (concurrency=1 —
-// "a safe bounded sequence", never parallel/uncontrolled paid requests).
-// A paid request only ever happens from runContactEnrichmentBatch(), which
-// is only ever invoked after the user has confirmed the cost modal — no
-// other code path in this file calls the network.
+// Capability — Off-Market Contact Enrichment V1 (+ Skip Trace Result
+// Explainability V1). A thin CLIENT-SIDE orchestrator over the EXISTING
+// single-lead netlify/functions/batchdata-enrich.mjs endpoint — no new
+// backend function, no duplicated BatchData/preflight/dedupe/wrong-unit
+// logic. Calls the same endpoint exactly once per selected lead, strictly
+// SEQUENTIALLY (concurrency=1 — "a safe bounded sequence", never parallel/
+// uncontrolled paid requests). A paid request only ever happens from
+// runContactEnrichmentBatch(), which is only ever invoked after the user
+// has confirmed the cost modal — no other code path in this file calls
+// the network.
 import { supabase } from './supabase'
+import { getEnrichmentResultExplanation } from './enrichmentResult.js'
 
 export const ENRICHMENT_STAGES = ['PENDING', 'RUNNING', 'CONTACT FOUND', 'NO MATCH', 'ALREADY ENRICHED', 'ERROR']
 
@@ -23,19 +25,23 @@ async function enrichOneLead(leadId) {
     body: JSON.stringify({ lead_id: leadId }),
   })
   const data = await res.json().catch(() => null)
-  if (!data) return { leadId, outcome: 'ERROR', error: 'Invalid response from enrichment service' }
-  if (!data.ok) return { leadId, outcome: 'ERROR', error: data.error || 'Enrichment failed' }
+  // explanation (Part 3/5) is derived from the SAME real response every
+  // outcome below is built from — never a second, competing interpretation.
+  const explanation = getEnrichmentResultExplanation(data)
+
+  if (!data) return { leadId, outcome: 'ERROR', error: 'Invalid response from enrichment service', rawResponse: null, explanation }
+  if (!data.ok && !data.skipped) return { leadId, outcome: 'ERROR', error: data.error || 'Enrichment failed', rawResponse: data, explanation }
   if (data.skipped) {
     // batchdata-enrich.mjs's own pre-flight gate declined the call — this
     // is NOT a failure, it's the existing #10.5 protection working
     // (ALREADY_ENRICHED / EXCLUDED_PROPERTY / RECENT_PROVIDER_FAILURE /
     // LOOKUP_IN_PROGRESS / INSUFFICIENT_IDENTITY).
-    if (data.decision === 'ALREADY_ENRICHED') return { leadId, outcome: 'ALREADY ENRICHED', reason: data.reason }
-    return { leadId, outcome: 'ERROR', error: data.reason || data.decision }
+    if (data.decision === 'ALREADY_ENRICHED') return { leadId, outcome: 'ALREADY ENRICHED', reason: data.reason, rawResponse: data, explanation }
+    return { leadId, outcome: 'ERROR', error: data.reason || data.decision, rawResponse: data, explanation }
   }
-  if (data.uiStatus === 'CONTACT READY') return { leadId, outcome: 'CONTACT FOUND', phoneFound: !!data.phoneFound, emailFound: !!data.emailFound }
-  if (data.uiStatus === 'ENRICHMENT TEMPORARILY UNAVAILABLE') return { leadId, outcome: 'ERROR', error: 'Provider temporarily unavailable — see credits/health status.' }
-  return { leadId, outcome: 'NO MATCH' }
+  if (data.uiStatus === 'CONTACT READY') return { leadId, outcome: 'CONTACT FOUND', phoneFound: !!data.phoneFound, emailFound: !!data.emailFound, rawResponse: data, explanation }
+  if (data.uiStatus === 'ENRICHMENT TEMPORARILY UNAVAILABLE') return { leadId, outcome: 'ERROR', error: 'Provider temporarily unavailable — see credits/health status.', rawResponse: data, explanation }
+  return { leadId, outcome: 'NO MATCH', rawResponse: data, explanation }
 }
 
 /**
@@ -52,7 +58,7 @@ export async function runContactEnrichmentBatch(leadIds, { onProgress } = {}) {
     try {
       result = await enrichOneLead(leadId)
     } catch (err) {
-      result = { leadId, outcome: 'ERROR', error: err.message || 'Network error' }
+      result = { leadId, outcome: 'ERROR', error: err.message || 'Network error', rawResponse: null, explanation: getEnrichmentResultExplanation(null) }
     }
     results.push(result)
     onProgress?.([...results])
@@ -61,7 +67,7 @@ export async function runContactEnrichmentBatch(leadIds, { onProgress } = {}) {
     // through the rest of the queue on requests we already know will fail
     // — every already-completed lead's result is preserved as-is.
     if (result.outcome === 'ERROR' && /provider temporarily unavailable/i.test(result.error || '')) {
-      const remaining = leadIds.slice(results.length).map(id => ({ leadId: id, outcome: 'ERROR', error: 'Skipped — provider unavailable' }))
+      const remaining = leadIds.slice(results.length).map(id => ({ leadId: id, outcome: 'ERROR', error: 'Skipped — provider unavailable', rawResponse: null, explanation: getEnrichmentResultExplanation(null) }))
       results.push(...remaining)
       onProgress?.([...results])
       break

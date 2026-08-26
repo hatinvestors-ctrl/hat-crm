@@ -268,6 +268,14 @@ export default async function handler(req) {
   let skipTraceStatus = 'ERROR'
   let skipTraceRaw = null
   let newContactProfile = null
+  // Skip Trace Result Explainability V1 — a SMALL, non-PII diagnostic
+  // captured on every real provider attempt (never on a preflight-skipped
+  // one). Deliberately contains only counts/booleans/the match verdict —
+  // no name, no phone, no address — so a future NO_MATCH/AMBIGUOUS lead
+  // can be explained after reload without persisting raw provider PII.
+  // Computed from the SAME `ranked` array below; does NOT change
+  // classifyPersonMatch's decision or any downstream field.
+  let matchDiagnostics = null
 
   if (skipTraceResult.errorType) {
     skipTraceStatus = skipTraceResult.errorType
@@ -278,6 +286,7 @@ export default async function handler(req) {
     const persons = skipTraceResult.data?.result?.data?.[0]?.persons || []
     if (!persons.length) {
       skipTraceStatus = 'NO_MATCH'
+      matchDiagnostics = { candidatesReturned: 0 }
     } else {
       skipTraceStatus = 'SUCCESS'
       // lead.phone/lead.email still ever come ONLY from the single best
@@ -286,6 +295,11 @@ export default async function handler(req) {
       const ranked = persons.map(p => ({ p, match: classifyPersonMatch(p, lead, identity) }))
         .sort((a, b) => ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(a.match) - ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(b.match))
       contactMatchStatus = ranked[0].match
+      matchDiagnostics = {
+        candidatesReturned: persons.length,
+        topCandidateHadName: !!(ranked[0].p.name?.full || ranked[0].p.name?.first),
+        topCandidateMatchStatus: ranked[0].match,
+      }
       if (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') {
         phones = pickPhones([ranked[0].p])
         email = pickEmail([ranked[0].p])
@@ -389,6 +403,7 @@ export default async function handler(req) {
     contact_source: (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') ? 'batchdata' : (lead.enrichment_data?.contact_source || 'none_connected'),
     contact_match_status: contactMatchStatus,
     contact_profile: mergedContactProfile,
+    match_diagnostics: matchDiagnostics, // non-PII counts/booleans only — see comment above where computed
     contact_enriched_at: now,
     contact_dnc: phones.dnc,
     contact_tcpa_litigator: phones.tcpaLitigator,
@@ -455,6 +470,8 @@ export default async function handler(req) {
     skipTraceStatus,
     propertyStatus,
     contactMatchStatus,
+    matchDiagnostics,
+    contactProfile: mergedContactProfile,
     identityUnit: identity.unit,
     phoneFound: !!phones.primary,
     emailFound: !!email,

@@ -18,6 +18,7 @@ import {
 } from '../../lib/distressInfo'
 import { fmtContactMatch } from '../../lib/contactEnrichment'
 import { runContactEnrichmentBatch } from '../../lib/enrichmentRun'
+import { getLastAttemptSummary } from '../../lib/enrichmentResult'
 import EnrichContactsModal from '../off-market/EnrichContactsModal'
 import ContactIntelligenceCard from './ContactIntelligenceCard'
 
@@ -29,6 +30,7 @@ export default function DistressBanner({ lead, onRefresh }) {
   const info = getDistressInfo(lead)
   const opp = getOpportunityInfo(lead)
   if (!info) return null
+  const lastAttempt = getLastAttemptSummary(lead)
 
   const runSingleEnrichment = async () => {
     setRunning(true)
@@ -173,16 +175,27 @@ export default function DistressBanner({ lead, onRefresh }) {
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic">Not found yet</div>
+          <div>
+            {lastAttempt ? (
+              <div className="mb-2">
+                <div className="text-[11.5px] font-bold text-amber-800 dark:text-amber-300">NO SAFE MATCH</div>
+                <div className="text-[10.5px] text-amber-700/70 dark:text-amber-400/70 mt-0.5">
+                  Last attempt: {new Date(lastAttempt.attemptedAt).toLocaleDateString()}
+                  {lastAttempt.ownerSearched && <> · Owner searched: {lastAttempt.ownerSearched}</>}
+                </div>
+                <div className="text-[11.5px] text-[color:var(--color-text-muted)] mt-1">{lastAttempt.humanReason}</div>
+              </div>
+            ) : (
+              <div className="text-[12px] text-amber-700/70 dark:text-amber-400/70 italic mb-2">Not found yet</div>
+            )}
             {/* Section 11 — single-lead action. Same confirmation modal,
                 same runContactEnrichmentBatch() call the batch flow uses —
                 one path to a paid request, not two. */}
             <button
               onClick={() => setConfirming(true)}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-900/30 shrink-0"
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-900/30"
             >
-              Enrich Contact
+              {lastAttempt ? 'Retry Enrich Contact' : 'Enrich Contact'}
             </button>
           </div>
         )}

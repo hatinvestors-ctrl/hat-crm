@@ -50,6 +50,7 @@ const CATEGORY_LABELS = {
   'offmarketControlCenter.test.js': 'OFF-MARKET ENGINE CONTROL CENTER (criteria clamping, DocTypes honesty contract, HTTP surface)',
   'contactEnrichment.test.js': 'OFF-MARKET CONTACT ENRICHMENT (recommendation criteria, contact status, batch summary, no-auto-bill safety)',
   'contactProfile.test.js': 'RICH SKIP TRACE CONTACT PROFILE (multi-phone/email dedupe, associated people, non-destructive merge, no-inference safety)',
+  'enrichmentResult.test.js': 'SKIP TRACE RESULT EXPLAINABILITY (real Ventnor/Woodstone regression, provider-called vs skipped, deterministic reason codes)',
 }
 
 const byFile = {}

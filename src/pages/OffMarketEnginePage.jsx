@@ -27,6 +27,7 @@ import {
 import { DISTRESS_CATEGORY_LABELS } from '../lib/distressScoring'
 import { getContactStatus, fmtContactStatus, getEnrichmentRecommendation } from '../lib/contactEnrichment'
 import { runContactEnrichmentBatch, summarizeEnrichmentResults } from '../lib/enrichmentRun'
+import { fmtAttemptResult } from '../lib/enrichmentResult'
 import { KPI_DEFINITIONS, annotate, filterBySource, computeFunnel, applyViewFilter } from '../lib/offMarketMetrics'
 import ControlCenter from '../components/off-market/ControlCenter'
 import EnrichContactsModal from '../components/off-market/EnrichContactsModal'
@@ -572,6 +573,34 @@ export default function OffMarketEnginePage() {
                     View Contact-Ready Leads
                   </button>
                   <button onClick={() => { setEnrichSummary(null); setEnrichResults(null) }} className="text-[11px] font-semibold underline text-[color:var(--color-text-dim)]">Dismiss</button>
+                </div>
+
+                {/* Part 4 — per-lead result report. RESULT / WHY / WHAT WE
+                    FOUND / WHAT WE SAVED / NEXT ACTION, using ONLY the real
+                    response each lead's attempt returned. */}
+                <div className="pt-2 border-t border-[color:var(--color-line)] space-y-2">
+                  {enrichResults?.map(r => {
+                    const lead = sorted.find(s => s.lead.id === r.leadId)?.lead
+                    const providerCalledLabel = r.explanation?.providerCalled === true ? 'Called' : r.explanation?.providerCalled === false ? 'Skipped' : 'Unknown'
+                    const profile = r.rawResponse?.contactProfile
+                    return (
+                      <div key={r.leadId} className="rounded border border-[color:var(--color-line)] px-3 py-2 text-[11.5px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-semibold text-[color:var(--color-text)]">{lead?.address || r.leadId}</div>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] shrink-0">{fmtAttemptResult(r.explanation?.attemptResult)}</span>
+                        </div>
+                        {lead?.owner_name && <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Owner on record: {lead.owner_name}</div>}
+                        <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Provider request: {providerCalledLabel}</div>
+                        <div className="text-[11px] text-[color:var(--color-text-muted)] mt-1">{r.explanation?.humanReason}</div>
+                        {profile && (
+                          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1">
+                            Saved: {profile.phones?.length || 0} phone(s), {profile.emails?.length || 0} email(s){profile.associated_people?.length ? `, ${profile.associated_people.length} associated person(s)` : ''}
+                          </div>
+                        )}
+                        {lead && <Link to={`../leads/${lead.id}`} className="text-[10.5px] font-semibold underline text-[color:var(--color-accent-text)] mt-1 inline-block">Open Lead →</Link>}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
