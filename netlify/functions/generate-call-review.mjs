@@ -28,7 +28,7 @@
 // SYSTEM never asks the model "is this rep improving" — that's computed
 // from persisted history in coachingMemory.js, never here.
 
-import { parseCallReviewResponse, fmtParseErrorForUser } from '../../src/lib/callReviewParser.js'
+import { parseCallReviewResponse, fmtParseErrorForUser, classifyRequestError, fmtRequestErrorForUser } from '../../src/lib/callReviewParser.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
@@ -176,6 +176,16 @@ Score this call against the rubric and return the JSON shape exactly as specifie
     }
     return new Response(JSON.stringify({ ok: true, review: parsed.review }), { status: 200, headers: HEADERS })
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
+    // Incident follow-up ("This operation was aborted") — this outer
+    // catch previously had ZERO logging/classification, the same class
+    // of gap the parse-failure path had before the JSON-hardening pass.
+    // ourTimerFired is known deterministically (our own AbortController's
+    // signal), never guessed from error text alone — abortCtrl.signal.
+    // aborted is only true if OUR 25s timer actually fired.
+    const code = classifyRequestError(e, abortCtrl.signal.aborted)
+    console.error('[generate-call-review] request failure', {
+      code, errorName: e?.name, errorMessage: e?.message, ourTimerFired: abortCtrl.signal.aborted,
+    })
+    return new Response(JSON.stringify({ ok: false, code, error: fmtRequestErrorForUser(code) }), { status: 500, headers: HEADERS })
   }
 }

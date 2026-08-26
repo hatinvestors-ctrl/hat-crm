@@ -15,6 +15,42 @@ export const PARSE_ERROR = {
   EMPTY_RESPONSE: 'EMPTY_RESPONSE',
 }
 
+// Follow-up incident ("This operation was aborted") — the function's
+// OUTER catch (network errors, our own 25s AbortController firing,
+// platform-level connection resets) had ZERO classification or logging,
+// same class of gap the parse-failure path had before. This does NOT
+// change the 25s AbortController itself (no evidence it's too short —
+// the real failing invocation ran only 468ms, nowhere near 25s) — it
+// only classifies whatever error already occurred, deterministically,
+// from the real exception's own name/message.
+export const REQUEST_ERROR = {
+  CLIENT_TIMEOUT: 'CLIENT_TIMEOUT', // our own AbortController fired
+  REQUEST_ABORTED: 'REQUEST_ABORTED', // aborted for a reason other than our own timer (network reset, platform connection drop, etc.)
+  OTHER: 'OTHER',
+}
+
+/**
+ * @param {Error} err - the caught exception from the fetch/parse pipeline
+ * @param {boolean} ourTimerFired - true if our own 25s AbortController's
+ *   signal is what triggered this (known deterministically by the caller,
+ *   not guessed from the error text)
+ */
+export function classifyRequestError(err, ourTimerFired) {
+  const isAbort = err?.name === 'AbortError' || /operation was aborted/i.test(err?.message || '')
+  if (isAbort) return ourTimerFired ? REQUEST_ERROR.CLIENT_TIMEOUT : REQUEST_ERROR.REQUEST_ABORTED
+  return REQUEST_ERROR.OTHER
+}
+
+export function fmtRequestErrorForUser(code) {
+  switch (code) {
+    case REQUEST_ERROR.CLIENT_TIMEOUT:
+    case REQUEST_ERROR.REQUEST_ABORTED:
+      return 'Call Review took too long to generate. Your captured call facts are safe. Please try again.'
+    default:
+      return 'Call review is temporarily unavailable.'
+  }
+}
+
 /**
  * Scans forward from the first '{' counting brace depth, correctly
  * ignoring braces that appear inside quoted strings (so a coaching quote

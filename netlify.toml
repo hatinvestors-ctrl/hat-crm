@@ -27,6 +27,17 @@
 [functions."generate-negotiation-plan"]
   timeout = 25
 
+# Call Review JSON Hardening incident follow-up (2026-08-26) — real
+# finding: this was the ONLY LLM-calling function with NO explicit
+# timeout override, silently relying on the platform default while every
+# comparable sibling (generate-comps/generate-core-analysis, same class
+# of call) has one. Real historical successful calls take ~20.6-20.9s;
+# the function's own internal AbortController caps at 25s — 30s matches
+# generate-comps/generate-core-analysis's precedent and gives real margin
+# above both.
+[functions."generate-call-review"]
+  timeout = 30
+
 [functions."generate-communications"]
   timeout = 22
 
