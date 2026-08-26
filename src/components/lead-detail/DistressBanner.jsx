@@ -19,6 +19,7 @@ import {
 import { fmtContactMatch } from '../../lib/contactEnrichment'
 import { runContactEnrichmentBatch } from '../../lib/enrichmentRun'
 import EnrichContactsModal from '../off-market/EnrichContactsModal'
+import ContactIntelligenceCard from './ContactIntelligenceCard'
 
 export default function DistressBanner({ lead, onRefresh }) {
   const [confirming, setConfirming] = useState(false)
@@ -156,7 +157,9 @@ export default function DistressBanner({ lead, onRefresh }) {
             </span>
           )}
         </div>
-        {(lead.phone || lead.email) ? (
+        {lead.enrichment_data?.contact_profile ? (
+          <ContactIntelligenceCard lead={lead} />
+        ) : (lead.phone || lead.email) ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[12.5px]">
             <Fact label="Phone" value={lead.phone} />
             <Fact label="Email" value={lead.email} />

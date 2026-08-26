@@ -1,0 +1,42 @@
+{
+  "_provenance": "No real captured raw BatchData skip-trace payload exists anywhere in this repo (audited: scripts/cap11_batchdata_results.json and scripts/cap14_batchdata_results.json only contain this app's own summarized function output, never the raw provider response). This fixture is built STRICTLY from fields netlify/functions/batchdata-enrich.mjs's own Stage-1-verified code comments confirm the real response actually contains: persons[].name.{full,first,last}, persons[].phones[].{rank,number,type,carrier,tested,reachable,dnc,tcpa}, persons[].emails[].{rank,email,tested}, persons[].addresses[].{fullAddress,street,propertyMailingAddress}. No relationship/spouse field is invented — none has ever been observed in this codebase.",
+  "result": {
+    "data": [
+      {
+        "persons": [
+          {
+            "name": { "full": "JOHN A SMITH", "first": "JOHN", "last": "SMITH" },
+            "phones": [
+              { "rank": 1, "number": "9045551212", "type": "Mobile", "carrier": "Verizon", "tested": true, "reachable": true, "dnc": false, "tcpa": false },
+              { "rank": 2, "number": "(904) 555-1212", "type": "Mobile", "carrier": "Verizon", "tested": true, "reachable": true, "dnc": false, "tcpa": false },
+              { "rank": 3, "number": "9045550099", "type": "Land Line", "carrier": null, "tested": false, "reachable": null, "dnc": null, "tcpa": null }
+            ],
+            "emails": [
+              { "rank": 1, "email": "john.smith@example.com", "tested": true },
+              { "rank": 2, "email": "JOHN.SMITH@example.com", "tested": false }
+            ],
+            "addresses": [
+              { "fullAddress": "123 MAIN ST, JACKSONVILLE, FL 32204", "street": "123 MAIN ST", "propertyMailingAddress": true }
+            ]
+          },
+          {
+            "name": { "full": "MARY SMITH", "first": "MARY", "last": "SMITH" },
+            "phones": [
+              { "rank": 1, "number": "9045559988", "type": "Mobile", "carrier": "AT&T", "tested": true, "reachable": true, "dnc": false, "tcpa": false }
+            ],
+            "emails": [],
+            "addresses": [
+              { "fullAddress": "123 MAIN ST, JACKSONVILLE, FL 32204", "street": "123 MAIN ST", "propertyMailingAddress": true }
+            ]
+          },
+          {
+            "name": { "full": "RANDOM UNRELATED PERSON", "first": "RANDOM", "last": "PERSON" },
+            "phones": [{ "rank": 1, "number": "9045551111", "type": "Mobile", "carrier": null, "tested": false, "reachable": null, "dnc": null, "tcpa": null }],
+            "emails": [],
+            "addresses": []
+          }
+        ]
+      }
+    ]
+  }
+}

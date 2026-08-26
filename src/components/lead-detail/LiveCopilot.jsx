@@ -325,6 +325,15 @@ export default function LiveCopilot({ lead, userId, workspaceId, members, canEdi
           <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-accent-text)] font-bold">HAT Acquisition Coach</div>
           <div className="text-[13px] font-bold text-[color:var(--color-text)]">{lead.owner_name || 'Owner'} · {lead.address}</div>
           <div className="text-[10.5px] text-[color:var(--color-text-dim)]">LIVE {formatDuration(getDurationSeconds(session))} · Stage: {stage}</div>
+          {/* Rich Skip Trace Contact Profile V1, Section 6 — external
+              contact-data hint only, NEVER a confirmed decision maker.
+              si.decision_makers stays 100% conversation-derived; this line
+              never writes to seller_intelligence. */}
+          {lead.enrichment_data?.contact_profile?.associated_people?.length > 0 && (
+            <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+              ℹ Possible additional decision maker on file — confirm who is involved in the decision.
+            </div>
+          )}
         </div>
         <button onClick={() => {
             // Lead Workspace redesign, Section 9 — a tabbed shell makes an

@@ -49,6 +49,7 @@ const CATEGORY_LABELS = {
   'callReviewQuality.test.js': 'CALL REVIEW QUALITY (objection/moment dedup, transcript quality, contradiction protection)',
   'offmarketControlCenter.test.js': 'OFF-MARKET ENGINE CONTROL CENTER (criteria clamping, DocTypes honesty contract, HTTP surface)',
   'contactEnrichment.test.js': 'OFF-MARKET CONTACT ENRICHMENT (recommendation criteria, contact status, batch summary, no-auto-bill safety)',
+  'contactProfile.test.js': 'RICH SKIP TRACE CONTACT PROFILE (multi-phone/email dedupe, associated people, non-destructive merge, no-inference safety)',
 }
 
 const byFile = {}

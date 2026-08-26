@@ -20,6 +20,7 @@ import { buildStrongestIdentity, formatStreetWithUnit, parseUnitAwareAddress } f
 import { batchDataPreflight } from '../../src/lib/batchDataPreflight.js'
 import { deriveBatchDataHealth } from '../../src/lib/batchDataHealth.js'
 import { MATCH_TOKEN_OVERLAP_LIKELY, MATCH_TOKEN_OVERLAP_AMBIGUOUS } from '../../src/lib/batchDataConfig.js'
+import { buildContactProfile, mergeContactProfile } from '../../src/lib/contactProfile.js'
 // Capability #15.2 — event-driven V2 shadow recalculation (Section 15).
 // BatchData enrichment is exactly the "CONTACT_ENRICHMENT"/"PROPERTY_DATA_UPDATE"
 // event this file already fires on completion — the natural, safe trigger
@@ -120,7 +121,10 @@ function downgrade(status, steps = 1) {
  * @param {object} lead
  * @param {{unit: string|null}} identity - our own best-known identity (from buildStrongestIdentity)
  */
-function classifyPersonMatch(person, lead, identity) {
+// Exported (additive only, no behavior change) so the real matching logic
+// is directly testable end-to-end against a fixture response — same
+// pattern generate-call-review.mjs uses for SYSTEM_PROMPT.
+export function classifyPersonMatch(person, lead, identity) {
   const returnedName = normalizeName(person?.name?.full || [person?.name?.first, person?.name?.last].filter(Boolean).join(' '))
   const ourOwner = normalizeName(lead.owner_name)
   if (!returnedName || !ourOwner) return 'NO_MATCH'
@@ -263,6 +267,7 @@ export default async function handler(req) {
   let email = null
   let skipTraceStatus = 'ERROR'
   let skipTraceRaw = null
+  let newContactProfile = null
 
   if (skipTraceResult.errorType) {
     skipTraceStatus = skipTraceResult.errorType
@@ -275,13 +280,19 @@ export default async function handler(req) {
       skipTraceStatus = 'NO_MATCH'
     } else {
       skipTraceStatus = 'SUCCESS'
-      // Best matching person only — never blindly attach every returned contact.
+      // lead.phone/lead.email still ever come ONLY from the single best
+      // match (unchanged — Section 9/11 backward compatibility) — never
+      // blindly attach every returned contact to the quick-call fields.
       const ranked = persons.map(p => ({ p, match: classifyPersonMatch(p, lead, identity) }))
         .sort((a, b) => ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(a.match) - ['VERIFIED', 'LIKELY', 'AMBIGUOUS', 'NO_MATCH'].indexOf(b.match))
       contactMatchStatus = ranked[0].match
       if (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') {
         phones = pickPhones([ranked[0].p])
         email = pickEmail([ranked[0].p])
+        // Rich Skip Trace Contact Profile V1 — same safety-gated `ranked`
+        // array, same VERIFIED/LIKELY gate as the quick-call fields above.
+        // Never built for AMBIGUOUS/NO_MATCH primaries.
+        newContactProfile = buildContactProfile(ranked, { propertyMatchStatus: contactMatchStatus })
       }
     }
   }
@@ -362,6 +373,14 @@ export default async function handler(req) {
     excluded,
   })
 
+  // Section 11 — non-destructive merge with any prior contact_profile
+  // (rerun/re-enrichment case). Never built at all when this run found no
+  // usable contact (newContactProfile stays null), so a prior good profile
+  // is never wiped out by a later NO_MATCH/AMBIGUOUS attempt.
+  const mergedContactProfile = newContactProfile
+    ? mergeContactProfile(lead.enrichment_data?.contact_profile || null, newContactProfile)
+    : (lead.enrichment_data?.contact_profile || null)
+
   const updatedEnrichmentData = {
     ...(lead.enrichment_data || {}),
     batchdata_lock_at: null, // release the idempotency lock acquired above
@@ -369,6 +388,7 @@ export default async function handler(req) {
     identity_source: identity.identitySource,
     contact_source: (contactMatchStatus === 'VERIFIED' || contactMatchStatus === 'LIKELY') ? 'batchdata' : (lead.enrichment_data?.contact_source || 'none_connected'),
     contact_match_status: contactMatchStatus,
+    contact_profile: mergedContactProfile,
     contact_enriched_at: now,
     contact_dnc: phones.dnc,
     contact_tcpa_litigator: phones.tcpaLitigator,
