@@ -14,8 +14,19 @@
 // the only safeguard.
 //
 // POST /.netlify/functions/generate-call-review
-// body: { transcript: string, sellerIntelligence: object, canonical: { maxBuy, maxBuyStrategy, sellerPrice, currentOffer }, activeFocus?: { skillKey, title, recommendation } }
-// Returns: { ok, review: { scores: [{key, score, why}], strengths: [...], missedOpportunity: {...}, coachingMoments: [...], strongMoves: [...], sellerOutcomeSummary: string, primaryCoachingFocus: {...}, focusAdherence: {...}|null } }
+// body: { transcript: string, sellerIntelligence: object, canonical: { maxBuy, maxBuyStrategy, sellerPrice, currentOffer }, activeFocus?: { skillKey, title, recommendation }, callContext?: { type, callNumber, previous } }
+// Returns: { ok, review: { scores: [{key, score, why}] | [{key, applicable:false, reason}], strengths: [...], missedOpportunity: {...}, coachingMoments: [...], strongMoves: [...], sellerOutcomeSummary: string, primaryCoachingFocus: {...}, focusAdherence: {...}|null } }
+//
+// Context-Aware Call Coaching / Multi-Call Seller Journey V1 — `callContext`
+// is optional and additive (src/lib/callContext.js builds it, deterministically,
+// from real call_sessions/call_reviews history — never fabricated, never a
+// second AI call). When present, it tells the model whether this is a
+// first conversation with this seller or a continuation, and what real
+// facts were already established last time, so a dimension that was
+// genuinely already resolved can be marked applicable:false with a reason
+// instead of being scored low for "not being re-discovered." Omitting
+// callContext (legacy caller, or a first call with no history) produces
+// the EXACT same prompt/behavior as before this capability.
 //
 // Capability #25.2 — extends #24's output with a `primaryCoachingFocus`
 // suggestion (always) and a `focusAdherence` evaluation (only when the
@@ -55,17 +66,23 @@ SCORING RULE: Score based on observable rep BEHAVIOR against the rubric below, n
 Score exactly these 9 dimensions, 0-10 each, each with a one-sentence "why" citing what actually happened in the transcript. IMPORTANT — "captured" vs. "score" are DIFFERENT questions: a topic can be captured (the rep got SOME information on it) while still scoring low (the rep never went deep, never explored consequence/impact, or explored it only superficially before moving on). When that happens, you MUST fill in "captured" (what information was actually obtained) and "missing" (what depth/execution was absent) so a low score next to a captured topic is never presented as a contradiction — it is a real, explainable distinction. Leave captured/missing as empty strings only when there's nothing meaningful to add beyond "why".
 OPENING_RAPPORT, MOTIVATION_DISCOVERY, PAIN_DEPTH, PROPERTY_DISCOVERY, TIMELINE, PRICE_DISCOVERY, DECISION_MAKERS, NEGOTIATION, COMMITMENT
 
+CONTEXT-AWARE SCORING (only matters when a CALL CONTEXT / PREVIOUS CALL CONTEXT block is supplied below) — a repeat call with the same seller is part of a continuing journey, not a fresh cold call:
+- If a dimension's information was ALREADY genuinely established in the PREVIOUS CALL CONTEXT and nothing in THIS transcript required revisiting it, that dimension is NOT_APPLICABLE for THIS call. Return it as {"key": "...", "applicable": false, "reason": "..."} INSTEAD of a score/why pair — the reason must cite what was already established and why it didn't need revisiting. A rep must NEVER be penalized with a low score merely for not re-asking something already answered last time; correctly SKIPPING it is good behavior, not a gap.
+- The reverse is just as important — NEVER mark a dimension not-applicable to hide poor performance. If a dimension was genuinely relevant to THIS call (e.g. price is actively being discussed, or the previous context is unresolved/open) and the rep avoided or mishandled it, it MUST still be scored normally (0-10), never marked applicable:false.
+- A GOOD follow-up explicitly reconnects to what was already known (e.g. referencing a prior objection, decision-maker, or commitment) and moves the conversation forward rather than restarting broad discovery. A BAD follow-up ignores real prior context and re-asks already-answered questions, or fails to progress an open loop (like the previous call's promised follow-up). Reflect this in strengths/missedOpportunity/sellerOutcomeSummary and in the "why" of the dimensions that ARE scored — do NOT invent a new dimension or numeric metric for "continuity" itself.
+- Every dimension entry must be EITHER a scored entry ({"key","score","why","captured","missing"}) OR a not-applicable entry ({"key","applicable":false,"reason"}) — never a mix of both shapes in one entry, and every one of the 9 keys must appear exactly once, one way or the other.
+
 STRONG MOVE NUANCE — every strongMove needs a "nuance" classification: "STRONG" (unqualified good execution), "GOOD_BUT_EARLY" (the individual behavior was good, but it happened before enough groundwork — e.g. asking price before understanding motivation/pain), "GOOD_BUT_LATE" (good behavior that came too late to matter as much as it could have), "MIXED" (real positives and real problems in the same moment), "GOOD" (solid, unremarkable). CRITICAL: if you also flag a coachingMoment or the missedOpportunity criticizing the SAME rep quote or the same underlying behavior, the strongMove for that behavior must NOT be plain "STRONG" — use "GOOD_BUT_EARLY"/"GOOD_BUT_LATE"/"MIXED" instead, so the review never praises and criticizes the identical behavior without explaining the nuance.
 
 PRIMARY COACHING FOCUS — always include one. It must be behavioral, actionable, observable in a future call, and narrow enough to measure (bad: "be better at sales"; good: "when the seller reveals pain, ask at least one follow-up question before moving to condition or price"). skillKey MUST be one of the 9 dimension keys above — the single dimension this focus most directly targets.
 
-FOCUS ADHERENCE — ONLY if an ACTIVE COACHING FOCUS is supplied in the prompt below. Determine whether THIS call's transcript shows the rep applying that specific focus. First decide opportunityExisted (true/false): did a moment in THIS transcript actually create a chance to apply the focus? If false, result MUST be "NOT_APPLICABLE" — never penalize a rep for a situation that never arose. If true, result MUST be one of "APPLIED" / "PARTIALLY_APPLIED" / "NOT_APPLIED", backed by an EXACT verbatim quote (sellerQuote and/or repQuote) from THIS transcript — the same no-paraphrase, no-invention rule as the evidence contract above. If no ACTIVE COACHING FOCUS is supplied, omit focusAdherence entirely (set it to null).
+FOCUS ADHERENCE — ONLY if an ACTIVE COACHING FOCUS is supplied in the prompt below. Determine whether THIS call's transcript shows the rep applying that specific focus. First decide opportunityExisted (true/false): did a moment in THIS transcript actually create a chance to apply the focus? Use PREVIOUS CALL CONTEXT (when supplied) to judge this honestly — if the focus targets something already fully resolved in a prior call and nothing in THIS transcript reopened it, opportunityExisted is false. If false, result MUST be "NOT_APPLICABLE" — never penalize a rep for a situation that never arose. If true, result MUST be one of "APPLIED" / "PARTIALLY_APPLIED" / "NOT_APPLIED", backed by an EXACT verbatim quote (sellerQuote and/or repQuote) from THIS transcript — the same no-paraphrase, no-invention rule as the evidence contract above. If no ACTIVE COACHING FOCUS is supplied, omit focusAdherence entirely (set it to null).
 
 DISTINCT INSIGHTS ONLY — each coachingMoment must be about a DIFFERENT moment/topic. Do not report the same underlying exchange (same seller statement, same rep response) as two separate coaching moments even if you'd phrase the coaching note slightly differently each time.
 
 Write EXACTLY this JSON shape and nothing else — no markdown, no prose outside the JSON:
 {
-  "scores": [{"key": "OPENING_RAPPORT", "score": 0, "why": "...", "captured": "...", "missing": "..."}, ... all 9 keys],
+  "scores": [{"key": "OPENING_RAPPORT", "score": 0, "why": "...", "captured": "...", "missing": "..."}, ... all 9 keys — OR, for a dimension that is genuinely not applicable to THIS call (see CONTEXT-AWARE SCORING above): {"key": "PROPERTY_DISCOVERY", "applicable": false, "reason": "..."}],
   "strengths": ["...", "..."],
   "missedOpportunity": {"summary": "...", "sellerQuote": "...", "repQuote": "...", "betterQuestion": "...", "why": "..."},
   "coachingMoments": [{"sellerQuote": "...", "repQuote": "...", "coach": "...", "betterQuestion": "...", "why": "..."}],
@@ -82,7 +99,7 @@ export default async (req) => {
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: HEADERS })
 
   const body = await req.json().catch(() => ({}))
-  const { transcript, sellerIntelligence = {}, canonical = {}, activeFocus = null } = body
+  const { transcript, sellerIntelligence = {}, canonical = {}, activeFocus = null, callContext = null } = body
 
   if (!transcript || !transcript.trim()) {
     return new Response(JSON.stringify({ ok: false, error: 'transcript required' }), { status: 400, headers: HEADERS })
@@ -94,6 +111,18 @@ export default async (req) => {
     ? `\nACTIVE COACHING FOCUS (evaluate adherence against this in THIS transcript):\nSkill: ${activeFocus.skillKey}\nTitle: ${activeFocus.title}\nRecommendation: ${activeFocus.recommendation}\n`
     : '\nACTIVE COACHING FOCUS: none — this rep has no prior focus yet. Set focusAdherence to null.\n'
 
+  // Context-Aware Call Coaching V1 — optional, additive. callContext comes
+  // from src/lib/callContext.js (deterministic, real call_sessions/
+  // call_reviews history — never fabricated here or client-side). Omitted
+  // entirely when there's no history (first call) or the caller doesn't
+  // supply one (legacy behavior, unchanged).
+  const callContextBlock = callContext
+    ? `\nCALL CONTEXT: ${callContext.type.replace(/_/g, ' ')} — this is call #${callContext.callNumber} with this seller.\n` +
+      (callContext.previous
+        ? `PREVIOUS CALL CONTEXT (real facts from the last call with this seller — use to judge continuity, do not restate as if it happened in THIS transcript):\n${JSON.stringify(callContext.previous)}\n`
+        : '')
+    : ''
+
   const userPrompt = `CANONICAL FINANCIALS (authoritative — copy exactly, never recalculate):
 Max Buy: ${fmt(canonical.maxBuy)}${canonical.maxBuyStrategy ? ` (${canonical.maxBuyStrategy})` : ''}
 Current Offer: ${fmt(canonical.currentOffer)}
@@ -101,7 +130,7 @@ Seller Asking Price: ${fmt(canonical.sellerPrice)}
 
 CAPTURED SELLER INTELLIGENCE (for context only, do not restate as if it were the transcript):
 ${JSON.stringify(sellerIntelligence)}
-${activeFocusBlock}
+${activeFocusBlock}${callContextBlock}
 TRANSCRIPT (full call — use it as a whole to understand sequencing, not just isolated lines):
 ${transcript}
 

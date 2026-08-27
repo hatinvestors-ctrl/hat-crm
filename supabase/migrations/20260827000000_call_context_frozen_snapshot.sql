@@ -1,0 +1,36 @@
+-- Context-Aware Coaching Hardening V1 — Frozen Call Context.
+--
+-- NOT YET APPLIED. Prepared for review/approval only (mission explicit
+-- instruction: "STOP BEFORE APPLYING IT"). Do not run this against any
+-- environment without explicit approval.
+--
+-- WHY A MIGRATION, NOT A REUSED JSONB FIELD: call_reviews already has two
+-- unused columns (`coverage` JSONB — always NULL today, never populated by
+-- any code path; `recommended_focus` TEXT — also always NULL). Both were
+-- rejected as reuse targets because each already has its own distinct,
+-- clearly-intended future purpose (call-coverage data mirroring
+-- call_sessions.coverage_snapshot; a mastery-linked focus recommendation)
+-- — repurposing either for an unrelated "frozen call context" payload
+-- would be a worse long-term confusion than one small additive column.
+-- dimension_scores/strengths/etc. are JSONB ARRAYS — adding a sibling key
+-- to an array (turning it into an object) would break every existing
+-- reader (`.find()`/`.map()` on those columns, both legacy and new code).
+--
+-- BACKWARD COMPATIBILITY: purely additive, nullable, no default expression
+-- that touches existing rows. Every row inserted before this migration
+-- keeps call_context = NULL indefinitely — read paths already have an
+-- explicit legacy fallback (re-derive from call_sessions/lead.status) for
+-- exactly that case. No existing column, constraint, policy, or index is
+-- touched. call_reviews has NO UPDATE policy (fully immutable table) —
+-- once a row (and its call_context) is inserted, nothing can ever change
+-- it, which is what makes this a genuine "frozen at review time" snapshot.
+--
+-- PAYLOAD IS DELIBERATELY MINIMAL (mission Part 1: "not archival
+-- duplication") — { type, callNumber, priorCallId, derivedAt }. It does
+-- NOT duplicate the previous call's full facts (summary/objections/price)
+-- — those remain queryable via priorCallId -> call_sessions/call_reviews
+-- if ever needed, so nothing is duplicated, only the classification used
+-- at generation time is frozen.
+
+ALTER TABLE public.call_reviews
+  ADD COLUMN IF NOT EXISTS call_context JSONB;

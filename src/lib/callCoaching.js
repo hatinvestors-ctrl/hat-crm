@@ -177,15 +177,36 @@ export const COACHING_DIMENSIONS = [
 // from COACHING_DIMENSIONS, every score 0-10, every score must have a
 // non-empty `why` (Part 21 — "never a mysterious 6/10 with no
 // explanation"). Anything that fails validation is dropped, not guessed.
+// Context-Aware Call Coaching V1 — a dimension entry may now ALSO arrive
+// shaped as { key, applicable: false, reason } instead of { key, score,
+// why } — used only when a dimension genuinely had no opportunity to be
+// observed in THIS call (e.g. property condition was already established
+// in a previous call and nothing new came up). This is purely ADDITIVE:
+// every existing/legacy caller that never sends `applicable` gets the
+// exact same validation and output shape as before (score/why required,
+// 0-10 range). `applicable` defaults to true when omitted — both here and
+// everywhere downstream that reads it — so old persisted reviews (which
+// have no such field at all) are indistinguishable from "scored normally."
 export function validateScorecard(rawScores) {
   if (!Array.isArray(rawScores)) return []
   const validKeys = new Set(COACHING_DIMENSIONS.map(d => d.key))
-  return rawScores
-    .filter(s =>
-      s && validKeys.has(s.key) &&
-      Number.isFinite(s.score) && s.score >= 0 && s.score <= 10 &&
-      typeof s.why === 'string' && s.why.trim().length > 0
-    )
+  const out = []
+  for (const s of rawScores) {
+    if (!s || !validKeys.has(s.key)) continue
+
+    if (s.applicable === false) {
+      // Not-applicable entries never carry a score — they must NOT be
+      // usable to silently hide a poor score behind a fabricated "N/A".
+      // A `reason` is mandatory (Part 5: "the AI must explain WHY").
+      if (typeof s.reason !== 'string' || !s.reason.trim()) continue
+      out.push({ key: s.key, applicable: false, score: null, why: null, captured: null, missing: null, reason: s.reason.trim().slice(0, 300) })
+      continue
+    }
+
+    // Applicable (the default, and the ONLY shape that existed before
+    // this capability) — same validation as always: real score, real why.
+    if (!(Number.isFinite(s.score) && s.score >= 0 && s.score <= 10)) continue
+    if (typeof s.why !== 'string' || !s.why.trim()) continue
     // Capability #25.3A, Part 5/6 — optional, additive fields. A dimension
     // that was CAPTURED (per the separate, deterministic coverage engine)
     // but still scores low is not a contradiction — `captured`/`missing`
@@ -194,16 +215,30 @@ export function validateScorecard(rawScores) {
     // remain two independent computations, per the mission's explicit
     // rule). Old reviews without these fields still render fine — both
     // are optional and the UI falls back to `why` alone.
-    .map(s => ({
-      key: s.key, score: s.score, why: s.why,
+    out.push({
+      key: s.key, applicable: true, score: s.score, why: s.why,
       captured: typeof s.captured === 'string' && s.captured.trim() ? s.captured.trim().slice(0, 200) : null,
       missing: typeof s.missing === 'string' && s.missing.trim() ? s.missing.trim().slice(0, 200) : null,
-    }))
+      reason: null,
+    })
+  }
+  return out
 }
 
+// Context-Aware Call Coaching V1 — the ONLY change here is excluding
+// applicable:false entries from both the numerator and denominator, so a
+// dimension that had no real opportunity in this call never drags down
+// Overall Score. This is a strict no-op for every legacy/pre-existing
+// review: those entries never have `applicable === false` (either
+// `applicable: true` from the new validator, or the field is absent
+// entirely on rows persisted before this capability) — `s.applicable !==
+// false` is true in both cases, so they're included exactly as before.
+// The math itself (percentage of points earned out of points possible)
+// is UNCHANGED — only which entries count toward "possible" changed.
 export function computeOverallScore(validatedScores) {
-  if (!validatedScores.length) return null
-  const totalPossible = validatedScores.length * 10
-  const totalActual = validatedScores.reduce((sum, s) => sum + s.score, 0)
+  const scored = validatedScores.filter(s => s.applicable !== false)
+  if (!scored.length) return null
+  const totalPossible = scored.length * 10
+  const totalActual = scored.reduce((sum, s) => sum + s.score, 0)
   return Math.round((totalActual / totalPossible) * 100)
 }

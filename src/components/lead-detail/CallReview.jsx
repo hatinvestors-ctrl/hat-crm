@@ -17,12 +17,27 @@ import {
   validateCoachingFocusSuggestion, validateAdherenceEvaluation, computeAdoptionRate, computeTrend,
   computeMasteryEligibility, decideFocusAction, pickNextFocusSkill, TREND_WINDOW_SIZE,
 } from '../../lib/coachingMemory'
+import { buildCallContext, buildFrozenCallContext, formatCallContextLabel } from '../../lib/callContext'
 
 const fc = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`
 
 function ScoreRow({ dim, score }) {
   const [open, setOpen] = useState(false)
   if (!score) return null
+  // Context-Aware Call Coaching V1 — a not-applicable dimension is shown
+  // honestly as N/A with its reason, never as a numeric score (and never
+  // silently omitted, which would look like the AI forgot the dimension).
+  if (score.applicable === false) {
+    return (
+      <div className="border-b border-[color:var(--color-line)] last:border-0 py-1.5">
+        <div className="w-full flex items-center justify-between text-left">
+          <span className="text-[11.5px] font-semibold text-[color:var(--color-text)]">{dim.label}</span>
+          <span className="text-[10.5px] font-bold text-[color:var(--color-text-dim)]">N/A</span>
+        </div>
+        {score.reason && <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">{score.reason}</div>}
+      </div>
+    )
+  }
   return (
     <div className="border-b border-[color:var(--color-line)] last:border-0 py-1.5">
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between text-left">
@@ -178,6 +193,31 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
     return data
   }
 
+  // Context-Aware Call Coaching V1 — a small, bounded, targeted read (same
+  // pattern as fetchActiveFocus above): every PRIOR call_session for this
+  // same lead (this seller), plus the call_reviews already written for
+  // those prior calls. Nothing here is a new table or a new column —
+  // src/lib/callContext.js turns these real rows into a deterministic
+  // callContext (never fabricated, never a second AI call).
+  async function fetchCallContext() {
+    if (!session?.leadId || !session?.startedAt) return null
+    const { data: priorSessions } = await supabase
+      .from('call_sessions')
+      .select('id,started_at,outcome,summary,seller_price_final,objections,follow_up_date')
+      .eq('lead_id', session.leadId)
+      .lt('started_at', session.startedAt)
+      .order('started_at', { ascending: false })
+      .limit(10)
+    if (!priorSessions || priorSessions.length === 0) {
+      return buildCallContext([], [], lead?.status ?? null)
+    }
+    const { data: priorReviews } = await supabase
+      .from('call_reviews')
+      .select('call_session_id,strengths,missed_opportunity')
+      .in('call_session_id', priorSessions.map(s => s.id))
+    return buildCallContext(priorSessions, priorReviews || [], lead?.status ?? null)
+  }
+
   // Capability #25.2, Part 9-14 — the SYSTEM decides longitudinal
   // improvement/mastery from real persisted history; the AI's role here
   // is already over by this point (its raw claims were validated in
@@ -294,6 +334,11 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
         validatedReview: reviewToSave,
         maxBuySnapshot: guardrail.maxBuyReady ? guardrail.maxBuy : null,
         sellerPriceSnapshot: guardrail.sellerPrice,
+        // Context-Aware Coaching Hardening V1 — freeze the EXACT context
+        // used at generation time (reviewToSave.callContext, set once in
+        // generate() and never re-derived), not whatever lead.status
+        // happens to be right now at save time.
+        frozenCallContext: buildFrozenCallContext(reviewToSave.callContext),
       })
       const { error: insertError } = await supabase.from('call_reviews').insert(record)
       // Postgres unique_violation on call_session_id — a review already
@@ -320,6 +365,12 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
       // focus; fetched here (once) and sent to the SAME single AI call
       // used for scoring — never a second LLM call.
       const activeFocusBefore = await fetchActiveFocus()
+      // Context-Aware Call Coaching V1 — best-effort, never blocks review
+      // generation: if this small read fails for any reason, callContext
+      // is simply null and the prompt behaves EXACTLY as it did before
+      // this capability (Part 15: enrich the existing call, never a new
+      // invocation, never a hard dependency).
+      const callContext = await fetchCallContext().catch(() => null)
       const { data: { session: authSession } } = await supabase.auth.getSession()
       const res = await fetch('/.netlify/functions/generate-call-review', {
         method: 'POST',
@@ -329,6 +380,7 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
           sellerIntelligence: si,
           canonical: { maxBuy: guardrail.maxBuyReady ? guardrail.maxBuy : null, maxBuyStrategy: guardrail.maxBuyStrategy, currentOffer: guardrail.currentOffer, sellerPrice: guardrail.sellerPrice },
           activeFocus: activeFocusBefore ? { skillKey: activeFocusBefore.skill_key, title: activeFocusBefore.title, recommendation: activeFocusBefore.recommendation } : null,
+          callContext,
         }),
       })
       const body = await res.json()
@@ -360,6 +412,10 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
         coachingMoments,
         strongMoves,
         sellerOutcomeSummary: body.review?.sellerOutcomeSummary || null,
+        // Context-Aware Call Coaching V1 — in-memory only, NOT persisted
+        // (no new column — Part 13). Re-derivable later from real
+        // call_sessions history any time it's needed for display.
+        callContext,
       }
       setReview(validated)
       // Persist immediately (Part 11: "The UI and DB should refer to the
@@ -431,6 +487,17 @@ export default function CallReview({ lead, session, si, ensureSessionPersisted }
           )}
           {dbSaveStatus === 'saved' && (
             <div className="text-[10px] text-[color:var(--color-success-text)]">✓ Saved to Calls History</div>
+          )}
+
+          {/* Context-Aware Call Coaching V1 — compact, presentation-only.
+              formatCallContextLabel/callContextObjective are pure
+              derivations from real call_sessions/call_reviews history
+              (src/lib/callContext.js), never fabricated, never a second
+              AI call. Absent entirely for a first call with no history. */}
+          {review.callContext && (
+            <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">
+              {formatCallContextLabel(review.callContext)}
+            </div>
           )}
 
           {/* Capability #25.3A, Part 8/11 — EXECUTIVE COACHING SUMMARY.

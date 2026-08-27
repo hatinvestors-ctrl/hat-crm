@@ -58,6 +58,11 @@ const CATEGORY_LABELS = {
   'callReviewParser.test.js': 'CALL REVIEW JSON HARDENING (real production truncation bug, balanced-brace extraction, safe diagnostic logging, max_tokens fix)',
   'callReviewAbort.test.js': 'CALL REVIEW ABORT HANDLING (real "operation was aborted" incident, missing timeout config fix, error classification, idempotency)',
   'triageDecisionBar.test.js': 'COMPACT TRIAGE DECISION BAR (presentation/placement only — reused playbook, no duplicate control, button hierarchy)',
+  'callDetailUX.test.js': 'COACHING CALL DETAIL UX (manager scanability — single score hero, win/miss/next-focus, skill breakdown, continuous coaching, progressive disclosure)',
+  'agentProfileUX.test.js': 'COACHING AGENT PROFILE UX (current focus prominence, honest coaching-loop states, compact baseline, additive previousFocus, Call Detail consistency)',
+  'contextAwareCoaching.test.js': 'CONTEXT-AWARE CALL COACHING (multi-call seller journey — call type/number derivation, dimension applicability, overall score N/A safety, skill trend N/A exclusion, legacy compatibility, no new AI call)',
+  'contextAwareCoachingHardening.test.js': 'CONTEXT-AWARE COACHING HARDENING (frozen call context immutability, comparable-context overall trend, no false cross-context improvement, manager attention/team-improving safety)',
+  'contextAwareCoachingFinalHardening.test.js': 'CONTEXT-AWARE COACHING FINAL HARDENING (deterministic comparable-cohort selection, recency tiebreak, honest no-claim, trend context labeling, migration review)',
 }
 
 const byFile = {}

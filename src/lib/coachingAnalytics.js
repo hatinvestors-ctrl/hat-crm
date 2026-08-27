@@ -27,6 +27,83 @@ export function computeOverallScoreMetrics(reviewsChronological) {
   return { average, trend: computeTrend(scores), reviewedCount: scores.length }
 }
 
+// ── Comparable Overall Score (Context-Aware Coaching Hardening V1/Final) ──
+// A raw score trend mixes calls with fundamentally different objectives
+// (an INITIAL_DISCOVERY call scored over 9 dimensions vs. a FOLLOW_UP call
+// scored over 4 applicable ones) — normalized to the same 0-100 scale,
+// but not necessarily an honest "improving" claim. This groups reviews by
+// their FROZEN call_context.type (see src/lib/callContext.js /
+// call_reviews.call_context) and computes the trend using ONLY the rep's
+// single most common context type — reusing computeOverallScoreMetrics/
+// computeTrend VERBATIM, never a new trend formula. A review with no
+// call_context (legacy, pre-capability) is grouped under 'UNCLASSIFIED'
+// and never mixed with a real classified type.
+//
+// Deterministic winner selection (Final Hardening — replaces the old
+// "first-seen on a tie" behavior):
+//   1. ELIGIBILITY — a context group only competes if computeTrend() over
+//      its own scores would ever produce a real (non-INSUFFICIENT_DATA)
+//      status. This reuses computeTrend's OWN existing recent/previous
+//      windowing (TREND_WINDOW_SIZE) — no new minimum-count constant is
+//      invented here; a group needs enough real observations for
+//      computeTrend itself to already say so.
+//   2. Among ELIGIBLE groups, the one with the MOST reviews wins.
+//   3. A tie on count is broken by RECENCY — whichever eligible group's
+//      most recent review is chronologically newest wins (never by which
+//      one happened to be scored higher — Part 3 explicitly forbids that).
+//   4. If recency is ALSO tied (same most-recent review timestamp, which
+//      cannot really happen for two different reviews but is handled
+//      defensively), there is no safe way to prefer one over the other —
+//      return no trend claim at all (contextType: null) rather than guess.
+//   5. If NO group is eligible, no trend claim is made — contextType/
+//      average/comparableCalls are null, trend is INSUFFICIENT_DATA. This
+//      is never overridden by "the biggest group anyway" (mission's
+//      explicit Scenario D: do not select an ineligible cohort merely
+//      because it has more calls).
+export function computeComparableOverallScoreMetrics(reviewsChronological) {
+  const groups = {}
+  for (const r of reviewsChronological) {
+    const type = r.call_context?.type || 'UNCLASSIFIED'
+    ;(groups[type] ||= []).push(r)
+  }
+  const types = Object.keys(groups)
+  const groupCounts = Object.fromEntries(types.map(t => [t, groups[t].length]))
+
+  const eligibleTypes = types.filter(t => {
+    const scores = groups[t].map(r => r.overall_score).filter(v => v != null)
+    return computeTrend(scores).status !== 'INSUFFICIENT_DATA'
+  })
+
+  if (eligibleTypes.length === 0) {
+    return { average: null, trend: computeTrend([]), reviewedCount: 0, contextType: null, comparableCalls: 0, groupCounts }
+  }
+
+  const maxCount = Math.max(...eligibleTypes.map(t => groups[t].length))
+  const topTypes = eligibleTypes.filter(t => groups[t].length === maxCount)
+
+  let winner
+  if (topTypes.length === 1) {
+    winner = topTypes[0]
+  } else {
+    // Tie on count — break by recency of the group's most recent review.
+    // reviewsChronological is already ordered oldest-first, and filtering
+    // preserves relative order, so the last element of each group's array
+    // IS that group's most recent review.
+    const mostRecentAt = (t) => groups[t][groups[t].length - 1]?.created_at ?? null
+    const withDates = topTypes.map(t => ({ t, at: mostRecentAt(t) }))
+    const sorted = [...withDates].sort((a, b) => new Date(b.at) - new Date(a.at))
+    const stillTied = sorted.length > 1 && sorted[0].at != null && sorted[0].at === sorted[1].at
+    winner = stillTied ? null : sorted[0]?.t ?? null
+  }
+
+  if (!winner) {
+    return { average: null, trend: computeTrend([]), reviewedCount: 0, contextType: null, comparableCalls: 0, groupCounts }
+  }
+
+  const metrics = computeOverallScoreMetrics(groups[winner])
+  return { ...metrics, contextType: winner, comparableCalls: groups[winner].length, groupCounts }
+}
+
 // ── Coverage (Part 6) — captured / total, using the SAME coverage shape
 // getCallCoverage() already produces ({ capturedCount, total, dimensions }).
 // PARTIAL is deliberately NOT counted as captured — conservative, matches
@@ -80,16 +157,24 @@ export const ATTENTION_REPEATED_NOT_APPLIED = 2     // 2+ NOT_APPLIED among the 
 export const WATCH_ADOPTION_THRESHOLD = 0.7         // below this (but above the ATTENTION floor) is an early warning
 export const WATCH_COVERAGE_THRESHOLD = 65          // coverage % below this is a real, callable-out gap
 
-export function computeAttentionLevel({ overallScoreMetrics, coveragePercent, adoption, recentEvaluations, skillTrends }) {
+// `comparableOverallScoreTrend` (optional) — Context-Aware Coaching
+// Hardening V1. Defaults to `overallScoreMetrics.trend` when omitted, so
+// every existing caller/test that doesn't pass it gets IDENTICAL behavior
+// to before this capability. When supplied, it must be the trend computed
+// over a context-comparable subset only (computeComparableOverallScoreMetrics)
+// — never raw, cross-context scores — so a DECLINING reason is never
+// raised from comparing an INITIAL_DISCOVERY call against a FOLLOW_UP one.
+export function computeAttentionLevel({ overallScoreMetrics, comparableOverallScoreTrend, coveragePercent, adoption, recentEvaluations, skillTrends }) {
   if (overallScoreMetrics.reviewedCount < MIN_CALLS_FOR_ASSESSMENT) {
     return { level: 'BUILDING_BASELINE', reasons: [`Only ${overallScoreMetrics.reviewedCount} reviewed call${overallScoreMetrics.reviewedCount === 1 ? '' : 's'} so far — need at least ${MIN_CALLS_FOR_ASSESSMENT} before a coaching signal is meaningful.`] }
   }
 
   const reasons = []
+  const declineTrend = comparableOverallScoreTrend || overallScoreMetrics.trend
 
   // ATTENTION signals
-  if (overallScoreMetrics.trend.status === 'DECLINING') {
-    reasons.push(`Overall score declining (${round1(overallScoreMetrics.trend.previousAvg)} → ${round1(overallScoreMetrics.trend.recentAvg)}).`)
+  if (declineTrend.status === 'DECLINING') {
+    reasons.push(`Overall score declining (${round1(declineTrend.previousAvg)} → ${round1(declineTrend.recentAvg)}).`)
   }
   if (adoption.applicableCount >= ATTENTION_MIN_APPLICABLE && adoption.rate != null && adoption.rate < ATTENTION_ADOPTION_THRESHOLD) {
     reasons.push(`Coaching adoption is ${Math.round(adoption.rate * 100)}% across ${adoption.applicableCount} applicable calls.`)
@@ -108,7 +193,7 @@ export function computeAttentionLevel({ overallScoreMetrics, coveragePercent, ad
     const names = weakest.map(s => s.label).join(' and ')
     watchReasons.push(names ? `${names} information ${weakest.length > 1 ? 'are' : 'is'} frequently missing (coverage ${coveragePercent}%).` : `Conversation coverage is low (${coveragePercent}%).`)
   }
-  if (overallScoreMetrics.trend.status === 'STABLE' && (skillTrends || []).some(s => s.trend === 'DECLINING')) {
+  if (declineTrend.status === 'STABLE' && (skillTrends || []).some(s => s.trend === 'DECLINING')) {
     const declining = skillTrends.filter(s => s.trend === 'DECLINING').map(s => s.label).join(', ')
     watchReasons.push(`Score is stable overall, but ${declining} ${skillTrends.filter(s => s.trend === 'DECLINING').length > 1 ? 'are' : 'is'} declining.`)
   }
@@ -212,7 +297,14 @@ export function deriveKeyConclusion({ review, evaluation }) {
 // ── Per-agent aggregate row (Part 8/9) — one function feeding both the
 // Team table and the Agents browse page, never two competing calculations. ──
 export function aggregateAgentRow({ reviewsChronological, evaluations, activeFocus }) {
+  // overallScoreMetrics.average stays the RAW average across every
+  // reviewed call — still an honest "how has this rep performed overall"
+  // snapshot, unchanged by this capability. Only the TREND/status claim
+  // ("is this rep improving") is context-scoped, via comparableMetrics
+  // below — Skill Development (computeSkillTrends) deliberately stays
+  // cross-context per Part 6, untouched.
   const overallScoreMetrics = computeOverallScoreMetrics(reviewsChronological)
+  const comparableMetrics = computeComparableOverallScoreMetrics(reviewsChronological)
   const coverageTrend = computeCoverageTrend(reviewsChronological)
   const coveragePcts = reviewsChronological.map(r => computeCoveragePercent(r.coverage)).filter(v => v != null)
   const coveragePercent = coveragePcts.length ? Math.round(coveragePcts[coveragePcts.length - 1]) : null
@@ -220,13 +312,17 @@ export function aggregateAgentRow({ reviewsChronological, evaluations, activeFoc
   const skillTrends = computeSkillTrends(reviewsChronological)
   const focusSkillTrend = activeFocus ? skillTrends.find(s => s.key === activeFocus.skill_key)?.trend : null
   const attention = computeAttentionLevel({
-    overallScoreMetrics, coveragePercent, adoption,
+    overallScoreMetrics, comparableOverallScoreTrend: comparableMetrics.trend, coveragePercent, adoption,
     recentEvaluations: evaluations, skillTrends,
   })
-  const performanceStatus = computeAgentPerformanceStatus(overallScoreMetrics)
+  // Part 8's Scenario H ("higher score on a different call type only must
+  // not count as Improving") is satisfied structurally here: performance
+  // status now derives from the context-comparable metrics, not the raw
+  // cross-context ones.
+  const performanceStatus = computeAgentPerformanceStatus(comparableMetrics)
   return {
     callsReviewed: overallScoreMetrics.reviewedCount,
-    overallScore: overallScoreMetrics,
+    overallScore: { ...overallScoreMetrics, trend: comparableMetrics.trend, trendContextType: comparableMetrics.contextType, trendComparableCalls: comparableMetrics.comparableCalls, trendGroupCounts: comparableMetrics.groupCounts },
     performanceStatus,
     coveragePercent,
     coverageTrend,

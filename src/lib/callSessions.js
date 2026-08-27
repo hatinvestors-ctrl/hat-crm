@@ -75,7 +75,15 @@ export function buildCallSessionFinalizeUpdate({ outcome, followUpDate, note }) 
 // succeeds. `validatedReview` is ALREADY the output of validateScorecard/
 // verifyCoachingMoments/verifyStrongMoves (Part 5) — this function never
 // re-derives or loosens that validation, only shapes it into a DB row.
-export function buildCallReviewRecord({ callSessionId, workspaceId, leadId, repId, validatedReview, maxBuySnapshot, sellerPriceSnapshot }) {
+// `frozenCallContext` (Context-Aware Coaching Hardening V1) — the
+// MINIMAL snapshot from callContext.js's buildFrozenCallContext(), or
+// null. Written to call_reviews.call_context, a nullable additive column
+// (see supabase/migrations/20260827000000_call_context_frozen_snapshot.sql
+// — NOT YET APPLIED, pending approval). Historical integrity: once this
+// row is inserted, call_reviews has NO update policy at all, so whatever
+// context is frozen here can never be silently rewritten by a later
+// lead.status change.
+export function buildCallReviewRecord({ callSessionId, workspaceId, leadId, repId, validatedReview, maxBuySnapshot, sellerPriceSnapshot, frozenCallContext = null }) {
   return {
     call_session_id: callSessionId,
     workspace_id: workspaceId,
@@ -91,6 +99,7 @@ export function buildCallReviewRecord({ callSessionId, workspaceId, leadId, repI
     max_buy_snapshot: maxBuySnapshot ?? null,
     seller_price_snapshot: sellerPriceSnapshot ?? null,
     recommended_focus: validatedReview.recommendedFocus ?? null,
+    call_context: frozenCallContext,
   }
 }
 
