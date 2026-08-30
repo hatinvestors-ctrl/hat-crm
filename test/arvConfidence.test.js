@@ -193,12 +193,29 @@ describe('getHatInternalEvidence — CASE G/H (real CRM data, capped/labeled, ne
   })
 })
 
-describe('getExternalCompConfidenceState — honest static state, product-safe copy, never a fabricated score', () => {
+describe('getExternalCompConfidenceState — honest, ARV-aware state, product-safe copy, never a fabricated score', () => {
   it('returns NOT_SCOREABLE with customer-facing copy (no implementation language in the label/message)', () => {
-    const state = getExternalCompConfidenceState()
+    const state = getExternalCompConfidenceState(robustLead())
     expect(state.status).toBe('NOT_SCOREABLE')
     expect(state).not.toHaveProperty('score')
     expect(state.message).not.toMatch(/AI-generated|database|structured per-comp|isn't stored/i)
+  })
+
+  // Analysis Readiness + Decision Integrity Fix, Part 1 — the real
+  // production bug: this function used to always claim "Current ARV is
+  // available" regardless of lead.arv. Now branches honestly.
+  it('ARV present — message says ARV is available', () => {
+    const state = getExternalCompConfidenceState(robustLead({ arv: 300000 }))
+    expect(state.message).toMatch(/Current ARV is available/i)
+  })
+  it('ARV absent (null) — message NEVER claims ARV is available; mentions AI can estimate it', () => {
+    const state = getExternalCompConfidenceState(robustLead({ arv: null }))
+    expect(state.message).not.toMatch(/Current ARV is available/i)
+    expect(state.message).toMatch(/HAT AI can estimate/i)
+  })
+  it('no lead at all — treated the same as ARV absent, never throws', () => {
+    const state = getExternalCompConfidenceState(undefined)
+    expect(state.message).not.toMatch(/Current ARV is available/i)
   })
 })
 

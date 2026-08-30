@@ -37,6 +37,8 @@ import DecisionHero from '../components/lead-detail/workspace/DecisionHero'
 import DealDecisionCenter from '../components/lead-detail/workspace/DealDecisionCenter'
 import OnMarketAcquisitionWorkspace from '../components/lead-detail/workspace/OnMarketAcquisitionWorkspace'
 import { getDealReadiness, getAcquisitionReadiness, getAiReadiness } from '../components/lead-detail/workspace/readiness'
+import { resolveUnderwritingSettings } from '../lib/underwritingSettings'
+import UnderwritingAssumptionsPanel from '../components/lead-detail/workspace/UnderwritingAssumptionsPanel'
 
 // Lead Workspace redesign, Phase 2 — SAME ENGINE, SAME COMPONENTS, BETTER
 // WORKSPACE (mission Section 3). Every child component below still
@@ -46,6 +48,12 @@ import { getDealReadiness, getAcquisitionReadiness, getAiReadiness } from '../co
 
 export default function LeadDetailPage() {
   const { workspace, workspaceId, members, user, userRole } = useOutletContext()
+  // Underwriting Configuration V1 — the ONE resolved effective settings
+  // object for this workspace, threaded to every canonical-engine
+  // consumer on this page. Resolved once per render; resolveUnderwritingSettings
+  // always returns a complete, valid object (safe fallback to system
+  // defaults when workspace.settings.underwriting is absent/malformed).
+  const underwritingSettings = resolveUnderwritingSettings(workspace.settings)
   const { leadId } = useParams()
   const navigate = useNavigate()
   const [lead, setLead] = useState(null)
@@ -324,7 +332,13 @@ export default function LeadDetailPage() {
             <div className="text-[11px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Deal Economics &amp; Underwriting</div>
           </div>
 
-          <DealDecisionCenter lead={lead} onRunAnalysis={() => setActiveTab('ai')} />
+          <DealDecisionCenter lead={lead} onRunAnalysis={() => setActiveTab('ai')} underwritingSettings={underwritingSettings} />
+
+          <UnderwritingAssumptionsPanel
+            underwritingSettings={underwritingSettings}
+            canEditSettings={userRole === 'admin'}
+            workspaceId={workspaceId}
+          />
 
           <div className="pt-2">
             <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Property &amp; Assumptions</div>
@@ -342,6 +356,7 @@ export default function LeadDetailPage() {
                 members={members}
                 canEdit={canEdit}
                 strategy={dealStrategy}
+                underwritingSettings={underwritingSettings}
                 onUpdated={onLeadUpdated}
               />
             </div>
@@ -412,11 +427,12 @@ export default function LeadDetailPage() {
             Conclusion (Detailed Analysis verdict strip), comps, Full
             Breakdown, notes, and Ask AI as the deeper evidence layer. ══ */}
         <div id="workspace-panel-ai" role="tabpanel" aria-labelledby="workspace-tab-ai" hidden={activeTab !== 'ai'} className="space-y-4">
-          <ComplsIntelligenceCard lead={lead} />
+          <ComplsIntelligenceCard lead={lead} underwritingSettings={underwritingSettings} />
           <DealAnalysisCard
             lead={lead}
             userId={user.id}
             canEdit={canEdit}
+            underwritingSettings={underwritingSettings}
             onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
             onStrategyChange={setDealStrategy}
             hideDecisionSummary

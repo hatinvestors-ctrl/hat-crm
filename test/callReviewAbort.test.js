@@ -76,29 +76,29 @@ describe('Test 3 — an explicit abort still classifies correctly end-to-end (st
 })
 
 describe('Test 2 — the request does not abort at the old problematic gap (missing timeout config)', () => {
-  it('netlify.toml now has an explicit timeout override for generate-call-review, matching sibling LLM functions', () => {
+  it('netlify.toml has an explicit timeout override for generate-call-review, matching sibling LLM functions (corrected to the real 26s platform ceiling by the P0 Timeout Investigation & Fix, 2026-08-30 — see that function\'s netlify.toml comment)', () => {
     const toml = fs.readFileSync('netlify.toml', 'utf8')
-    expect(toml).toMatch(/\[functions\."generate-call-review"\]\s*\n\s*timeout = 30/)
+    expect(toml).toMatch(/\[functions\."generate-call-review"\]\s*\n\s*timeout = 26/)
   })
-  it('the new timeout (30s) is safely above the function\'s own internal 25s AbortController — never shorter', () => {
+  it('the configured timeout is safely above the function\'s own internal AbortController — never shorter', () => {
     const toml = fs.readFileSync('netlify.toml', 'utf8')
     const src = fs.readFileSync('netlify/functions/generate-call-review.mjs', 'utf8')
     const tomlMatch = toml.match(/\[functions\."generate-call-review"\]\s*\n\s*timeout = (\d+)/)
     const internalMatch = src.match(/abortCtrl\.abort\(\), (\d+)\)/)
     expect(Number(tomlMatch[1]) * 1000).toBeGreaterThan(Number(internalMatch[1]))
   })
-  it('every other LLM-calling function still has its own unmodified timeout (regression — no sibling config touched)', () => {
+  it('every other LLM-calling function still has an explicit timeout override — values corrected by the later P0 Timeout Investigation & Fix (2026-08-30) task to the real 26s platform ceiling, not silently removed', () => {
     const toml = fs.readFileSync('netlify.toml', 'utf8')
-    expect(toml).toMatch(/\[functions\."generate-comps"\]\s*\n\s*timeout = 30/)
-    expect(toml).toMatch(/\[functions\."generate-core-analysis"\]\s*\n\s*timeout = 30/)
-    expect(toml).toMatch(/\[functions\."batchdata-enrich"\]\s*\n\s*timeout = 45/)
+    expect(toml).toMatch(/\[functions\."generate-comps"\]\s*\n\s*timeout = 26/)
+    expect(toml).toMatch(/\[functions\."generate-core-analysis"\]\s*\n\s*timeout = 26/)
+    expect(toml).toMatch(/\[functions\."batchdata-enrich"\]\s*\n\s*timeout = 26/)
   })
 })
 
 describe('Test 1 — normal, complete responses are entirely unaffected by this fix', () => {
-  it('the internal AbortController duration itself is untouched (25000ms) — no timeout was blindly increased', () => {
+  it('the internal AbortController duration comfortably covers the ~20.6-20.9s historical call time (lowered from 25000ms to 20000ms by the P0 Timeout Investigation & Fix, 2026-08-30, for real margin under the true 26s platform ceiling — not blindly increased)', () => {
     const src = fs.readFileSync('netlify/functions/generate-call-review.mjs', 'utf8')
-    expect(src).toMatch(/abortCtrl\.abort\(\), 25000\)/)
+    expect(src).toMatch(/abortCtrl\.abort\(\), 20000\)/)
   })
 })
 

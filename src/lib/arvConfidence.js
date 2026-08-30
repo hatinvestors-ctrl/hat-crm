@@ -74,7 +74,7 @@ const STRESS_LABEL = {
 // about whether the $220K ARV itself is well-evidenced, and
 // NO_DEAL_ACROSS_RANGE says nothing about weak comps — it can happen with
 // a perfectly-evidenced ARV that's simply not enough to clear Max Buy.
-export function computeDecisionSensitivity(lead, { bandPct = ARV_SCENARIO_BAND_PCT } = {}) {
+export function computeDecisionSensitivity(lead, { bandPct = ARV_SCENARIO_BAND_PCT, underwritingSettings = null } = {}) {
   const arv = lead?.arv != null ? Number(lead.arv) : null
   if (arv == null) return { available: false, reason: 'ARV is missing — ARV stress test cannot be evaluated.' }
   const reno = lead?.renovation_cost != null ? Number(lead.renovation_cost) : null
@@ -90,8 +90,8 @@ export function computeDecisionSensitivity(lead, { bandPct = ARV_SCENARIO_BAND_P
     return {
       tier,
       arv: scenarioLead.arv,
-      flip: computeFlipResult(scenarioLead),
-      brrrr: lead.rent_estimate != null ? computeBrrrrResult(scenarioLead) : null,
+      flip: computeFlipResult(scenarioLead, underwritingSettings),
+      brrrr: lead.rent_estimate != null ? computeBrrrrResult(scenarioLead, underwritingSettings) : null,
     }
   })
   const [conservative, base, upside] = scenarios
@@ -172,7 +172,21 @@ export function getHatInternalEvidence(lead, candidateLeads = []) {
 // copy (no "AI-generated narrative" / "structured records" / "isn't
 // stored" implementation language — that belongs in this code comment,
 // not the UI). Never a fabricated number.
-export function getExternalCompConfidenceState() {
+//
+// Analysis Readiness + Decision Integrity Fix (Part 1) — real bug found in
+// QA: this function used to take no argument and always claimed "Current
+// ARV is available," even when lead.arv was null. It now branches on
+// whether ARV actually exists, without fabricating a confidence score in
+// either branch.
+export function getExternalCompConfidenceState(lead) {
+  const hasArv = lead?.arv != null
+  if (!hasArv) {
+    return {
+      status: 'NOT_SCOREABLE',
+      label: 'Detailed confidence scoring not yet available',
+      message: 'No current ARV is set for this property yet, so comp-by-comp validation of proximity, recency, and property similarity cannot be evaluated. HAT AI can estimate an ARV from comparable sales during analysis, or one can be entered manually.',
+    }
+  }
   return {
     status: 'NOT_SCOREABLE',
     label: 'Detailed confidence scoring not yet available',

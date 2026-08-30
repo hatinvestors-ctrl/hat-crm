@@ -6,23 +6,41 @@
 [functions]
   node_bundler = "esbuild"
 
+# P0 Timeout Investigation & Fix (2026-08-30) — real finding: Netlify's
+# actual hard ceiling for synchronous function execution on this account's
+# plan is 26 seconds (confirmed via `netlify api listAccountsForUser` —
+# capability "configure_functions": true, which gates the ability to raise
+# the timeout at all, but does not raise the platform's own ceiling above
+# 26s). Every value below that requested MORE than 26s (batchdata-enrich
+# 45s, analyze-deal/generate-report 120s, generate-ai-notes 50s,
+# generate-core-analysis/generate-comps 30s) was silently clamped by
+# Netlify to 26s in production — the config on disk never matched what the
+# platform actually enforced. That mismatch is what let generate-core-
+# analysis's internal 22s AbortController look safe on paper (22s < the
+# requested-but-fictional 30s) while leaving only ~4s of real margin
+# against the platform's true 26s kill, with no protective margin at all
+# for the unprotected calls (analyze-deal/generate-report had NO internal
+# AbortController — see those files — so they were relying entirely on a
+# 120s budget that never existed). Corrected to the real, enforced value so
+# every function's own internal guard has provable, honest margin under
+# the ceiling Netlify actually applies.
 [functions."batchdata-enrich"]
-  timeout = 45
+  timeout = 26
 
 [functions."analyze-deal"]
-  timeout = 120
+  timeout = 26
 
 [functions."generate-report"]
-  timeout = 120
+  timeout = 26
 
 [functions."generate-ai-notes"]
-  timeout = 50
+  timeout = 26
 
 [functions."generate-core-analysis"]
-  timeout = 30
+  timeout = 26
 
 [functions."generate-comps"]
-  timeout = 30
+  timeout = 26
 
 [functions."generate-negotiation-plan"]
   timeout = 25
@@ -31,12 +49,14 @@
 # finding: this was the ONLY LLM-calling function with NO explicit
 # timeout override, silently relying on the platform default while every
 # comparable sibling (generate-comps/generate-core-analysis, same class
-# of call) has one. Real historical successful calls take ~20.6-20.9s;
-# the function's own internal AbortController caps at 25s — 30s matches
-# generate-comps/generate-core-analysis's precedent and gives real margin
-# above both.
+# of call) has one. Real historical successful calls take ~20.6-20.9s.
+# P0 Timeout Investigation & Fix (2026-08-30) — the 30s requested here
+# exceeded the account's real 26s platform ceiling (same finding as every
+# other function below); corrected to 26, and the internal AbortController
+# lowered from 25s to 20s so it keeps real margin under that ceiling
+# while still safely covering the ~20.6-20.9s historical calls above.
 [functions."generate-call-review"]
-  timeout = 30
+  timeout = 26
 
 [functions."generate-communications"]
   timeout = 22

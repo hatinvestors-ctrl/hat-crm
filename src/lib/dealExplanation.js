@@ -20,6 +20,7 @@ import {
   FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, FLIP_PASS_MARGIN,
   formatCurrency as fc, getEffectiveOffer, describeCashLeftIn,
 } from './calculations.js'
+import { resolveHoldMonths } from './underwritingSettings.js'
 
 const THIN_MARGIN = FLIP_PASS_MARGIN // within $5K of target = WATCH, not a clean PASS (Section 11)
 
@@ -101,10 +102,17 @@ function marginOfSafetyExplanation({ verdict, priceCushion, profitCushion, maoFe
 // NEGOTIATED offer HAT would extend (getEffectiveOffer/calculateLiveOffer)
 // — still useful, still returned, never confused with the real evaluation
 // price above.
-export function computeFlipResult(lead) {
+// Underwriting Configuration V1 — `settings` (optional, a resolved
+// underwritingSettings.js object) is a new trailing param. Omitted by
+// every pre-existing call site (unchanged behavior); only callers that
+// explicitly resolve and pass workspace underwriting settings get
+// configured values. Also fixes the previously-found `lead.hold_months
+// || 6` bug (Part 4, explicitly authorized) via resolveHoldMonths — a
+// real `hold_months: 0` now survives instead of silently becoming 6.
+export function computeFlipResult(lead, settings = null) {
   const arv = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, settings?.default_holding_months)
   const ask = lead.asking_price != null ? Number(lead.asking_price) : null
   // D2 (System Validation Review — Product Decision, see RELEASE-
   // READINESS.md) — field provenance audit confirmed `lead.offer_price`
@@ -122,7 +130,7 @@ export function computeFlipResult(lead) {
   if (arv == null) return { available: false, reason: 'ARV is missing.' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.' }
 
-  const rawMao = calculateFlipMAO(arv, reno, holdMonths)
+  const rawMao = calculateFlipMAO(arv, reno, holdMonths, FLIP_MIN_PROFIT_TARGET, settings)
   // F2 — a Max Buy at or below $0 is not a valid acquisition price under
   // any purchase-price assumption; expose it as unusable (null) rather
   // than a negative dollar figure a downstream reader (or a clamp) could
@@ -143,7 +151,7 @@ export function computeFlipResult(lead) {
   // ONCE here and exposed as-is — a "View Calculation" UI reads this
   // object directly instead of re-deriving All-In/profit math itself.
   const evaluationBreakdown = (evaluationPrice != null && evaluationPrice > 0)
-    ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths)
+    ? computeFlipBreakdown(evaluationPrice, arv, reno, holdMonths, settings)
     : null
   const profitAtEvaluationPrice = evaluationBreakdown ? evaluationBreakdown.totalProfit : null
 
@@ -234,16 +242,16 @@ export function computeFlipResult(lead) {
 // Section 15 (optional) — downside sensitivity. Reuses computeFlipBreakdown
 // with modified inputs ONLY; no new financial model, no probability claims,
 // just "what does profit become if X changes" using the exact same formula.
-export function computeFlipDownsideSensitivity(lead, flipResult) {
+export function computeFlipDownsideSensitivity(lead, flipResult, settings = null) {
   if (!flipResult?.available || flipResult.currentOffer == null) return null
   const arv = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   if (arv == null || reno == null) return null
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, settings?.default_holding_months)
   const pp = flipResult.currentOffer
 
-  const renoOverrun = computeFlipBreakdown(pp, arv, reno + 5000, holdMonths).totalProfit
-  const softerArv = computeFlipBreakdown(pp, arv - 10000, reno, holdMonths).totalProfit
+  const renoOverrun = computeFlipBreakdown(pp, arv, reno + 5000, holdMonths, settings).totalProfit
+  const softerArv = computeFlipBreakdown(pp, arv - 10000, reno, holdMonths, settings).totalProfit
 
   return [
     { label: 'Rehab +$5,000', profit: renoOverrun },
@@ -252,22 +260,22 @@ export function computeFlipDownsideSensitivity(lead, flipResult) {
 }
 
 // ── BRRRR ─────────────────────────────────────────────────────────────
-export function computeBrrrrResult(lead) {
+export function computeBrrrrResult(lead, settings = null) {
   const arv = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : null
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, settings?.default_holding_months)
 
   if (arv == null) return { available: false, reason: 'ARV is missing.', missingField: 'ARV' }
   if (reno == null) return { available: false, reason: 'Renovation cost is missing.', missingField: 'renovation cost' }
   if (rent == null) return { available: false, reason: 'BRRRR cannot be confirmed yet — rent estimate is missing.', missingField: 'rent estimate' }
 
-  const maoResult = calculateBrrrrMAO(arv, reno, rent, holdMonths)
+  const maoResult = calculateBrrrrMAO(arv, reno, rent, holdMonths, BRRRR_MAX_CASH_LEFT_IN, settings)
   // Same effective-offer logic as Flip (see computeFlipResult) — keeps
   // BRRRR's cash-left-in/cash-flow figures aligned with whatever
   // Financials is currently showing, not a stale stored offer.
   const currentOffer = getEffectiveOffer(lead, maoResult.mao) ?? (lead.asking_price != null ? Number(lead.asking_price) : null)
-  const current = currentOffer != null ? computeBrrrrBreakdown(currentOffer, arv, reno, rent, holdMonths) : null
+  const current = currentOffer != null ? computeBrrrrBreakdown(currentOffer, arv, reno, rent, holdMonths, { settings }) : null
   const cashLeftIn = current ? Math.round(current.totalCashInvested) : null
   const monthlyCashFlow = current?.monthlyCF != null ? Math.round(current.monthlyCF) : null
   const coc = current?.coc ?? null

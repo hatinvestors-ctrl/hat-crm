@@ -260,8 +260,8 @@ describe('Backward compatibility — netlify.toml/model/timeouts untouched', () 
     expect(genReviewSrc).toMatch(/model: 'claude-haiku-4-5-20251001'/)
     expect(genReviewSrc).toMatch(/max_tokens: 4096/)
   })
-  it('the internal 25s abort timer is unchanged', () => {
-    expect(genReviewSrc).toMatch(/abortCtrl\.abort\(\), 25000\)/)
+  it('the internal abort timer (lowered from 25s to 20s by the P0 Timeout Investigation & Fix, 2026-08-30, for real margin under the account\'s true 26s Netlify platform ceiling — not touched by this capability)', () => {
+    expect(genReviewSrc).toMatch(/abortCtrl\.abort\(\), 20000\)/)
   })
 })
 

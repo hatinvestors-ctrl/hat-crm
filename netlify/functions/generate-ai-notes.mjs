@@ -402,8 +402,15 @@ export default async (req) => {
     const userPrompt   = buildUserPrompt(lead) + (screener_mode ? '' : buildCompsBlock(comps, lead))
 
     const abortCtrl = new AbortController()
-    // screener_mode targets <10s; full analysis can use up to 45s (Netlify function timeout is 50s)
-    const abortTimer = setTimeout(() => abortCtrl.abort(), screener_mode ? 12000 : 45000)
+    // P0 Timeout Investigation & Fix (2026-08-30) — real finding: this
+    // budget assumed a 50s Netlify function timeout, but the platform's
+    // actual ceiling for this account is 26s (see netlify.toml's comment
+    // on generate-core-analysis for how that was confirmed) — the old
+    // 45s non-screener abort exceeded that real ceiling and could never
+    // fire before Netlify's own kill produced a non-JSON response.
+    // screener_mode targets <10s; full analysis now capped at 20s, safely
+    // under the real 26s ceiling.
+    const abortTimer = setTimeout(() => abortCtrl.abort(), screener_mode ? 12000 : 20000)
 
     let claudeRes
     try {

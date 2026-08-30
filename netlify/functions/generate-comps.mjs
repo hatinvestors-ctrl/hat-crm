@@ -201,8 +201,13 @@ Renovation Budget: ${fmt(lead.renovation_cost)}${rentalMathBlock}${compsBlock}
 
 Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS USED if historical data was provided above. Every reference to "the ARV" or "Max Buy" in your output must use the CANONICAL FINANCIALS values above exactly.`
 
+  // P0 Timeout Investigation & Fix (2026-08-30) — same real finding as
+  // generate-core-analysis.mjs (see its comment): the true platform
+  // ceiling for this account is 26s, not the 30s previously requested in
+  // netlify.toml. Lowered for real, provable margin.
   const abortCtrl = new AbortController()
-  const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
+  const t0 = Date.now()
 
   try {
     let resp
@@ -228,14 +233,17 @@ Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS US
 
     if (!resp.ok) {
       const err = await resp.text()
+      console.log(`[generate-comps] FAILED total=${Date.now() - t0}ms status=${resp.status}`)
       return new Response(JSON.stringify({ ok: false, error: err }), { status: 502, headers: HEADERS })
     }
 
     const data = await resp.json()
     const raw = data.content?.[0]?.text?.trim() || ''
     const notes = '=====================================\n' + raw
+    console.log(`[generate-comps] OK total=${Date.now() - t0}ms`)
     return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
+    console.log(`[generate-comps] EXCEPTION total=${Date.now() - t0}ms aborted=${abortCtrl.signal.aborted} error=${e.message}`)
     return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
   }
 }

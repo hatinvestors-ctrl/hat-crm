@@ -82,21 +82,49 @@ export function calculateMortgagePayment(principal, annualRate = BRRRR_REFI_RATE
   return p * (r * factor) / (factor - 1)
 }
 
+// Underwriting Configuration V1 (Part 1/3) — every formula below accepts
+// an OPTIONAL trailing `settings` object. When omitted (every pre-existing
+// call site, unchanged), each field falls back to the EXACT literal that
+// was already hardcoded here — behavior is byte-identical to before this
+// capability. Only a caller that explicitly resolves and passes workspace
+// underwriting settings (via resolveUnderwritingSettings in
+// underwritingSettings.js) gets configured values. This file intentionally
+// does NOT import underwritingSettings.js — the fallback literals below
+// are this file's own, independent source of truth, never derived from
+// another module, so this file keeps working standalone exactly as before.
+function pctOrDefault(settings, key, defaultPct) {
+  const v = settings?.[key]
+  return (typeof v === 'number' && Number.isFinite(v)) ? v / 100 : defaultPct
+}
+function numOrDefault(settings, key, defaultVal) {
+  const v = settings?.[key]
+  return (typeof v === 'number' && Number.isFinite(v)) ? v : defaultVal
+}
+
 // Full Flip P&L at a given purchase price — HML financing (90% purchase +
 // 100% reno, 2% points, 1%/mo interest), $2,450 fixed closing costs, taxes
 // $208/mo + insurance $100/mo holding, sale at 93% of ARV. Same formula as
 // calculateFlipProfitAtPrice() below, but returns every intermediate line
 // item (needed for the Full Breakdown tab and the BRRRR/Flip solvers).
-export function computeFlipBreakdown(pp, arv, reno, holdMonths = 6) {
-  const hmlLoan         = pp * 0.90 + reno
-  const monthlyPmt      = hmlLoan * 0.01
-  const points          = hmlLoan * 0.02
-  const downPayment     = pp * 0.10
-  const fixedCosts      = 2450
+export function computeFlipBreakdown(pp, arv, reno, holdMonths = 6, settings = null) {
+  const purchaseFinancingPct = pctOrDefault(settings, 'hml_purchase_financing_pct', 0.90)
+  const rehabFinancingPct    = pctOrDefault(settings, 'hml_rehab_financing_pct', 1.00)
+  const hmlMonthlyRatePct    = pctOrDefault(settings, 'hml_interest_monthly_pct', 0.01)
+  const hmlPointsPct         = pctOrDefault(settings, 'hml_points_pct', 0.02)
+  const fixedClosing         = numOrDefault(settings, 'acquisition_closing_costs', 2450)
+  const monthlyTaxes         = numOrDefault(settings, 'monthly_taxes', 208)
+  const monthlyInsurance     = numOrDefault(settings, 'monthly_insurance', 100)
+  const sellingCostPct       = pctOrDefault(settings, 'flip_selling_cost_pct', 0.07)
+
+  const hmlLoan         = pp * purchaseFinancingPct + reno * rehabFinancingPct
+  const monthlyPmt      = hmlLoan * hmlMonthlyRatePct
+  const points          = hmlLoan * hmlPointsPct
+  const downPayment     = pp * (1 - purchaseFinancingPct)
+  const fixedCosts      = fixedClosing
   const totalCashNeeded = downPayment + points + fixedCosts
-  const holdingPerMo    = monthlyPmt + 208 + 100
+  const holdingPerMo    = monthlyPmt + monthlyTaxes + monthlyInsurance
   const totalHolding    = holdingPerMo * holdMonths
-  const saleProceeds    = arv * 0.93
+  const saleProceeds    = arv * (1 - sellingCostPct)
   const totalProfit     = saleProceeds - hmlLoan - totalHolding - totalCashNeeded
   const roi             = totalCashNeeded > 0 ? (totalProfit / totalCashNeeded) * 100 : 0
   const annualizedRoi   = holdMonths > 0 ? (roi / holdMonths) * 12 : 0
@@ -142,26 +170,45 @@ export function computeFlipBreakdown(pp, arv, reno, holdMonths = 6) {
 // this pass, deliberately left unchanged. `opts` only exposes the
 // APPROVED Issue #1 override surface (rate/amortization); it does not
 // add an unapproved override for refi costs.
+// Underwriting Configuration V1 — `opts.settings` (optional, resolved
+// underwriting settings from underwritingSettings.js) is a NEW, additive
+// override surface alongside the pre-existing `opts.refiInterestRate`/
+// `opts.amortizationYears` (Issue #1's approved override, unchanged).
+// When `opts.settings` is absent (every pre-existing call site), every
+// field below falls back to the exact literal already hardcoded here.
 export function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6, opts = {}) {
-  const refiInterestRate   = opts.refiInterestRate != null ? Number(opts.refiInterestRate) : BRRRR_REFI_RATE
-  const amortizationYears  = opts.amortizationYears != null ? Number(opts.amortizationYears) : BRRRR_REFI_AMORT_YEARS
+  const settings = opts.settings || null
+  const refiInterestRate   = opts.refiInterestRate != null
+    ? Number(opts.refiInterestRate)
+    : (typeof settings?.refi_interest_rate_pct === 'number' ? settings.refi_interest_rate_pct / 100 : BRRRR_REFI_RATE)
+  const amortizationYears  = opts.amortizationYears != null ? Number(opts.amortizationYears) : numOrDefault(settings, 'refi_amort_years', BRRRR_REFI_AMORT_YEARS)
 
-  const hmlLoan           = pp * 0.90 + reno
-  const monthlyPmt        = hmlLoan * 0.01
-  const points            = hmlLoan * 0.02
-  const downPayment       = pp * 0.10
-  const fixedCosts        = 2450
+  const purchaseFinancingPct = pctOrDefault(settings, 'hml_purchase_financing_pct', 0.90)
+  const rehabFinancingPct    = pctOrDefault(settings, 'hml_rehab_financing_pct', 1.00)
+  const hmlMonthlyRatePct    = pctOrDefault(settings, 'hml_interest_monthly_pct', 0.01)
+  const hmlPointsPct         = pctOrDefault(settings, 'hml_points_pct', 0.02)
+  const fixedClosing         = numOrDefault(settings, 'acquisition_closing_costs', 2450)
+  const monthlyTaxes         = numOrDefault(settings, 'monthly_taxes', 208)
+  const monthlyInsurance     = numOrDefault(settings, 'monthly_insurance', 100)
+  const refiLtvPct           = pctOrDefault(settings, 'refi_ltv_pct', 0.70)
+  const refiCostsPct         = pctOrDefault(settings, 'refi_costs_pct', 0.03)
+
+  const hmlLoan           = pp * purchaseFinancingPct + reno * rehabFinancingPct
+  const monthlyPmt        = hmlLoan * hmlMonthlyRatePct
+  const points            = hmlLoan * hmlPointsPct
+  const downPayment       = pp * (1 - purchaseFinancingPct)
+  const fixedCosts        = fixedClosing
   const totalCashNeeded   = downPayment + points + fixedCosts
-  const holdingPerMo      = monthlyPmt + 208 + 100
+  const holdingPerMo      = monthlyPmt + monthlyTaxes + monthlyInsurance
   const totalHolding      = holdingPerMo * holdMonths
-  const refiLoan          = arv * 0.70
-  const refiCosts         = refiLoan * 0.03   // Issue #2 — estimated/defaulted, NOT approved to change this pass
+  const refiLoan          = arv * refiLtvPct
+  const refiCosts         = refiLoan * refiCostsPct   // Issue #2 — estimated/defaulted, NOT approved to change the DEFAULT this pass; now configurable, default unchanged
   const refiCashOut       = refiLoan - refiCosts - hmlLoan - totalHolding
   // Issue #4 fix — signed, never clamped inside the engine.
   const totalCashInvested = totalCashNeeded - refiCashOut
   // Issue #1 fix — real amortization at the canonical rate, not a flat multiplier.
   const refiMoPmt         = calculateMortgagePayment(refiLoan, refiInterestRate, amortizationYears)
-  const monthlyCF         = monthlyRent > 0 ? monthlyRent - refiMoPmt - 208 - 100 : null
+  const monthlyCF         = monthlyRent > 0 ? monthlyRent - refiMoPmt - monthlyTaxes - monthlyInsurance : null
   const annualCF          = monthlyCF != null ? monthlyCF * 12 : null
   // Part 3 — CoC edge-case handling was ALREADY correct: null whenever
   // cash left in is <= 0 (never divides by zero or a negative number,
@@ -193,9 +240,20 @@ export function computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths = 6
     // Transparency additions:
     purchasePrice: pp, rehab: reno, acquisitionCosts, financingCosts, investorPurchaseEquity,
     investorCashContributed, allIn, cashLeftIn, cashExtracted,
-    refiValue: arv, refiLtvPct: 0.70, grossRefiLoan: refiLoan, hmlPayoff: hmlLoan,
+    // BRRRR Rendered Settings Integrity Fix (2026-08-30) — real, confirmed
+    // root cause: these three DESCRIPTIVE fields were hardcoded literals
+    // (0.70 / 208 / 100) instead of the `refiLtvPct`/`monthlyTaxes`/
+    // `monthlyInsurance` local variables already computed above and
+    // already used for the ACTUAL math (refiLoan, holdingPerMo, monthlyCF
+    // etc. were always correct). A UI reading `b.refiLtvPct` to LABEL the
+    // Gross Refinance Loan therefore showed a stale "70%" next to a
+    // correctly-computed 75%-derived dollar amount — exactly the
+    // "label = 70%, loan = 75%" defect this fix removes. No math changed:
+    // every dollar value in this return object is unchanged; only these
+    // three fields now describe the settings that were already in effect.
+    refiValue: arv, refiLtvPct, grossRefiLoan: refiLoan, hmlPayoff: hmlLoan,
     netRefiCashReturned, refiInterestRate, amortizationYears,
-    rent: monthlyRent, taxesMonthly: 208, insuranceMonthly: 100, mortgagePayment: refiMoPmt,
+    rent: monthlyRent, taxesMonthly: monthlyTaxes, insuranceMonthly: monthlyInsurance, mortgagePayment: refiMoPmt,
   }
 }
 
@@ -222,7 +280,14 @@ export function bisectThreshold(evalFn, lo, hi, iterations = 60) {
 // totalProfit is linear in purchase price for fixed arv/reno/holdMonths).
 // Returns null when ARV is unknown — never invents a price ceiling from
 // no data.
-export function calculateFlipMAO(arv, renovationCost, holdMonths = 6, targetProfit = FLIP_MIN_PROFIT_TARGET) {
+// Underwriting Configuration V1 — the closed-form coefficients below are
+// algebraically re-derived (independently verified, not just re-typed)
+// from computeFlipBreakdown's formula with the same optional `settings`
+// generalization. At every default value, ppCoeff/renoCoeff/constant
+// reduce EXACTLY to the original hardcoded 1.018+0.009×hold /
+// 1.02+0.01×hold / arv×0.93−hold×308−2450 — proven identical by
+// construction and locked by test/underwritingSettings.test.js.
+export function calculateFlipMAO(arv, renovationCost, holdMonths = 6, targetProfit = FLIP_MIN_PROFIT_TARGET, settings = null) {
   const a = num(arv)
   if (!a) return null
   // Real-data validation (Section 21) caught this: the module-level num()
@@ -232,9 +297,18 @@ export function calculateFlipMAO(arv, renovationCost, holdMonths = 6, targetProf
   // explicitly known for a Flip MAO to mean anything.
   if (renovationCost === null || renovationCost === undefined || renovationCost === '') return null
   const reno = num(renovationCost)
-  const ppCoeff   = 1.018 + 0.009 * holdMonths
-  const renoCoeff = 1.02 + 0.01 * holdMonths
-  const constant  = a * 0.93 - holdMonths * 308 - 2450
+
+  const financePct   = pctOrDefault(settings, 'hml_purchase_financing_pct', 0.90)
+  const rehabFinPct  = pctOrDefault(settings, 'hml_rehab_financing_pct', 1.00)
+  const hmlRate      = pctOrDefault(settings, 'hml_interest_monthly_pct', 0.01)
+  const pointsPct    = pctOrDefault(settings, 'hml_points_pct', 0.02)
+  const fixedClosing = numOrDefault(settings, 'acquisition_closing_costs', 2450)
+  const monthlyTI    = numOrDefault(settings, 'monthly_taxes', 208) + numOrDefault(settings, 'monthly_insurance', 100)
+  const sellingCostPct = pctOrDefault(settings, 'flip_selling_cost_pct', 0.07)
+
+  const ppCoeff   = 1 + financePct * (holdMonths * hmlRate + pointsPct)
+  const renoCoeff = rehabFinPct * (1 + holdMonths * hmlRate + pointsPct)
+  const constant  = a * (1 - sellingCostPct) - holdMonths * monthlyTI - fixedClosing
   return (constant - reno * renoCoeff - targetProfit) / ppCoeff
 }
 
@@ -250,7 +324,7 @@ export function calculateFlipMAO(arv, renovationCost, holdMonths = 6, targetProf
 // Returns { mao, limitingFactor: 'CASH_LEFT_IN'|'CASH_FLOW', cashLeftInAtMao, cashFlowAtMao }
 // or { mao: null, reason } when a required input (ARV, rent) is missing —
 // never a fabricated number (Section 9's explicit "NOT READY" requirement).
-export function calculateBrrrrMAO(arv, renovationCost, monthlyRent, holdMonths = 6, maxCashLeftIn = BRRRR_MAX_CASH_LEFT_IN) {
+export function calculateBrrrrMAO(arv, renovationCost, monthlyRent, holdMonths = 6, maxCashLeftIn = BRRRR_MAX_CASH_LEFT_IN, settings = null) {
   const a = num(arv)
   if (!a) return { mao: null, reason: 'ARV unknown' }
   // Same null-coerces-to-0 trap as calculateFlipMAO above — checked against
@@ -271,21 +345,21 @@ export function calculateBrrrrMAO(arv, renovationCost, monthlyRent, holdMonths =
   // Cash flow is correctly a PASS/FAIL GATE on the rent/ARV/reno inputs,
   // not a price-dependent constraint; only cash-left-in actually moves
   // with purchase price, so it's the only one ever bisected.
-  const cashFlowAtAnyPrice = computeBrrrrBreakdown(a, a, reno, rent, holdMonths).monthlyCF
+  const cashFlowAtAnyPrice = computeBrrrrBreakdown(a, a, reno, rent, holdMonths, { settings }).monthlyCF
   if (cashFlowAtAnyPrice == null || cashFlowAtAnyPrice <= 0) {
     return { mao: null, reason: 'Cash flow is not positive at this rent/ARV/reno — no purchase price fixes this, since the refi loan (and its payment) is fixed at 70% of ARV regardless of price' }
   }
 
-  const cashLeftInOk = (pp) => computeBrrrrBreakdown(pp, a, reno, rent, holdMonths).totalCashInvested < maxCashLeftIn
+  const cashLeftInOk = (pp) => computeBrrrrBreakdown(pp, a, reno, rent, holdMonths, { settings }).totalCashInvested < maxCashLeftIn
   const lo = a * 0.1, hi = a * 3 // comfortably brackets any realistic purchase price
   const mao = bisectThreshold(cashLeftInOk, lo, hi)
   if (mao == null) return { mao: null, reason: 'No purchase price in range keeps cash left in under the limit' }
 
-  return { mao, limitingFactor: 'CASH_LEFT_IN', ...breakdownAt(mao, a, reno, rent, holdMonths) }
+  return { mao, limitingFactor: 'CASH_LEFT_IN', ...breakdownAt(mao, a, reno, rent, holdMonths, settings) }
 }
 
-function breakdownAt(pp, arv, reno, rent, holdMonths) {
-  const b = computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
+function breakdownAt(pp, arv, reno, rent, holdMonths, settings = null) {
+  const b = computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths, { settings })
   return { cashLeftInAtMao: Math.round(b.totalCashInvested), cashFlowAtMao: b.monthlyCF != null ? Math.round(b.monthlyCF) : null }
 }
 
@@ -383,21 +457,17 @@ export function calculateFlipProfit(arv, purchasePrice, renovationCost) {
 // Used to show "expected profit if bought at MAO" next to MAO, since MAO's fixed
 // 75%-of-ARV rule doesn't by itself guarantee any particular profit dollar amount
 // — that depends on how big the ARV is.
-export function calculateFlipProfitAtPrice(purchasePrice, arv, renovationCost, holdMonths = 6) {
+// Underwriting Configuration V1, Part 13 duplicate-formula cleanup — this
+// used to independently re-derive the exact same lines computeFlipBreakdown
+// already computes. Now delegates to it (same formula, verified identical
+// output at every default), so there is only ONE place this math lives.
+// `settings` optional, same contract as everywhere else in this file.
+export function calculateFlipProfitAtPrice(purchasePrice, arv, renovationCost, holdMonths = 6, settings = null) {
   const pp   = num(purchasePrice)
   const rv   = num(arv)
   const reno = num(renovationCost)
   if (!pp || !rv) return null
-  const hmlLoan = pp * 0.90 + reno
-  const downPayment = pp * 0.10
-  const points = hmlLoan * 0.02
-  const fixedCosts = 2450
-  const totalCashNeeded = downPayment + points + fixedCosts
-  const monthlyPmt = hmlLoan * 0.01
-  const holdingPerMo = monthlyPmt + 208 + 100
-  const totalHolding = holdingPerMo * holdMonths
-  const saleProceeds = rv * 0.93
-  return saleProceeds - hmlLoan - totalHolding - totalCashNeeded
+  return computeFlipBreakdown(pp, rv, reno, holdMonths, settings).totalProfit
 }
 
 export function formatCurrency(value) {

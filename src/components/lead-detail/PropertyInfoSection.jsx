@@ -7,6 +7,7 @@ import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { mlsStatusMeta } from '../../lib/mlsStatus'
 import { safeUrl } from '../../lib/urlSafety'
 import { enrichLead } from '../../lib/enrichment'
+import { isDistressedLead } from '../../lib/distressInfo'
 
 const TONE_PILL = {
   success: 'bg-[color:var(--color-success-soft)] text-[color:var(--color-success-text)]',
@@ -80,8 +81,21 @@ export default function PropertyInfoSection({ lead, userId, members, canEdit, on
         />
       </div>
 
+      {/* Demo Stabilization, Part 5 — lead.asking_price is used identically
+          for on-market and off-market leads (a generic evaluation-price
+          input the underwriting engine reads), but off-market/distressed
+          leads are sourced from public records (Lis Pendens etc.), not an
+          MLS listing — there is no verified seller statement backing this
+          number until an actual seller conversation happens (see
+          lead.distress_data.seller_intelligence.seller_asking_price, a
+          SEPARATE field captured live during calls, untouched here).
+          "Seller's Asking Price" would claim something not provable for
+          those leads, so it's neutral ("Evaluation Price") for distressed
+          leads and unchanged for on-market ones (a real MLS list price is
+          a legitimate concept there). Same field, same save path — label
+          only. */}
       <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-md bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)]">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-warn-text)]">Seller's Asking Price</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-warn-text)]">{isDistressedLead(lead) ? 'Evaluation Price' : "Seller's Asking Price"}</span>
         <EditableField
           label=""
           type="currency"

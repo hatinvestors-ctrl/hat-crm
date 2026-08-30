@@ -4,11 +4,13 @@ import Card from '../ui/Card'
 import NotesRenderer from './NotesRenderer'
 import DealQA from './DealQA'
 import RenoTierPicker from './RenoTierPicker'
+import EditableField from './EditableField'
 import { supabase } from '../../lib/supabase'
+import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import {
   formatCurrency, computeFlipBreakdown, computeBrrrrBreakdown, bisectThreshold,
   calculateFlipMAO, calculateBrrrrMAO, FLIP_MIN_PROFIT_TARGET, BRRRR_MAX_CASH_LEFT_IN, FLIP_STRONG_PROFIT, getEffectiveOffer,
-  describeCashLeftIn,
+  describeCashLeftIn, roundMaxBuy,
 } from '../../lib/calculations'
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, computeFlipDownsideSensitivity } from '../../lib/dealExplanation'
@@ -18,6 +20,7 @@ import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/
 import { isDistressedLead } from '../../lib/distressInfo'
 import { derivePriority } from '../../lib/leadPriority'
 import { recalculateDecisionV2 } from '../../lib/decisionV2Persistence'
+import { resolveHoldMonths } from '../../lib/underwritingSettings'
 
 // Parse the AI-computed MAO from the generated notes text ("Our MAO: $X")
 // so lead.mao always matches exactly what the AI Summary shows.
@@ -116,6 +119,20 @@ async function callFnFull(name, body) {
   return data
 }
 
+// P0 Timeout Investigation & Fix — Part 4. Internal function names/error
+// strings (e.g. "generate-core-analysis timed out") are useful in logs but
+// meaningless and unprofessional in front of a user during a demo. This
+// maps ANY internal AI-pipeline failure (timeout, provider error, malformed
+// response) to one honest, reassuring message — it never invents a cause
+// it can't back up, and it always reassures the user that their inputs and
+// the deterministic Deal calculations (a completely separate code path,
+// untouched by this failure) are safe. The real error string is still
+// logged to the console for engineering/demo-day diagnosis.
+function friendlyAiError(err) {
+  console.error('[AI analysis] pipeline failure:', err?.message || err)
+  return "AI analysis couldn't be completed. Your deal inputs and calculations are safe. Please try again."
+}
+
 // Capability #19.1 — computeFlipBreakdown/computeBrrrrBreakdown/
 // bisectThreshold/maxOfferForProfit moved to src/lib/calculations.js
 // (calculateFlipMAO/calculateBrrrrMAO) so there is exactly ONE
@@ -158,13 +175,13 @@ const pct = n => n != null ? `${n.toFixed(1)}%` : '—'
 // and plain-language guidance — no "pick one lever" phrasing (Section 12),
 // no lever shown unless the solver actually produced a number for it
 // (Section 14 — never fake precision).
-export function BrrrrRealityCheck({ lead }) {
+export function BrrrrRealityCheck({ lead, underwritingSettings = null }) {
   const arv  = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   const rent = lead.rent_estimate != null ? Number(lead.rent_estimate) : (lead.monthly_rent != null ? Number(lead.monthly_rent) : null)
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months)
 
-  const result = calculateBrrrrMAO(arv, reno, rent, holdMonths)
+  const result = calculateBrrrrMAO(arv, reno, rent, holdMonths, BRRRR_MAX_CASH_LEFT_IN, underwritingSettings)
 
   // Current-scenario purchase price — the SAME effective-offer function
   // Financials/Detailed Analysis use (calculations.js), not a separately-
@@ -172,7 +189,7 @@ export function BrrrrRealityCheck({ lead }) {
   // could move Financials' "We Offer" and Detailed Analysis' numbers
   // while Path to a Deal kept showing the old price.
   const currentPP = getEffectiveOffer(lead, result.mao)
-  const current = (arv && reno != null && rent && currentPP) ? computeBrrrrBreakdown(currentPP, arv, reno, rent, holdMonths) : null
+  const current = (arv && reno != null && rent && currentPP) ? computeBrrrrBreakdown(currentPP, arv, reno, rent, holdMonths, { settings: underwritingSettings }) : null
 
   return (
     <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3 space-y-2.5">
@@ -249,14 +266,14 @@ export function BrrrrRealityCheck({ lead }) {
 // — deliberately different questions, not duplicated (Section 8). Every
 // number here comes straight from flipResult (computeFlipResult in
 // dealExplanation.js) — no second calculation, no LLM.
-export function FlipMarginOfSafety({ lead, flipResult }) {
+export function FlipMarginOfSafety({ lead, flipResult, underwritingSettings = null }) {
   const [whyOpen, setWhyOpen] = useState(false)
   const [testDownside, setTestDownside] = useState(false)
   const { verdict, currentOffer, mao, projectedProfit, targetProfit, marginOfSafety } = flipResult
   if (!marginOfSafety) return null
   const theme = VERDICT_THEME[verdict] || VERDICT_THEME.WATCH
   const maturity = getDecisionMaturity(lead)
-  const sensitivity = testDownside ? computeFlipDownsideSensitivity(lead, flipResult) : null
+  const sensitivity = testDownside ? computeFlipDownsideSensitivity(lead, flipResult, underwritingSettings) : null
 
   // Last-Mile UX, Section 6 — this used to repeat a full Current Offer /
   // Max Buy / Cushion / Profit / Target row that's already visible
@@ -345,14 +362,14 @@ export function FlipMarginOfSafety({ lead, flipResult }) {
 // result the caller already computed (never duplicated) — a fresh
 // computeFlipResult call is only a fallback for a caller that doesn't
 // pass one, so this component still works mounted standalone.
-export function FlipRealityCheck({ lead, flipResult }) {
+export function FlipRealityCheck({ lead, flipResult, underwritingSettings = null }) {
   const arv  = lead.arv != null ? Number(lead.arv) : null
   const reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : null
   if (!arv || reno == null) return null
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months)
 
-  const canonicalFlip = flipResult ?? computeFlipResult(lead)
-  const flipMao = canonicalFlip.available ? canonicalFlip.mao : calculateFlipMAO(arv, reno, holdMonths)
+  const canonicalFlip = flipResult ?? computeFlipResult(lead, underwritingSettings)
+  const flipMao = canonicalFlip.available ? canonicalFlip.mao : calculateFlipMAO(arv, reno, holdMonths, FLIP_MIN_PROFIT_TARGET, underwritingSettings)
   // The real CURRENT price this deal is evaluated at — never the
   // recommended/negotiated offer, never Max Buy.
   const currentPP = canonicalFlip.available ? canonicalFlip.evaluationPrice : null
@@ -399,12 +416,22 @@ export function FlipRealityCheck({ lead, flipResult }) {
 
       {/* Capability #19.2, Section 10 — plain-language distance from Flip
           MAO, in terms of the CURRENT purchase-price scenario above, not a
-          repeat of the lever list below. */}
+          repeat of the lever list below.
+          Demo Stabilization, Part 2 — DISPLAY/ROUNDING ONLY fix: the
+          headline Max Buy just above rounds flipMao to the nearest $100
+          (roundMaxBuy, same function FinancialSection/Deal tab use); this
+          sentence used the RAW unrounded flipMao, so the same underlying
+          number could show as "$102,200" in the headline and "$2,222"
+          (vs. the honest $2,200) in this sentence for the exact same
+          scenario. Now uses the SAME rounded figure as the headline it
+          sits directly under — no financial value or comparison logic
+          changed, only which already-existing rounding is applied to the
+          displayed dollar amount. */}
       {currentPP != null && flipMao != null && (
         <p className="text-[11px] text-[color:var(--color-text-muted)]">
           {currentPP <= flipMao
-            ? `You are currently ${fc(flipMao - currentPP)} below the maximum supported purchase price.`
-            : `Purchase price needs to decrease by ${fc(currentPP - flipMao)} to reach Max Buy.`}
+            ? `You are currently ${fc(roundMaxBuy(flipMao) - currentPP)} below the maximum supported purchase price.`
+            : `Purchase price needs to decrease by ${fc(currentPP - roundMaxBuy(flipMao))} to reach Max Buy.`}
         </p>
       )}
 
@@ -490,18 +517,41 @@ function TargetProfitCalc({ arv, reno, holdMonths, currentPP, currentProfit }) {
   )
 }
 
-function FullBreakdownTab({ lead, strategy }) {
+// BRRRR Refinance Cost Settings Integrity Fix (2026-08-30) — real,
+// confirmed root cause of the Deal page's "Full Breakdown" tab showing
+// stale refi numbers ($4,350 instead of the effective-settings $4,500 for
+// Woodleigh at 75% LTV/3% costs): this component never received
+// `underwritingSettings` at all — its call site below passed only
+// `lead`/`strategy` — so EVERY canonical function it calls
+// (calculateFlipMAO/calculateBrrrrMAO/computeFlipBreakdown/
+// computeBrrrrBreakdown) silently fell back to each function's own
+// internal hardcoded defaults (70% LTV, 3% of a 70%-LTV loan) instead of
+// the workspace's actual configured settings — including the effective
+// offer price itself (`canonicalMao`, which `getEffectiveOffer` uses),
+// so even the base the refi loan was computed against could be wrong.
+// This tab is a genuine, previously-missed canonical consumer that
+// bypassed the settings resolver — not a duplicate/hand-coded formula
+// (it already called the right functions), just never wired to them.
+function FullBreakdownTab({ lead, strategy, underwritingSettings = null }) {
   const arv  = Number(lead.arv || 0)
   const reno = Number(lead.renovation_cost ?? 0)
   const rent = Number(lead.rent_estimate || lead.monthly_rent || 0)
   const isFlip = strategy !== 'brrrr'
-  const holdMonths = lead.hold_months || 6
+  const holdMonths = resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months)
   // Same canonical MAO + effective-offer functions every other card on
   // this page uses — this tab used to compute its own flat-75%-rule MAO
   // and prefer stored lead.mao directly, a fourth "current price" concept.
-  const canonicalMao = isFlip ? calculateFlipMAO(arv, reno, holdMonths) : calculateBrrrrMAO(arv, reno, rent, holdMonths)?.mao
+  const canonicalMao = isFlip
+    ? calculateFlipMAO(arv, reno, holdMonths, undefined, underwritingSettings)
+    : calculateBrrrrMAO(arv, reno, rent, holdMonths, undefined, underwritingSettings)?.mao
   const pp = Number(getEffectiveOffer(lead, canonicalMao) || 0)
-  const f = isFlip ? computeFlipBreakdown(pp, arv, reno, holdMonths) : computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths)
+  const f = isFlip
+    ? computeFlipBreakdown(pp, arv, reno, holdMonths, underwritingSettings)
+    : computeBrrrrBreakdown(pp, arv, reno, rent, holdMonths, { settings: underwritingSettings })
+  // Part 4 — labels must reflect the EFFECTIVE percentages, not hardcoded
+  // text, so a customized workspace never sees a mislabeled number.
+  const refiLtvPctDisplay   = underwritingSettings?.refi_ltv_pct ?? 70
+  const refiCostsPctDisplay = underwritingSettings?.refi_costs_pct ?? 3
 
   const Row = ({ label, value, bold, positive, separator, indent }) => (
     separator
@@ -587,8 +637,8 @@ function FullBreakdownTab({ lead, strategy }) {
         {/* BRRRR — Refi */}
         <div>
           <div className="text-[9.5px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-bold mb-1">Refinance</div>
-          <Row label="Refi Loan (70% of ARV)" value={fc(f.refiLoan)} />
-          <Row label="Refi Closing Costs (3%)" value={`−${fc(f.refiCosts)}`} indent />
+          <Row label={`Refi Loan (${refiLtvPctDisplay}% of ARV)`} value={fc(f.refiLoan)} />
+          <Row label={`Refi Closing Costs (${refiCostsPctDisplay}%)`} value={`−${fc(f.refiCosts)}`} indent />
           <Row label="HML Loan Repayment" value={`−${fc(f.hmlLoan)}`} indent />
           <Row label="Holding Costs" value={`−${fc(f.totalHolding)}`} indent />
           <Row separator />
@@ -662,8 +712,118 @@ function FullBreakdownTab({ lead, strategy }) {
   )
 }
 
-export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onStrategyChange, hideDecisionSummary = false }) {
-  const staleness = useDealStaleness(lead)
+// Analysis Readiness + Decision Integrity Fix, Part 2/3 — pure, testable
+// readiness computation. Determines what's REQUIRED vs. AI-DERIVABLE from
+// real code paths (runGenerate below), never inferred from UI copy:
+//   - asking_price: REQUIRED — runGenerate throws NO_ASKING_PRICE without it.
+//   - renovation_cost: REQUIRED — handleRun opens RenoTierPicker and blocks
+//     generation until set; null/undefined = missing, 0 = present.
+//   - arv: NOT required — runGenerate falls back to an AI-comps-derived ARV
+//     (see the "Realistic ARV: $X" regex) when lead.arv is null. Never
+//     shown as a blocking "missing" state.
+//   - rent_estimate: REQUIRED only when the strategy being evaluated is BRRRR.
+export function computeAnalysisReadiness(lead, strategy) {
+  const askingPriceMissing = !lead?.asking_price
+  const renoIsMissing = lead?.renovation_cost == null // 0 is present, per Part 5
+  const arvIsMissing = lead?.arv == null
+  const rentMissing = strategy === 'brrrr' && lead?.rent_estimate == null
+
+  const items = [
+    { key: 'asking_price', label: isDistressedLead(lead) ? 'Target / Evaluation Price' : 'Asking Price', required: true, present: !askingPriceMissing, status: askingPriceMissing ? 'missing' : 'available' },
+    { key: 'renovation_cost', label: 'Renovation Estimate', required: true, present: !renoIsMissing, status: renoIsMissing ? 'missing' : 'available' },
+    { key: 'arv', label: 'ARV', required: false, present: !arvIsMissing, status: arvIsMissing ? 'ai_derivable' : 'available' },
+  ]
+  if (strategy === 'brrrr') {
+    items.push({ key: 'rent_estimate', label: 'Rent Estimate', required: true, present: !rentMissing, status: rentMissing ? 'missing' : 'available' })
+  }
+
+  const missingRequired = items.filter(i => i.required && !i.present)
+  return {
+    items,
+    ready: missingRequired.length === 0,
+    missingRequiredCount: missingRequired.length,
+    missingRequiredLabels: missingRequired.map(i => i.label),
+  }
+}
+
+const READINESS_STATUS_DOT = {
+  available: 'bg-[color:var(--color-success)]',
+  missing: 'bg-[color:var(--color-danger)]',
+  ai_derivable: 'bg-[color:var(--color-accent)]',
+}
+
+// Analysis Readiness + Decision Integrity Fix, Part 2/13 — only rendered
+// before analysis has ever run (see call site: !hasAnalysis). Replaces the
+// old dead-end "More property/financial information is needed" text with
+// an actionable checklist. ARV is NEVER presented as blocking — it always
+// explains HAT AI can derive it during analysis, per Part 3/6.
+function AnalysisReadinessPanel({ lead, strategy, canEdit, update, onOpenRenoPicker }) {
+  const readiness = computeAnalysisReadiness(lead, strategy)
+  return (
+    <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3.5 mb-3 space-y-2.5">
+      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Analysis Readiness</div>
+      <div className="space-y-2">
+        {readiness.items.map(item => (
+          <div key={item.key} className="flex items-center justify-between gap-3 text-[12px]">
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${READINESS_STATUS_DOT[item.status]}`} />
+              <span className="font-semibold text-[color:var(--color-text)]">{item.label}</span>
+            </div>
+
+            {item.key === 'asking_price' && (
+              canEdit ? (
+                <EditableField
+                  label="" type="currency" value={lead.asking_price} formatter={fc}
+                  onSave={(v) => update({ asking_price: v })} placeholder="Set price"
+                  displayClassName={item.present ? 'font-bold tabular-nums' : 'text-[color:var(--color-danger-text)] font-semibold'}
+                />
+              ) : (
+                <span className={item.present ? 'font-bold tabular-nums' : 'text-[color:var(--color-danger-text)] font-semibold'}>{item.present ? fc(lead.asking_price) : 'Missing'}</span>
+              )
+            )}
+
+            {item.key === 'renovation_cost' && (
+              item.present ? (
+                <span className="font-bold tabular-nums">{fc(lead.renovation_cost)}</span>
+              ) : canEdit ? (
+                <button type="button" onClick={onOpenRenoPicker} className="text-[11px] font-semibold underline text-[color:var(--color-accent-text)]">Set Renovation Estimate</button>
+              ) : (
+                <span className="text-[color:var(--color-danger-text)] font-semibold">Missing</span>
+              )
+            )}
+
+            {item.key === 'arv' && (
+              item.present ? (
+                <span className="font-bold tabular-nums">{fc(lead.arv)}</span>
+              ) : (
+                <span className="text-[11px] text-[color:var(--color-text-dim)] text-right max-w-[240px]">Not provided — HAT AI can estimate ARV from comparable sales during analysis</span>
+              )
+            )}
+
+            {item.key === 'rent_estimate' && (
+              item.present ? (
+                <span className="font-bold tabular-nums">{fc(lead.rent_estimate)}/mo</span>
+              ) : (
+                <span className="text-[color:var(--color-danger-text)] font-semibold">Missing — edit in Financials</span>
+              )
+            )}
+          </div>
+        ))}
+      </div>
+      <div className={`text-[11.5px] font-bold pt-2 border-t border-[color:var(--color-line)] ${readiness.ready ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text-dim)]'}`}>
+        {readiness.ready ? '✓ Ready for analysis' : `${readiness.missingRequiredCount} required input${readiness.missingRequiredCount === 1 ? '' : 's'} needed before analysis`}
+      </div>
+    </div>
+  )
+}
+
+export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onStrategyChange, hideDecisionSummary = false, underwritingSettings = null }) {
+  const staleness = useDealStaleness(lead, underwritingSettings)
+  // Analysis Readiness + Decision Integrity Fix, Part 4 — reuses the SAME
+  // canonical save path FinancialSection's asking_price editor already
+  // uses (useLeadUpdate → same validation/persistence/activity-logging/
+  // decision_v2 recalculation). No second source of truth for asking_price.
+  const update = useLeadUpdate(lead, userId, null, onUpdated)
 
   const [strategy,    setStrategy]    = useState(lead.deal_analysis?.strategy || 'flip')
 
@@ -680,6 +840,11 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   const [generating,  setGenerating]  = useState(false)
   const [phase,       setPhase]       = useState(null)
   const [genError,    setGenError]    = useState(null)
+  // Analysis Readiness + Decision Integrity Fix, Part 12 — factual,
+  // non-blocking notice when generate-comps failed for this run. Never
+  // implies comp validation occurred when it didn't; never fabricates ARV
+  // confidence. Cleared on the next successful run.
+  const [compsWarning, setCompsWarning] = useState(null)
   const [showRenoPicker, setShowRenoPicker] = useState(false)
   const [generatingScripts, setGeneratingScripts] = useState(false)
   const [competitiveMode, setCompetitiveMode] = useState(false)
@@ -720,12 +885,23 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
 
   const hasAnalysis = !!lead.deal_analysis
   const renoMissing = lead.renovation_cost == null
+  // Analysis Readiness + Decision Integrity Fix, Part 2/7 — the single
+  // source of truth for "is this lead ready for analysis," reused by both
+  // the readiness panel and the primary CTA below so they can never disagree.
+  const readiness = computeAnalysisReadiness(lead, strategy)
 
   // Note: ARV/Reno/DOM/Rent overrides have no input UI in this card (edited only in
   // PropertyInfoSection/FinancialSection), so they are intentionally excluded from this check.
   const overrideChanged = !!priceDropOverride.trim() || !!sellerNotesOverride.trim()
 
   function handleRun(forceRefreshComps) {
+    // P0 Timeout Investigation & Fix, Part 6 — defense in depth. The CTA
+    // is already swapped out for a non-clickable loading indicator while
+    // `generating` is true (see the button render logic below), so this
+    // is unreachable from the UI today — but a cheap, explicit guard here
+    // means a duplicate expensive AI request can never fire even if
+    // handleRun is ever called from a second code path in the future.
+    if (generating) return
     if (renoMissing) { setShowRenoPicker(true); return }
     // Shorten "Refresh Detailed Analysis": once a lead already has an
     // analysis, only re-run the core numbers that actually depend on
@@ -753,6 +929,15 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
     setGenError(null)
     cancelledRef.current = false
 
+    // P0 Timeout Investigation & Fix, Part 2 — client-side stage timing.
+    // "Get Comps & Detailed AI" is 4 sequential AI-backed Netlify Function
+    // calls chained by the browser (comps → core-analysis →
+    // negotiation-plan → analyze-deal), each independently timing out —
+    // this makes it possible to see which stage actually took the time
+    // from the browser console, without logging any prompt/secret content.
+    const t0 = Date.now()
+    const mark = (label) => console.log(`[AI analysis] ${label}: ${Date.now() - t0}ms elapsed`)
+
     try {
       if (!lead.asking_price) throw new Error('NO_ASKING_PRICE')
 
@@ -769,8 +954,32 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       const freshComps = needFreshComps
         ? await callFn('generate-comps', { lead: leadWithContext }).catch(() => null)
         : null
+      if (needFreshComps) mark('generate-comps done')
       if (cancelledRef.current) return
       const compsNotes = freshComps || existingComps
+
+      // Analysis Readiness + Decision Integrity Fix, Part 12 — factual
+      // visibility when comps generation failed, without making the whole
+      // analysis unusable (graceful degradation stays intentional). Never
+      // claims comp validation happened; never fabricates ARV confidence.
+      if (needFreshComps && !freshComps) {
+        setCompsWarning(existingComps
+          ? 'Comparable-sales refresh failed for this run — showing the previous comps.'
+          : 'Comparable-sales analysis was unavailable for this run.')
+      } else {
+        setCompsWarning(null)
+      }
+
+      // Part 12 — if comps failed to produce anything AND there is no
+      // manually-entered ARV at all, there is no ARV information of any
+      // kind to underwrite against. Use the existing error path (same
+      // pattern as NO_ASKING_PRICE) rather than letting a misleading
+      // financial conclusion get generated from nothing. This is NOT a
+      // new ARV sanity-bound formula — it's a hard "we have zero ARV
+      // signal" guard, not a plausibility check on a number that exists.
+      if (!compsNotes && !lead.arv) {
+        throw new Error('NO_ARV_AVAILABLE')
+      }
 
       // Phase 1b — core analysis with comps ARV injected so all numbers agree.
       // ARV set in Financials is the single source of truth — comps only fill it in
@@ -793,6 +1002,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       }
       setLastArv(arvForCore)
       const coreResult = await callFnFull('generate-core-analysis', { lead: leadWithArv })
+      mark('generate-core-analysis done')
       if (cancelledRef.current) return
       const coreNotes = coreResult.notes || ''
       if (!coreNotes) throw new Error('Core analysis failed')
@@ -805,6 +1015,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       setPhase('negotiation')
       const aiSummary = coreNotes.slice(0, 3000)
       const planNotes = await callFn('generate-negotiation-plan', { lead: leadWithArv, ai_notes: aiSummary }).catch(() => null)
+      mark('generate-negotiation-plan done')
       if (cancelledRef.current) return
 
       const timestamp = `Generated: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n\n`
@@ -895,24 +1106,49 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       // Verdict/score/profit — same analyze-deal call FinancialSection.runAnalyze used to make
       const activeStrategy = strategyOverride ?? strategy
       const effectiveReno = renoOverrideVal ?? lead.renovation_cost ?? 0
-      const freshMao = finalArv
-        ? Math.round(Number(finalArv) * 0.75 - Number(effectiveReno) - 2450)
-        : finalMao
+      // P0/P1 Decision Integrity Fix (2026-08-30) — real, confirmed
+      // defect: `purchase_price` here used to be populated with a
+      // locally re-derived legacy-MAO-shaped value (`freshMao`, its own
+      // independent copy of the 0.75×ARV−reno−2450 formula — for
+      // Woodleigh that was $108,550) instead of the actual CURRENT
+      // EVALUATION PRICE the deal is being analyzed at. `purchase_price`
+      // is the price analyze-deal.mjs computes profit/verdict AT — that
+      // must be the real current price ($100,000 for Woodleigh), never a
+      // Max Buy ceiling of any kind (legacy or canonical). The canonical
+      // Flip Max Buy is a SEPARATE concept (already surfaced elsewhere —
+      // the Deal page's own MAO badge, and analyze-deal.mjs's own
+      // PRE-COMPUTED FINANCIALS block, which derives MAO internally from
+      // this same evaluation price) and must never be substituted in for
+      // it.
       const verdictRes = await fetch('/.netlify/functions/analyze-deal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_id: lead.id,
           address: [lead.address, lead.city, lead.state].filter(Boolean).join(', '),
-          purchase_price: freshMao ?? lead.mao ?? lead.asking_price,
+          purchase_price: lead.asking_price,
           arv: finalArv ?? lead.arv,
           renovation_cost: effectiveReno || null,
           monthly_rent: activeStrategy === 'brrrr' ? (lead.rent_estimate || null) : null,
           strategy: activeStrategy,
           reno_was_estimated: false,
-          hold_months: lead.hold_months || 6,
+          hold_months: resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months),
+          // Analysis Readiness + Decision Integrity Fix, Part 9 — passed
+          // through only so analyze-deal.mjs can freeze it into
+          // deal_analysis.inputs.asking_price for staleness detection.
+          // Never used in the AI prompt or any calculation.
+          asking_price: lead.asking_price ?? null,
+          // Underwriting Configuration V1, Part 5/15 — the SAME effective
+          // settings the Deal page just used, so the AI's PRE-COMPUTED
+          // FINANCIALS agree with what is displayed here. P0/P1 Decision
+          // Integrity Fix (2026-08-30) — the BRRRR path in analyze-deal.mjs
+          // is NOW wired to this (consolidated onto the canonical
+          // computeBrrrrBreakdown — see that file), so this settings
+          // object is used for both Flip and BRRRR now.
+          underwriting_settings: underwritingSettings,
         }),
       })
+      mark('analyze-deal done')
       const verdictData = await verdictRes.json()
       if (verdictRes.ok && verdictData.ok) {
         await logDealAnalysis(lead.id, userId, verdictData.analysis)
@@ -921,14 +1157,17 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         setGenError(verdictData.error || 'Verdict/score generation failed — comps and negotiation plan were saved, but no deal score is available. Try re-running.')
       }
 
+      mark('total pipeline complete')
       // Auto-generate scripts in background — no await, runs independently
       generateScripts(fullNotes)
     } catch (err) {
       if (!cancelledRef.current) {
         setGenError(
           err.message === 'NO_ASKING_PRICE'
-            ? "Please fill in the Seller's Asking Price before generating AI analysis."
-            : err.message || 'Something went wrong.'
+            ? (isDistressedLead(lead) ? 'Please fill in the Evaluation Price before generating AI analysis.' : "Please fill in the Seller's Asking Price before generating AI analysis.")
+            : err.message === 'NO_ARV_AVAILABLE'
+            ? 'Comparable-sales analysis was unavailable and no ARV is set for this property, so a reliable AI analysis could not be generated. Try again, or enter an ARV in Financials.'
+            : friendlyAiError(err)
         )
       }
     } finally {
@@ -1006,6 +1245,12 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         if (freshDecision) { supabaseUpdate.decision_v2 = freshDecision; supabaseUpdate.decision_v2_updated_at = freshDecision.calculated_at }
       }
       setLocalNotes(fullNotes)
+      // Analysis Readiness + Decision Integrity Fix, Part 9/11 — this
+      // lightweight refresh path never calls analyze-deal.mjs (no new
+      // verdict/score), so it must patch the SAME material-input keys
+      // locally, from the current live lead values, or a "Refresh
+      // Detailed Analysis" click here would leave asking_price/strategy/
+      // rent_estimate staleness unresolved even after refreshing.
       const reRunDealAnalysis = lead.deal_analysis ? {
         ...lead.deal_analysis,
         inputs: {
@@ -1013,6 +1258,15 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
           ...(arv         != null ? { arv }                    : {}),
           ...(reRunAiMao  !== null ? { purchase_price: reRunAiMao } : {}),
           ...(reno        != null ? { renovation_cost: reno }  : {}),
+          ...(lead.asking_price != null ? { asking_price: Number(lead.asking_price) } : {}),
+          strategy,
+          ...(strategy === 'brrrr' ? { rent_estimate: lead.rent_estimate != null ? Number(lead.rent_estimate) : null } : {}),
+          // Underwriting Configuration V1, Part 12 — same reasoning as
+          // asking_price/strategy/rent_estimate above: this lightweight
+          // refresh path never calls analyze-deal.mjs, so it must patch
+          // the underwriting snapshot locally or a "Refresh" click here
+          // would leave underwriting-assumption staleness unresolved.
+          underwriting: underwritingSettings || null,
         }
       } : lead.deal_analysis
       onUpdated?.({ ai_notes: fullNotes, ...supabaseUpdate, deal_analysis: reRunDealAnalysis, ...(reRunStartingOffer !== null ? { starting_offer: reRunStartingOffer } : {}) })
@@ -1021,7 +1275,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       // because ARV/reno moved. Kevin can refresh it on demand with the
       // "Update Negotiation Plan" button when he actually wants that.
     } catch (err) {
-      if (!cancelledRef.current) setGenError(err.message || 'Re-run failed.')
+      if (!cancelledRef.current) setGenError(friendlyAiError(err))
     } finally {
       if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
     }
@@ -1137,8 +1391,8 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   // make the selected UI tab determine the underlying strategy
   // recommendation"). The strategy tab only decides which one's numbers
   // are shown as the primary summary below.
-  const flipResult = hasAnalysis ? computeFlipResult(lead) : { available: false, reason: 'Run analysis first.' }
-  const brrrrResult = hasAnalysis ? computeBrrrrResult(lead) : { available: false, reason: 'Run analysis first.' }
+  const flipResult = hasAnalysis ? computeFlipResult(lead, underwritingSettings) : { available: false, reason: 'Run analysis first.' }
+  const brrrrResult = hasAnalysis ? computeBrrrrResult(lead, underwritingSettings) : { available: false, reason: 'Run analysis first.' }
   const strategyRecommendation = computeStrategyRecommendation(flipResult, brrrrResult)
 
   return (
@@ -1154,6 +1408,14 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       )}
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-[color:var(--color-line)] mb-3">
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Analysis Readiness + Decision Integrity Fix, Part 8 — before
+              analysis has ever run, Flip/BRRRR is a pure pre-selection
+              (nothing to switch between yet); labeled explicitly so it
+              never reads as "results already exist." Once analysis exists,
+              behavior/label reverts to the original (switching regenerates). */}
+          {!hasAnalysis && (
+            <span className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mr-0.5">Analysis Strategy</span>
+          )}
           <div className="flex rounded-lg border border-[color:var(--color-line)] overflow-hidden text-[11px] font-bold">
             {['flip', 'brrrr'].map(s => (
               <button
@@ -1199,14 +1461,17 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
               {phase === 'analysis' ? 'Analyzing…' : phase === 'negotiation' ? 'Building negotiation plan…' : 'Working…'}
               <button onClick={cancelGenerate} className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">Cancel</button>
             </span>
-          ) : (!hasAnalysis && isDistressedLead(lead) && !lead.asking_price && !lead.arv) ? (
-            // Capability #10.1 — an off-market lead with no ARV/asking
-            // price yet has nothing meaningful to underwrite. Don't
-            // invite a click that would run on empty inputs; explain
-            // instead. Reappears as a normal button the moment ARV or
-            // asking price is filled in — no change to handleRun itself.
-            <span className="text-[11.5px] text-[color:var(--color-text-dim)] italic">
-              More property/financial information is needed before underwriting.
+          ) : (!hasAnalysis && !readiness.ready) ? (
+            // Analysis Readiness + Decision Integrity Fix, Part 2/7 — the
+            // old version of this branch hid the CTA with a plain,
+            // unactionable sentence and no recovery path (real QA dead
+            // end: an off-market lead with no asking price and no ARV).
+            // Now: a clear, honest reason (never a silent hide), and the
+            // Analysis Readiness panel below gives the actual fix action
+            // for each missing REQUIRED input. ARV is intentionally never
+            // counted here — see computeAnalysisReadiness.
+            <span className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">
+              {readiness.missingRequiredCount} required input{readiness.missingRequiredCount === 1 ? '' : 's'} missing — see Analysis Readiness below
             </span>
           ) : (!hasAnalysis || staleness.stale) ? (
             <button
@@ -1251,6 +1516,19 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         )}
       </div>
 
+      {/* Analysis Readiness + Decision Integrity Fix, Part 2/13 — only
+          before analysis has ever run. Once hasAnalysis is true, the
+          normal result-oriented experience below takes over unchanged. */}
+      {!hasAnalysis && (
+        <AnalysisReadinessPanel
+          lead={lead}
+          strategy={strategy}
+          canEdit={canEdit}
+          update={update}
+          onOpenRenoPicker={() => setShowRenoPicker(true)}
+        />
+      )}
+
       {renoMissing && showRenoPicker && (
         <RenoTierPicker
           lead={lead}
@@ -1267,6 +1545,14 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       {staleness.stale && hasAnalysis && !generating && (
         <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]">
           <span className="text-[11.5px] font-semibold text-[color:var(--color-warn-text)]">⚠ {staleness.reasons.join(', ')} — results may be outdated. Use "Re-run Analysis" above.</span>
+        </div>
+      )}
+
+      {/* Analysis Readiness + Decision Integrity Fix, Part 12 — factual,
+          non-blocking notice, never implies comp validation occurred. */}
+      {compsWarning && hasAnalysis && !generating && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+          <span className="text-[11.5px] text-[color:var(--color-text-dim)]">ⓘ {compsWarning}</span>
         </div>
       )}
 
@@ -1482,7 +1768,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
               id: 'breakdown',
               label: 'Full Breakdown',
               icon: '🧮',
-              content: <FullBreakdownTab lead={lead} strategy={strategy} />,
+              content: <FullBreakdownTab lead={lead} strategy={strategy} underwritingSettings={underwritingSettings} />,
             },
             {
               id: 'askai',
@@ -1497,7 +1783,13 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       ) : (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <p className="text-[13px] text-[color:var(--color-text-dim)]">No AI analysis yet.</p>
-          {canEdit && <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>✦ Run Analysis</strong> above.</p>}
+          {/* P0 Timeout Investigation & Fix, Part 5 — stale-copy bug: this
+              instruction referenced a "Run Analysis" button that no longer
+              exists once a lead already has a preliminary V2 decision (the
+              CTA reads "Get Comps & Detailed AI" in that case — see the
+              button label logic above). Match whichever label is actually
+              showing instead of hardcoding one of them. */}
+          {canEdit && <p className="text-[12px] text-[color:var(--color-text-faint)]">Click <strong>{lead.decision_v2 ? '✦ Get Comps & Detailed AI' : '✦ Run Analysis'}</strong> above.</p>}
         </div>
       )}
 

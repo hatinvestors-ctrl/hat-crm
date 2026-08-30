@@ -42,7 +42,7 @@ function EvidenceTypeBadge({ type }) {
   return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">PRIOR HAT ARV ESTIMATE</span>
 }
 
-export default function ComplsIntelligenceCard({ lead }) {
+export default function ComplsIntelligenceCard({ lead, underwritingSettings = null }) {
   const [candidates, setCandidates] = useState([])
   const [evidenceLoading, setEvidenceLoading] = useState(true)
   const [evidenceError, setEvidenceError] = useState(null)
@@ -86,8 +86,8 @@ export default function ComplsIntelligenceCard({ lead }) {
     return () => { cancelled = true }
   }, [lead.zip_code, lead.id])
 
-  const sensitivity = computeDecisionSensitivity(lead)
-  const externalState = getExternalCompConfidenceState()
+  const sensitivity = computeDecisionSensitivity(lead, { underwritingSettings })
+  const externalState = getExternalCompConfidenceState(lead)
   const evidence = getHatInternalEvidence(lead, candidates)
   const recommendation = sensitivity.available ? getValuationRecommendation(sensitivity.sensitivity) : null
 

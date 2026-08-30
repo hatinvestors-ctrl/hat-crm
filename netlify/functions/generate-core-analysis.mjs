@@ -10,6 +10,7 @@
 
 import { calculateFlipMAO, computeFlipBreakdown, computeBrrrrBreakdown } from '../../src/lib/calculations.js'
 import { computeBrrrrResult } from '../../src/lib/dealExplanation.js'
+import { resolveHoldMonths } from '../../src/lib/underwritingSettings.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
@@ -117,7 +118,7 @@ Priority:   [HIGH - act today / MEDIUM - this week / LOW - watch]`
 // math feeding the AI prompt — the part that must stay canonical, per
 // the Product Decision in RELEASE-READINESS.md (QA-03) — is directly
 // unit-testable without a live LLM call.
-export function buildPrompt(lead) {
+export function buildPrompt(lead, underwritingSettings = null) {
   const addr = [lead.address, lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')
   const fmt  = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'Unknown'
   const num  = (n) => n != null ? Number(n) : null
@@ -129,6 +130,11 @@ export function buildPrompt(lead) {
   const mao  = num(lead.mao)
   const sqft = num(lead.sqft)
 
+  // P0/P1 Decision Integrity Fix (2026-08-30) — resolved the same way the
+  // Deal page resolves it (resolveHoldMonths), so a workspace with a
+  // non-default holding period doesn't silently diverge here.
+  const holdMonths = resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months)
+
   // Capability #19.2, Section 6 — pre-compute MAO so the AI never has to
   // estimate it. Uses the SAME canonical Flip MAO function (src/lib/
   // calculations.js) the Lead Detail UI's "Flip MAO" badge/Path to a Flip
@@ -137,7 +143,11 @@ export function buildPrompt(lead) {
   // "$147,550 here, $148,200 there" contradiction this capability exists
   // to remove. Falls back to lead.mao only when ARV or reno is unknown
   // (calculateFlipMAO returns null in that case, same as before).
-  const computedMao = (arv && reno != null) ? Math.round(calculateFlipMAO(arv, reno, 6)) : mao
+  // P0/P1 Decision Integrity Fix (2026-08-30) — now threads the effective
+  // workspace underwriting settings so this number matches the Deal
+  // page's canonical Flip MAO under a customized configuration too, not
+  // just at system defaults.
+  const computedMao = (arv && reno != null) ? Math.round(calculateFlipMAO(arv, reno, holdMonths, undefined, underwritingSettings)) : mao
 
   let computedBlock = ''
   let brrrrResult = null
@@ -152,9 +162,18 @@ export function buildPrompt(lead) {
     const refi     = arv * 0.70
     const rentEst  = rent || (lead.bedrooms >= 4 ? 2000 : lead.bedrooms === 3 ? 1600 : 1300)
     // P&I at 6.875% / 30yr. Factor = 0.006566
+    // NOTE (P0/P1 Decision Integrity Fix, 2026-08-30) — `refi`/`loanFactor`
+    // here are dead values (never read below in this branch — superseded
+    // by the canonical computeBrrrrResult/computeBrrrrBreakdown calls a
+    // few lines down). Left as-is; removing unused code is out of this
+    // task's scope ("do not refactor unrelated code").
     const loanFactor = refi <= 150000 ? 985 : refi <= 180000 ? 1182 : refi <= 200000 ? 1313 : refi <= 220000 ? 1445 : Math.round(refi * 0.006566)
-    // Hold period scales with reno size: light (<$20K)=4mo, medium=5.5mo, heavy(>$50K)=7mo
-    const holdMo = 6
+    // P0/P1 Decision Integrity Fix (2026-08-30) — was hardcoded to 6,
+    // now the same resolved holdMonths used for computedMao above, so
+    // this block's BRRRR/Flip math (computeBrrrrBreakdown/
+    // computeFlipBreakdown calls below) uses the effective holding
+    // period, not a silently different one.
+    const holdMo = holdMonths
 
     // Math AT MAO (what we actually pay)
     // Product Decision — Canonical Deal Values (QA-03, see RELEASE-
@@ -172,7 +191,7 @@ export function buildPrompt(lead) {
     // cash flow at the RECOMMENDED offer, not at BRRRR's own Max Buy —
     // reusing it directly, instead of re-implementing that same
     // convention by hand, is what guarantees the match).
-    const brrrr = computeBrrrrResult(lead)
+    const brrrr = computeBrrrrResult(lead, underwritingSettings)
     // currentOffer is the SAME price computeBrrrrResult itself evaluated
     // cashLeftIn/monthlyCashFlow at (the recommended/negotiated offer,
     // not BRRRR's own Max Buy) — computeBrrrrBreakdown here only supplies
@@ -181,7 +200,7 @@ export function buildPrompt(lead) {
     // recomputed, so they can never drift from the canonical value.
     const brrrrBuyPrice = brrrr.available ? brrrr.currentOffer : null
     if (brrrr.available && brrrrBuyPrice != null && brrrr.cashLeftIn != null) {
-      const bb = computeBrrrrBreakdown(brrrrBuyPrice, arv, reno, rentEst, holdMo)
+      const bb = computeBrrrrBreakdown(brrrrBuyPrice, arv, reno, rentEst, holdMo, { settings: underwritingSettings })
       brrrrResult = {
         allIn: Math.round(bb.totalCashNeeded + bb.totalHolding),
         refi: Math.round(bb.refiLoan),
@@ -195,7 +214,7 @@ export function buildPrompt(lead) {
     // "ARV − price − reno − 8%" formula this used to compute independently
     // — that second formula was the actual source of the "$46,650 at MAO"
     // text that didn't match the $30,728/$30,000 figures shown elsewhere.
-    const flipNetMao    = Math.round(computeFlipBreakdown(buyPrice, arv, reno, holdMo).totalProfit)
+    const flipNetMao    = Math.round(computeFlipBreakdown(buyPrice, arv, reno, holdMo, underwritingSettings).totalProfit)
     // $30,000 is HAT's minimum acceptable Flip profit (FLIP_MIN_PROFIT_TARGET) —
     // anything at/above it is never "FAILS"; $40K+ is descriptively STRONG.
     flipResult  = { allIn: buyPrice + reno, netProfit: flipNetMao, label: flipNetMao >= 40000 ? 'STRONG' : flipNetMao >= 30000 ? 'ACCEPTABLE' : 'FAILS' }
@@ -204,10 +223,10 @@ export function buildPrompt(lead) {
     // BRRRR reference figures now use the same canonical
     // computeBrrrrBreakdown, at the actual asking price, for the same
     // provenance reason as above.
-    const askBrrrr    = computeBrrrrBreakdown(pp, arv, reno, rentEst, holdMo)
+    const askBrrrr    = computeBrrrrBreakdown(pp, arv, reno, rentEst, holdMo, { settings: underwritingSettings })
     const allInAsk    = Math.round(askBrrrr.totalCashNeeded + askBrrrr.totalHolding)
     const cashLeftAsk = Math.round(askBrrrr.totalCashInvested)
-    const flipNetAsk  = Math.round(computeFlipBreakdown(pp, arv, reno, holdMo).totalProfit)
+    const flipNetAsk  = Math.round(computeFlipBreakdown(pp, arv, reno, holdMo, underwritingSettings).totalProfit)
 
     const pctAboveMaoNum = computedMao ? ((pp - computedMao) / Math.abs(computedMao)) * 100 : 0
     const pctAboveMao    = pctAboveMaoNum.toFixed(1)
@@ -330,7 +349,7 @@ export function buildPrompt(lead) {
 
     computedBlock = `
 PRE-COMPUTED DEAL MATH — use these exact numbers, do not recalculate:
-MAO (75%×ARV−Reno−closing): ${fmt(computedMao)}
+Our MAO (canonical Flip Max Buy — the ceiling; NOT the current evaluation price below): ${fmt(computedMao)}
 Price gap: Ask ${fmt(pp)} vs MAO ${fmt(computedMao)} = ${pctAboveMao}% ${askBelowMao ? 'AT/BELOW MAO ✓ — ASK IS ALREADY A GOOD PRICE' : 'ABOVE MAO — need price reduction'}
 OFFER LADDER (use these exact values — do not adjust):
   Starting Offer (anchor): ${anchorOffer} (${anchorNote})
@@ -485,10 +504,19 @@ Starting Offer: ${anchorLocked}
 Target Price:   ${targetLocked}
 Max Walk-Away:  ${maxLocked}`,
       prefill: '=====================================',
+      // P0/P1 Decision Integrity Fix (2026-08-30) — returned so the
+      // handler below can reuse THESE canonical, settings-aware values
+      // for its API response instead of independently re-deriving MAO/
+      // starting-offer with a different (legacy, or re-implemented)
+      // formula. This is the exact number the LLM was told to use — the
+      // response the client persists into lead.mao can now never
+      // disagree with what the AI narrative itself says.
+      computedMao: computedMao ?? null,
+      computedStartingOffer: anchorFinal ?? null,
     }
   }
 
-  return { prompt: userPrompt, prefill: assistantPrefill }
+  return { prompt: userPrompt, prefill: assistantPrefill, computedMao: computedMao ?? null, computedStartingOffer: null }
 }
 
 export default async (req) => {
@@ -496,54 +524,46 @@ export default async (req) => {
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: HEADERS })
 
   const body = await req.json().catch(() => ({}))
-  const { lead = {} } = body
+  const { lead = {}, underwriting_settings = null } = body
 
   if (!lead.address) return new Response(JSON.stringify({ ok: false, error: 'lead.address required' }), { status: 400, headers: HEADERS })
   if (!lead.asking_price) return new Response(JSON.stringify({ ok: false, error: 'NO_ASKING_PRICE' }), { status: 400, headers: HEADERS })
 
-  // Pre-compute MAO + starting offer server-side so client can save without regex parsing
-  const _arv  = lead.arv  != null ? Number(lead.arv)  : null
-  const _reno = lead.renovation_cost != null ? Number(lead.renovation_cost) : 0
-  const _pp   = lead.asking_price != null ? Number(lead.asking_price) : null
-  const computedMaoForResponse = _arv ? Math.round(_arv * 0.75 - _reno - 2450) : null
-  let computedStartingOffer = null
-  if (_pp && computedMaoForResponse) {
-    const competitive = !!lead.competitive_mode
-    if (_pp <= computedMaoForResponse) {
-      computedStartingOffer = Math.round(_pp / 100) * 100
-    } else if (competitive) {
-      const pct = ((_pp - computedMaoForResponse) / Math.abs(computedMaoForResponse)) * 100
-      const raw = pct <= 15 ? computedMaoForResponse : pct <= 35 ? Math.round(computedMaoForResponse * 0.96) : Math.round(computedMaoForResponse * 0.91)
-      computedStartingOffer = Math.round(raw / 100) * 100
-    } else {
-      // Negotiation-room model — same logic as buildPrompt
-      const notesForScore = ((lead.notes || '') + ' ' + (lead.team_comments || '')).toLowerCase()
-      let mScore = 0
-      const dom2 = lead.days_on_market != null ? Number(lead.days_on_market) : null
-      if (dom2 != null) { mScore += dom2 > 90 ? 3 : dom2 > 60 ? 2 : dom2 > 30 ? 1 : 0 }
-      const drop2 = lead.price_drop_pct != null ? Number(lead.price_drop_pct) : null
-      if (drop2 != null) { mScore += drop2 > 15 ? 3 : drop2 > 5 ? 2 : 0 }
-      const motivKw = ['estate','probate','divorce','relocation','relocating','must sell','motivated','as-is','as is','tired landlord','behind on','pre-foreclosure','foreclosure','job loss','medical','inherited','cash only','quick close','fast close','price reduced','reduced','vacant']
-      for (const kw of motivKw) { if (notesForScore.includes(kw)) mScore += kw === 'estate' || kw === 'probate' || kw === 'divorce' || kw === 'must sell' || kw === 'behind on' || kw === 'pre-foreclosure' || kw === 'foreclosure' ? 3 : 2 }
-      mScore = Math.min(10, mScore)
-      const gap = _pp - computedMaoForResponse
-      const roomFactor = Math.max(0.20, 0.50 - mScore * 0.02)
-      let raw = computedMaoForResponse - gap * roomFactor
-      const floorPct = Math.max(0.72, 0.80 - mScore * 0.008)
-      raw = Math.max(raw, _pp * floorPct)
-      raw = Math.max(raw, _pp * 0.65)
-      // MAO is an absolute ceiling — apply it last so no floor above can push the
-      // offer back over it (a starting offer must never exceed the max we'd pay).
-      raw = Math.min(raw, computedMaoForResponse * 0.995)
-      computedStartingOffer = Math.round(raw / 100) * 100
-    }
-  }
+  // Returned to the client alongside computed_mao — unchanged, still the
+  // investor-provided/comps ARV, not a derived value.
+  const _arv = lead.arv != null ? Number(lead.arv) : null
 
+  // P0/P1 Decision Integrity Fix (2026-08-30) — real finding: this
+  // response used to compute its own `computed_mao`/`computed_starting_
+  // offer` with an ENTIRELY SEPARATE, legacy 0.75×ARV−reno−2450 formula
+  // and a hand-duplicated copy of the negotiation-room model, both
+  // independent of what buildPrompt() had already computed (canonically,
+  // via calculateFlipMAO) and told the LLM to use. For Woodleigh
+  // (ARV $200K, reno $39K) that legacy formula produced $108,550 — a
+  // real, materially different number from the canonical $102,222 Flip
+  // MAO the Deal page and the AI narrative itself both show. Persisting
+  // $108,550 into lead.mao while the Deal page and the AI's own written
+  // analysis said $102,222 is the confirmed decision-integrity defect
+  // this fix removes. buildPrompt is now called once, and its own
+  // canonical computedMao/anchorFinal are reused for the API response —
+  // there is no longer a second, independent calculation to drift.
+
+  // P0 Timeout Investigation & Fix (2026-08-30) — real finding: this
+  // account's actual Netlify platform ceiling for synchronous function
+  // execution is 26s (confirmed via `netlify api listAccountsForUser`),
+  // not the 30s previously requested in netlify.toml (silently clamped).
+  // Lowered from 22000ms to 20000ms so there is real, provable margin
+  // under the true ceiling — not just margin under a number the platform
+  // never actually honored. No prompt/model/financial-calculation change.
   const abortCtrl = new AbortController()
-  const abortTimer = setTimeout(() => abortCtrl.abort(), 22000)
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
+
+  // Part 2 diagnostics — stage timing, no secrets/prompt content logged.
+  const t0 = Date.now()
 
   try {
-    const { prompt: builtPrompt, prefill: builtPrefill } = buildPrompt(lead)
+    const { prompt: builtPrompt, prefill: builtPrefill, computedMao: computedMaoForResponse, computedStartingOffer } = buildPrompt(lead, underwriting_settings)
+    const tPromptBuilt = Date.now()
     let resp
     try {
       resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -564,9 +584,11 @@ export default async (req) => {
     } finally {
       clearTimeout(abortTimer)
     }
+    const tAiDone = Date.now()
 
     if (!resp.ok) {
       const err = await resp.text()
+      console.log(`[generate-core-analysis] FAILED prompt_build=${tPromptBuilt - t0}ms ai_call=${tAiDone - tPromptBuilt}ms total=${tAiDone - t0}ms status=${resp.status}`)
       return new Response(JSON.stringify({ ok: false, error: err }), { status: 502, headers: HEADERS })
     }
 
@@ -574,6 +596,8 @@ export default async (req) => {
     const raw = data.content?.[0]?.text?.trim() || ''
     // Prepend the prefill so the full output includes the section header
     const notes = builtPrefill + '\n' + raw
+    const tTotal = Date.now() - t0
+    console.log(`[generate-core-analysis] OK prompt_build=${tPromptBuilt - t0}ms ai_call=${tAiDone - tPromptBuilt}ms parse=${Date.now() - tAiDone}ms total=${tTotal}ms`)
     // Also return computed arv/mao so client can save them without fragile regex parsing
     return new Response(JSON.stringify({
       ok: true,
@@ -583,6 +607,7 @@ export default async (req) => {
       computed_starting_offer: computedStartingOffer,
     }), { status: 200, headers: HEADERS })
   } catch (e) {
+    console.log(`[generate-core-analysis] EXCEPTION total=${Date.now() - t0}ms aborted=${abortCtrl.signal.aborted} error=${e.message}`)
     return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: HEADERS })
   }
 }

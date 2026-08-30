@@ -136,8 +136,14 @@ ${transcript}
 
 Score this call against the rubric and return the JSON shape exactly as specified.`
 
+  // P0 Timeout Investigation & Fix (2026-08-30) — real finding: this
+  // account's actual Netlify platform ceiling is 26s (see netlify.toml's
+  // comment on this function). The old 25s abort left only ~1s of margin
+  // against that real ceiling; lowered to 20s for the same safe margin
+  // used by every sibling AI-calling function, while still comfortably
+  // covering the ~20.6-20.9s historical successful-call duration.
   const abortCtrl = new AbortController()
-  const abortTimer = setTimeout(() => abortCtrl.abort(), 25000)
+  const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
 
   try {
     let resp

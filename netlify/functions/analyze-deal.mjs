@@ -5,6 +5,8 @@
 //
 // Required env vars: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_PAT
 
+import { computeFlipBreakdown, computeBrrrrBreakdown } from '../../src/lib/calculations.js'
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 const SUPABASE_URL      = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY      = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
@@ -340,48 +342,63 @@ Numbers-first, no fluff. Short and actionable. Flag clearly if inputs are estima
 - Include: distance, similarity %, beds/baths, sq ft, listed rent, rent/sqft, last seen
 - State estimated rent range and midpoint used in analysis`
 
-function computeFlipMetrics(pp, arv, reno, holdMonths = 6) {
-  const hmlLoan       = pp * 0.90 + reno
-  const monthlyPmt    = hmlLoan * 0.01
-  const points        = hmlLoan * 0.02
-  const fixedCosts    = 2450                          // title + lender insurance + doc stamps + intangible
-  const downPayment   = pp * 0.10
-  const totalCashNeeded = downPayment + points + fixedCosts
-  const holdingPerMo  = monthlyPmt + 208 + 100        // loan pmt + taxes + insurance
-  const totalHolding  = holdingPerMo * holdMonths
-  const saleProceeds  = arv * 0.93
-  const totalProfit   = saleProceeds - hmlLoan - totalHolding - totalCashNeeded
-  const roi           = totalCashNeeded > 0 ? (totalProfit / totalCashNeeded) * 100 : 0
-  const annualizedRoi = holdMonths > 0 ? (roi / holdMonths) * 12 : 0
-  return { hmlLoan, monthlyPmt, points, downPayment, totalCashNeeded, holdingPerMo, totalHolding, saleProceeds, totalProfit, roi, annualizedRoi }
+// Underwriting Configuration V1, Part 5/19 — CONSOLIDATED (was a hand-copy
+// of the exact same formula computeFlipBreakdown already implements in
+// src/lib/calculations.js — confirmed byte-identical output for every
+// existing case, since the two were already the same literals). Now
+// delegates to the canonical function so a future underwriting-setting
+// change (e.g. selling cost %, HML terms) reaches the AI's PRE-COMPUTED
+// FINANCIALS block the same way it reaches the Deal page — eliminating
+// the P0 drift risk the forensic audit found here. `settings` optional
+// (resolved underwriting settings) — omitted, this is byte-identical to
+// the pre-consolidation hand-copy.
+function computeFlipMetrics(pp, arv, reno, holdMonths = 6, settings = null) {
+  const b = computeFlipBreakdown(pp, arv, reno, holdMonths, settings)
+  return {
+    hmlLoan: b.hmlLoan, monthlyPmt: b.monthlyPmt, points: b.points, downPayment: b.downPayment,
+    totalCashNeeded: b.totalCashNeeded, holdingPerMo: b.holdingPerMo, totalHolding: b.totalHolding,
+    saleProceeds: b.saleProceeds, totalProfit: b.totalProfit, roi: b.roi, annualizedRoi: b.annualizedRoi,
+  }
 }
 
-function computeBrrrrMetrics(pp, arv, reno, monthlyRent, holdMonths = 6) {
-  const hmlLoan       = pp * 0.90 + reno
-  const monthlyPmt    = hmlLoan * 0.01
-  const points        = hmlLoan * 0.02
-  const fixedCosts    = 2450
-  const downPayment   = pp * 0.10
-  const totalCashNeeded = downPayment + points + fixedCosts
-  const holdingPerMo  = monthlyPmt + 208 + 100
-  const totalHolding  = holdingPerMo * holdMonths
-  const refiLoan      = arv * 0.70
-  const refiCosts     = refiLoan * 0.03
-  const refiCashOut   = refiLoan - refiCosts - hmlLoan - totalHolding
-  const totalCashInvested = refiCashOut >= 0
-    ? Math.max(0, totalCashNeeded - refiCashOut)
-    : totalCashNeeded + Math.abs(refiCashOut)
-  const refiMoPmt     = refiLoan * 0.006607
-  const monthlyCF     = monthlyRent > 0 ? monthlyRent - refiMoPmt - 208 - 100 : null
-  const annualCF      = monthlyCF != null ? monthlyCF * 12 : null
-  const coc           = totalCashInvested > 0 && annualCF != null ? (annualCF / totalCashInvested) * 100 : null
-  return { hmlLoan, monthlyPmt, points, downPayment, totalCashNeeded, holdingPerMo, totalHolding, refiLoan, refiCosts, refiCashOut, totalCashInvested, refiMoPmt, monthlyCF, annualCF, coc }
+// P0/P1 Decision Integrity Fix (2026-08-30) — CONSOLIDATED, explicitly
+// authorized by this task (Part 5). The Underwriting Configuration V1
+// task (2026-08-26) deliberately left this hand-coded, because
+// consolidating it onto the canonical computeBrrrrBreakdown would have
+// silently changed real leads' AI-narrative BRRRR numbers — a STOP
+// CONDITION at the time. That STOP CONDITION is explicitly lifted here:
+// this task exists BECAUSE the two disagreeing — the hand-coded copy
+// used a flat mortgage-payment multiplier (refiLoan * 0.006607, an
+// undocumented ~6.93% rate) instead of real 30yr amortization at the
+// canonical rate, clamped totalCashInvested to a $0 floor instead of the
+// canonical signed value, and hardcoded refi LTV to 70% regardless of
+// the workspace's actual configured setting (confirmed FAIL condition —
+// this task's Part 6 requires the AI to see 75% when the workspace is
+// configured for 75%, and the old hardcoded 0.70 here could never do
+// that). Now delegates to the SAME canonical computeBrrrrBreakdown the
+// Deal page uses, threaded with the SAME effective underwriting settings
+// — the AI pipeline can no longer disagree with the Deal page on BRRRR
+// math. No formula was invented; this is a straight swap onto the
+// existing, already-validated canonical engine.
+function computeBrrrrMetrics(pp, arv, reno, monthlyRent, holdMonths = 6, settings = null) {
+  const b = computeBrrrrBreakdown(pp, arv, reno, monthlyRent, holdMonths, { settings })
+  return {
+    hmlLoan: b.hmlLoan, monthlyPmt: b.monthlyPmt, points: b.points, downPayment: b.downPayment,
+    totalCashNeeded: b.totalCashNeeded, holdingPerMo: b.holdingPerMo, totalHolding: b.totalHolding,
+    refiLoan: b.refiLoan, refiCosts: b.refiCosts, refiCashOut: b.refiCashOut,
+    totalCashInvested: b.totalCashInvested, refiMoPmt: b.mortgagePayment,
+    monthlyCF: b.monthlyCF, annualCF: b.annualCF, coc: b.coc,
+  }
 }
 
 function fmt(n) { return n == null ? 'N/A' : '$' + Math.round(n).toLocaleString('en-US') }
 function pct(n) { return n == null ? 'N/A' : n.toFixed(1) + '%' }
 
-function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy, hold_months }) {
+// Exported (additive only, no behavior change) so this prompt-building
+// function — including the PRE-COMPUTED FINANCIALS block that must stay
+// canonical — is directly unit-testable without a live LLM call, matching
+// the pattern already used for buildPrompt/SYSTEM_PROMPT elsewhere.
+export function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy, hold_months, underwriting_settings = null }) {
   const pp   = Number(purchase_price)
   const rv   = Number(arv)
   const reno = Number(renovation_cost || 0)
@@ -394,7 +411,7 @@ function buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthl
   let jsonDefaults = {}
 
   if (strategyLabel === 'flip') {
-    const m = computeFlipMetrics(pp, rv, reno, holdMonths)
+    const m = computeFlipMetrics(pp, rv, reno, holdMonths, underwriting_settings)
     // Capability #19.1, Section 6 — HAT's minimum acceptable Flip profit is
     // $30,000 (FLIP_MIN_PROFIT_TARGET in src/lib/calculations.js); a deal
     // that clears it is BUY, full stop — no longer demoted to CONDITIONAL
@@ -419,20 +436,27 @@ PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
 `
     jsonDefaults = { verdict, score, profit: Math.round(m.totalProfit), roi: Math.round(m.roi * 10) / 10, annualized_roi: Math.round(m.annualizedRoi * 10) / 10, total_cash_needed: Math.round(m.totalCashNeeded) }
   } else {
-    const m = computeBrrrrMetrics(pp, rv, reno, rent, holdMonths)
+    const m = computeBrrrrMetrics(pp, rv, reno, rent, holdMonths, underwriting_settings)
     // Capability #19.1, Section 8 — HAT's BRRRR requirement is binary:
     // positive monthly cash flow AND less than $30K cash left in after
     // refinance (BRRRR_MAX_CASH_LEFT_IN). Replaces the old CoC-tiered
     // BUY/CONDITIONAL/PASS bands.
     const verdict = (m.monthlyCF ?? 0) > 0 && (m.totalCashInvested ?? Infinity) < 30000 ? 'BUY' : 'PASS'
     const score = m.coc != null ? Math.max(0, Math.min(100, Math.round(50 + (m.coc - 6) * 5))) : 20
+    // P0/P1 Decision Integrity Fix (2026-08-30) — LTV/refi-cost % labels
+    // were hardcoded text ("70% ARV", "3%") regardless of the actual
+    // settings used to compute m.refiLoan/m.refiCosts above — a Part 6
+    // FAIL condition (the AI would print "70% ARV" even when computed at
+    // a workspace-configured 75%). Now reads the same effective values.
+    const refiLtvPctDisplay   = underwriting_settings?.refi_ltv_pct ?? 70
+    const refiCostsPctDisplay = underwriting_settings?.refi_costs_pct ?? 3
     computedBlock = `
 PRE-COMPUTED FINANCIALS (use these exact numbers — do not recalculate):
 - HML Loan: ${fmt(m.hmlLoan)}
 - Total Cash Needed: ${fmt(m.totalCashNeeded)}
 - Total Holding (${holdMonths} months): ${fmt(m.totalHolding)}
-- Refi Loan (70% ARV): ${fmt(m.refiLoan)}
-- Refi Costs (3%): ${fmt(m.refiCosts)}
+- Refi Loan (${refiLtvPctDisplay}% ARV): ${fmt(m.refiLoan)}
+- Refi Costs (${refiCostsPctDisplay}%): ${fmt(m.refiCosts)}
 - Refi Cash Out: ${fmt(m.refiCashOut)}
 - Total Cash Invested after refi: ${fmt(m.totalCashInvested)}
 - Refi monthly mortgage: ${fmt(m.refiMoPmt)}
@@ -509,26 +533,54 @@ export default async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const { lead_id, address, purchase_price, arv, renovation_cost, monthly_rent = null, strategy = 'flip', skip_save = false, reno_was_estimated = false } = body
+    const { lead_id, address, purchase_price, arv, renovation_cost, monthly_rent = null, strategy = 'flip', skip_save = false, reno_was_estimated = false, asking_price = null, underwriting_settings = null, hold_months = null } = body
 
     if (!purchase_price) return new Response(JSON.stringify({ ok: false, error: 'purchase_price is required.' }), { status: 400, headers: HEADERS })
     if (!arv)            return new Response(JSON.stringify({ ok: false, error: 'arv is required.' }), { status: 400, headers: HEADERS })
 
-    // Call Claude API
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy }) }],
-      }),
-    })
+    // P0 Timeout Investigation & Fix (2026-08-30) — real finding: this
+    // call had NO internal timeout guard at all, relying entirely on the
+    // netlify.toml `timeout = 120` config — a budget that never actually
+    // existed. Netlify's real platform ceiling for this account is 26s
+    // (see netlify.toml's comment on this function for how that was
+    // confirmed); anything past that is hard-killed with a non-JSON
+    // response regardless of what the config file says. This abort at
+    // 20s guarantees the function ALWAYS returns valid JSON (a real error
+    // message, gracefully handled by the client) before Netlify's own
+    // platform-level kill can produce an opaque, ungraceful failure —
+    // matching the pattern already used by analyze-deal's sibling
+    // functions (generate-core-analysis, generate-comps,
+    // generate-negotiation-plan). Does not touch the prompt, the model,
+    // or any financial calculation.
+    const abortCtrl = new AbortController()
+    const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
+    let claudeRes
+    try {
+      claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
+          // P0/P1 Decision Integrity Fix (2026-08-30) — real finding:
+          // hold_months was already destructured in buildUserPrompt's
+          // signature but never actually forwarded from this call site,
+          // so it silently always fell back to 6 months regardless of
+          // what the client sent (or the effective workspace default).
+          // The client (DealAnalysisCard.jsx) already sends the resolved
+          // value — it just wasn't being read here.
+          messages: [{ role: 'user', content: buildUserPrompt({ address, purchase_price, arv, renovation_cost, monthly_rent, strategy, hold_months, underwriting_settings }) }],
+        }),
+        signal: abortCtrl.signal,
+      })
+    } finally {
+      clearTimeout(abortTimer)
+    }
 
     if (!claudeRes.ok) {
       const errText = await claudeRes.text()
@@ -552,11 +604,28 @@ export default async (req) => {
       markdown,
       analyzed_at:       new Date().toISOString(),
       reno_unknown: !renovation_cost && !reno_was_estimated,
+      // Analysis Readiness + Decision Integrity Fix, Part 9 — the frozen
+      // "what was this analysis actually generated against" snapshot.
+      // Additive only: purchase_price/arv/renovation_cost/reno_was_estimated
+      // are UNCHANGED (same values, same meaning, same math). strategy/
+      // asking_price/monthly_rent are NEW fields added here so
+      // useDealStaleness (src/hooks/useDealStaleness.js) can detect drift
+      // on those material inputs too — this does not touch how any of
+      // these numbers are calculated, only what gets remembered about them.
       inputs: {
         purchase_price:   Number(purchase_price),
         arv:              Number(arv),
         renovation_cost:  renovation_cost != null ? Number(renovation_cost) : null,
         reno_was_estimated,
+        strategy,
+        asking_price:     asking_price != null ? Number(asking_price) : null,
+        rent_estimate:    strategy === 'brrrr' && monthly_rent != null ? Number(monthly_rent) : null,
+        // Underwriting Configuration V1, Part 12 — the EFFECTIVE settings
+        // actually used for this generation (not just the raw workspace
+        // config), so useDealStaleness can detect drift precisely. Null
+        // when the caller didn't pass any (legacy/unwired caller) — never
+        // fabricated.
+        underwriting: underwriting_settings || null,
       },
     }
 

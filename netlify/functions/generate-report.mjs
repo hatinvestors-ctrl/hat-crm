@@ -1,4 +1,6 @@
 // netlify/functions/generate-report.mjs
+import { computeFlipBreakdown } from '../../src/lib/calculations.js'
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 const HEADERS = {
@@ -69,15 +71,20 @@ const LENGTH_INSTRUCTIONS = {
   detailed: 'Target approximately 600+ words. Include full comps list, complete scenario narrative, all risks and notes details.',
 }
 
-function buildUserPrompt(lead, recipientType, length) {
+function buildUserPrompt(lead, recipientType, length, underwriting_settings = null) {
   const fmt = (v) => v != null ? `$${Number(v).toLocaleString()}` : '—'
 
+  // Underwriting Configuration V1, Part 5/19 — CONSOLIDATED (was a
+  // hand-copy of the same formula computeFlipBreakdown implements;
+  // confirmed byte-identical output). The pre-existing `holdMonths = 3`
+  // default (different from the canonical engine's 6-month default, and
+  // never reads the lead's real hold_months) is a real, PRE-EXISTING
+  // behavioral quirk — deliberately preserved as-is here, not silently
+  // "fixed" to 6, since changing it would change every report's scenario
+  // numbers (a STOP CONDITION, flagged in the delivery report instead).
   function scenarioProfit(arv, pp, reno, holdMonths = 3) {
     if (!arv || !pp) return null
-    const loan = pp * 0.9 + reno
-    const cashNeeded = pp * 0.1 + loan * 0.02 + 2450
-    const holdCost = (loan * 0.01 + 308) * holdMonths
-    return Math.round(arv * 0.93 - loan - holdCost - cashNeeded)
+    return Math.round(computeFlipBreakdown(pp, arv, reno, holdMonths, underwriting_settings).totalProfit)
   }
 
   const conProfit = scenarioProfit(lead.conservative_arv, lead.conservative_offer_price || lead.offer_price, lead.conservative_renovation_cost || lead.renovation_cost)
@@ -141,27 +148,42 @@ export default async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const { lead, recipient_type = 'lender', length = 'standard' } = body
+    const { lead, recipient_type = 'lender', length = 'standard', underwriting_settings = null } = body
 
     if (!lead) return new Response(JSON.stringify({ ok: false, error: 'lead is required.' }), { status: 400, headers: HEADERS })
 
     const systemPrompt = SYSTEM_PROMPTS[recipient_type] || SYSTEM_PROMPTS.lender
-    const userPrompt   = buildUserPrompt(lead, recipient_type, length)
+    const userPrompt   = buildUserPrompt(lead, recipient_type, length, underwriting_settings)
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: length === 'brief' ? 400 : length === 'standard' ? 800 : 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    })
+    // P0 Timeout Investigation & Fix (2026-08-30) — same real finding as
+    // analyze-deal.mjs (see its comment): this call had no internal
+    // timeout guard, relying on a netlify.toml `timeout = 120` budget
+    // that the platform's real 26s ceiling for this account never
+    // actually honored. This abort guarantees a graceful JSON error
+    // response instead of an opaque platform-level kill. No prompt,
+    // model, or financial-calculation change.
+    const abortCtrl = new AbortController()
+    const abortTimer = setTimeout(() => abortCtrl.abort(), 20000)
+    let res
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: length === 'brief' ? 400 : length === 'standard' ? 800 : 1200,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        signal: abortCtrl.signal,
+      })
+    } finally {
+      clearTimeout(abortTimer)
+    }
 
     if (!res.ok) {
       const err = await res.text()

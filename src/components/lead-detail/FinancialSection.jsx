@@ -9,6 +9,7 @@ import {
 } from '../../lib/calculations'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
 import { isDistressedLead } from '../../lib/distressInfo'
+import { resolveHoldMonths } from '../../lib/underwritingSettings'
 
 
 // Bug fix — this section always computed/labeled a Flip MAO regardless of
@@ -19,7 +20,7 @@ import { isDistressedLead } from '../../lib/distressInfo'
 // sync with DealAnalysisCard's own tab (see DealAnalysisCard's
 // onStrategyChange). Defaults to 'flip' so nothing changes for a lead
 // where BRRRR was never touched.
-export default function FinancialSection({ lead, userId, members, canEdit, onUpdated, strategy = 'flip' }) {
+export default function FinancialSection({ lead, userId, members, canEdit, onUpdated, strategy = 'flip', underwritingSettings = null }) {
   const update = useLeadUpdate(lead, userId, members, onUpdated)
   const isBrrrr = strategy === 'brrrr'
 
@@ -73,8 +74,8 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
         // cash flow + under $30K cash left in) when BRRRR is active. Same
         // canonical functions Deal Analysis/Path to a Deal use — no second
         // formula.
-        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6) : null
-        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
+        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), BRRRR_MAX_CASH_LEFT_IN, underwritingSettings) : null
+        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), FLIP_MIN_PROFIT_TARGET, underwritingSettings)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         // "Diverged" (stored lead.mao vs. canonical) is a Flip-only concept
         // — lead.mao is V2's Flip-formula fallback input; BRRRR MAO has no
@@ -135,7 +136,12 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
             <div className="flex items-stretch gap-0 rounded-xl border border-[color:var(--color-line)] overflow-hidden mb-3">
               {/* Ask */}
               <div className="flex-1 flex flex-col items-center justify-center px-3 py-3 bg-[color:var(--color-bg-elev-2)] border-r border-[color:var(--color-line)]">
-                <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold mb-1">Asking</div>
+                {/* Demo Stabilization, Part 5 — off-market leads have no
+                    verified seller statement behind lead.asking_price
+                    (sourced from public records, not an MLS listing or a
+                    captured seller call); neutral wording there, unchanged
+                    for on-market. Same field, same save path. */}
+                <div className="text-[9px] uppercase tracking-widest text-[color:var(--color-text-dim)] font-semibold mb-1">{isDistressedLead(lead) ? 'Evaluation Price' : 'Asking'}</div>
                 <EditableField label="" type="currency" value={lead.asking_price} formatter={formatCurrency}
                   onSave={(v) => update({ asking_price: v })} disabled={!canEdit}
                   displayClassName="text-[16px] font-bold text-[color:var(--color-text)]" />
@@ -201,7 +207,19 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                     onClick={() => setShowLegacyMao(o => !o)}
                     className="text-[8.5px] mt-0.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] underline underline-offset-2"
                   >
-                    {showLegacyMao ? 'Hide legacy data' : diverged ? 'Legacy data (diverges from Max Buy)' : 'Legacy data'}
+                    {/* Demo Stabilization, Part 6 — confirmed diagnostic-
+                        only: this collapsed toggle never feeds profit/
+                        verdict/Margin of Safety/offer generation (all read
+                        the canonical Max Buy above, never lead.mao). When
+                        there's genuinely a stored legacy value (present,
+                        whether or not it diverges), "Legacy data" is
+                        accurate. When storedMao is null (nothing stored —
+                        Woodleigh's actual case), the toggle only reveals a
+                        "Set manual override" action, so calling it
+                        "Legacy data" is misleading — nothing legacy exists
+                        yet. Presentation-only; the underlying field/value/
+                        toggle behavior is unchanged. */}
+                    {showLegacyMao ? 'Hide legacy data' : diverged ? 'Legacy data (diverges from Max Buy)' : storedMao != null ? 'Legacy data' : 'Advanced'}
                   </button>
                 )}
                 {!isBrrrr && showLegacyMao && (
@@ -228,7 +246,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                 )}
                 {isBrrrr ? (() => {
                   if (formulaMao == null) return null
-                  const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6)
+                  const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), { settings: underwritingSettings })
                   const tone = b.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'var(--color-success-text)' : 'var(--color-warn-text)'
                   return (
                     <div className="text-[9.5px] mt-0.5" style={{ color: tone }} title="Cash left in / cash flow at the canonical BRRRR MAO shown above — by construction, right at HAT's cash-left-in or cash-flow limit.">
@@ -236,7 +254,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                     </div>
                   )
                 })() : (() => {
-                  const profitAtCanonical = formulaMao != null ? calculateFlipProfitAtPrice(formulaMao, lead.arv, lead.renovation_cost, lead.hold_months || 6) : null
+                  const profitAtCanonical = formulaMao != null ? calculateFlipProfitAtPrice(formulaMao, lead.arv, lead.renovation_cost, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), underwritingSettings) : null
                   if (profitAtCanonical == null) return null
                   const tone = profitAtCanonical >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : 'var(--color-warn-text)'
                   return (
@@ -265,8 +283,8 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
 
       {/* Fallback hero when no asking price yet: show MAO + Starting Offer plainly */}
       {!(lead.asking_price && (lead.arv || lead.mao)) && (() => {
-        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6) : null
-        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, lead.hold_months || 6)
+        const brrrrMaoResult = isBrrrr ? calculateBrrrrMAO(lead.arv, lead.renovation_cost, lead.rent_estimate, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), BRRRR_MAX_CASH_LEFT_IN, underwritingSettings) : null
+        const formulaMao = isBrrrr ? brrrrMaoResult?.mao ?? null : calculateFlipMAO(lead.arv, lead.renovation_cost, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), FLIP_MIN_PROFIT_TARGET, underwritingSettings)
         const storedMao  = lead.mao != null ? Number(lead.mao) : null
         const diverged   = !isBrrrr && formulaMao !== null && storedMao !== null && Math.abs(formulaMao - storedMao) > 1
         // Price Clarity fix — this used to display `lead.mao` (legacy)
@@ -318,7 +336,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
               )}
               {isBrrrr ? (() => {
                 if (formulaMao == null) return null
-                const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, lead.hold_months || 6)
+                const b = computeBrrrrBreakdown(formulaMao, lead.arv, lead.renovation_cost, lead.rent_estimate, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), { settings: underwritingSettings })
                 const tone = b.totalCashInvested < BRRRR_MAX_CASH_LEFT_IN ? 'var(--color-success-text)' : 'var(--color-warn-text)'
                 return (
                   <div className="text-[10px] mt-0.5" style={{ color: tone }}>
@@ -326,7 +344,7 @@ export default function FinancialSection({ lead, userId, members, canEdit, onUpd
                   </div>
                 )
               })() : (() => {
-                const profitAtMao = calculateFlipProfitAtPrice(displayedMao, lead.arv, lead.renovation_cost)
+                const profitAtMao = calculateFlipProfitAtPrice(displayedMao, lead.arv, lead.renovation_cost, resolveHoldMonths(lead.hold_months, underwritingSettings?.default_holding_months), underwritingSettings)
                 if (profitAtMao == null) return null
                 const tone = profitAtMao >= FLIP_STRONG_PROFIT ? 'var(--color-success-text)' : profitAtMao >= FLIP_MIN_PROFIT_TARGET ? 'var(--color-warn-text)' : 'var(--color-danger-text)'
                 return (

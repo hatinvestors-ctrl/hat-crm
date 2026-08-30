@@ -14,6 +14,7 @@
 // formats and arranges those results; it never recomputes a formula.
 import { formatCurrency as fc, describeCashLeftIn, roundMaxBuy } from '../../../lib/calculations'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
+import { isDistressedLead } from '../../../lib/distressInfo'
 import { FlipMarginOfSafety, FlipRealityCheck, BrrrrRealityCheck, VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
 import { getDealReadiness } from './readiness'
 import EmptyState from './EmptyState'
@@ -34,7 +35,7 @@ const VERDICT_TONE = {
   WATCH: 'var(--color-warn-text)', 'NO DEAL': 'var(--color-danger-text)',
 }
 
-export default function DealDecisionCenter({ lead, onRunAnalysis }) {
+export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSettings = null }) {
   const readiness = getDealReadiness(lead)
 
   // L1 fallback — one consolidated readiness block instead of the
@@ -66,8 +67,8 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
     )
   }
 
-  const flip = computeFlipResult(lead)
-  const brrrr = computeBrrrrResult(lead)
+  const flip = computeFlipResult(lead, underwritingSettings)
+  const brrrr = computeBrrrrResult(lead, underwritingSettings)
   const strategyRec = computeStrategyRecommendation(flip, brrrr)
   const preferBrrrr = strategyRec.preferredStrategy === 'BRRRR' && brrrr.available
   const hero = preferBrrrr ? brrrr : flip
@@ -188,7 +189,11 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
         </div>
         {/* L2 — context, secondary line */}
         <div className="px-4 py-2 border-t border-[color:var(--color-line)] text-[11px] text-[color:var(--color-text-dim)]">
-          Seller asks {lead.asking_price != null ? fc(lead.asking_price) : '—'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
+          {/* Demo Stabilization, Part 5 — "Seller asks" implies a verified
+              seller statement, unprovable for off-market/distressed leads
+              (sourced from public records, no MLS listing). Neutral for
+              those; unchanged for on-market. */}
+          {isDistressedLead(lead) ? 'Evaluating at' : 'Seller asks'} {lead.asking_price != null ? fc(lead.asking_price) : '—'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
           {lead.starting_offer != null && <> · Starting offer {fc(lead.starting_offer)}</>}
         </div>
       </div>
@@ -254,7 +259,7 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
                   ? { label: 'CASH LEFT IN — all capital recovered, extracted', value: `$0 · +${fc(cli.extracted)}`, bold: true, tone: 'success' }
                   : { label: 'CASH LEFT IN', value: cli.display, bold: true },
               ]}
-              assumptionNote={`Refinance closing costs (3% of loan) and rate assumptions are ESTIMATED/DEFAULTED, not an actual lender quote — see "Remaining Financial Assumptions" in the release-readiness report. Rehab is modeled as 100% lender-financed (no draw-timing/reimbursement mechanic).`}
+              assumptionNote={`Refinance closing costs (${(b.refiCosts / b.grossRefiLoan * 100).toFixed(1)}% of loan) and rate assumptions are ESTIMATED/DEFAULTED, not an actual lender quote — see "Remaining Financial Assumptions" in the release-readiness report. Rehab is modeled as 100% lender-financed (no draw-timing/reimbursement mechanic).`}
             />
             <CalculationDetails
               label="Monthly Cash Flow"
@@ -281,11 +286,24 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
         )
       })()}
 
-      {/* L3 — Best Fit: restrained accent, not a giant blue box (Part 15). */}
-      {strategyRec.preferredStrategy !== 'NONE' ? (
+      {/* Demo Stabilization, Part 4 — PRESENTATION ONLY, computeStrategyRecommendation
+          untouched. That function cannot distinguish "BRRRR was evaluated
+          and lost" from "BRRRR was never evaluated" (e.g. no rent estimate)
+          — both collapse into the same FLIP-preferred branch. "Best Fit"
+          implies a real comparison happened; only show it when BOTH
+          strategies were genuinely evaluated. When only one could be
+          evaluated, say so honestly instead — never implies the other one
+          was compared and lost. */}
+      {strategyRec.preferredStrategy !== 'NONE' && flip.available && brrrr.available ? (
         <div className="flex items-center gap-2 px-1 border-l-2 pl-3" style={{ borderLeftColor: 'var(--color-accent)' }}>
           <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Best Fit</span>
           <span className="text-[12.5px] font-bold text-[color:var(--color-accent-text)]">{strategyRec.summary.replace(/^BEST EXIT: /, '')}</span>
+          {recReason && <span className="text-[11px] text-[color:var(--color-text-dim)]">— {recReason}</span>}
+        </div>
+      ) : strategyRec.preferredStrategy !== 'NONE' ? (
+        <div className="flex items-center gap-2 px-1 border-l-2 pl-3" style={{ borderLeftColor: 'var(--color-line)' }}>
+          <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Analysis Available</span>
+          <span className="text-[12.5px] font-bold text-[color:var(--color-text)]">{strategyRec.preferredStrategy} ANALYSIS AVAILABLE</span>
           {recReason && <span className="text-[11px] text-[color:var(--color-text-dim)]">— {recReason}</span>}
         </div>
       ) : (
@@ -297,9 +315,9 @@ export default function DealDecisionCenter({ lead, onRunAnalysis }) {
       {/* L3 — Margin of Safety detail + Path to a Deal (moved from AI &
           Comps, not duplicated — DealAnalysisCard hides these via
           hideDecisionSummary when mounted in AI & Comps). */}
-      <FlipMarginOfSafety lead={lead} flipResult={flip} />
-      <FlipRealityCheck lead={lead} flipResult={flip} />
-      {readiness.brrrrReady && <BrrrrRealityCheck lead={lead} />}
+      <FlipMarginOfSafety lead={lead} flipResult={flip} underwritingSettings={underwritingSettings} />
+      <FlipRealityCheck lead={lead} flipResult={flip} underwritingSettings={underwritingSettings} />
+      {readiness.brrrrReady && <BrrrrRealityCheck lead={lead} underwritingSettings={underwritingSettings} />}
     </div>
   )
 }
