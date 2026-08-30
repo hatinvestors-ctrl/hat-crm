@@ -14,6 +14,7 @@
 // file is destructive or required for V1 to keep working.
 
 import { computeDecisionV2, shouldTriggerV2Recalc } from './decisionEngineV2.js'
+import { isDistressedLead } from './distressInfo.js'
 
 /**
  * @param {object} supabase - a Supabase client (browser or service-role)
@@ -23,7 +24,24 @@ import { computeDecisionV2, shouldTriggerV2Recalc } from './decisionEngineV2.js'
  */
 export async function recalculateDecisionV2(supabase, lead, trigger = 'MANUAL_RECALCULATION') {
   if (!lead?.id) return null
-  const marketType = lead.is_distressed ? 'off_market' : 'on_market'
+  // P1 Market Type Integrity Fix (2026-08-31) — real, confirmed decision-
+  // integrity defect: this used to check only the bare `lead.is_distressed`
+  // boolean, which live audit proved under-populated on real leads with a
+  // fully-evidenced distress notes block / distress_data object (see
+  // distressInfo.js's resolveMarketType header comment for the full
+  // writeup and the specific affected addresses). Those leads were being
+  // scored through decisionEngineV2's ON_MARKET branch — which needs
+  // ARV/asking/listing-text signals an off-market-sourced record doesn't
+  // have — producing artificially low Opportunity (7-15) and a PASS
+  // recommendation, silently dropping genuine distressed opportunities
+  // out of the Action Center worklist. Now uses the SAME canonical
+  // isDistressedLead() check the OFF-MARKET section and market-type badge
+  // already use, so scoring can never route a lead through a different
+  // market-type branch than what's displayed for it. This ONLY changes
+  // routing for calls made from this point forward (new leads, and any
+  // lead whose normal recalculation triggers fire) — no bulk/retroactive
+  // recalculation of already-stored decision_v2 records happens here.
+  const marketType = isDistressedLead(lead) ? 'off_market' : 'on_market'
 
   let decision
   try {

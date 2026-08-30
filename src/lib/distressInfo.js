@@ -68,6 +68,44 @@ export function isDistressedLead(lead) {
   return getDistressInfo(lead) !== null
 }
 
+// P1 Market Type Integrity Fix (2026-08-31) — real, confirmed root cause:
+// two DIFFERENT predicates were independently deciding "off-market or
+// on-market" for the same lead. Action Center's V1 OFF-MARKET section has
+// always used isDistressedLead() above (the broad, already-correct
+// check — is_distressed flag OR a structured distress_data object OR the
+// self-authored "⚠ DISTRESSED OPPORTUNITY" notes block). But the
+// Action Center market-type BADGE (added in the prior UX task) and
+// decisionV2Persistence.js's scoring-routing check both used only the
+// bare `lead.is_distressed` boolean — a flag confirmed, by live read-only
+// audit, to be under-populated: real production leads (971 S 16th Ave,
+// 3603 E Ledbury Dr, 6446 S Ish Brant Rd, 12264 Crossfield Dr, and 15
+// more — 19 total in this workspace) have a fully-populated, marker-
+// verified Lis Pendens/foreclosure distress notes block or
+// enrichment_data.distress_category, are correctly caught as distressed
+// by isDistressedLead() and appear in the OFF-MARKET section, but
+// `is_distressed` itself was never set to true on the row — so the badge
+// showed ON-MARKET (a presentation contradiction) AND
+// decisionV2Persistence.js scored them through the ON_MARKET branch of
+// decisionEngineV2.js (a real decision-integrity defect: their Opportunity
+// scored 7-15 and recommendation PASS, using on-market rules — ARV/asking/
+// listing-text signals — that an off-market-sourced record structurally
+// doesn't have, instead of the off-market distress-quality/identity/
+// contactability rules these leads actually warrant).
+//
+// This is the ONE canonical resolver every consumer (badge, section,
+// decisionEngineV2 routing, any future lead-UI market-type display) must
+// use — reusing isDistressedLead(), the existing, more complete helper,
+// rather than inventing a second heuristic. No new field, no migration:
+// distress and market type are currently, intentionally, the same
+// concept in this data model (see delivery report, Part 8) — every
+// lead_source value observed in production ('mls' → on-market,
+// 'off_market'/'other' → distressed-sourcing pipelines) is consistent
+// with that collapse, so OFF_MARKET here still means exactly what the
+// existing OFF-MARKET section has always meant.
+export function resolveMarketType(lead) {
+  return isDistressedLead(lead) ? 'OFF_MARKET' : 'ON_MARKET'
+}
+
 // ── Human-readable translations (mission Section 2: no raw true/false/MATCH) ──
 export function fmtOwnerMatch(status) {
   switch (status) {

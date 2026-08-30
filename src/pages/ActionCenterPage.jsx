@@ -21,13 +21,27 @@ import { formatCurrency } from '../lib/calculations'
 import { applyLeadVisibility } from '../lib/leadVisibility'
 import { TERMINAL_STATUSES, STATUS_MAP } from '../lib/constants'
 import { derivePriority, PRIORITY_DISPLAY, PRIORITY_THEME } from '../lib/leadPriority'
-import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo } from '../lib/distressInfo'
+import { isDistressedLead, getDistressInfo, getNextAction, fmtDistressType, getOpportunityInfo, resolveMarketType } from '../lib/distressInfo'
 import { isContactReady } from '../lib/contactEnrichment'
 import { isV2ActionCenter } from '../lib/featureFlags'
 import { classifyFollowUpDate, daysOverdue } from '../lib/followUpTiming'
 import { getActionReason } from '../lib/actionReason'
 import { computeFlipResult } from '../lib/dealExplanation'
+import { resolveUnderwritingSettings } from '../lib/underwritingSettings'
 import LogOutcomeModal from '../components/action-center/LogOutcomeModal'
+
+// P1 Market Type Integrity Fix (2026-08-31) — real, confirmed defect:
+// this page-local resolver used only the bare `lead.is_distressed`
+// boolean, which live audit proved under-populated (19 real leads with a
+// marker-verified distress notes block / distress_data never had the
+// flag set). That produced the exact "OFF-MARKET section, ON-MARKET
+// badge" contradiction found in production — V1's OFF_MARKET section
+// below already uses the broader, more complete isDistressedLead()
+// helper (see distressInfo.js), so the badge simply disagreed with the
+// section it was rendered inside. Now imports the ONE canonical
+// resolveMarketType (distressInfo.js) that badge, section, and
+// decisionV2Persistence.js's scoring routing all share — see that
+// file's header comment for the full root-cause writeup.
 
 // Product Decision — Canonical Deal Values (see RELEASE-READINESS.md,
 // Defect D1). "Expected Profit"/"Maximum Offer" must reflect the SAME
@@ -42,8 +56,20 @@ import LogOutcomeModal from '../components/action-center/LogOutcomeModal'
 // two headline numbers have always been Flip's dollar profit/Max Buy;
 // widening that to a strategy-dependent number is a UI scope decision the
 // mission for this pass explicitly asked NOT to expand into.
-function canonicalEconomics(lead) {
-  const flip = computeFlipResult(lead)
+// Action Center Demo-Safe UX & Integrity Fix, Part 9 — real, confirmed
+// latent gap closed: computeFlipResult() used to be called with no
+// settings argument at all, silently falling back to calculations.js's
+// own hardcoded defaults regardless of the workspace's actual configured
+// underwriting settings. Threading the SAME resolved settings object the
+// Deal page uses (resolveUnderwritingSettings(workspace.settings),
+// passed in by the caller below) means Action Center can no longer
+// silently disagree with the Deal page under a customized workspace —
+// exactly the same fix pattern already applied to every other Flip/BRRRR
+// consumer this session. No formula changed; computeFlipResult's
+// signature/contract is unchanged (settings was always its optional
+// 2nd argument).
+function canonicalEconomics(lead, underwritingSettings) {
+  const flip = computeFlipResult(lead, underwritingSettings)
   return {
     expectedProfit: flip.available ? flip.projectedProfit : null,
     maxOffer: flip.available ? flip.mao : null,
@@ -102,7 +128,7 @@ function isToday(isoString) {
 // Reuses derivePriority + rediscovery status already persisted per lead —
 // no recalculation. Classifies each lead into exactly one bucket (or none,
 // if it isn't actionable), per the priority order in the spec.
-function classifyLead(lead, rediscovery) {
+function classifyLead(lead, rediscovery, underwritingSettings = null) {
   const priorityInfo = derivePriority(lead.ai_notes)
   const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
   const distressed = isDistressedLead(lead)
@@ -153,7 +179,7 @@ function classifyLead(lead, rediscovery) {
   // from the SAME deterministic engine the Deal tab uses, never from
   // deal_analysis.profit/lead.mao. Still null (never fabricated) whenever
   // Flip itself is unavailable (e.g. an off-market lead with no ARV yet).
-  const { expectedProfit, maxOffer } = canonicalEconomics(lead)
+  const { expectedProfit, maxOffer } = canonicalEconomics(lead, underwritingSettings)
 
   return {
     category,
@@ -161,6 +187,7 @@ function classifyLead(lead, rediscovery) {
     decision,
     nextAction,
     distressed,
+    marketType: resolveMarketType(lead),
     opportunity,
     expectedProfit,
     maxOffer,
@@ -207,7 +234,7 @@ const NEXT_ACTION_LABELS = {
 // Exported (Capability #17.1) so Lead Detail's decision header
 // (AcquisitionCopilot.jsx) can derive the SAME category this page uses,
 // instead of re-deriving its own copy of the RE_ENGAGE/mapping logic.
-export function classifyLeadV2(lead) {
+export function classifyLeadV2(lead, underwritingSettings = null) {
   const d = lead.decision_v2
   if (!d) return null
   const isFollowUpStatus = FOLLOW_UP_STATUSES.includes(lead.status)
@@ -241,10 +268,11 @@ export function classifyLeadV2(lead) {
       decision: 'RE-ENGAGE',
       nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
       distressed: false,
+      marketType: resolveMarketType(lead),
       opportunity: null,
       // Product Decision — Canonical Deal Values (Defect D1): computed
       // fresh from computeFlipResult, never deal_analysis.profit/lead.mao.
-      ...canonicalEconomics(lead),
+      ...canonicalEconomics(lead, underwritingSettings),
       reason, // always visible on the card — Section 7's explicit requirement
       score: d.opportunity?.score ?? null,
       rediscoveredAt: null,
@@ -272,10 +300,11 @@ export function classifyLeadV2(lead) {
     decision: d.recommendation.replace(/_/g, ' '),
     nextAction: NEXT_ACTION_LABELS[d.next_best_action] || d.next_best_action || null,
     distressed: false, // always renders the generic (non-OFF_MARKET) card layout — see ActionCard
+    marketType: resolveMarketType(lead),
     opportunity: null,
     // Product Decision — Canonical Deal Values (Defect D1): computed
     // fresh from computeFlipResult, never deal_analysis.profit/lead.mao.
-    ...canonicalEconomics(lead),
+    ...canonicalEconomics(lead, underwritingSettings),
     reason: d.why?.[0] || null,
     score: d.opportunity?.score ?? null,
     rediscoveredAt: null,
@@ -322,6 +351,53 @@ function sortCategory(category, items) {
 
 const NA = 'Not available' // #5.1 — replaces bare "—" so missing data reads as intentional, not broken
 
+// Action Center Demo-Safe UX & Integrity Fix, Part 3 — real, confirmed
+// defect fixed: the profit figure used to render in success/green
+// whenever it was merely non-null, so a genuinely negative Expected
+// Flip Profit (e.g. Riverdale's -$51,228) rendered the same color as a
+// positive one. Presentation only — the number, its sign, and the
+// bucket a lead lands in are completely unchanged.
+function profitTone(expectedProfit) {
+  if (expectedProfit == null) return 'var(--color-text-dim)'
+  if (expectedProfit > 0) return 'var(--color-success-text)'
+  if (expectedProfit < 0) return 'var(--color-danger-text)'
+  return 'var(--color-text-muted)' // exactly $0 — neutral, neither win nor loss
+}
+
+// Part 1/2 — small, consistent badge so market source (the data the
+// score/bucket was actually computed against) is always visible, never
+// louder than the workflow-priority badge next to it.
+const MARKET_TYPE_META = {
+  ON_MARKET:  { label: 'ON-MARKET',  bg: 'rgba(59,130,246,0.12)',  color: 'rgb(37,99,235)' },
+  OFF_MARKET: { label: 'OFF-MARKET', bg: 'rgba(217,119,6,0.12)',   color: 'rgb(180,95,6)' },
+}
+function MarketBadge({ marketType }) {
+  const meta = MARKET_TYPE_META[marketType]
+  if (!meta) return null
+  return (
+    <span
+      className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+      style={{ color: meta.color, background: meta.bg }}
+    >
+      {meta.label}
+    </span>
+  )
+}
+
+// Part 8 — strategy badge, ONLY rendered when item.strategy is already
+// reliably populated (from decision_v2.strategy or deal_analysis.strategy
+// — an existing field, never invented here).
+const STRATEGY_LABELS = { flip: 'FLIP', brrrr: 'BRRRR', both: 'BOTH' }
+function StrategyBadge({ strategy }) {
+  const label = STRATEGY_LABELS[strategy]
+  if (!label) return null
+  return (
+    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]">
+      {label}
+    </span>
+  )
+}
+
 // #5.1 — Card hierarchy top to bottom: Address → Next Action → Expected
 // Profit (emphasized — Kevin's primary decision metric) → Maximum Offer →
 // Reason (clamped ~2 lines + "More…", opens the same lead — no new modal,
@@ -338,10 +414,17 @@ function ActionCard({ item, workspaceId, userId, members, onLeadUpdated }) {
       style={{ borderColor: theme.border, background: theme.bg }}
     >
       <div className="px-3.5 py-3">
-        {/* 1. Address */}
+        {/* 1. Address + market source + workflow-priority badge. Market
+             source is the SAME resolver decision_v2's own scoring used
+             (resolveMarketType) — it can never disagree with what
+             economics/urgency model was actually applied to this lead. */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[14px] font-bold text-[color:var(--color-text)] truncate">{item.lead.address}</div>
+            <div className="flex items-center gap-1.5">
+              <div className="text-[14px] font-bold text-[color:var(--color-text)] truncate">{item.lead.address}</div>
+              <MarketBadge marketType={item.marketType} />
+              <StrategyBadge strategy={item.strategy} />
+            </div>
             {item.lead.city && <div className="text-[11px] text-[color:var(--color-text-dim)]">{item.lead.city}</div>}
           </div>
           {item.decision && (
@@ -410,20 +493,41 @@ function ActionCard({ item, workspaceId, userId, members, onLeadUpdated }) {
           </div>
         ) : (
           <>
-            {/* 3. Expected Profit — visually the loudest number on the card */}
+            {/* Part 5/6 — an ACT_NOW item with no economics at all (only
+                possible off-market, before any underwriting exists — see
+                decisionEngineV2.js's off-market Opportunity/Confidence,
+                which contain no financial fields) means "strong seller/
+                distress opportunity, contact now" — NOT "financially
+                validated deal." Shown ONLY when economics are genuinely
+                unavailable; an Act Now lead that DOES have economics (Part
+                6) renders the normal labels below with no qualifier. */}
+            {item.category === 'ACT_NOW' && item.expectedProfit == null && item.maxOffer == null && (
+              <div className="mt-2 rounded-md px-2.5 py-1.5 border border-dashed" style={{ borderColor: theme.border, background: 'var(--color-bg-elev)' }}>
+                <div className="text-[10.5px] font-bold" style={{ color: theme.text }}>
+                  {item.marketType === 'OFF_MARKET' ? 'Strong Seller Opportunity' : 'Contact Priority'}
+                </div>
+                <div className="text-[10px] text-[color:var(--color-text-dim)] mt-0.5">Economics not yet underwritten — this is a contact priority, not a validated deal.</div>
+              </div>
+            )}
+
+            {/* 3. Expected Flip Profit — visually the loudest number on the
+                card. Part 7 — explicitly labeled "Flip" because this value
+                is always Flip economics (computeFlipResult), even for a
+                BRRRR-preferred lead like Beckner — see StrategyBadge above
+                for the lead's actual preferred strategy, when known. */}
             <div className="mt-2 rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-elev)' }}>
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Profit</div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Expected Flip Profit</div>
               <div
                 className="text-[18px] font-extrabold tabular-nums"
-                style={{ color: item.expectedProfit != null ? 'var(--color-success-text)' : 'var(--color-text-dim)' }}
+                style={{ color: profitTone(item.expectedProfit) }}
               >
                 {item.expectedProfit != null ? formatCurrency(item.expectedProfit) : NA}
               </div>
             </div>
 
-            {/* 4. Maximum Offer */}
+            {/* 4. Flip Max Buy */}
             <div className="mt-2">
-              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Maximum Offer</div>
+              <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Flip Max Buy</div>
               <div className="text-[12.5px] font-semibold text-[color:var(--color-text)]">{item.maxOffer != null ? formatCurrency(item.maxOffer) : NA}</div>
             </div>
           </>
@@ -482,6 +586,9 @@ function ActionCard({ item, workspaceId, userId, members, onLeadUpdated }) {
 
 export default function ActionCenterPage() {
   const { workspace, workspaceId, user, userRole, members } = useOutletContext()
+  // Part 9 — the SAME resolver the Deal page uses (no second settings
+  // object/resolver introduced), resolved once per render.
+  const underwritingSettings = resolveUnderwritingSettings(workspace.settings)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ALL')
@@ -509,7 +616,7 @@ export default function ActionCenterPage() {
       // Expected Profit/Maximum Offer.
       let leadsQ = supabase
         .from('leads')
-        .select('id, address, city, status, ai_notes, mao, asking_price, arv, renovation_cost, offer_price, starting_offer, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email, decision_v2, acquisition_override')
+        .select('id, address, city, status, ai_notes, mao, asking_price, arv, renovation_cost, offer_price, starting_offer, deal_analysis, follow_up_date, updated_at, notes, owner_name, enrichment_data, phone, email, decision_v2, acquisition_override, is_distressed')
         .eq('workspace_id', workspaceId)
         .not('status', 'in', `(${TERMINAL_STATUSES.map(s => `"${s}"`).join(',')})`)
       leadsQ = applyLeadVisibility(leadsQ, user.id, userRole)
@@ -541,7 +648,7 @@ export default function ActionCenterPage() {
       }
 
       const classified = (leads || [])
-        .map(lead => isV2ActionCenter ? classifyLeadV2(lead) : classifyLead(lead, rediscoveryByLead[lead.id]))
+        .map(lead => isV2ActionCenter ? classifyLeadV2(lead, underwritingSettings) : classifyLead(lead, rediscoveryByLead[lead.id], underwritingSettings))
         .filter(Boolean)
 
       if (!cancelled) {
@@ -612,6 +719,14 @@ export default function ActionCenterPage() {
           <h2 className="text-[22px] font-semibold text-[color:var(--color-text)] tracking-tight mt-1">
             {todayCount === 0 ? 'Nothing needs action right now.' : `${todayCount} Action${todayCount === 1 ? '' : 's'} Today`}
           </h2>
+          {/* Part 4 — one concise page-level helper, not repeated per card.
+              Buckets are workflow priority (seller signals, follow-ups,
+              distress events, or deal economics can each drive it) — never
+              a substitute for reviewing the actual Expected Flip Profit/
+              Flip Max Buy shown on each card. */}
+          <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1 max-w-xl leading-snug">
+            Priority reflects what needs attention now — seller signals, follow-ups, distress events, or deal economics. It is not itself a financial verdict; check each card's Expected Flip Profit.
+          </p>
           {todayCount > 0 && (
             <p className="text-[12.5px] text-[color:var(--color-text-muted)] mt-1">
               {items.filter(i => i.category === 'OVERDUE').length > 0 && <>Overdue: <span className="font-semibold text-[color:var(--color-danger-text)]">{items.filter(i => i.category === 'OVERDUE').length}</span>{'  ·  '}</>}
@@ -627,22 +742,26 @@ export default function ActionCenterPage() {
         {/* #5.1 — business value KPI row, only for values that exist */}
         {(kpis.pipelineValue != null || kpis.totalProfit != null || kpis.avgProfit != null) && (
           <div className="flex flex-wrap gap-3 mb-5">
+            {/* Part 13 — relabeled to match reality: every KPI here sums
+                Flip-specific fields (kpis.pipelineValue sums i.maxOffer =
+                Flip Max Buy; totalProfit/avgProfit sum i.expectedProfit =
+                Expected Flip Profit) — no KPI math changed, labels only. */}
             {kpis.pipelineValue != null && (
               <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
-                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Potential Pipeline Value</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Potential Flip Pipeline Value</div>
                 <div className="text-[17px] font-bold text-[color:var(--color-text)] tabular-nums">{formatCurrency(kpis.pipelineValue)}</div>
               </div>
             )}
             {kpis.totalProfit != null && (
               <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
-                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Total Expected Profit</div>
-                <div className="text-[17px] font-bold text-[color:var(--color-success-text)] tabular-nums">{formatCurrency(kpis.totalProfit)}</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Total Expected Flip Profit</div>
+                <div className="text-[17px] font-bold tabular-nums" style={{ color: profitTone(kpis.totalProfit) }}>{formatCurrency(kpis.totalProfit)}</div>
               </div>
             )}
             {kpis.avgProfit != null && (
               <div className="flex-1 min-w-[160px] rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
-                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Average Expected Profit</div>
-                <div className="text-[17px] font-bold text-[color:var(--color-text)] tabular-nums">{formatCurrency(kpis.avgProfit)}</div>
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Average Expected Flip Profit</div>
+                <div className="text-[17px] font-bold tabular-nums" style={{ color: profitTone(kpis.avgProfit) }}>{formatCurrency(kpis.avgProfit)}</div>
               </div>
             )}
           </div>
