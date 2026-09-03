@@ -2,12 +2,23 @@
 // Lead Workspace redesign, Final UX Polish, Sections 4C/5 — Overview's
 // compact deal snapshot. DATA-AWARE, not status-dependent: this always
 // renders the same way for every lead, adapting only to what data exists
-// (never branching on lead.status/'triage'/etc). Uses the SAME
-// computeFlipResult/computeBrrrrResult/computeStrategyRecommendation
-// (src/lib/dealExplanation.js) the Deal tab and DealAnalysisCard already
-// call — no independent calculation.
-import { formatCurrency as fc, roundMaxBuy } from '../../../lib/calculations'
-import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
+// (never branching on lead.status/'triage'/etc).
+//
+// UX V2.5, Part 9/10 — this card used to repeat Ask/Suggested Offer/Max
+// Buy/Profit/Strategy, all of which DecisionHero (the Overview hero,
+// directly above this card) already shows as the primary decision. Worse,
+// this component independently called computeFlipResult(lead)/
+// computeBrrrrResult(lead) with NO underwritingSettings — a second,
+// separate wiring gap from the one already fixed in DecisionHero (V2.4)
+// and DealDecisionCenter, capable of showing a THIRD disagreeing Max
+// Buy/strategy on the same page. Per the mission's explicit "prefer the
+// simpler solution": rather than thread settings through a fourth
+// consumer of the same facts, this card no longer recomputes deal
+// economics at all — it shows only the property inputs (ARV/Rehab/Rent)
+// that don't change based on strategy or settings, plus a link to the
+// Deal tab for the full, single-sourced economics. No data lost — full
+// Flip/BRRRR/strategy detail remains on the Deal tab, unchanged.
+import { formatCurrency as fc } from '../../../lib/calculations'
 import { getDealReadiness } from './readiness'
 
 function Cell({ label, value }) {
@@ -50,29 +61,20 @@ export default function DealSnapshotCompact({ lead, onOpenDeal }) {
     )
   }
 
-  const flip = computeFlipResult(lead)
-  const brrrr = computeBrrrrResult(lead)
-  const strategyRec = computeStrategyRecommendation(flip, brrrr)
-  const preferBrrrr = strategyRec.preferredStrategy === 'BRRRR'
-
+  // UX V2.5, Part 10 — only the raw property inputs that feed the
+  // economics (not the economics themselves, which now live solely on
+  // DecisionHero + the Deal tab, single-sourced against the real
+  // underwritingSettings).
   return (
     <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[9.5px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Deal Snapshot</span>
-        <button type="button" onClick={onOpenDeal} className="text-[10.5px] font-semibold underline text-[color:var(--color-accent-text)]">Open Deal →</button>
+        <button type="button" onClick={onOpenDeal} className="text-[10.5px] font-semibold underline text-[color:var(--color-accent-text)]">Open Deal Analysis →</button>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-        <Cell label="Ask" value={lead.asking_price != null ? fc(lead.asking_price) : 'Not set'} />
+      <div className="grid grid-cols-3 gap-2.5">
         <Cell label="ARV" value={fc(lead.arv)} />
-        <Cell label="Current Offer" value={flip.currentOffer != null ? fc(flip.currentOffer) : 'Not set'} />
-        {/* Cross-screen consistency (Part 8) — same roundMaxBuy helper the
-            Deal tab hero uses, so Overview and Deal never disagree on
-            the actionable Max Buy for the same lead. */}
-        <Cell label={preferBrrrr ? 'Max Buy (BRRRR)' : 'Max Buy (Flip)'}
-          value={preferBrrrr ? (brrrr.available ? fc(roundMaxBuy(brrrr.mao)) : 'Needs rent') : fc(roundMaxBuy(flip.mao))} />
-        <Cell label={preferBrrrr ? 'Cash Flow' : 'Profit'}
-          value={preferBrrrr ? (brrrr.available && brrrr.monthlyCashFlow != null ? `${fc(brrrr.monthlyCashFlow)}/mo` : 'Needs rent') : fc(flip.projectedProfit)} />
-        <Cell label="Strategy" value={strategyRec.preferredStrategy !== 'NONE' ? strategyRec.preferredStrategy.replace('BOTH', 'Flip + BRRRR') : 'Not ready'} />
+        <Cell label="Rehab" value={fc(lead.renovation_cost)} />
+        <Cell label="Rent" value={lead.rent_estimate != null ? fc(lead.rent_estimate) : 'Not set'} />
       </div>
     </div>
   )

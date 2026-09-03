@@ -19,8 +19,17 @@ describe('Part 2 — Next Action is clickable only where a safe existing action 
     expect(DISTRESS_SRC).not.toMatch(/import .*from .*(enrichmentRun|batchdata-enrich)/)
     expect(DISTRESS_SRC).toMatch(/onClick=\{onRequestEnrich\}/)
   })
-  it('clicking never bypasses confirmation — DistressBanner has no modal or running state of its own', () => {
-    expect(DISTRESS_SRC).not.toMatch(/EnrichContactsModal|useState/)
+  it('clicking never bypasses confirmation — DistressBanner has no enrichment modal or running/loading state of its own', () => {
+    // UX V2.5, Part 7 — DistressBanner now has ONE local useState, but it is
+    // purely a collapsed/expanded UI toggle for the progressive-disclosure
+    // redesign (never touches enrichment/confirmation flow at all — no
+    // modal state, no "running" flag, no enrichment call). The real
+    // guarantee this test protects — enrichment always routes through the
+    // single onRequestEnrich callback, never a local execution path — is
+    // covered by the two assertions above; this one narrows to the actual
+    // risk (a second confirmation-bypassing modal), not "any useState".
+    expect(DISTRESS_SRC).not.toMatch(/EnrichContactsModal/)
+    expect(DISTRESS_SRC).toMatch(/const \[expanded, setExpanded\] = useState\(false\)/)
   })
 })
 

@@ -11,7 +11,6 @@ import ComplsIntelligenceCard from '../components/lead-detail/workspace/ComplsIn
 import MlsStatusBanner from '../components/lead-detail/MlsStatusBanner'
 import DistressBanner from '../components/lead-detail/DistressBanner'
 import LeadEssentialsBar from '../components/lead-detail/LeadEssentialsBar'
-import FinancialSection from '../components/lead-detail/FinancialSection'
 import ReportSection from '../components/lead-detail/ReportSection'
 import ActivityTimeline from '../components/lead-detail/ActivityTimeline'
 import CommentBox from '../components/lead-detail/CommentBox'
@@ -249,6 +248,7 @@ export default function LeadDetailPage() {
           canEdit={canEdit}
           onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))}
           onRequestEnrich={() => setEnrichConfirmOpen(true)}
+          underwritingSettings={underwritingSettings}
         />
 
         {/* Compact Triage Decision Bar V1 — a lightweight workflow gate,
@@ -276,13 +276,23 @@ export default function LeadDetailPage() {
             (off-market) → compact status. A user should understand the
             lead within ~5 seconds without scrolling past all of this. ══ */}
         <div id="workspace-panel-overview" role="tabpanel" aria-labelledby="workspace-tab-overview" hidden={activeTab !== 'overview'} className="space-y-4">
-          <DistressBanner lead={lead} onRequestEnrich={() => setEnrichConfirmOpen(true)} />
-          <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
-
+          {/* Lead Workspace UX V2.2, Part 2/8/10 — real, confirmed root
+              cause of "distress card / system banner outrank the
+              decision": DistressBanner and MlsStatusBanner used to render
+              ABOVE DecisionHero, so the very first thing a user saw for
+              an off-market lead was seller-opportunity/system-state
+              content, not "what should I do." The Acquisition Decision
+              must be the first major card after the tabs, for both
+              market types — these two banners are now supporting
+              intelligence, rendered below it. No functionality removed,
+              content unchanged, order only. */}
           {/* HAT Premium Visual Pass, Part 7 — the ONE dominant decision
               surface. AcquisitionCopilot below is now Deal-Brief-only
               (its old header duplicated this). */}
-          <DecisionHero lead={lead} />
+          <DecisionHero lead={lead} underwritingSettings={underwritingSettings} />
+
+          <DistressBanner lead={lead} onRequestEnrich={() => setEnrichConfirmOpen(true)} />
+          <MlsStatusBanner lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} paused={!!workspace?.settings?.mls_paused} />
 
           <AcquisitionCopilot lead={lead} onUpdated={(updated) => setLead(prev => ({ ...prev, ...updated }))} />
 
@@ -342,6 +352,17 @@ export default function LeadDetailPage() {
 
           <div className="pt-2">
             <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Property &amp; Assumptions</div>
+            {/* UX V2.7, Part 4 — the standalone "Financials" card
+                (FinancialSection.jsx) removed from this workspace: it
+                duplicated Evaluation Price/Gap to Max Buy/Max Buy (Flip)/
+                "We Offer" already shown correctly by DealDecisionCenter's
+                V2.6 canonical strategy comparison above, and its ONLY-
+                editable-there inputs (ARV/Renovation/Rent/Holding
+                Period/Suggested Offer/legacy Max Offer override) now live
+                in PropertyInfoSection below — the ONE canonical editable
+                home for property/deal inputs. FinancialSection.jsx itself
+                is untouched and still exported (not deleted), simply no
+                longer mounted here. */}
             <div className="space-y-4">
               <PropertyInfoSection
                 lead={lead}
@@ -349,15 +370,7 @@ export default function LeadDetailPage() {
                 members={members}
                 canEdit={canEdit}
                 onUpdated={onLeadUpdated}
-              />
-              <FinancialSection
-                lead={lead}
-                userId={user.id}
-                members={members}
-                canEdit={canEdit}
-                strategy={dealStrategy}
                 underwritingSettings={underwritingSettings}
-                onUpdated={onLeadUpdated}
               />
             </div>
           </div>
@@ -427,7 +440,10 @@ export default function LeadDetailPage() {
             Conclusion (Detailed Analysis verdict strip), comps, Full
             Breakdown, notes, and Ask AI as the deeper evidence layer. ══ */}
         <div id="workspace-panel-ai" role="tabpanel" aria-labelledby="workspace-tab-ai" hidden={activeTab !== 'ai'} className="space-y-4">
-          <ComplsIntelligenceCard lead={lead} underwritingSettings={underwritingSettings} />
+          {/* UX V2.8 — "Comps & ARV": comparable-market evidence only. It no
+              longer needs underwritingSettings, because it no longer runs
+              the ARV stress test / Max Buy comparison that required them. */}
+          <ComplsIntelligenceCard lead={lead} />
           <DealAnalysisCard
             lead={lead}
             userId={user.id}

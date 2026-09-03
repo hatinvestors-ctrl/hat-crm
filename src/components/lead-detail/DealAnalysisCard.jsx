@@ -757,13 +757,35 @@ const READINESS_STATUS_DOT = {
 // old dead-end "More property/financial information is needed" text with
 // an actionable checklist. ARV is NEVER presented as blocking — it always
 // explains HAT AI can derive it during analysis, per Part 3/6.
+// UX V2.8, Part 4 — the readiness area must answer only "can HAT run the
+// comp analysis?", not restate Evaluation Price / Renovation / ARV as a
+// third input-summary card (Property & Assumptions owns those). When
+// everything required is present there is nothing to act on, so it
+// collapses to a single "Analysis Ready ✓" line. When something IS
+// missing, the actionable rows render exactly as before — same
+// EditableField for asking price, same reno-tier picker trigger, same
+// copy. No editing capability was removed; ARV is still never blocking.
 function AnalysisReadinessPanel({ lead, strategy, canEdit, update, onOpenRenoPicker }) {
   const readiness = computeAnalysisReadiness(lead, strategy)
+
+  if (readiness.ready) {
+    return (
+      <div className="mb-3 text-[11.5px]">
+        <span className="font-semibold text-[color:var(--color-success-text)]">Analysis Ready ✓</span>
+        {lead.arv == null && (
+          <span className="text-[color:var(--color-text-dim)]"> · HAT AI will estimate ARV from comparable sales during analysis.</span>
+        )}
+      </div>
+    )
+  }
+
+  const actionableItems = readiness.items.filter(i => i.status !== 'available')
+
   return (
     <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3.5 mb-3 space-y-2.5">
-      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Analysis Readiness</div>
+      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Missing for analysis</div>
       <div className="space-y-2">
-        {readiness.items.map(item => (
+        {actionableItems.map(item => (
           <div key={item.key} className="flex items-center justify-between gap-3 text-[12px]">
             <div className="flex items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${READINESS_STATUS_DOT[item.status]}`} />
@@ -804,14 +826,14 @@ function AnalysisReadinessPanel({ lead, strategy, canEdit, update, onOpenRenoPic
               item.present ? (
                 <span className="font-bold tabular-nums">{fc(lead.rent_estimate)}/mo</span>
               ) : (
-                <span className="text-[color:var(--color-danger-text)] font-semibold">Missing — edit in Financials</span>
+                <span className="text-[color:var(--color-danger-text)] font-semibold">Missing — edit in Property</span>
               )
             )}
           </div>
         ))}
       </div>
-      <div className={`text-[11.5px] font-bold pt-2 border-t border-[color:var(--color-line)] ${readiness.ready ? 'text-[color:var(--color-success-text)]' : 'text-[color:var(--color-text-dim)]'}`}>
-        {readiness.ready ? '✓ Ready for analysis' : `${readiness.missingRequiredCount} required input${readiness.missingRequiredCount === 1 ? '' : 's'} needed before analysis`}
+      <div className="text-[11.5px] font-bold pt-2 border-t border-[color:var(--color-line)] text-[color:var(--color-text-dim)]">
+        {`${readiness.missingRequiredCount} required input${readiness.missingRequiredCount === 1 ? '' : 's'} needed before analysis`}
       </div>
     </div>
   )
@@ -1446,7 +1468,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
               <span className="text-[12px] font-semibold text-[color:var(--color-text)]">
                 {lead.rent_estimate ? fc(lead.rent_estimate) : '—'}
               </span>
-              <span className="text-[11px] text-[color:var(--color-text-dim)]">/mo · edit in Financials</span>
+              <span className="text-[11px] text-[color:var(--color-text-dim)]">/mo · edit in Property</span>
             </div>
           )}
         </div>

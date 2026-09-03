@@ -6,6 +6,16 @@
 // two canonical numbers (computeFlipResult's currentOffer/mao) Deal
 // Economics Hero and Margin of Safety already show as text. This is only
 // a second, faster-to-read PRESENTATION of the identical relationship.
+//
+// UX V2.5, Part 10 audit finding — `currentOffer` here is always
+// computeFlipResult's `currentOffer` (getEffectiveOffer(lead, mao) — a
+// stored/live-calculated SUGGESTED negotiation anchor, clamped to MAO;
+// see calculations.js), never `lead.offer_price` (the real submitted-offer
+// field). It was NEVER an actual offer, on-market or off — so "our offer"
+// was always a mislabel, not a market-type-conditional one. Renamed to
+// "Suggested Offer" to match the identical field's label everywhere else
+// on the page (DealSnapshotCompact.jsx, DealDecisionCenter.jsx's own
+// Metric, both fixed in V2.1/V2.4).
 import { formatCurrency as fc } from '../../../lib/calculations'
 
 export default function MarginVisualization({ currentOffer, mao }) {
@@ -24,9 +34,9 @@ export default function MarginVisualization({ currentOffer, mao }) {
         <div className="absolute top-1/2 -translate-y-1/2 w-0.5 h-4 bg-[color:var(--color-text-dim)]" style={{ left: overMax ? '100%' : `${fillPct}%` }} />
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-[10px] text-[color:var(--color-text-dim)]">Offer {fc(currentOffer)}</span>
+        <span className="text-[10px] text-[color:var(--color-text-dim)]">Suggested Offer {fc(currentOffer)}</span>
         <span className="text-[10px] font-semibold" style={{ color }}>
-          {overMax ? `${fc(Math.abs(cushion))} over Max Buy` : `${fc(cushion)} room from our offer to Max Buy`}
+          {overMax ? `${fc(Math.abs(cushion))} over Max Buy` : `${fc(cushion)} room from Suggested Offer to Max Buy`}
         </span>
         <span className="text-[10px] text-[color:var(--color-text-dim)]">Max {fc(mao)}</span>
       </div>

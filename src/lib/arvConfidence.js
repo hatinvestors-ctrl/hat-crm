@@ -194,6 +194,27 @@ export function getExternalCompConfidenceState(lead) {
   }
 }
 
+// UX V2.8, Part 8 — COMPARABLE SALES EVIDENCE (presentation support only).
+// Pure reader over the ONE place real comp evidence already lives in this
+// system: the "MARKET COMPS" block generate-comps.mjs writes into
+// lead.ai_notes (its COMP: / "Market Range" / "Evidence Read" lines — see
+// that function's SYSTEM_PROMPT template). Deliberately parse-only: it
+// invents no field the template doesn't emit, derives no score, and never
+// touches ARV/MAO/profit. `count` uses the SAME `^COMP:` line definition
+// getArvProvenance() (arvProvenance.js) already uses, so the two can never
+// disagree about whether comp evidence exists for a lead.
+export function getCompEvidenceSummary(lead) {
+  const notes = lead?.ai_notes || ''
+  const compLines = notes.match(/^COMP:\s.+$/gim) || []
+  const marketRange = notes.match(/^Market Range[^:\n]*:\s*(.+)$/im)?.[1]?.trim() || null
+  const evidenceRead = notes.match(/^Evidence Read:\s*(.+)$/im)?.[1]?.trim() || null
+  const comps = compLines.slice(0, 5).map((line, i) => {
+    const parts = line.replace(/^COMP:\s*/i, '').split('|').map(p => p.trim()).filter(Boolean)
+    return { key: `${i}-${parts[0] || ''}`, label: parts[0] || '—', details: parts.slice(1) }
+  })
+  return { available: compLines.length > 0, count: compLines.length, comps, marketRange, evidenceRead }
+}
+
 // Part 5/19 — recommendation text is driven ONLY by the deterministic
 // stress classification above; nothing here is AI-decided, and nothing
 // here claims comp quality that hasn't actually been evidenced (Part 5:

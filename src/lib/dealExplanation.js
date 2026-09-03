@@ -341,13 +341,46 @@ export function computeStrategyRecommendation(flip, brrrr) {
   // Both viable — rank by verdict strength, tie → SIMILAR.
   const fr = VERDICT_RANK[flip.verdict] ?? 0
   const br = VERDICT_RANK[brrrr.verdict] ?? 0
-  if (fr === br) return { preferredStrategy: 'BOTH', summary: 'BOTH WORK — SIMILAR', reason: null }
+  // UX V2.5, Part 2 audit — real, confirmed pre-existing defect (reported
+  // before this edit, per that mission's Part 15): this branch already
+  // computes a real tie-break winner (fr/br above) whenever the verdicts
+  // aren't exactly equal, but historically only encoded it inside the
+  // free-text `summary`/`reason` strings — `preferredStrategy` itself
+  // collapsed to the literal string 'BOTH' either way. Every consumer
+  // across the app (DecisionHero, DealDecisionCenter, DealSnapshotCompact,
+  // LeadEssentialsBar) checks `preferredStrategy === 'BRRRR'` to decide
+  // which strategy's numbers to lead with, so a genuine "BOTH WORK — BRRRR
+  // PREFERRED" tie silently fell through to FLIP everywhere except the
+  // printed sentence — producing exactly Woodleigh's real Overview-says-
+  // FLIP-but-Deal-tab-says-BRRRR-PREFERRED contradiction. `preferredWhenBoth`
+  // is a purely ADDITIVE field exposing the SAME winner this branch was
+  // already computing (fr/br comparison, unchanged) — it changes no
+  // ranking, verdict, or threshold, and `preferredStrategy` itself is
+  // untouched ('BOTH' still means "both viable", exactly as before) so no
+  // existing caller relying on that string is affected. See
+  // resolveEffectiveStrategy() below for the one shared consumption point.
+  if (fr === br) return { preferredStrategy: 'BOTH', preferredWhenBoth: null, summary: 'BOTH WORK — SIMILAR', reason: null }
   const winner = fr > br ? 'FLIP' : 'BRRRR'
   return {
     preferredStrategy: 'BOTH',
+    preferredWhenBoth: winner,
     summary: `BOTH WORK — ${winner} PREFERRED`,
     reason: winner === 'BRRRR'
       ? 'BRRRR has the stronger risk-adjusted numbers.'
       : 'Flip has the stronger risk-adjusted numbers.',
   }
+}
+
+// UX V2.5, Part 2 — the ONE place every consumer decides which strategy's
+// numbers to lead with. Replaces each component's own
+// `preferredStrategy === 'BRRRR'` check (which silently ignored a real
+// BOTH-tie winner — see the comment above) with a single resolver that
+// folds `preferredWhenBoth` in. Returns 'FLIP' | 'BRRRR' | 'NONE' — never
+// invents a preference beyond what computeStrategyRecommendation already
+// computed.
+export function resolveEffectiveStrategy(strategyRec) {
+  if (!strategyRec) return 'NONE'
+  if (strategyRec.preferredStrategy === 'FLIP' || strategyRec.preferredStrategy === 'BRRRR') return strategyRec.preferredStrategy
+  if (strategyRec.preferredStrategy === 'BOTH') return strategyRec.preferredWhenBoth === 'BRRRR' ? 'BRRRR' : 'FLIP'
+  return 'NONE'
 }

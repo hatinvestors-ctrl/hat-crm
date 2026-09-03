@@ -26,15 +26,19 @@ export default function MlsStatusBanner({ lead, onUpdated, paused = false }) {
   const [refreshing, setRefreshing] = useState(false)
   const [err, setErr] = useState(null)
 
-  // Paused state — show a clear notice instead of the rich banner.
+  // UX V2.5, Part 8 — this is a SYSTEM/CONFIGURATION state ("is a
+  // background job turned on"), not an acquisition insight about this
+  // property, but it previously rendered as a full-width warm banner —
+  // the same visual weight as MLS Status/Days on Market/List Price below,
+  // competing with real deal information on every single lead. No
+  // behavior change (RentCast/auto-refresh settings untouched) — display
+  // only, now a small muted status strip.
   if (paused) {
     return (
-      <div className="bg-[color:var(--color-warn-soft)] border border-[color:var(--color-warn)] rounded-lg px-4 py-2.5 flex items-center gap-2 text-[color:var(--color-warn-text)]">
+      <div className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)] px-1 py-1">
         <span>⏸</span>
-        <span className="text-[12.5px]">
-          <strong>MLS auto-enrichment paused.</strong> No RentCast calls are being made.
-          Toggle in <span className="underline">Settings → MLS Auto-Refresh</span> when you're ready to resume.
-        </span>
+        <span>MLS enrichment paused —</span>
+        <a href="/settings" className="underline hover:text-[color:var(--color-text)]">Settings</a>
       </div>
     )
   }

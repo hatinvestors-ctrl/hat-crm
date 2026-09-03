@@ -25,10 +25,12 @@ import { useState } from 'react'
 import EditableField from './EditableField'
 import ContactIntelligenceCard from './ContactIntelligenceCard'
 import { useLeadUpdate } from '../../hooks/useLeadUpdate'
-import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../lib/dealExplanation'
+import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, resolveEffectiveStrategy } from '../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../lib/calculations'
 import { getContactStatus } from '../../lib/contactEnrichment'
 import { getLastAttemptSummary } from '../../lib/enrichmentResult'
+import { resolveMarketType } from '../../lib/distressInfo'
+import { hasEvaluablePrice, resolveNoPriceStrategyPreference } from '../../lib/acquisitionDecisionPresentation'
 
 function InputTile({ label, value, onSave, canEdit }) {
   return (
@@ -62,23 +64,55 @@ const CONTACT_STATUS_BADGE = {
   NEEDS_ENRICHMENT: { text: 'NOT ENRICHED', cls: 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]' },
 }
 
-export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUpdated, onRequestEnrich }) {
+export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUpdated, onRequestEnrich, underwritingSettings = null }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const update = useLeadUpdate(lead, userId, members, onUpdated)
 
-  const flip = computeFlipResult(lead)
-  const brrrr = computeBrrrrResult(lead)
+  // UX V2.5, Part 2 audit — this bar independently called
+  // computeFlipResult(lead)/computeBrrrrResult(lead) with NO
+  // underwritingSettings, a THIRD instance of the same wiring gap already
+  // fixed in DecisionHero (V2.4) and DealDecisionCenter — capable of
+  // showing yet another disagreeing Max Buy/strategy. Now threads the
+  // same resolved settings every other consumer on this page uses, and
+  // uses resolveEffectiveStrategy (dealExplanation.js) instead of a bare
+  // `=== 'BRRRR'` check so a genuine "BOTH WORK — BRRRR PREFERRED" tie is
+  // never silently dropped to Flip (see dealExplanation.js's comment).
+  const flip = computeFlipResult(lead, underwritingSettings)
+  const brrrr = computeBrrrrResult(lead, underwritingSettings)
   const strategy = computeStrategyRecommendation(flip, brrrr)
-  const maxBuy = strategy.preferredStrategy === 'BRRRR' ? brrrr.mao : flip.mao
-  const profitLabel = strategy.preferredStrategy === 'BRRRR' ? 'Cash Flow' : 'Profit'
-  const profitValue = strategy.preferredStrategy === 'BRRRR' ? brrrr.monthlyCashFlow : flip.projectedProfit
+  // UX V2.9, Part 10 — the absence of a seller price must not suppress
+  // valid underwriting intelligence. With no price, every verdict is the
+  // vacuous 'NO DEAL' (see acquisitionDecisionPresentation.js's V2.9 note)
+  // so computeStrategyRecommendation returns 'NONE' and this bar showed
+  // "Strategy —  Insufficient data for either Flip or BRRRR to clear HAT's
+  // targets" for a lead whose Max Buys both computed perfectly. Same
+  // canonical resolver as Overview/Deal for the priced case; the SAME
+  // shared no-price preference resolver otherwise — never a fourth
+  // independent rule.
+  const priceKnown = hasEvaluablePrice({ flip, lead })
+  const noPricePref = priceKnown ? null : resolveNoPriceStrategyPreference({ flip, brrrr })
+  const effectiveStrategy = priceKnown ? resolveEffectiveStrategy(strategy) : (noPricePref.strategy || 'NONE')
+  const maxBuy = effectiveStrategy === 'BRRRR' ? brrrr.mao : flip.mao
+  const profitLabel = effectiveStrategy === 'BRRRR' ? 'Cash Flow' : 'Profit'
+  const profitValue = priceKnown ? (effectiveStrategy === 'BRRRR' ? brrrr.monthlyCashFlow : flip.projectedProfit) : null
+  const strategyShown = priceKnown ? (strategy.preferredStrategy !== 'NONE' ? effectiveStrategy : null) : (noPricePref.strategy || null)
 
   // Part 7 — real, deterministic reasons an output is missing, built only
   // from which of the actual required inputs are absent.
   const missingForMaxBuy = [lead.arv == null && 'ARV', lead.renovation_cost == null && 'Rehab'].filter(Boolean)
   const maxBuyExplanation = missingForMaxBuy.length ? `Needs ${missingForMaxBuy.join(' + ')}` : (maxBuy == null ? 'No purchase price meets HAT\'s target under current assumptions' : null)
-  const profitExplanation = maxBuy == null ? 'Needs deal inputs' : null
-  const strategyExplanation = strategy.preferredStrategy === 'NONE' ? (missingForMaxBuy.length ? `Needs ${missingForMaxBuy.join(' + ')}` : 'Insufficient data for either Flip or BRRRR to clear HAT\'s targets') : null
+  const profitExplanation = maxBuy == null ? 'Needs deal inputs' : (!priceKnown ? 'Needs a purchase price' : null)
+  const strategyExplanation = strategyShown != null ? null
+    : (missingForMaxBuy.length ? `Needs ${missingForMaxBuy.join(' + ')}` : 'Insufficient data for either Flip or BRRRR to clear HAT\'s targets')
+  // UX V2.5, Part 11 — "ASK" implies a genuine MLS listing price; for an
+  // off-market/distressed lead this exact same lead.asking_price column
+  // is a user-entered EVALUATION price (see acquisitionDecisionPresentation.js's
+  // header note — the same provenance fact already established in V2.2).
+  // No new field, no new resolver logic — resolveMarketType is the same
+  // canonical resolver already used for the Action Center badge/section
+  // and Decision V2 routing (task G).
+  const isOffMarket = resolveMarketType(lead) === 'OFF_MARKET'
+  const askLabel = isOffMarket ? 'Evaluation' : 'Ask'
 
   const contactStatus = getContactStatus(lead)
   const lastAttempt = getLastAttemptSummary(lead)
@@ -137,7 +171,7 @@ export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUp
         <div className="py-3 lg:py-0 lg:px-4">
           <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-1">Deal Inputs</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <InputTile label="Ask" value={lead.asking_price} canEdit={canEdit} onSave={(v) => update({ asking_price: v })} />
+            <InputTile label={askLabel} value={lead.asking_price} canEdit={canEdit} onSave={(v) => update({ asking_price: v })} />
             <InputTile label="ARV" value={lead.arv} canEdit={canEdit} onSave={(v) => update({ arv: v })} />
             <InputTile label="Rehab" value={lead.renovation_cost} canEdit={canEdit} onSave={(v) => update({ renovation_cost: v })} />
             <InputTile label="Rent" value={lead.rent_estimate} canEdit={canEdit} onSave={(v) => update({ rent_estimate: v })} />
@@ -149,9 +183,13 @@ export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUp
         <div className="pt-3 lg:pt-0 lg:pl-4">
           <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-1">Deal Output</div>
           <div className="grid grid-cols-3 gap-3">
-            <OutputTile label="Max Buy" value={maxBuy != null ? fc(Math.round(maxBuy / 100) * 100) : null} explanation={maxBuyExplanation} />
+            {/* UX V2.1, Part 11 — never a bare "Max Buy" when two
+                strategies can have different values; maxBuy itself was
+                already strategy-aware (see above), only the label lied
+                about which strategy it reflected. */}
+            <OutputTile label={effectiveStrategy === 'BRRRR' ? 'BRRRR Max Buy' : 'Flip Max Buy'} value={maxBuy != null ? fc(Math.round(maxBuy / 100) * 100) : null} explanation={maxBuyExplanation} />
             <OutputTile label={profitLabel} value={profitValue != null ? fc(profitValue) : null} explanation={profitExplanation} />
-            <OutputTile label="Strategy" value={strategy.preferredStrategy !== 'NONE' ? strategy.preferredStrategy : null} explanation={strategyExplanation} />
+            <OutputTile label="Strategy" value={strategyShown} explanation={strategyExplanation} />
           </div>
         </div>
       </div>

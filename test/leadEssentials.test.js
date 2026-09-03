@@ -50,7 +50,10 @@ describe('Quick edit save path (Part 4, Test 6/7) — reuses the existing hook, 
 
 describe('Deal output — Part 2, no duplicate calculation engine', () => {
   it('computes output via the canonical dealExplanation.js functions only — zero local arithmetic on ARV/reno/rate', () => {
-    expect(SRC).toMatch(/import \{ computeFlipResult, computeBrrrrResult, computeStrategyRecommendation \} from '\.\.\/\.\.\/lib\/dealExplanation'/)
+    // UX V2.5, Part 2 — also imports resolveEffectiveStrategy (still a
+    // canonical dealExplanation.js export, not local arithmetic) so the
+    // "BOTH WORK — X PREFERRED" tie-break winner is never dropped here.
+    expect(SRC).toMatch(/import \{ computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, resolveEffectiveStrategy \} from '\.\.\/\.\.\/lib\/dealExplanation'/)
     // No re-implemented MAO/profit formula (e.g. "* 0.7", "0.75 *") anywhere in this file.
     expect(SRC).not.toMatch(/0\.7\d?\s*\*|\*\s*0\.7\d?/)
   })
@@ -115,10 +118,24 @@ describe('Test 17 — old leads without a rich contact_profile still render safe
 })
 
 describe('Terminology consistency (Part 11)', () => {
-  it('uses the short canonical labels Ask/ARV/Rehab/Rent/Max Buy/Strategy, consistently', () => {
-    for (const label of ['Ask', 'ARV', 'Rehab', 'Rent', 'Max Buy']) {
+  it('uses the short canonical labels ARV/Rehab/Rent, consistently, and a market-aware Ask/Evaluation label (UX V2.5, Part 11)', () => {
+    for (const label of ['ARV', 'Rehab', 'Rent']) {
       expect(SRC).toContain(`label="${label}"`)
     }
+    // "Ask" implies a real MLS listing price; for an off-market/distressed
+    // lead the same lead.asking_price column is an internal evaluation
+    // price (see acquisitionDecisionPresentation.js's provenance note) —
+    // the label now switches via the same canonical resolveMarketType
+    // used everywhere else on the page.
+    expect(SRC).toMatch(/const askLabel = isOffMarket \? 'Evaluation' : 'Ask'/)
+    expect(SRC).toMatch(/label=\{askLabel\}/)
+  })
+  it('Max Buy label is now strategy-specific ("BRRRR Max Buy"/"Flip Max Buy") — Lead Workspace UX V2.1, Part 11: never a bare "Max Buy" when two strategies can have different values', () => {
+    // UX V2.5, Part 2 — uses effectiveStrategy (resolveEffectiveStrategy's
+    // output), not the raw strategyRec.preferredStrategy string, so a
+    // genuine "BOTH WORK — BRRRR PREFERRED" tie is labeled correctly too.
+    expect(SRC).toMatch(/effectiveStrategy === 'BRRRR' \? 'BRRRR Max Buy' : 'Flip Max Buy'/)
+    expect(SRC).not.toMatch(/label="Max Buy"/)
   })
 })
 

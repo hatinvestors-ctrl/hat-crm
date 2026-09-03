@@ -5,6 +5,7 @@
 // never asserts a number this module invented independently of that
 // engine.
 import { describe, it, expect } from 'vitest'
+import fs from 'fs'
 import {
   computeDecisionSensitivity, getHatInternalEvidence, getExternalCompConfidenceState, getValuationRecommendation,
   STRESS_CLASSIFICATION,
@@ -234,9 +235,20 @@ describe('Financial engine isolation — arvConfidence.js only calls the canonic
   it('imports zero raw calculation primitives (MAO/breakdown functions) — only the already-explained dealExplanation.js results', async () => {
     const mod = await import('../src/lib/arvConfidence.js')
     const exportedNames = Object.keys(mod).sort()
+    // UX V2.8 added getCompEvidenceSummary — a pure, parse-only reader over
+    // the MARKET COMPS text already stored in lead.ai_notes. It is listed
+    // here (the allowlist is exhaustive by design) but does not weaken the
+    // guarantee this suite protects: it performs no arithmetic, and the
+    // module's import surface is still exactly dealExplanation.js, asserted
+    // structurally below.
     expect(exportedNames).toEqual([
-      'ARV_SCENARIO_BAND_PCT', 'STRESS_CLASSIFICATION', 'computeDecisionSensitivity', 'getExternalCompConfidenceState',
-      'getHatInternalEvidence', 'getValuationRecommendation',
+      'ARV_SCENARIO_BAND_PCT', 'STRESS_CLASSIFICATION', 'computeDecisionSensitivity', 'getCompEvidenceSummary',
+      'getExternalCompConfidenceState', 'getHatInternalEvidence', 'getValuationRecommendation',
     ].sort())
+  })
+  it('still imports ONLY dealExplanation.js — no calculations.js/MAO/breakdown primitives', () => {
+    const src = fs.readFileSync('src/lib/arvConfidence.js', 'utf8')
+    const imports = src.match(/^import .+$/gm) || []
+    expect(imports).toEqual(["import { computeFlipResult, computeBrrrrResult } from './dealExplanation.js'"])
   })
 })

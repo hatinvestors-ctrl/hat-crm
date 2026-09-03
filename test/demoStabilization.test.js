@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../src/lib/dealExplanation.js'
 import { roundMaxBuy } from '../src/lib/calculations.js'
+import { statusForResult } from '../src/lib/acquisitionDecisionPresentation.js'
 
 const GOLDEN_LEAD = { asking_price: 100000, arv: 200000, renovation_cost: 39000, hold_months: 6, rent_estimate: null }
 
@@ -84,21 +85,37 @@ describe('Part 3 — profit cushion and price cushion are already correctly dist
     expect(dealAnalysisCardSrc).toMatch(/Profit cushion vs\. price cushion/)
     expect(dealAnalysisCardSrc).toMatch(/not always the same as the price cushion shown above, since purchase price also moves financing\/holding costs/)
   })
-  it('ComplsIntelligenceCard separately labels "Seller Gap to Max Buy" (price) and "Profit Shortfall to Target" (profit) — never blurred into one "gap"', () => {
+  // UX V2.8 supersedes the original form of this assertion. The guarantee
+  // it protected was "a price gap and a profit shortfall must never be
+  // blurred into one ambiguous 'gap' number in Comps Intelligence." V2.8
+  // removed BOTH numbers from that card entirely (they are acquisition
+  // conclusions owned by Overview/Deal, not comparable-market evidence),
+  // which satisfies the guarantee in the strongest possible way — there is
+  // no gap label left to be ambiguous. Asserted as an absence so the
+  // duplication cannot silently return. The equivalent positive assertion
+  // for the surface that DOES own these two numbers (FlipMarginOfSafety's
+  // "Profit cushion vs. price cushion" explainer) is unchanged above.
+  it('ComplsIntelligenceCard no longer shows any price-gap or profit-shortfall number — those acquisition conclusions live in Overview/Deal (UX V2.8)', () => {
+    // Comments stripped: the file header documents what V2.8 removed, and
+    // that documentation must not read as the markup still being there.
     const src = fs.readFileSync('src/components/lead-detail/workspace/ComplsIntelligenceCard.jsx', 'utf8')
-    expect(src).toMatch(/Seller Gap to Max Buy/)
-    expect(src).toMatch(/Profit Shortfall to Target/)
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
+    expect(src).not.toMatch(/Seller Gap to Max Buy/)
+    expect(src).not.toMatch(/Room to Max Buy/)
+    expect(src).not.toMatch(/Profit Shortfall to Target/)
   })
 })
 
 // ── Part 4 — no unsupported "Best Fit Flip" when BRRRR was never evaluated ──
 describe('Part 4 — "Best Fit" never implies BRRRR was compared and lost when it was never evaluated', () => {
-  it('Best Fit only renders when BOTH flip.available AND brrrr.available are true', () => {
-    expect(dealDecisionCenterSrc).toMatch(/strategyRec\.preferredStrategy !== 'NONE' && flip\.available && brrrr\.available/)
+  it('UX V2.6 — the standalone "Best Fit" line was removed entirely (Part 10: redundant with the canonical Recommended Strategy line); the underlying honesty guarantee this test protects (never implying BRRRR was compared and lost when it was never evaluated) is now enforced by buildStrategyComparison\'s UNAVAILABLE status + explanation text instead', () => {
+    expect(dealDecisionCenterSrc).not.toMatch(/text-\[color:var\(--color-accent-text\)\]">Best Fit</)
+    expect(dealDecisionCenterSrc).not.toMatch(/uppercase tracking-wider[^>]*>Best Fit</)
+    const presentationSrc = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
+    expect(presentationSrc).toMatch(/return 'UNAVAILABLE'/)
   })
-  it('when only one strategy was evaluated, shows "<STRATEGY> ANALYSIS AVAILABLE" instead of "Best Fit"', () => {
-    expect(dealDecisionCenterSrc).toMatch(/\{strategyRec\.preferredStrategy\} ANALYSIS AVAILABLE/)
-    expect(dealDecisionCenterSrc).toMatch(/Analysis Available/)
+  it('an unevaluated strategy shows status UNAVAILABLE, never a false "compared and lost" implication', () => {
+    expect(statusForResult({ available: false })).toBe('UNAVAILABLE')
   })
   it('computeStrategyRecommendation itself is untouched — the fix is presentation-only', () => {
     expect(dealExplanationSrc).toMatch(/if \(flipOk && !brrrrOk\) \{\s*return \{ preferredStrategy: 'FLIP', summary: 'BEST EXIT: FLIP', reason: null \}/)
@@ -120,8 +137,9 @@ describe('Part 5 — off-market/distressed leads never claim a verified seller a
   it('PropertyInfoSection labels the warning box "Evaluation Price" for distressed leads, "Seller\'s Asking Price" for on-market', () => {
     expect(propertyInfoSrc).toMatch(/isDistressedLead\(lead\) \? 'Evaluation Price' : "Seller's Asking Price"/)
   })
-  it('DealDecisionCenter secondary line says "Evaluating at" for distressed leads, "Seller asks" for on-market', () => {
-    expect(dealDecisionCenterSrc).toMatch(/isDistressedLead\(lead\) \? 'Evaluating at' : 'Seller asks'/)
+  it('DealDecisionCenter secondary line uses market-aware price provenance — UX V2.6 replaced "Evaluating at"/"Seller asks" with the more precise Evaluation Price/Seller Asking/Asking Price labels already established in V2.3–V2.5 (resolveMarketType + getSellerIntelligence, not a new resolver)', () => {
+    expect(dealDecisionCenterSrc).toMatch(/const priceLabel = isOffMarket \? \(genuineSellerAsking != null \? 'Seller Asking' : 'Evaluation Price'\) : 'Asking Price'/)
+    expect(dealDecisionCenterSrc).toMatch(/import \{ isDistressedLead, resolveMarketType \} from '\.\.\/\.\.\/\.\.\/lib\/distressInfo'/)
   })
   it('the NO_ASKING_PRICE error message is also distressed-aware', () => {
     expect(dealAnalysisCardSrc).toMatch(/Please fill in the Evaluation Price before generating AI analysis\./)
