@@ -53,16 +53,31 @@ export function useLeadUpdate(lead, userId, members, onUpdated) {
         }).catch(() => {})
       }
 
-      onUpdated?.(updated)
+      // Small Change #2 — Overview input-sync fix. Root cause: this call
+      // used to be fire-and-forget (`.catch(() => {})`, no `.then`), so the
+      // freshly-recalculated decision_v2 (which is what Overview's
+      // "PRELIMINARY — MISSING" line actually reads, via
+      // d.confidence.missing) was written to the DATABASE but never fed
+      // back into the caller's local React state. The top Deal Inputs tile
+      // reads `lead.renovation_cost`/`lead.arv` directly so it updated
+      // instantly, while Overview kept showing the STALE decision_v2 that
+      // was in state before the edit — until an unrelated reload refetched
+      // the lead. Same fix DealAnalysisCard.jsx's runGenerate already uses
+      // for its own writes (await recalculateDecisionV2, merge the result
+      // in before calling onUpdated) — no new engine, no new field, same
+      // deterministic computeDecisionV2 call, just correctly awaited and
+      // merged into the SAME update() this hook already returns/notifies
+      // with. shouldTriggerV2Recalc() (#15.2) still decides whether this
+      // specific patch even matters (asking_price/arv/renovation_cost/
+      // rent_estimate/zip_code/property_type/bedrooms/bathrooms/sqft/
+      // status/etc.) — never fires for cosmetic fields, never calls an LLM.
+      const freshDecision = await maybeRecalculateDecisionV2(supabase, lead, updated).catch(() => null)
+      if (freshDecision) {
+        updated.decision_v2 = freshDecision
+        updated.decision_v2_updated_at = freshDecision.calculated_at
+      }
 
-      // Capability #15.5.1, Section 5 — deterministic V2 recalculation on
-      // every real structured edit through the ONE hook every field edit
-      // in the app already goes through. shouldTriggerV2Recalc() (#15.2)
-      // decides whether this specific patch actually matters (asking_price/
-      // arv/renovation_cost/rent_estimate/zip_code/property_type/bedrooms/
-      // bathrooms/sqft/status/etc.) — never fires for cosmetic fields, never
-      // calls an LLM. Fire-and-forget: never delays the UI update.
-      maybeRecalculateDecisionV2(supabase, lead, updated).catch(() => {})
+      onUpdated?.(updated)
     }
     return updated
   }
