@@ -47,6 +47,24 @@ export default function ComplsIntelligenceCard({ lead }) {
   const provenance = getArvProvenance(lead)
   const hasCompAnalysis = compEvidence.available
 
+  // Small Change #1 — display-only parse of the AI's 3-level ARV, mirrors
+  // DealAnalysisCard.jsx's own inline regex approach (no shared module
+  // introduced). Display never requires the ordering validation writeback
+  // uses — it simply renders whatever the AI wrote when all three labels
+  // are present, same as the existing Rental Comps section's own display
+  // (which similarly doesn't re-validate before showing).
+  const arvEstimate = (() => {
+    const notes = lead.ai_notes || ''
+    const get = (label) => {
+      const m = notes.match(new RegExp(`${label} ARV:\\s*\\$([0-9,]+)`, 'i'))
+      return m ? parseInt(m[1].replace(/,/g, ''), 10) : null
+    }
+    const conservative = get('Conservative')
+    const realistic = get('Realistic')
+    const optimistic = get('Optimistic')
+    return (conservative != null && realistic != null && optimistic != null) ? { conservative, realistic, optimistic } : null
+  })()
+
   // ONE scoped query (same ZIP only, small column list, capped rows), never
   // a full-table scan. Only runs once comp analysis exists — before that,
   // this card is intentionally near-empty and has nothing to show it in.
@@ -134,6 +152,33 @@ export default function ComplsIntelligenceCard({ lead }) {
               <div className="text-[11.5px]">
                 <span className="text-[color:var(--color-text-dim)]">Market range: </span>
                 <span className="font-semibold text-[color:var(--color-text)]">{compEvidence.marketRange}</span>
+              </div>
+            )}
+
+            {/* ARV ESTIMATE — Small Change #1. The AI's 3-level valuation
+                (Conservative/Realistic/Optimistic), parsed verbatim from
+                the same ai_notes text already read above — only ever
+                present when generate-comps.mjs's new VALUATION section
+                genuinely ran (i.e. ARV was blank at that time). Same
+                compact visual language as the existing Rental Comps
+                Conservative/Realistic/Optimistic box (NotesRenderer.jsx's
+                RentalCompsSection) — no new card, no redesign. */}
+            {arvEstimate && (
+              <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5 space-y-1.5">
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">ARV Estimate</div>
+                <div className="flex gap-2 items-baseline">
+                  <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Conservative</span>
+                  <span className="text-[12px] font-semibold text-[color:var(--color-warn-text)]">{fc(arvEstimate.conservative)}</span>
+                </div>
+                <div className="flex gap-2 items-baseline">
+                  <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Realistic</span>
+                  <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{fc(arvEstimate.realistic)}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-accent-text)]">Recommended</span>
+                </div>
+                <div className="flex gap-2 items-baseline">
+                  <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Optimistic</span>
+                  <span className="text-[12px] font-semibold text-[color:var(--color-success-text)]">{fc(arvEstimate.optimistic)}</span>
+                </div>
               </div>
             )}
 

@@ -1006,8 +1006,24 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       // Phase 1b — core analysis with comps ARV injected so all numbers agree.
       // ARV set in Financials is the single source of truth — comps only fill it in
       // when it's not set yet; they never silently override a value the user typed.
-      const compsArvMatch = compsNotes?.match(/Realistic ARV:\s*\$([0-9,]+)/i)
-      const resolvedArv = compsArvMatch ? parseInt(compsArvMatch[1].replace(/,/g, '')) : null
+      // Small Change #1 — the AI's 3-level ARV (generate-comps.mjs's new,
+      // conditional VALUATION section) is only ever accepted as a resolved
+      // ARV after the same lightweight sanity check the mission requires:
+      // numeric/finite/positive, and Conservative <= Realistic <= Optimistic.
+      // No new business threshold — this is the ONE check, same spirit as
+      // the existing NO_ARV_AVAILABLE guard just above.
+      const parseArvLevel = (label) => {
+        const m = compsNotes?.match(new RegExp(`${label} ARV:\\s*\\$([0-9,]+)`, 'i'))
+        if (!m) return null
+        const n = parseInt(m[1].replace(/,/g, ''), 10)
+        return Number.isFinite(n) && n > 0 ? n : null
+      }
+      const conservativeArv = parseArvLevel('Conservative')
+      const realisticArv    = parseArvLevel('Realistic')
+      const optimisticArv   = parseArvLevel('Optimistic')
+      const arvLevelsValid  = conservativeArv != null && realisticArv != null && optimisticArv != null
+        && conservativeArv <= realisticArv && realisticArv <= optimisticArv
+      const resolvedArv = arvLevelsValid ? realisticArv : null
       if (resolvedArv) setAiCompsArv(resolvedArv)
       const arvForCore = (lead.arv ? Number(lead.arv) : null) ?? resolvedArv
       // Apply any override values already entered by the user (reno, notes) —

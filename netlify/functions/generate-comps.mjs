@@ -37,6 +37,8 @@ export const SYSTEM_PROMPT = `You are a senior Jacksonville FL real estate inves
 CANONICAL AUTHORITY CONTRACT — READ FIRST:
 The CANONICAL FINANCIALS block in the prompt (ARV, Max Buy, Projected Profit) is authoritative. Copy those numbers exactly wherever you reference them. Do NOT calculate, restate, or imply a different ARV. Do NOT calculate, restate, or imply a different Max Buy / MAO / acquisition ceiling. Your job is to explain, contextualize, and identify evidence that AGREES or CONFLICTS with the canonical numbers — never to produce a second, competing valuation. If market evidence conflicts with the canonical ARV, say so as a review flag ("Available market context does not strongly support the current $[canonical ARV] ARV — additional comp validation is recommended"), never as a replacement number.
 
+EXCEPTION — no canonical ARV exists yet: when CANONICAL FINANCIALS below shows "ARV: Unknown", there is no existing value to contradict. In that case ONLY, write the VALUATION section (see below) with your own evidence-based ARV estimate. The moment a canonical ARV is supplied on a future run, this exception no longer applies and VALUATION must be omitted — never restate a different ARV once one exists.
+
 JAX ARV benchmarks (fully renovated 3/2, for evidence context only — NOT a substitute for the canonical ARV above):
 32208/32219: $160–240K | 32210/32244/32221: $220–320K | 32205/32216: $230–380K | 32211: $155–200K | Clay Co: $200–300K
 Adjustments: 2BR −$20K | 4BR +$15K | 1BA only −$20K | <1,000sqft −$15K | CBS/brick +$7K
@@ -46,7 +48,16 @@ JAX Rental benchmarks (renovated):
 Adjustments: 1BA only −$150/mo | 4BR +$200/mo | <1,000sqft −$100/mo
 
 Write EXACTLY these sections in order. No intro. Start with the first ===== line.
+Include VALUATION only when CANONICAL FINANCIALS below shows "ARV: Unknown" — omit entirely when a canonical ARV is already provided.
 Include CRM COMPS USED only if historical CRM deals were provided — omit entirely if none.
+
+=====================================
+VALUATION
+=====================================
+[ONLY when ARV: Unknown above. Every number here must be evidence-based from the comps you cite below — never a fixed percentage spread, never derived from asking price or Max Buy.]
+Conservative ARV: $[X] — [1 line: which specific comp(s) support this defensible lower bound, and why the evidence is weaker/uncertain]
+Realistic ARV:    $[X] — [1 line: the best-supported working value — cite the most relevant comp(s) by location/size/bed-bath/condition]
+Optimistic ARV:   $[X] — [1 line: which specific comp(s) support this reasonable upper-end value if condition/finish/execution matches the stronger evidence]
 
 =====================================
 MARKET COMPS
@@ -199,7 +210,7 @@ ARV: ${fmt(arv)}
 Max Buy (MAO): ${fmt(mao)}
 Renovation Budget: ${fmt(lead.renovation_cost)}${rentalMathBlock}${compsBlock}
 
-Write the MARKET COMPS section, then the RENTAL COMPS section, then CRM COMPS USED if historical data was provided above. Every reference to "the ARV" or "Max Buy" in your output must use the CANONICAL FINANCIALS values above exactly.`
+Write the VALUATION section (only if ARV: Unknown above), then MARKET COMPS, then RENTAL COMPS, then CRM COMPS USED if historical data was provided above. Every reference to "the ARV" or "Max Buy" in your output must use the CANONICAL FINANCIALS values above exactly whenever ARV is already provided.`
 
   // P0 Timeout Investigation & Fix (2026-08-30) — same real finding as
   // generate-core-analysis.mjs (see its comment): the true platform

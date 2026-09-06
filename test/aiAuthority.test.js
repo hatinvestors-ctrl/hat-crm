@@ -21,10 +21,24 @@ describe('generate-comps.mjs SYSTEM_PROMPT — canonical authority contract (CAS
     expect(SYSTEM_PROMPT).toMatch(/never as a replacement number/i)
   })
 
-  it('the MARKET COMPS template no longer has a "Realistic ARV: $X" slot (the exact defect found on 8054 Paschal Street)', () => {
-    expect(SYSTEM_PROMPT).not.toMatch(/Realistic ARV:/i)
-    expect(SYSTEM_PROMPT).not.toMatch(/Optimistic ARV:/i)
-    expect(SYSTEM_PROMPT).not.toMatch(/Conservative ARV:/i)
+  // Small Change #1 (Sep 4 baseline) — the exact Paschal Street defect was
+  // an AI-proposed ARV competing with an EXISTING canonical ARV. That
+  // specific failure mode is what this test guards, and it still cannot
+  // happen: the MARKET COMPS section (and everywhere ARV is already
+  // provided) still has no such slot, and the new VALUATION section is
+  // explicitly gated to fire ONLY when "ARV: Unknown" — i.e. exactly the
+  // case where no canonical ARV exists yet to contradict. Verified below
+  // instead of banning the words outright.
+  it('the MARKET COMPS section itself still has no "Realistic ARV: $X" slot — the 3-level ARV lives only in the new, separately-gated VALUATION section', () => {
+    const marketCompsSection = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('MARKET COMPS\n====='), SYSTEM_PROMPT.indexOf('RENTAL COMPS\n====='))
+    expect(marketCompsSection).not.toMatch(/Realistic ARV:/i)
+    expect(marketCompsSection).not.toMatch(/Optimistic ARV:/i)
+    expect(marketCompsSection).not.toMatch(/Conservative ARV:/i)
+  })
+  it('the new VALUATION section is explicitly gated to ONLY when no canonical ARV exists yet, and is omitted the moment one is provided', () => {
+    expect(SYSTEM_PROMPT).toMatch(/Include VALUATION only when CANONICAL FINANCIALS below shows "ARV: Unknown" — omit entirely when a canonical ARV is already provided\./)
+    expect(SYSTEM_PROMPT).toMatch(/EXCEPTION — no canonical ARV exists yet/)
+    expect(SYSTEM_PROMPT).toMatch(/never restate a different ARV once one exists/)
   })
 
   it('the CRM COMPS USED template no longer invites a "Confidence Impact" line that raises ARV confidence to a dollar figure or recommends an alternate MAO', () => {

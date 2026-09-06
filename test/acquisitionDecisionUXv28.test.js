@@ -126,7 +126,16 @@ describe('B–I. The underwriting / decision layer is removed from the primary A
     expect(compsSrc).not.toMatch(/stress[- ]test/i)
     expect(compsSrc).not.toMatch(/computeDecisionSensitivity/)
     expect(compsSrc).not.toMatch(/getValuationRecommendation/)
-    expect(compsSrc).not.toMatch(/Conservative|Upside/)
+    // Small Change #1 (Sep 4 baseline) legitimately reintroduces the word
+    // "Conservative" as one of 3 ARV valuation levels (Conservative/
+    // Realistic/Optimistic) — a different, additive feature, not the old
+    // removed ±5% scenario table. Narrowed to the actual removed markup
+    // (a "Scenario" table column header) instead of banning the word
+    // outright — "Upside" (that table's other column label) still never
+    // appears anywhere.
+    expect(compsSrc).not.toMatch(/Scenario<\/th>/)
+    expect(compsSrc).not.toMatch(/Base \(current ARV\)/)
+    expect(compsSrc).not.toMatch(/Upside/)
   })
   it('E. "What Makes This Deal Work?" is removed', () => {
     expect(compsSrc).not.toMatch(/What Makes This Deal Work/i)
