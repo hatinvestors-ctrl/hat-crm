@@ -144,9 +144,21 @@ describe('B–I. The underwriting / decision layer is removed from the primary A
     expect(compsSrc).not.toMatch(/Seller Gap to Max Buy/)
   })
   it('W. no other deal-level verdict, strategy or offer surface was introduced in its place', () => {
-    for (const banned of [/Suggested Offer/, /Actual Offer/, /Recommended Strategy/, /Margin of Safety/, /Cash Left In/, /Cash Flow/, /Projected Profit/, /NO DEAL/, /WATCH/, /Act Now/, /Review Today/]) {
+    // UX V3, Part 3/4 note: "Cash Flow" now legitimately appears as one of
+    // the AI Deal Score's own genuine scoring-rubric category labels
+    // (parsed verbatim from ai_notes, not a dollar-value duplicate of
+    // Deal's Cash Flow figure) — excluded from this ban with that specific
+    // justification. "Margin of Safety" also now appears, but only inside
+    // the AI Deal Score's own disclaimer sentence distinguishing itself
+    // FROM Deal's Margin of Safety (Part 5's explicit requirement: "AI
+    // Deal Score != deterministic Margin of Safety" must be stated) — it
+    // is not a second Margin of Safety verdict card. Every other
+    // deal-level conclusion/dollar-value surface remains banned.
+    for (const banned of [/Suggested Offer/, /Actual Offer/, /Recommended Strategy/, /Cash Left In/, /Projected Profit/, /NO DEAL/, /WATCH/, /Act Now/, /Review Today/]) {
       expect(compsSrc).not.toMatch(banned)
     }
+    expect(compsSrc).not.toMatch(/border-l-\[3px\][^`]*Margin of Safety/) // no standalone Margin of Safety card, only the disclaimer sentence
+    expect(compsSrc).toMatch(/does not replace Overview's Acquisition Decision or Deal's Margin of Safety/)
   })
 })
 
@@ -172,7 +184,14 @@ describe('N, O. Comp-evidence confidence is preserved honestly and never fabrica
   it('O. no numeric comp-confidence score is invented — the honest "not yet available" state is used', () => {
     expect(getExternalCompConfidenceState(WOODLEIGH).status).toBe('NOT_SCOREABLE')
     expect(getExternalCompConfidenceState({}).status).toBe('NOT_SCOREABLE')
-    expect(compsSrc).not.toMatch(/confidenceScore|compScore|\/\s*100/)
+    expect(compsSrc).not.toMatch(/confidenceScore|compScore/)
+    // UX V3, Part 3/4 note: the card now legitimately shows "X/100" for the
+    // AI Deal Score (dealScore.total) — a real, existing, genuinely
+    // AI-generated value, not a fabricated comp-confidence score. This
+    // assertion narrows to the Comp Confidence block specifically, rather
+    // than banning "/100" anywhere in the file.
+    const compConfidenceBlock = compsSrc.slice(compsSrc.indexOf('Comp Confidence'), compsSrc.indexOf('AI DEAL SCORE'))
+    expect(compConfidenceBlock).not.toMatch(/\d\s*\/\s*100/)
   })
   it('the ±5% stress test was NOT relabelled as comp confidence', () => {
     expect(compsSrc).not.toMatch(/sensitivity/i)
@@ -197,7 +216,15 @@ describe('J, K, L. Get Comps & Detailed AI, readiness and existing generated ana
   })
   it('K. readiness is compact when ready and actionable when not', () => {
     expect(dealCardSrc).toMatch(/Analysis Ready ✓/)
-    expect(dealCardSrc).toMatch(/Missing for analysis/)
+    // UX — Early Property Analysis Fix, Part 11: relabeled from the
+    // generic "Missing for analysis" (which implied the whole AI
+    // capability was blocked) to "Deal Analysis — missing", now paired
+    // with a "Property Analysis: Ready ✓" line above it — Property
+    // Analysis (comps/market research) has no prerequisites and was
+    // never actually blocked; only Deal Analysis (economics) needs these
+    // inputs. Same computeAnalysisReadiness() output, label only.
+    expect(dealCardSrc).toMatch(/Property Analysis: Ready ✓/)
+    expect(dealCardSrc).toMatch(/Deal Analysis — missing/)
   })
   it('L. the existing generated analysis (NotesRenderer + Full Breakdown + Ask AI) is still mounted', () => {
     expect(dealCardSrc).toMatch(/<NotesRenderer/)

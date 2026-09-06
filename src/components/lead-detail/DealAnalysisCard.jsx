@@ -783,7 +783,16 @@ function AnalysisReadinessPanel({ lead, strategy, canEdit, update, onOpenRenoPic
 
   return (
     <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] p-3.5 mb-3 space-y-2.5">
-      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Missing for analysis</div>
+      {/* UX — Early Property Analysis Fix, Part 11. This panel only ever
+          described DEAL ANALYSIS (Stage B) prerequisites — Property
+          Analysis (Stage A, comps/market research) has none. Split the
+          copy so "missing" never reads as "the whole AI capability is
+          unavailable." No readiness computation changed — same
+          computeAnalysisReadiness() output as before, just relabeled. */}
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="font-semibold text-[color:var(--color-success-text)]">Property Analysis: Ready ✓</span>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)]">Deal Analysis — missing</div>
       <div className="space-y-2">
         {actionableItems.map(item => (
           <div key={item.key} className="flex items-center justify-between gap-3 text-[12px]">
@@ -911,6 +920,13 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   // source of truth for "is this lead ready for analysis," reused by both
   // the readiness panel and the primary CTA below so they can never disagree.
   const readiness = computeAnalysisReadiness(lead, strategy)
+  // UX — Early Property Analysis Fix. STAGE A completion signal: distinct
+  // from `hasAnalysis` (Stage B / deal_analysis). A lead can have property/
+  // market intelligence (ai_notes written by runPropertyOnly or by the
+  // full pipeline) without ever having deal_analysis, when Evaluation
+  // Price/Renovation aren't known yet. No new field — reuses the same
+  // ai_notes column every other AI surface already reads.
+  const hasPropertyAnalysis = !!(localNotes || lead.ai_notes)
 
   // Note: ARV/Reno/DOM/Rent overrides have no input UI in this card (edited only in
   // PropertyInfoSection/FinancialSection), so they are intentionally excluded from this check.
@@ -937,6 +953,20 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
     } else {
       runGenerate(forceRefreshComps, strategy)
     }
+  }
+
+  // UX — Early Property Analysis Fix, Part 6. The ONE orchestration
+  // decision: does this lead have what Stage B (deal economics) genuinely
+  // requires? If not, run Stage A only (comps/market intelligence) instead
+  // of either blocking the CTA entirely (the old bug) or blindly sending
+  // missing asking_price/renovation_cost into runGenerate (which would
+  // just throw NO_ASKING_PRICE / open the reno picker). readiness.ready
+  // is the SAME computeAnalysisReadiness() the panel below already uses —
+  // never a second, disagreeing check.
+  function handleAnalyzeClick() {
+    if (generating) return
+    if (!hasAnalysis && !readiness.ready) { runPropertyOnly(); return }
+    handleRun(false)
   }
 
   function cancelGenerate() {
@@ -1197,6 +1227,44 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
         setGenerating(false)
         setPhase(null)
       }
+    }
+  }
+
+  // UX — AI & Comps Early Property Analysis Fix. STAGE A only:
+  // property/market intelligence that genuinely doesn't need a purchase
+  // price or a renovation budget. Calls the EXACT SAME generate-comps.mjs
+  // function runGenerate() already calls above — no new AI call, no new
+  // pipeline, no fabricated ARV/asking_price/renovation_cost. Writes ONLY
+  // ai_notes (so ComplsIntelligenceCard's comp-evidence/market-range
+  // readers, which already read lead.ai_notes, pick it up) — never
+  // touches lead.arv, lead.asking_price, lead.renovation_cost, lead.mao,
+  // or lead.deal_analysis. This is the root-cause fix: previously, a
+  // fresh lead with no Evaluation Price/Renovation could not reach ANY
+  // AI action at all (readiness.ready gated the CTA to plain text with no
+  // button — see the render logic below), even though comps/market
+  // research never actually depended on those fields.
+  const runPropertyOnly = async () => {
+    setGenerating(true)
+    setGenError(null)
+    cancelledRef.current = false
+    setPhase('analysis')
+    try {
+      const teamComments = await fetchLeadContext(lead)
+      const leadWithContext = teamComments ? { ...lead, team_comments: teamComments } : lead
+      const compsNotes = await callFn('generate-comps', { lead: leadWithContext })
+      if (cancelledRef.current) return
+      if (!compsNotes) throw new Error('Property analysis produced no output')
+      const timestamp = `Generated: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n\n`
+      const fullNotes = timestamp + compsNotes
+      if (lead.id) {
+        await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
+      }
+      setLocalNotes(fullNotes)
+      onUpdated?.({ ai_notes: fullNotes })
+    } catch (err) {
+      if (!cancelledRef.current) setGenError(friendlyAiError(err))
+    } finally {
+      if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
     }
   }
 
@@ -1484,17 +1552,24 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
               <button onClick={cancelGenerate} className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">Cancel</button>
             </span>
           ) : (!hasAnalysis && !readiness.ready) ? (
-            // Analysis Readiness + Decision Integrity Fix, Part 2/7 — the
-            // old version of this branch hid the CTA with a plain,
-            // unactionable sentence and no recovery path (real QA dead
-            // end: an off-market lead with no asking price and no ARV).
-            // Now: a clear, honest reason (never a silent hide), and the
-            // Analysis Readiness panel below gives the actual fix action
-            // for each missing REQUIRED input. ARV is intentionally never
-            // counted here — see computeAnalysisReadiness.
-            <span className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">
-              {readiness.missingRequiredCount} required input{readiness.missingRequiredCount === 1 ? '' : 's'} missing — see Analysis Readiness below
-            </span>
+            // UX — Early Property Analysis Fix (root-cause fix). The
+            // Analysis Readiness + Decision Integrity Fix (above, in the
+            // preserved comment below) had ALREADY replaced a dead-end
+            // hidden CTA with an honest reason — but the reason was still
+            // text-only, no button, no way to actually run ANY AI action
+            // on a fresh lead with no Evaluation Price/Renovation yet.
+            // Real bug: market/comps research never needed those fields.
+            // Now: an always-clickable button that runs STAGE A (property/
+            // market intelligence, generate-comps only) via
+            // handleAnalyzeClick/runPropertyOnly — never fabricates
+            // asking_price/renovation_cost/ARV, never silently attempts
+            // Stage B (deal economics) without its real prerequisites.
+            <button
+              onClick={handleAnalyzeClick}
+              className="text-[12px] font-semibold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity bg-[color:var(--color-accent)]"
+            >
+              {hasPropertyAnalysis ? '↻ Refresh Property Analysis' : '✦ Analyze Property with AI'}
+            </button>
           ) : (!hasAnalysis || staleness.stale) ? (
             <button
               onClick={() => handleRun(false)}
@@ -1537,6 +1612,24 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
           </button>
         )}
       </div>
+
+      {/* UX — Early Property Analysis Fix, Part 7/12. Property analysis
+          (Stage A) succeeding while Deal analysis (Stage B) hasn't run yet
+          is a valid, honest PARTIAL state — never presented as an error.
+          Shows what genuinely ran and names the one real next input,
+          instead of the generic "N required inputs missing" framing that
+          used to imply nothing had happened at all. */}
+      {hasPropertyAnalysis && !hasAnalysis && !generating && (
+        <div className="mb-3 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3.5 py-2.5">
+          <div className="text-[12px] font-bold text-[color:var(--color-success-text)]">Property Analysis Complete ✓</div>
+          <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-0.5">Market comps and property intelligence are available below.</p>
+          {readiness.missingRequiredLabels.length > 0 && (
+            <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1">
+              <span className="font-semibold text-[color:var(--color-text)]">Next step:</span> enter {readiness.missingRequiredLabels.join(' and ')} to complete HAT deal economics.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Analysis Readiness + Decision Integrity Fix, Part 2/13 — only
           before analysis has ever run. Once hasAnalysis is true, the
@@ -1641,7 +1734,20 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
           calculateBrrrrMAO/computeFlipBreakdown/computeBrrrrBreakdown
           functions the rest of the page uses. No LLM call, no invented
           numbers, no cross-strategy leakage. */}
-      {(flipResult.available || brrrrResult.available) && (() => {
+      {/* UX V3, Part 2/6/29 — "AI Deal Read"/"AI Read" removed from the
+          primary AI & Comps workflow (its only mount point —
+          LeadDetailPage.jsx always passes hideDecisionSummary here).
+          Forensic audit confirmed this was NEVER actually AI-generated:
+          `activeResult` below is computeFlipResult/computeBrrrrResult
+          (dealExplanation.js), the identical deterministic engine
+          Overview's Acquisition Decision and Deal's own verdict already
+          use — showing it a third time under an "AI" label duplicated
+          Overview/Deal and was actively misleading. The underlying
+          calculation is completely untouched and still renders normally
+          wherever hideDecisionSummary is false (no other call site exists
+          today, but the gate preserves the option). Nothing deleted —
+          unmount only. */}
+      {!hideDecisionSummary && (flipResult.available || brrrrResult.available) && (() => {
         const activeResult = strategy === 'brrrr' ? brrrrResult : flipResult
         const theme = VERDICT_THEME[activeResult.verdict] || VERDICT_THEME.WATCH
         // Premium visual pass, Part 19/20 — "AI Deal Read," an executive

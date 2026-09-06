@@ -26,6 +26,7 @@ import { supabase } from '../../../lib/supabase'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { getHatInternalEvidence, getExternalCompConfidenceState, getCompEvidenceSummary } from '../../../lib/arvConfidence'
 import { getArvProvenance } from '../../../lib/arvProvenance'
+import { parseAiDealScore, getAiInsights } from '../../../lib/aiDealScore'
 
 function EvidenceTypeBadge({ type }) {
   // Two-tier hierarchy preserved from V1: VERIFIED OUTCOME EVIDENCE (an
@@ -46,6 +47,14 @@ export default function ComplsIntelligenceCard({ lead }) {
   const compEvidence = getCompEvidenceSummary(lead)
   const provenance = getArvProvenance(lead)
   const hasCompAnalysis = compEvidence.available
+  // UX V3, Part 3/4/19 — genuinely AI-generated content (the LLM's own
+  // scored rubric + its own PROS/CONS observations), parsed read-only
+  // from the SAME ai_notes text the rest of this card already reads.
+  // Independent of compEvidence.available — a lead can have a Deal Score
+  // even before/without fresh comps (e.g. right after a refresh that
+  // reused existing comps).
+  const dealScore = parseAiDealScore(lead.ai_notes)
+  const aiInsights = getAiInsights(lead.ai_notes)
 
   // ONE scoped query (same ZIP only, small column list, capped rows), never
   // a full-table scan. Only runs once comp analysis exists — before that,
@@ -166,6 +175,61 @@ export default function ComplsIntelligenceCard({ lead }) {
             <div className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">{externalState.label}</div>
             <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">{externalState.message}</div>
           </div>
+
+          {/* AI DEAL SCORE — UX V3, Part 3/4/5. Genuinely AI-generated
+              (the LLM's own rubric-based judgment), parsed verbatim from
+              ai_notes — no new scoring, no changed criteria, no new
+              band language beyond the neutral caption below. Explicitly
+              NOT the acquisition decision — Overview owns that. This
+              replaces the removed "AI Read" card (which was NOT actually
+              AI-generated — see DealAnalysisCard.jsx's disposition). */}
+          {dealScore && (
+            <div className="pt-3 border-t border-[color:var(--color-line)]">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">AI Deal Score</div>
+                <div className="text-[18px] font-extrabold tabular-nums">{dealScore.total}<span className="text-[11px] font-semibold text-[color:var(--color-text-dim)]">/100</span></div>
+              </div>
+              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">
+                AI assessment of the opportunity across returns, pricing, seller signals, market strength, cash flow, and data quality.
+              </p>
+              {dealScore.categories.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {dealScore.categories.map(c => (
+                    <div key={c.key} className="text-[11.5px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-[color:var(--color-text)]">{c.label}</span>
+                        <span className="font-bold tabular-nums text-[color:var(--color-text-dim)]">{c.score}/{c.max}</span>
+                      </div>
+                      {c.note && <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{c.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] text-[color:var(--color-text-dim)] mt-2 pt-1.5 border-t border-[color:var(--color-line)]">
+                Higher scores indicate a stronger overall AI-assessed opportunity across the scored dimensions. This score does not replace Overview's Acquisition Decision or Deal's Margin of Safety — those come from HAT's deterministic underwriting engine, not this AI assessment.
+              </p>
+            </div>
+          )}
+
+          {/* AI INSIGHTS — UX V3, Part 19. The AI's own PROS/CONS
+              observations, parsed verbatim (no new AI call, no
+              rewording beyond the existing shortenReason-style trim
+              already used for Smart Lead Prioritization). Never repeats
+              MAO/profit/strategy — those bullets are about the property/
+              market itself. */}
+          {aiInsights.length > 0 && (
+            <div className="pt-3 border-t border-[color:var(--color-line)]">
+              <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">AI Insights</div>
+              <ul className="space-y-1">
+                {aiInsights.map((insight, i) => (
+                  <li key={i} className="text-[11.5px] text-[color:var(--color-text-muted)] flex items-start gap-1.5">
+                    <span className={insight.tone === 'risk' ? 'text-[color:var(--color-warn-text)]' : 'text-[color:var(--color-success-text)]'}>{insight.tone === 'risk' ? '⚠' : '✓'}</span>
+                    <span>{insight.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* HAT MARKET HISTORY — genuinely unique evidence (HAT's own past
               activity in this ZIP), but kept visually secondary: one line

@@ -71,9 +71,16 @@ describe('D — the confirmed dead end is fixed: distressed, no asking price, no
   it('the old hardcoded dead-end condition is gone from the render branch', () => {
     expect(cardSrc).not.toMatch(/More property\/financial information is needed before underwriting/)
   })
-  it('the new branch shows an actionable count, keyed off computeAnalysisReadiness, not a static sentence', () => {
+  it('the branch is now a real, always-clickable "Analyze Property with AI" button, not just an actionable sentence — the Early Property Analysis Fix root-cause fix', () => {
+    // The prior turn's fix (text sentence, no button) was itself later
+    // found to still be a dead end: honest wording, but nothing to click.
+    // This fix replaces it with a button that runs Stage A (property/
+    // market intelligence via runPropertyOnly) — still keyed off the same
+    // computeAnalysisReadiness()-derived `readiness.ready`, never a
+    // second, disagreeing check.
     expect(cardSrc).toMatch(/!hasAnalysis && !readiness\.ready/)
-    expect(cardSrc).toMatch(/required input\{readiness\.missingRequiredCount === 1 \? '' : 's'\} missing/)
+    expect(cardSrc).toMatch(/onClick=\{handleAnalyzeClick\}/)
+    expect(cardSrc).toMatch(/hasPropertyAnalysis \? '↻ Refresh Property Analysis' : '✦ Analyze Property with AI'/)
   })
   it('AnalysisReadinessPanel renders before analysis exists, giving a real recovery action for asking price (EditableField) and renovation (RenoTierPicker)', () => {
     expect(cardSrc).toMatch(/\{!hasAnalysis && \(\s*<AnalysisReadinessPanel/)
