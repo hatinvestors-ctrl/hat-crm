@@ -21,10 +21,21 @@ describe('generate-comps.mjs SYSTEM_PROMPT — canonical authority contract (CAS
     expect(SYSTEM_PROMPT).toMatch(/never as a replacement number/i)
   })
 
-  it('the MARKET COMPS template no longer has a "Realistic ARV: $X" slot (the exact defect found on 8054 Paschal Street)', () => {
+  it('the MARKET COMPS template no longer has an UNCONDITIONAL "Realistic ARV: $X" slot (the exact defect found on 8054 Paschal Street)', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/Realistic ARV:/i)
     expect(SYSTEM_PROMPT).not.toMatch(/Optimistic ARV:/i)
-    expect(SYSTEM_PROMPT).not.toMatch(/Conservative ARV:/i)
+  })
+  it('AI Valuation V1 — the new "Conservative ARV:" slot exists ONLY inside a VALUATION section explicitly gated on "ARV: —" (no canonical ARV yet) — never a second ARV when one already exists', () => {
+    // The original defect was an UNCONDITIONAL second ARV that could
+    // contradict an ALREADY-SET canonical one. This new slot fires only
+    // when there is genuinely nothing to contradict (blank ARV) and uses
+    // different terminology (Recommended, not Realistic/Optimistic) to
+    // keep it visually distinct from the old, removed pattern.
+    expect(SYSTEM_PROMPT).toMatch(/Conservative ARV: \$\[X\]/)
+    expect(SYSTEM_PROMPT).toMatch(/Recommended ARV:\s*\$\[X\]/)
+    expect(SYSTEM_PROMPT).toMatch(/Upside ARV:\s*\$\[X\]/)
+    expect(SYSTEM_PROMPT).toMatch(/ONLY when CANONICAL FINANCIALS shows "ARV: —"/)
+    expect(SYSTEM_PROMPT).toMatch(/If ARV is already provided, OMIT the VALUATION section entirely/)
   })
 
   it('the CRM COMPS USED template no longer invites a "Confidence Impact" line that raises ARV confidence to a dollar figure or recommends an alternate MAO', () => {

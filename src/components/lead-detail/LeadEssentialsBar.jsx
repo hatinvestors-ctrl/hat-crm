@@ -31,11 +31,22 @@ import { getContactStatus } from '../../lib/contactEnrichment'
 import { getLastAttemptSummary } from '../../lib/enrichmentResult'
 import { resolveMarketType } from '../../lib/distressInfo'
 import { hasEvaluablePrice, resolveNoPriceStrategyPreference } from '../../lib/acquisitionDecisionPresentation'
+import { wasArvSetByAi } from '../../lib/arvProvenance'
 
-function InputTile({ label, value, onSave, canEdit }) {
+// AI Valuation V1, Part 7/17 — optional provenance badge on the ONE
+// canonical top-input display (never a second editor — same EditableField/
+// onSave as every other tile). `badge` is presentation-only text
+// ("AI Estimate"/"Manual"), passed in by the caller from the existing
+// wasArvSetByAi() read — no new state, no new source of truth here.
+function InputTile({ label, value, onSave, canEdit, badge, badgeTone }) {
   return (
     <div>
-      <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
+      <div className="flex items-center gap-1">
+        <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
+        {badge && (
+          <span className={`text-[7.5px] font-bold uppercase tracking-wide px-1 py-0.5 rounded ${badgeTone === 'ai' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-dim)]'}`}>{badge}</span>
+        )}
+      </div>
       <EditableField
         label="" type="currency" value={value} formatter={fc} placeholder="Not set"
         onSave={onSave} disabled={!canEdit}
@@ -112,6 +123,10 @@ export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUp
   // canonical resolver already used for the Action Center badge/section
   // and Decision V2 routing (task G).
   const isOffMarket = resolveMarketType(lead) === 'OFF_MARKET'
+  // AI Valuation V1, Part 7/17 — the SAME schema-free provenance check
+  // ComplsIntelligenceCard.jsx uses, so the top bar and AI & Comps never
+  // disagree about whether the current ARV is AI-sourced or manual.
+  const arvIsAi = wasArvSetByAi(lead)
   const askLabel = isOffMarket ? 'Evaluation' : 'Ask'
 
   const contactStatus = getContactStatus(lead)
@@ -172,7 +187,11 @@ export default function LeadEssentialsBar({ lead, userId, members, canEdit, onUp
           <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold mb-1">Deal Inputs</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <InputTile label={askLabel} value={lead.asking_price} canEdit={canEdit} onSave={(v) => update({ asking_price: v })} />
-            <InputTile label="ARV" value={lead.arv} canEdit={canEdit} onSave={(v) => update({ arv: v })} />
+            <InputTile
+              label="ARV" value={lead.arv} canEdit={canEdit} onSave={(v) => update({ arv: v })}
+              badge={lead.arv != null ? (arvIsAi ? 'AI Estimate' : 'Manual') : null}
+              badgeTone={arvIsAi ? 'ai' : 'manual'}
+            />
             <InputTile label="Rehab" value={lead.renovation_cost} canEdit={canEdit} onSave={(v) => update({ renovation_cost: v })} />
             <InputTile label="Rent" value={lead.rent_estimate} canEdit={canEdit} onSave={(v) => update({ rent_estimate: v })} />
           </div>

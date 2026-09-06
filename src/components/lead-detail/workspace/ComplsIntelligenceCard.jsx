@@ -25,8 +25,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { getHatInternalEvidence, getExternalCompConfidenceState, getCompEvidenceSummary } from '../../../lib/arvConfidence'
-import { getArvProvenance } from '../../../lib/arvProvenance'
+import { getArvProvenance, wasArvSetByAi } from '../../../lib/arvProvenance'
 import { parseAiDealScore, getAiInsights } from '../../../lib/aiDealScore'
+import { parseAiValuation } from '../../../lib/aiValuation'
 
 function EvidenceTypeBadge({ type }) {
   // Two-tier hierarchy preserved from V1: VERIFIED OUTCOME EVIDENCE (an
@@ -96,6 +97,23 @@ export default function ComplsIntelligenceCard({ lead }) {
 
   const externalState = getExternalCompConfidenceState(lead)
   const evidence = getHatInternalEvidence(lead, candidates)
+  // AI Valuation V1, Part 5/7 — the 3-level valuation and the "was this
+  // ARV set by AI" provenance check, both pure reads over ai_notes/lead.arv
+  // already established by aiValuation.js/arvProvenance.js. No new AI
+  // call, no new canonical ARV source — lead.arv remains the ONE
+  // canonical value.
+  const valuation = parseAiValuation(lead.ai_notes)
+  const arvIsAi = wasArvSetByAi(lead)
+
+  // AI Valuation + Guided Lead Underwriting Flow V1, Part 11-14 — a
+  // compact, informational progress strip only (no second CTA button —
+  // the ONE "Analyze Property with AI"/"Get Comps & Detailed AI" action
+  // stays in DealAnalysisCard.jsx below, per the mission's own "avoid
+  // competing controls" instruction). Reuses ai_notes/arv/renovation_cost
+  // presence — no new state, no new readiness computation.
+  const propertyAnalysisDone = !!lead.ai_notes
+  const renovationDone = lead.renovation_cost != null
+  const dealReady = lead.arv != null && renovationDone
 
   return (
     <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] p-4 space-y-3.5">
@@ -104,11 +122,31 @@ export default function ComplsIntelligenceCard({ lead }) {
         <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">What market evidence supports our ARV?</p>
       </div>
 
+      {/* Guided flow, Part 12-14 — one compact line, three steps. Never a
+          wizard, never a second "Analyze"/"Enter Rehab" button — status
+          only, so this can never compete with the real actions elsewhere
+          on the page. */}
+      <div className="flex items-center gap-2 text-[10.5px]">
+        <span className={propertyAnalysisDone ? 'text-[color:var(--color-success-text)] font-semibold' : 'text-[color:var(--color-text-dim)]'}>{propertyAnalysisDone ? '✓' : '1'} Property Analysis</span>
+        <span className="text-[color:var(--color-line)]">→</span>
+        <span className={renovationDone ? 'text-[color:var(--color-success-text)] font-semibold' : 'text-[color:var(--color-text-dim)]'}>{renovationDone ? '✓' : '2'} Renovation</span>
+        <span className="text-[color:var(--color-line)]">→</span>
+        <span className={dealReady ? 'text-[color:var(--color-success-text)] font-semibold' : 'text-[color:var(--color-text-dim)]'}>{dealReady ? '✓' : '3'} Deal Ready</span>
+      </div>
+
       {/* Current ARV — the canonical value, read straight from the lead and
           never recomputed here. Its provenance caption comes from the
           EXISTING getArvProvenance() reader (no new source of truth). */}
       <div>
-        <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Current ARV</div>
+        <div className="flex items-center gap-1.5">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Current ARV</div>
+          {/* AI Valuation V1, Part 7 — subtle, informative provenance
+              badge, never a warning treatment. Only the AI-sourced value
+              gets it; nothing else on the page changes color. */}
+          {arvIsAi && (
+            <span className="text-[8.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">AI Estimate</span>
+          )}
+        </div>
         <div className="text-[22px] font-extrabold tabular-nums leading-tight">{lead.arv != null ? fc(lead.arv) : '—'}</div>
         {lead.arv != null && (
           <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">
@@ -118,6 +156,34 @@ export default function ComplsIntelligenceCard({ lead }) {
           </div>
         )}
       </div>
+
+      {/* AI Valuation V1, Part 5 — the 3-level valuation, shown ABOVE
+          individual comp cards per the mission's explicit hierarchy.
+          Only ever renders when generate-comps.mjs genuinely produced a
+          VALUATION section (i.e. ARV was blank when that run started) —
+          never fabricated, never a fixed +/- spread. */}
+      {valuation && (
+        <div className="pt-3 border-t border-[color:var(--color-line)]">
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Valuation</div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Conservative</div>
+              <div className="text-[14px] font-bold tabular-nums">{fc(valuation.conservative)}</div>
+            </div>
+            <div className="rounded-md bg-[color:var(--color-bg-elev-2)] py-1">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] font-bold">Recommended</div>
+              <div className="text-[15px] font-extrabold tabular-nums text-[color:var(--color-accent-text)]">{fc(valuation.recommended)}</div>
+            </div>
+            <div>
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Upside</div>
+              <div className="text-[14px] font-bold tabular-nums">{fc(valuation.upside)}</div>
+            </div>
+          </div>
+          {valuation.rationale && (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">{valuation.rationale}</p>
+          )}
+        </div>
+      )}
 
       {!hasCompAnalysis ? (
         /* BEFORE ANALYSIS — deliberately almost empty. The single CTA lives

@@ -15,6 +15,7 @@ import {
 import { logDealAnalysis } from '../../lib/activityLogger'
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, computeFlipDownsideSensitivity } from '../../lib/dealExplanation'
 import { getDecisionMaturity } from '../../lib/arvProvenance'
+import { parseAiValuation } from '../../lib/aiValuation'
 import { useDealStaleness } from '../../hooks/useDealStaleness'
 import { evaluateAndRecordRediscovery, fetchRediscoveryStatus } from '../../lib/propertyIntelligence'
 import { isDistressedLead } from '../../lib/distressInfo'
@@ -886,6 +887,11 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   // where/how the same controls are shown.
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [aiCompsArv, setAiCompsArv] = useState(null)
+  // AI Valuation V1, Part 10 — refresh safety. Holds the freshly-parsed
+  // AI valuation ONLY when it genuinely differs from the current
+  // canonical lead.arv (i.e. there's something for "Use AI Estimate" to
+  // actually offer). Never auto-applied — user intent always wins.
+  const [newAiValuation, setNewAiValuation] = useState(null)
   const [lastArv,  setLastArv]  = useState(lead.arv ? Number(lead.arv) : null)
   const [lastReno, setLastReno] = useState(lead.renovation_cost ? Number(lead.renovation_cost) : null)
   const [refreshingComps, setRefreshingComps] = useState(false)
@@ -1246,6 +1252,7 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   const runPropertyOnly = async () => {
     setGenerating(true)
     setGenError(null)
+    setNewAiValuation(null)
     cancelledRef.current = false
     setPhase('analysis')
     try {
@@ -1256,16 +1263,43 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
       if (!compsNotes) throw new Error('Property analysis produced no output')
       const timestamp = `Generated: ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n\n`
       const fullNotes = timestamp + compsNotes
+
+      // AI Valuation V1, Part 6/21/22/24 — the ONE intentional write beyond
+      // ai_notes: a validated Recommended ARV auto-populates lead.arv ONLY
+      // when it is currently blank. An existing canonical ARV (manually
+      // set, or set by a prior AI run) is NEVER silently replaced — Part
+      // 10's refresh safety instead surfaces the new number for explicit
+      // user action via newAiValuation/"Use AI Estimate" (rendered below).
+      const valuation = parseAiValuation(compsNotes)
+      const dbUpdate = { ai_notes: fullNotes }
+      if (valuation) {
+        if (lead.arv == null) {
+          dbUpdate.arv = valuation.recommended
+        } else if (Number(lead.arv) !== valuation.recommended) {
+          setNewAiValuation(valuation)
+        }
+      }
+
       if (lead.id) {
-        await supabase.from('leads').update({ ai_notes: fullNotes }).eq('id', lead.id)
+        await supabase.from('leads').update(dbUpdate).eq('id', lead.id)
       }
       setLocalNotes(fullNotes)
-      onUpdated?.({ ai_notes: fullNotes })
+      onUpdated?.(dbUpdate)
     } catch (err) {
       if (!cancelledRef.current) setGenError(friendlyAiError(err))
     } finally {
       if (!cancelledRef.current) { setGenerating(false); setPhase(null) }
     }
+  }
+
+  // AI Valuation V1, Part 10 — the ONLY way a new AI recommendation can
+  // ever replace an existing canonical ARV: explicit user action. Reuses
+  // the SAME update()/useLeadUpdate() path every other ARV edit already
+  // uses — no second write mechanism.
+  const acceptAiValuation = () => {
+    if (!newAiValuation) return
+    update({ arv: newAiValuation.recommended })
+    setNewAiValuation(null)
   }
 
   // Re-run only core analysis with ARV and/or reno overrides — skips comps (fast ~8s)
@@ -1627,6 +1661,27 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
             <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1">
               <span className="font-semibold text-[color:var(--color-text)]">Next step:</span> enter {readiness.missingRequiredLabels.join(' and ')} to complete HAT deal economics.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* AI Valuation V1, Part 10 — refresh safety. A new AI recommendation
+          is NEVER silently applied over an existing canonical ARV — shown
+          here, explicit user action required via "Use AI Estimate". */}
+      {newAiValuation && !generating && (
+        <div className="mb-3 rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-bg-elev-2)] px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-[11px] text-[color:var(--color-text-dim)]">New AI recommendation: <span className="font-bold text-[color:var(--color-text)] tabular-nums">{fc(newAiValuation.recommended)}</span></div>
+            <div className="text-[11px] text-[color:var(--color-text-dim)]">Current underwriting ARV: <span className="font-bold text-[color:var(--color-text)] tabular-nums">{fc(Number(lead.arv))}</span></div>
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={acceptAiValuation}
+              className="text-[11.5px] font-semibold px-3 py-1.5 rounded-lg text-white bg-[color:var(--color-accent)] hover:opacity-90 transition-opacity"
+            >
+              Use AI Estimate
+            </button>
           )}
         </div>
       )}

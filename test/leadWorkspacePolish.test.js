@@ -72,8 +72,16 @@ describe('Part 1 — clearer contact status wording, still canonical', () => {
   })
   it('owner name still renders first, unconditionally, before the status badge JSX', () => {
     const ownerLineIdx = ESSENTIALS_SRC.indexOf('primary_person?.name || lead.owner_name')
-    const badgeRenderIdx = ESSENTIALS_SRC.indexOf('{badge && (')
+    // Search for the contact-status badge render specifically, starting
+    // after the `const badge = CONTACT_STATUS_BADGE[contactStatus]`
+    // declaration — an EARLIER, unrelated `{badge && (` now exists inside
+    // InputTile (the AI ARV provenance pill, added by AI Valuation V1),
+    // which is a different `badge` prop entirely and would otherwise be
+    // matched first by a plain indexOf().
+    const contactBadgeDeclIdx = ESSENTIALS_SRC.indexOf('const badge = CONTACT_STATUS_BADGE[contactStatus]')
+    const badgeRenderIdx = ESSENTIALS_SRC.indexOf('{badge && (', contactBadgeDeclIdx)
     expect(ownerLineIdx).toBeGreaterThan(-1)
+    expect(contactBadgeDeclIdx).toBeGreaterThan(-1)
     expect(badgeRenderIdx).toBeGreaterThan(-1)
     expect(ownerLineIdx).toBeLessThan(badgeRenderIdx)
   })

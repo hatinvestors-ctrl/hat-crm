@@ -1,4 +1,6 @@
 // src/lib/arvProvenance.js
+import { parseAiValuation } from './aiValuation'
+
 // Capability #16.1 — ARV authority/provenance (Section 5). Deliberately NO
 // new database column: derived at read time from data that already exists
 // (ai_notes' own "MARKET COMPS" section, written verbatim by
@@ -30,6 +32,28 @@ export function getArvProvenance(lead) {
     comps_count: compLines.length,
     last_updated: lead.updated_at || null,
   }
+}
+
+// AI Valuation + Guided Lead Underwriting Flow V1, Part 9 — provenance
+// audit finding: proper "was this ARV set by AI, and has it since been
+// manually changed" tracking CAN be done safely WITHOUT a schema change
+// (per the mission's explicit requirement to prefer that). Same principle
+// as getArvProvenance above: derived at read time, nothing new persisted.
+// The AI's own most recent recommendation is already stored verbatim in
+// ai_notes' VALUATION section (see generate-comps.mjs) — if the current
+// canonical lead.arv exactly equals that number, it is still AI-owned
+// (either just auto-filled, or the user hasn't touched it since). The
+// moment a user edits ARV to any other value, this naturally returns
+// false on the very next read — no extra write, no extra field, no
+// migration. This is intentionally a fingerprint match, not a persisted
+// flag: if a user happens to manually type the exact same number the AI
+// recommended, it is indistinguishable from (and functionally equivalent
+// to) accepting the AI's estimate — never a meaningful edge case.
+export function wasArvSetByAi(lead) {
+  const arv = lead.arv != null ? Number(lead.arv) : null
+  if (arv == null) return false
+  const valuation = parseAiValuation(lead.ai_notes)
+  return !!valuation && valuation.recommended === arv
 }
 
 // Preliminary vs Refined (Section 3) — reuses EXISTING V2 Confidence/missing
