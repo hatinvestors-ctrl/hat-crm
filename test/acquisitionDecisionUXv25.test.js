@@ -273,12 +273,20 @@ describe('Part 8 — MLS auto-enrichment-paused notice is now a small muted stri
 
 // ── Part 9 — Deal Snapshot / Seller Snapshot dedup ──────────────────────────
 describe('Part 9 — Overview duplication removed', () => {
-  it('DealSnapshotCompact.jsx no longer recomputes Flip/BRRRR economics — ARV/Rehab/Rent + Open Deal Analysis only', () => {
+  // AI & Comps Recovery Pass, Part 20 — DealSnapshotCompact.jsx now DOES
+  // call computeFlipResult/computeBrrrrResult again, but only with the
+  // SAME threaded underwritingSettings every other consumer (DecisionHero,
+  // Deal tab) already uses — the exact wiring fix, not the wiring bug this
+  // test originally guarded against (a settings-less, disagreeing FOURTH
+  // computation site). ARV/Rehab still shown; Rent only in the BRRRR
+  // branch now, alongside Strategy/Max Buy/Seller Price/Profit.
+  it('DealSnapshotCompact.jsx computes Flip/BRRRR economics with the SAME threaded underwritingSettings as every other consumer — ARV/Rehab/Strategy/Max Buy/Seller Price/Profit, Open Deal Analysis link preserved', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/DealSnapshotCompact.jsx', 'utf8')
-    expect(src).not.toMatch(/^import \{ [^}]*computeFlipResult/m)
+    expect(src).toMatch(/computeFlipResult\(lead, underwritingSettings\)/)
+    expect(src).toMatch(/computeBrrrrResult\(lead, underwritingSettings\)/)
     expect(src).toMatch(/Cell label="ARV"/)
     expect(src).toMatch(/Cell label="Rehab"/)
-    expect(src).toMatch(/Cell label="Rent"/)
+    expect(src).toMatch(/Open Deal Analysis/)
   })
   it('SellerSnapshotStrip.jsx collapses to one action-oriented line when all 4 seller facts are unknown', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/SellerSnapshotStrip.jsx', 'utf8')

@@ -28,6 +28,7 @@ import { getHatInternalEvidence, getExternalCompConfidenceState, getCompEvidence
 import { getArvProvenance, wasArvSetByAi } from '../../../lib/arvProvenance'
 import { parseAiDealScore, getAiInsights } from '../../../lib/aiDealScore'
 import { parseAiValuation } from '../../../lib/aiValuation'
+import { parseRentalRange } from '../../../lib/rentalRange'
 
 function EvidenceTypeBadge({ type }) {
   // Two-tier hierarchy preserved from V1: VERIFIED OUTCOME EVIDENCE (an
@@ -56,6 +57,11 @@ export default function ComplsIntelligenceCard({ lead }) {
   // reused existing comps).
   const dealScore = parseAiDealScore(lead.ai_notes)
   const aiInsights = getAiInsights(lead.ai_notes)
+  // AI & Comps Recovery Pass, Part 5 — the EXISTING RENTAL COMPS section
+  // (generate-comps.mjs), parsed read-only and tolerant of markdown the
+  // model sometimes wraps a line in. No new rent methodology, no new
+  // values — presentation only.
+  const rentalRange = parseRentalRange(lead.ai_notes)
 
   // ONE scoped query (same ZIP only, small column list, capped rows), never
   // a full-table scan. Only runs once comp analysis exists — before that,
@@ -232,6 +238,46 @@ export default function ComplsIntelligenceCard({ lead }) {
             </div>
           </div>
 
+          {/* RENTAL RANGE — AI & Comps Recovery Pass, Part 5. The EXISTING
+              RENTAL COMPS section (generate-comps.mjs), parsed and shown as
+              a clean 3-level block instead of raw prose. No new rent
+              methodology, no new values — presentation only. Terminology
+              kept exactly as the AI's own output ("Realistic"/"Optimistic"),
+              never relabeled to Recommended/Upside (that vocabulary is
+              reserved for ARV valuation, a different estimate). */}
+          {rentalRange && (
+            <div className="pt-3 border-t border-[color:var(--color-line)]">
+              <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Rental Range</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Conservative</div>
+                  <div className="text-[13px] font-bold tabular-nums">{rentalRange.conservative || '—'}</div>
+                </div>
+                <div className="rounded-md bg-[color:var(--color-bg-elev-2)] py-1">
+                  <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] font-bold">Realistic</div>
+                  <div className="text-[14px] font-extrabold tabular-nums text-[color:var(--color-accent-text)]">{rentalRange.realistic || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Optimistic</div>
+                  <div className="text-[13px] font-bold tabular-nums">{rentalRange.optimistic || '—'}</div>
+                </div>
+              </div>
+              {rentalRange.verdict && (
+                <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">Rent Verdict: <span className="font-semibold text-[color:var(--color-text)]">{rentalRange.verdict}</span></p>
+              )}
+              {rentalRange.onePercentRule && (
+                <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">1% Rule: {rentalRange.onePercentRule}</p>
+              )}
+              {rentalRange.rentalComps.length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {rentalRange.rentalComps.map((line, i) => (
+                    <div key={i} className="text-[10.5px] text-[color:var(--color-text-muted)]">{line}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* COMP-EVIDENCE CONFIDENCE — honest state from the existing
               getExternalCompConfidenceState(). This is NOT the ±5% ARV
               stress test (removed in V2.8), and no score is fabricated in
@@ -241,41 +287,6 @@ export default function ComplsIntelligenceCard({ lead }) {
             <div className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">{externalState.label}</div>
             <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">{externalState.message}</div>
           </div>
-
-          {/* AI DEAL SCORE — UX V3, Part 3/4/5. Genuinely AI-generated
-              (the LLM's own rubric-based judgment), parsed verbatim from
-              ai_notes — no new scoring, no changed criteria, no new
-              band language beyond the neutral caption below. Explicitly
-              NOT the acquisition decision — Overview owns that. This
-              replaces the removed "AI Read" card (which was NOT actually
-              AI-generated — see DealAnalysisCard.jsx's disposition). */}
-          {dealScore && (
-            <div className="pt-3 border-t border-[color:var(--color-line)]">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">AI Deal Score</div>
-                <div className="text-[18px] font-extrabold tabular-nums">{dealScore.total}<span className="text-[11px] font-semibold text-[color:var(--color-text-dim)]">/100</span></div>
-              </div>
-              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">
-                AI assessment of the opportunity across returns, pricing, seller signals, market strength, cash flow, and data quality.
-              </p>
-              {dealScore.categories.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {dealScore.categories.map(c => (
-                    <div key={c.key} className="text-[11.5px]">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-[color:var(--color-text)]">{c.label}</span>
-                        <span className="font-bold tabular-nums text-[color:var(--color-text-dim)]">{c.score}/{c.max}</span>
-                      </div>
-                      {c.note && <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{c.note}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-[10px] text-[color:var(--color-text-dim)] mt-2 pt-1.5 border-t border-[color:var(--color-line)]">
-                Higher scores indicate a stronger overall AI-assessed opportunity across the scored dimensions. This score does not replace Overview's Acquisition Decision or Deal's Margin of Safety — those come from HAT's deterministic underwriting engine, not this AI assessment.
-              </p>
-            </div>
-          )}
 
           {/* AI INSIGHTS — UX V3, Part 19. The AI's own PROS/CONS
               observations, parsed verbatim (no new AI call, no
@@ -343,6 +354,53 @@ export default function ComplsIntelligenceCard({ lead }) {
           </div>
         </>
       )}
+
+      {/* AI DEAL SCORE — AI & Comps Recovery Pass, Part 2/3. Genuinely
+          AI-generated (the LLM's own rubric-based judgment), parsed
+          verbatim from ai_notes — no new scoring, no changed criteria,
+          no new band language beyond the neutral caption below.
+          Explicitly NOT the acquisition decision — Overview owns that.
+          Rendered UNCONDITIONALLY (independent of hasCompAnalysis/
+          Stage A) so a valid Stage-B score is never simply invisible,
+          and — when Stage B genuinely hasn't produced one yet — an
+          honest waiting state shows instead of nothing. Never
+          fabricated: dealScore is null unless parseAiDealScore found a
+          real "Total: X/100" line. */}
+      <div className="pt-3 border-t border-[color:var(--color-line)]">
+        {dealScore ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">AI Deal Score</div>
+              <div className="text-[18px] font-extrabold tabular-nums">{dealScore.total}<span className="text-[11px] font-semibold text-[color:var(--color-text-dim)]">/100</span></div>
+            </div>
+            <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">
+              AI assessment of the opportunity across returns, pricing, seller signals, market strength, cash flow, and data quality.
+            </p>
+            {dealScore.categories.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {dealScore.categories.map(c => (
+                  <div key={c.key} className="text-[11.5px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-[color:var(--color-text)]">{c.label}</span>
+                      <span className="font-bold tabular-nums text-[color:var(--color-text-dim)]">{c.score}/{c.max}</span>
+                    </div>
+                    {c.note && <div className="text-[10.5px] text-[color:var(--color-text-dim)]">{c.note}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-[color:var(--color-text-dim)] mt-2 pt-1.5 border-t border-[color:var(--color-line)]">
+              Higher scores indicate a stronger overall AI-assessed opportunity across the scored dimensions. This score does not replace Overview's Acquisition Decision or Deal's Margin of Safety — those come from HAT's deterministic underwriting engine, not this AI assessment.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">AI Deal Score</div>
+            <div className="text-[13px] font-semibold text-[color:var(--color-text-dim)] mt-1">Not available yet</div>
+            <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">Complete Deal Analysis to generate the AI Deal Score.</p>
+          </>
+        )}
+      </div>
     </div>
   )
 }

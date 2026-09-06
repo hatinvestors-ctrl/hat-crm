@@ -74,10 +74,18 @@ describe('B. Offer/evaluation provenance — Finding B fix', () => {
   it('DealDecisionCenter.jsx no longer labels a calculated value "We Offer"', () => {
     expect(dealDecisionCenterSrc).not.toMatch(/label="We Offer"/)
   })
-  it('DealDecisionCenter.jsx labels the same flip.currentOffer value "Suggested Offer", matching DealSnapshotCompact.jsx', () => {
+  it('DealDecisionCenter.jsx still labels the same flip.currentOffer value "Suggested Offer"', () => {
     expect(dealDecisionCenterSrc).toMatch(/label="Suggested Offer"/)
+  })
+  // AI & Comps Recovery Pass, Part 20 — DealSnapshotCompact.jsx no longer
+  // shows "Suggested Offer" (a match here was previously coincidental,
+  // from a header comment, not an actual field); it now shows "Seller
+  // Price" instead, per the mission's explicit restructure to Strategy/
+  // Max Buy/Seller Price/ARV/Rehab/Profit — same canonical values, no
+  // new business logic.
+  it('DealSnapshotCompact.jsx shows Seller Price alongside Max Buy — the restructured executive summary', () => {
     const snapshotSrc = fs.readFileSync('src/components/lead-detail/workspace/DealSnapshotCompact.jsx', 'utf8')
-    expect(snapshotSrc).toMatch(/Suggested Offer/)
+    expect(snapshotSrc).toMatch(/Seller Price/)
   })
 })
 

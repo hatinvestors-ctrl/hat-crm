@@ -132,9 +132,9 @@ describe('I. No bare "Max Buy" on primary surfaces where the strategy is known',
     expect(src).toMatch(/effectiveStrategy === 'BRRRR' \? 'BRRRR Max Buy' : 'Flip Max Buy'/)
     expect(src).not.toMatch(/label="Max Buy"/)
   })
-  it('DealSnapshotCompact.jsx no longer duplicates Max Buy/Suggested Offer — UX V2.5, Part 9/10: collapsed to ARV/Rehab/Rent, full economics live only on the Deal tab now (avoids a FOURTH independent Max Buy/strategy computation site)', () => {
+  it('DealSnapshotCompact.jsx still links to the full Deal tab — AI & Comps Recovery Pass, Part 20, reintroduced Strategy/Max Buy/Seller Price/Profit as a compact executive summary, calling the SAME computeFlipResult/computeBrrrrResult with the SAME threaded underwritingSettings every other consumer uses (not a fourth independent computation — same shared pure function, correctly wired, per the mission\'s explicit "read the existing canonical outputs only" instruction)', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/DealSnapshotCompact.jsx', 'utf8')
-    expect(src).not.toMatch(/^import \{ [^}]*computeFlipResult/m)
+    expect(src).toMatch(/computeFlipResult\(lead, underwritingSettings\)/)
     expect(src).toMatch(/Open Deal Analysis/)
   })
 })

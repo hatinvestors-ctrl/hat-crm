@@ -308,7 +308,7 @@ export default function LeadDetailPage() {
               DealSnapshotCompact always renders the same way for every
               lead, adapting to what data exists rather than branching on
               lead.status/'triage'. */}
-          <DealSnapshotCompact lead={lead} onOpenDeal={() => setActiveTab('deal')} />
+          <DealSnapshotCompact lead={lead} underwritingSettings={underwritingSettings} onOpenDeal={() => setActiveTab('deal')} />
 
           {isOffMarket && (
             <SellerSnapshotStrip lead={lead} onOpenFull={() => setActiveTab('acquisition')} />

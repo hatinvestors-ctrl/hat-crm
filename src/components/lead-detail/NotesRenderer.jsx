@@ -1684,8 +1684,12 @@ function MarketCompsSection({ body }) {
 
 function RentalCompsSection({ body }) {
   const lines = body.split('\n').filter(Boolean)
-  const get = (prefix) => lines.find(l => new RegExp(`^${prefix}:`, 'i').test(l.trim()))
-    ?.replace(new RegExp(`^${prefix}:\\s*`, 'i'), '').trim()
+  // AI & Comps Recovery Pass, Part 5/6 — tolerant of markdown emphasis
+  // markers (**bold**, leading bullets/headers) the model sometimes wraps
+  // a line in, mirroring DealScoreSection's own robust field extraction
+  // above. Presentation-only: no new rent methodology, no new values.
+  const get = (prefix) => lines.find(l => new RegExp(`^[\\s*_#>-]*${prefix}:`, 'i').test(l.trim()))
+    ?.replace(new RegExp(`^[\\s*_#>-]*${prefix}:\\s*`, 'i'), '').replace(/\*+\s*$/, '').trim()
 
   const consRent  = get('Conservative Rent')
   const realRent  = get('Realistic Rent')
@@ -1697,7 +1701,7 @@ function RentalCompsSection({ body }) {
 
   const cfLines = lines.filter(l => /^At (conservative|realistic|optimistic) rent:/i.test(l.trim()))
 
-  const rentalComps = lines.filter(l => /^RENTAL:/i.test(l.trim()))
+  const rentalComps = lines.filter(l => /^[\s*_#>-]*RENTAL:/i.test(l.trim()))
 
   if (!consRent && !realRent && rentalComps.length === 0) return <PlainText body={body} />
 
@@ -1763,7 +1767,7 @@ function RentalCompsSection({ body }) {
         <>
           <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Active Rentals Used</div>
           {rentalComps.map((line, i) => {
-            const content = line.replace(/^RENTAL:\s*/i, '')
+            const content = line.trim().replace(/^[\s*_#>-]*RENTAL:\s*/i, '').replace(/\*+\s*$/, '')
             const parts   = content.split('|').map(s => s.trim())
             const [area, profile, sqft, rent, note] = parts
             return (
