@@ -437,10 +437,30 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
     // never invents a threshold or recalculates anything.
     const viableFlipMao  = flip?.available  && flip.maoFeasible && flip.mao != null ? flip.mao : null
     const viableBrrrrMao = brrrr?.available && brrrr.mao != null ? brrrr.mao : null
-    const currentPriceForPass = (isOffMarket && sellerAskingPrice != null) ? num(sellerAskingPrice)
+    const genuineSellerPriceForPass = isOffMarket && sellerAskingPrice != null ? num(sellerAskingPrice) : null
+    const currentPriceForPass = genuineSellerPriceForPass != null ? genuineSellerPriceForPass
       : (flip?.available ? num(flip.evaluationPrice) : (lead?.asking_price != null ? num(lead.asking_price) : null))
 
     if (currentPriceForPass != null && (viableFlipMao != null || viableBrrrrMao != null)) {
+      // Small Change #4 — root-cause fix. `flip.evaluationPrice` already
+      // correctly follows the SAME `actualOffer ?? ask` rule every other
+      // branch in this function uses (dealExplanation.js's documented,
+      // protected D2 rule: a real submitted offer, lead.offer_price,
+      // takes priority over the raw asking price for "what price are we
+      // evaluating against" — untouched, not a bug). The ACTUAL defect
+      // was here: this branch hardcoded `priceIsEvaluation: false` and
+      // never set `currentPriceLabel`, so whenever that rule picked
+      // actualOffer over asking_price, the UI still labeled — and
+      // narrated in this very explanation string — the resulting number
+      // "asking price," even though it was genuinely the evaluation/
+      // offer price. A newly-edited, correctly-live asking_price could
+      // then look identical to a stale one it never was. Fixed by
+      // computing priceIsEvaluation/currentPriceLabel the SAME way the
+      // NEGOTIATE/GOOD_AT_ASKING branches below already do — reused, not
+      // reinvented.
+      const priceIsEvaluationForPass = genuineSellerPriceForPass == null && flip?.available && flip.actualOffer != null && lead?.asking_price != null && num(flip.actualOffer) !== num(lead.asking_price)
+      const currentPriceLabelForPass = genuineSellerPriceForPass != null ? 'Seller Asking' : priceIsEvaluationForPass ? 'Evaluation Price' : 'Asking Price'
+      const priceWordForPass = genuineSellerPriceForPass != null ? 'seller' : priceIsEvaluationForPass ? 'evaluation' : 'asking'
       // Same tie-break precedent as resolveNoPriceStrategyPreference:
       // whichever strategy supports the higher (less restrictive) price.
       const negotiableStrategy = (viableBrrrrMao != null && (viableFlipMao == null || viableBrrrrMao >= viableFlipMao)) ? 'BRRRR' : 'FLIP'
@@ -450,10 +470,10 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
         state: 'PASS_NEGOTIABLE', ...STATE_META.PASS_NEGOTIABLE,
         headline: STATE_META.PASS_NEGOTIABLE.label,
         passAtCurrentPrice: true,
-        explanation: `Current ${isOffMarket ? 'seller' : 'asking'} price of ${fullCurrency(currentPriceForPass)} does not meet HAT's targets. HAT's ${negotiableStrategy} buying range requires approximately ${fullCurrency(Math.round(negotiableTarget / 100) * 100)} or below.`,
-        currentPrice: currentPriceForPass, targetPrice: negotiableTarget, targetStrategy: negotiableStrategy, targetLabel: negotiableLabel,
+        explanation: `Current ${priceWordForPass} price of ${fullCurrency(currentPriceForPass)} does not meet HAT's targets. HAT's ${negotiableStrategy} buying range requires approximately ${fullCurrency(Math.round(negotiableTarget / 100) * 100)} or below.`,
+        currentPrice: currentPriceForPass, currentPriceLabel: currentPriceLabelForPass, targetPrice: negotiableTarget, targetStrategy: negotiableStrategy, targetLabel: negotiableLabel,
         gap: Math.round(Math.abs(currentPriceForPass - negotiableTarget)), gapLabel: 'NEEDED PRICE REDUCTION', gapValue: currentPriceForPass - negotiableTarget,
-        withinBuyRange: false, priceIsEvaluation: false,
+        withinBuyRange: false, priceIsEvaluation: priceIsEvaluationForPass,
         strategyLine: null, nextAction: 'Negotiate with seller toward HAT\'s buying range.',
         actualOffer, actualOfferSource: actualOfferInfo.source,
       }
