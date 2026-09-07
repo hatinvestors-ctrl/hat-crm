@@ -264,6 +264,16 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
               <div className="text-[10.5px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)] mt-0.5">Pass at current price</div>
             )}
             <p className="text-[12.5px] text-[color:var(--color-text)] mt-1 leading-snug">{decision.explanation}</p>
+            {/* Small Change #5 — audit-confirmed fix: a hard Buy Box PASS
+                (property-fit) is categorically different from a price
+                PASS/NEGOTIATE. Buy Box logic itself (buyBox.js) is
+                UNCHANGED — this only makes the EXISTING conclusion
+                unambiguous, per the mission's explicit "why" requirement. */}
+            {decision.buyBoxNotFit && (
+              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1 leading-snug">
+                This is a property-fit restriction, not a pricing issue. A lower purchase price does not change this Buy Box decision.
+              </p>
+            )}
           </>
         ) : (
           <div className="text-[20px] font-extrabold" style={{ color: theme.text }}>
@@ -361,10 +371,13 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           </div>
         )}
 
-        {/* LEVEL 3 — Next Action, one clear actionable line */}
+        {/* LEVEL 3 — Next Action, one clear actionable line. Small Change
+            #5 — relabeled "Recommended Action" only for the hard Buy Box
+            PASS, per the mission's explicit hierarchy; every other state
+            keeps the exact same "Next Action" label/behavior. */}
         {decision?.nextAction && (
           <div className="mt-2">
-            <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Next Action</span>{' '}
+            <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{decision.buyBoxNotFit ? 'Recommended Action' : 'Next Action'}</span>{' '}
             <span className="text-[12px] font-semibold text-[color:var(--color-text)]">
               {actionReason?.reason && /agent|owner/i.test(decision.nextAction) ? composeNextActionText(decision.nextAction, decision) : decision.nextAction}
             </span>
@@ -429,7 +442,13 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
               </div>
             )}
 
-            {flip.marginOfSafety?.why && decision?.targetStrategy !== 'BRRRR' && (
+            {/* Small Change #5 — Margin of Safety is a PRICE question
+                ("does this price leave room"); for a hard Buy Box PASS
+                that question is moot regardless of price, so this detail
+                is suppressed here to avoid reading as a recommendation.
+                flip.marginOfSafety itself is untouched — still computed,
+                still shown for every other PASS/NEGOTIATE state. */}
+            {flip.marginOfSafety?.why && decision?.targetStrategy !== 'BRRRR' && !decision?.buyBoxNotFit && (
               <div className="mt-2">
                 <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Margin of Safety detail</span>
                 <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-0.5 leading-snug">{flip.marginOfSafety.why}</p>
@@ -504,7 +523,10 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
             vacuous 'NO DEAL' (see acquisitionDecisionPresentation.js's V2.9
             note), which would render here as a red failure signal for a
             deal that has not failed. Suppressed rather than reinterpreted. */}
-        {flip.available && !decision?.priceUnknown && decision?.targetStrategy !== 'BRRRR' && (
+        {/* Small Change #5 — same suppression as the Show Details variant
+            above: a PRICE-margin signal must not sit beside a hard Buy
+            Box PASS as if it were relevant to the recommendation. */}
+        {flip.available && !decision?.priceUnknown && decision?.targetStrategy !== 'BRRRR' && !decision?.buyBoxNotFit && (
           <div className="mt-2">
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Margin of Safety</span>
@@ -535,10 +557,17 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           carries the useful number). */}
       {flip.available && !decision?.priceUnknown && (
         <div className="px-4 py-2 border-t border-[color:var(--color-line)] text-[11.5px] text-[color:var(--color-text-muted)]">
+          {/* Small Change #5 — audit Part 2/4: for a hard Buy Box PASS,
+              this strip is unavoidably still useful internally but must
+              never look like a recommendation; labeled explicitly.
+              Untouched (still shown, same values) for every other state. */}
+          {decision?.buyBoxNotFit && (
+            <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1">Economics — Reference Only (does not override the Buy Box decision)</div>
+          )}
           <span className="font-bold text-[color:var(--color-text)]">FLIP</span>{' '}
           {fc(flip.projectedProfit)} projected profit @ {decision?.priceIsEvaluation ? 'evaluation' : 'current'} price
           {brrrr.available && brrrr.monthlyCashFlow != null && (
-            <> · <span className="font-bold text-[color:var(--color-text)]">BRRRR</span> {brrrr.monthlyCashFlow >= 0 ? '+' : ''}{fc(brrrr.monthlyCashFlow)}/mo cash flow</>
+            <> · <span className="font-bold text-[color:var(--color-text)]">BRRRR</span> {brrrr.monthlyCashFlow >= 0 ? '+' : ''}{fc(brrrr.monthlyCashFlow)}/mo cash flow at current price</>
           )}
         </div>
       )}

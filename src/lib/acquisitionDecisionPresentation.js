@@ -339,14 +339,27 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
 
   // 2. Existing buy-box / recommendation logic already says PASS — never
   // a new "price too high" PASS invented here.
+  //
+  // Small Change #5 — audit-confirmed presentation gap: this is a
+  // categorically different PASS reason (property-fit, qualifyBuyBox/
+  // buyBox.js, UNCHANGED) than the price-based PASS_NEGOTIABLE/PASS
+  // branches below. `buyBoxNotFit`/`buyBoxReason` are additive fields so
+  // DecisionHero.jsx can make this unambiguous — no different decision,
+  // no new Buy Box logic, just surfacing the SAME `fit.reasons` the
+  // engine already computed instead of only a generic sentence.
   if (fit?.status === 'NOT_FIT') {
+    const buyBoxReason = fit.reasons?.[0] || null
     return {
       state: 'PASS', ...STATE_META.PASS,
-      headline: 'PASS — NOT A FIT',
-      explanation: 'This property is outside HAT\'s current buy box.',
+      headline: 'PASS — NOT IN BUY BOX',
+      buyBoxNotFit: true,
+      buyBoxReason,
+      explanation: buyBoxReason
+        ? `${buyBoxReason} — outside HAT's current acquisition Buy Box.`
+        : 'This property is outside HAT\'s current acquisition Buy Box.',
       currentPrice: null, targetPrice: null, targetStrategy: null, targetLabel: null,
       gap: null, gapLabel: null, gapValue: null, withinBuyRange: null, priceIsEvaluation: false,
-      strategyLine: null, nextAction: 'Pass',
+      strategyLine: null, nextAction: 'Pass on this property — no negotiation required.',
       actualOffer, actualOfferSource: actualOfferInfo.source,
     }
   }

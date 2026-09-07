@@ -58,10 +58,16 @@ describe('Part 26 — regression UX cases', () => {
     const d = decide(lead)
     expect(d.state).toBe('NEEDS_RESEARCH')
   })
-  it('6. Not In Buy Box (fit.status=NOT_FIT) → PASS / NOT A FIT — an EXISTING fact, not a new price-based PASS', () => {
+  // Small Change #5 — audit-confirmed presentation fix: this state's
+  // headline was relabeled "PASS — NOT IN BUY BOX" (from "PASS — NOT A
+  // FIT") so a hard property-fit rejection is unmistakably distinct from
+  // a price-based PASS/NEGOTIATE. `state` stays 'PASS' — same underlying
+  // fact, same fit.status check, wording only.
+  it('6. Not In Buy Box (fit.status=NOT_FIT) → PASS / NOT IN BUY BOX — an EXISTING fact, not a new price-based PASS', () => {
     const d = decide(WOODLEIGH, { fit: { status: 'NOT_FIT' } })
     expect(d.state).toBe('PASS')
-    expect(d.headline).toBe('PASS — NOT A FIT')
+    expect(d.headline).toBe('PASS — NOT IN BUY BOX')
+    expect(d.buyBoxNotFit).toBe(true)
   })
   it('7. BRRRR preferred with two different Max Buy values: both remain independently derivable, never conflated', () => {
     const flip = computeFlipResult(NORFOLK)
