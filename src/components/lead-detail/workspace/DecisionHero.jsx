@@ -19,7 +19,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
-import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText } from '../../../lib/acquisitionDecisionPresentation'
+import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary } from '../../../lib/acquisitionDecisionPresentation'
 import { resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
 import InfoTooltip from '../../ui/InfoTooltip'
@@ -42,6 +42,94 @@ function Metric({ label, value, tone }) {
     <div className="min-w-0">
       <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
       <div className="text-[19px] font-extrabold tabular-nums truncate" style={tone ? { color: tone } : undefined}>{value}</div>
+    </div>
+  )
+}
+
+function SummaryMetric({ label, value, tone }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{label}</div>
+      <div className="text-[13px] font-bold tabular-nums truncate" style={tone ? { color: tone } : undefined}>{value}</div>
+    </div>
+  )
+}
+
+// Small Change #3 — DEAL OPPORTUNITY SUMMARY. Compact, read-only "now vs
+// at HAT's Max Buy" comparison, built entirely from
+// buildDealOpportunitySummary() (acquisitionDecisionPresentation.js,
+// which itself only calls the EXISTING computeFlipBreakdown/
+// computeBrrrrBreakdown at an alternate price for display — no new
+// formula, nothing persisted). This component only arranges/labels
+// those already-computed numbers.
+function DealOpportunitySummary({ summary, flip, decision }) {
+  const { flip: f, brrrr: b } = summary
+  const showAction = decision?.state === 'PASS_NEGOTIABLE' || decision?.state === 'NEGOTIATE'
+  return (
+    <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] space-y-3">
+      {f && (
+        <div>
+          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5">Flip</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
+            <SummaryMetric label="Current Price" value={f.currentPrice != null ? fc(f.currentPrice) : '—'} />
+            <SummaryMetric
+              label="Profit Now"
+              value={f.profitNow != null ? fc(f.profitNow) : '—'}
+              tone={f.profitNow != null ? (f.meetsTargetNow ? 'var(--color-success-text)' : 'var(--color-warn-text)') : undefined}
+            />
+            <SummaryMetric label="HAT Max Buy" value={f.maxBuy != null ? fc(Math.round(f.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
+            <SummaryMetric
+              label="Profit at Max Buy"
+              value={f.profitAtMaxBuy != null ? fc(f.profitAtMaxBuy) : '—'}
+              tone={f.profitAtMaxBuy != null ? (f.meetsTargetAtMaxBuy ? 'var(--color-success-text)' : undefined) : undefined}
+            />
+          </div>
+          {f.gap != null && f.gap > 0 ? (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
+              Price gap <span className="font-semibold text-[color:var(--color-text)]">{fc(f.gap)}</span> — negotiate to {fc(Math.round(f.maxBuy / 100) * 100)} or below.
+            </p>
+          ) : f.gap != null && (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
+              Room to Max Buy <span className="font-semibold text-[color:var(--color-success-text)]">{fc(Math.abs(f.gap))}</span> below HAT's ceiling.
+            </p>
+          )}
+        </div>
+      )}
+      {b?.needsRent && (
+        <div>
+          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1">BRRRR</div>
+          <div className="text-[11.5px] font-semibold text-[color:var(--color-text-dim)]">Rent estimate needed</div>
+          <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Add rent to determine BRRRR Max Buy, monthly cash flow and cash left in.</p>
+        </div>
+      )}
+      {b && !b.needsRent && (
+        <div>
+          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5">BRRRR</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
+            <SummaryMetric label="Current Price" value={b.currentPrice != null ? fc(b.currentPrice) : '—'} />
+            <SummaryMetric label="Cash Flow Now" value={b.cashFlowNow != null ? `${b.cashFlowNow >= 0 ? '+' : ''}${fc(b.cashFlowNow)}/mo` : '—'} />
+            <SummaryMetric label="HAT BRRRR Max Buy" value={b.maxBuy != null ? fc(Math.round(b.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
+            <SummaryMetric label="At Max Buy" value={b.atMaxBuy ? `${b.atMaxBuy.cashFlow >= 0 ? '+' : ''}${fc(b.atMaxBuy.cashFlow)}/mo` : '—'} />
+          </div>
+          {b.atMaxBuy && (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">Cash left in at Max Buy: <span className="font-semibold text-[color:var(--color-text)]">{fc(b.atMaxBuy.cashLeftIn)}</span></p>
+          )}
+        </div>
+      )}
+      {showAction && (f?.maxBuy != null || b?.maxBuy != null) && (
+        <div className="pt-2 border-t border-[color:var(--color-line)]">
+          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1">Recommended Action</div>
+          <div className="text-[12px] font-semibold text-[color:var(--color-text)]">{decision.nextAction}</div>
+          {decision.targetStrategy === 'FLIP' && flip?.currentOffer != null ? (
+            <div className="mt-1 flex gap-4 text-[11px] text-[color:var(--color-text-dim)]">
+              <span>Suggested Opening Offer <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(flip.currentOffer))}</b></span>
+              <span>Flip Max Buy <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(f.maxBuy / 100) * 100)}</b></span>
+            </div>
+          ) : (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Negotiate toward HAT's buying range.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -145,6 +233,14 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
   })
   const whyReasons = decision ? buildWhyReasons({ decision, flip, brrrr, decisionV2Confidence: d.confidence?.score }) : []
 
+  // Small Change #3 — read-only Deal Opportunity Summary. Only shown for
+  // states where there's genuinely an actionable price story to tell
+  // (a real Max Buy exists to negotiate toward, or the deal already
+  // works) — never for NEEDS_RESEARCH/no-price/true-PASS states.
+  const opportunitySummary = (decision?.state === 'PASS_NEGOTIABLE' || decision?.state === 'NEGOTIATE' || decision?.state === 'GOOD_AT_ASKING')
+    ? buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSettings })
+    : null
+
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
 
@@ -161,6 +257,12 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           <>
             <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Acquisition Decision</div>
             <div className="text-[20px] font-extrabold mt-0.5" style={{ color: DECISION_TONE[decision.tone] }}>{decision.headline}</div>
+            {/* Small Change #3 — the one secondary line that distinguishes
+                "worth negotiating" from a true dead-end pass, using the
+                SAME underlying engine conclusion (never mutated). */}
+            {decision.passAtCurrentPrice && (
+              <div className="text-[10.5px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)] mt-0.5">Pass at current price</div>
+            )}
             <p className="text-[12.5px] text-[color:var(--color-text)] mt-1 leading-snug">{decision.explanation}</p>
           </>
         ) : (
@@ -229,6 +331,12 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
               </p>
             )}
           </div>
+        )}
+
+        {/* Small Change #3 — DEAL OPPORTUNITY SUMMARY. See
+            buildDealOpportunitySummary/DealOpportunitySummary above. */}
+        {opportunitySummary && (
+          <DealOpportunitySummary summary={opportunitySummary} flip={flip} decision={decision} />
         )}
 
         {/* LEVEL 3 — RECOMMENDED STRATEGY: ONE primary, one small optional

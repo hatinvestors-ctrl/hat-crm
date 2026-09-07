@@ -69,6 +69,7 @@
 //       only).
 
 import { resolveEffectiveStrategy } from './dealExplanation'
+import { computeFlipBreakdown, computeBrrrrBreakdown } from './calculations'
 
 // UX V2.6, Part 3/10 — the ONE canonical strategy-comparison builder.
 // Both DecisionHero (Overview) and DealDecisionCenter (Deal tab) call
@@ -273,6 +274,17 @@ const STATE_META = {
   // do. "CONTACT SELLER" is the actual, immediate, concrete action this
   // state's own nextAction has always resolved to.
   READY_TO_PURSUE: { label: 'CONTACT SELLER', tone: 'success' },
+  // Small Change #3 — a genuinely NEW state, not a relabel: the existing
+  // engine's own strategyRec.preferredStrategy === 'NONE' conclusion
+  // (computeStrategyRecommendation, dealExplanation.js, UNCHANGED) can
+  // mean two different things to an acquisitions rep: (a) truly nothing
+  // works at ANY price (a hard pass), or (b) the CURRENT price fails but
+  // a real, feasible Max Buy still exists below it — worth negotiating,
+  // not abandoning. Same tone/label as NEGOTIATE (this reads as an
+  // actionable opportunity, not a failure) — the distinct state key only
+  // exists so the "Pass at current price" secondary line can be shown
+  // without touching the real NEGOTIATE branch's own wording.
+  PASS_NEGOTIABLE: { label: 'NEGOTIATE', tone: 'caution' },
 }
 
 // Part 5/17 — the strategy-appropriate Max Buy. Never picks arbitrarily
@@ -417,6 +429,36 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
   // 3. Neither strategy could be evaluated as viable at all (the existing
   // engine's own 'NONE' conclusion) — present as PASS, using its own reason.
   if (!strategyRec || strategyRec.preferredStrategy === 'NONE' || (!flip?.available && !brrrr?.available)) {
+    // Small Change #3 — presentation-only distinction (see PASS_NEGOTIABLE
+    // above): computeStrategyRecommendation's own 'NONE' conclusion never
+    // changes here — this only decides HOW to communicate the SAME
+    // underlying facts. A viable Max Buy is one the engine itself already
+    // computed as feasible (flip.maoFeasible / brrrr.mao != null); this
+    // never invents a threshold or recalculates anything.
+    const viableFlipMao  = flip?.available  && flip.maoFeasible && flip.mao != null ? flip.mao : null
+    const viableBrrrrMao = brrrr?.available && brrrr.mao != null ? brrrr.mao : null
+    const currentPriceForPass = (isOffMarket && sellerAskingPrice != null) ? num(sellerAskingPrice)
+      : (flip?.available ? num(flip.evaluationPrice) : (lead?.asking_price != null ? num(lead.asking_price) : null))
+
+    if (currentPriceForPass != null && (viableFlipMao != null || viableBrrrrMao != null)) {
+      // Same tie-break precedent as resolveNoPriceStrategyPreference:
+      // whichever strategy supports the higher (less restrictive) price.
+      const negotiableStrategy = (viableBrrrrMao != null && (viableFlipMao == null || viableBrrrrMao >= viableFlipMao)) ? 'BRRRR' : 'FLIP'
+      const negotiableTarget = negotiableStrategy === 'BRRRR' ? viableBrrrrMao : viableFlipMao
+      const negotiableLabel = targetLabelForStrategy(negotiableStrategy, isOffMarket)
+      return {
+        state: 'PASS_NEGOTIABLE', ...STATE_META.PASS_NEGOTIABLE,
+        headline: STATE_META.PASS_NEGOTIABLE.label,
+        passAtCurrentPrice: true,
+        explanation: `Current ${isOffMarket ? 'seller' : 'asking'} price of ${fullCurrency(currentPriceForPass)} does not meet HAT's targets. HAT's ${negotiableStrategy} buying range requires approximately ${fullCurrency(Math.round(negotiableTarget / 100) * 100)} or below.`,
+        currentPrice: currentPriceForPass, targetPrice: negotiableTarget, targetStrategy: negotiableStrategy, targetLabel: negotiableLabel,
+        gap: Math.round(Math.abs(currentPriceForPass - negotiableTarget)), gapLabel: 'NEEDED PRICE REDUCTION', gapValue: currentPriceForPass - negotiableTarget,
+        withinBuyRange: false, priceIsEvaluation: false,
+        strategyLine: null, nextAction: 'Negotiate with seller toward HAT\'s buying range.',
+        actualOffer, actualOfferSource: actualOfferInfo.source,
+      }
+    }
+
     return {
       state: 'PASS', ...STATE_META.PASS,
       headline: 'PASS',
@@ -706,4 +748,74 @@ export function composeNextActionText(baseAction, decision) {
     return `${baseAction} and negotiate toward ~${formatShort(Math.round(decision.targetPrice))} or below.`
   }
   return baseAction
+}
+
+// Small Change #3 — DEAL OPPORTUNITY SUMMARY (Parts 5-9). A compact,
+// read-only comparison of "now" vs "at HAT's Max Buy" for whichever
+// strategies are computable. Every dollar figure comes from the EXISTING
+// canonical engine:
+//   - flip.evaluationPrice/projectedProfit/mao/maoFeasible/targetProfit
+//     and brrrr.currentOffer/monthlyCashFlow/cashLeftIn/mao — the SAME
+//     computeFlipResult/computeBrrrrResult outputs every other surface
+//     already reads (dealExplanation.js, UNCHANGED).
+//   - "Profit at Max Buy" / "cash flow and cash left in at Max Buy" are
+//     NOT a new formula — this calls computeFlipBreakdown/
+//     computeBrrrrBreakdown (calculations.js, UNCHANGED, already
+//     imported and called internally by computeFlipResult/
+//     computeBrrrrResult themselves) at an alternate purchase price
+//     (the canonical Max Buy) for DISPLAY ONLY. Exactly the same
+//     read-only-alternate-scenario pattern dealExplanation.js's own
+//     computeFlipDownsideSensitivity already uses (re-reads lead.arv/
+//     renovation_cost/rent_estimate directly, same as here). Nothing
+//     computed here is ever persisted.
+// Returns null when neither strategy has enough data to say anything
+// (mirrors readiness — never fabricates a "no deal" summary from
+// nothing).
+export function buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSettings = null }) {
+  if (!flip?.available && !brrrr?.available) return null
+  const arv  = lead?.arv != null ? Number(lead.arv) : null
+  const reno = lead?.renovation_cost != null ? Number(lead.renovation_cost) : null
+  const rent = lead?.rent_estimate != null ? Number(lead.rent_estimate) : null
+  if (arv == null || reno == null) return null
+
+  const holdMonths = flip?.breakdown?.holdMonths ?? brrrr?.breakdown?.holdMonths ?? 6
+
+  let flipSummary = null
+  if (flip?.available) {
+    const maxBuy = flip.maoFeasible && flip.mao != null ? flip.mao : null
+    const profitAtMaxBuy = maxBuy != null
+      ? computeFlipBreakdown(maxBuy, arv, reno, holdMonths, underwritingSettings).totalProfit
+      : null
+    flipSummary = {
+      currentPrice: flip.evaluationPrice,
+      profitNow: flip.projectedProfit,
+      meetsTargetNow: flip.projectedProfit != null && flip.targetProfit != null && flip.projectedProfit >= flip.targetProfit,
+      maxBuy,
+      profitAtMaxBuy,
+      meetsTargetAtMaxBuy: profitAtMaxBuy != null && flip.targetProfit != null && profitAtMaxBuy >= flip.targetProfit,
+      gap: (flip.evaluationPrice != null && maxBuy != null) ? Math.round(flip.evaluationPrice - maxBuy) : null,
+    }
+  }
+
+  let brrrrSummary = null
+  if (rent == null) {
+    brrrrSummary = { needsRent: true }
+  } else if (brrrr?.available) {
+    const maxBuy = brrrr.mao != null ? brrrr.mao : null
+    let atMaxBuy = null
+    if (maxBuy != null) {
+      const b = computeBrrrrBreakdown(maxBuy, arv, reno, rent, holdMonths, { settings: underwritingSettings })
+      atMaxBuy = { cashFlow: Math.round(b.monthlyCF), cashLeftIn: Math.round(b.totalCashInvested) }
+    }
+    brrrrSummary = {
+      currentPrice: brrrr.currentOffer,
+      cashFlowNow: brrrr.monthlyCashFlow,
+      cashLeftInNow: brrrr.cashLeftIn,
+      maxBuy,
+      atMaxBuy,
+    }
+  }
+
+  if (!flipSummary && !brrrrSummary) return null
+  return { flip: flipSummary, brrrr: brrrrSummary }
 }

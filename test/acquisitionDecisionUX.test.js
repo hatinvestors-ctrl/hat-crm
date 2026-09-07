@@ -233,8 +233,23 @@ describe('Part 25 — proof: no financial/scoring logic changed', () => {
     const src = fs.readFileSync('src/lib/decisionEngineV2.js', 'utf8')
     expect(src).toMatch(/const strong = opportunity\.score >= 65 && confidence\.score >= 60/)
   })
-  it('acquisitionDecisionPresentation.js itself computes zero dollar amounts from raw ARV/reno/rent — every number it uses is read from an already-computed field (flip.mao, brrrr.mao, flip.projectedProfit, etc.), never arv/renovation_cost/rent_estimate directly', () => {
+  it('acquisitionDecisionPresentation.js\'s decision-derivation logic (deriveAcquisitionDecision and everything above buildDealOpportunitySummary) computes zero dollar amounts from raw ARV/reno/rent — every number it uses is read from an already-computed field (flip.mao, brrrr.mao, flip.projectedProfit, etc.), never arv/renovation_cost/rent_estimate directly', () => {
     const src = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
-    expect(src).not.toMatch(/lead\.arv|lead\.renovation_cost|lead\.rent_estimate/)
+    const decisionLogic = src.slice(0, src.indexOf('// Small Change #3 — DEAL OPPORTUNITY SUMMARY'))
+    expect(decisionLogic).not.toMatch(/lead\.arv|lead\.renovation_cost|lead\.rent_estimate/)
+  })
+  // Small Change #3 — buildDealOpportunitySummary is the ONE approved
+  // exception: it re-reads lead.arv/renovation_cost/rent_estimate ONLY to
+  // pass them, unchanged, into the EXISTING computeFlipBreakdown/
+  // computeBrrrrBreakdown (calculations.js) at an alternate purchase
+  // price (the canonical Max Buy) for read-only display — the exact same
+  // precedent dealExplanation.js's own computeFlipDownsideSensitivity
+  // already established. It invents no formula and no threshold.
+  it('buildDealOpportunitySummary only ever calls the EXISTING computeFlipBreakdown/computeBrrrrBreakdown — no new formula', () => {
+    const src = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
+    const fnBody = src.slice(src.indexOf('export function buildDealOpportunitySummary'))
+    expect(fnBody).toMatch(/computeFlipBreakdown\(maxBuy, arv, reno, holdMonths, underwritingSettings\)/)
+    expect(fnBody).toMatch(/computeBrrrrBreakdown\(maxBuy, arv, reno, rent, holdMonths, \{ settings: underwritingSettings \}\)/)
+    expect(src).toMatch(/import \{ computeFlipBreakdown, computeBrrrrBreakdown \} from '\.\/calculations'/)
   })
 })
