@@ -149,6 +149,25 @@ const ACCENT = {
 function smartActions(lead, staticActions) {
   if (lead.status !== 'new_lead') return staticActions
 
+  // Small Change #8, Issue #1 — root-cause fix: this function had zero
+  // Buy Box awareness, so it could recommend "Start Negotiating" purely
+  // from Max Buy economics even when the SAME lead's canonical decision
+  // (lead.decision_v2.fit, decisionEngineV2.js, UNCHANGED — the exact
+  // fit.status the primary Acquisition Decision card already reads) has
+  // already hard-excluded the property from HAT's Buy Box entirely.
+  // Reuses the SAME stored value; never recalculates Buy Box, never a
+  // second rule. "Schedule Follow-Up" stays available as a neutral,
+  // non-negotiation CRM utility; "Start Negotiating"/"Draft Offer" are
+  // omitted so the card can never communicate negotiation as the
+  // recommended action for a hard Buy Box exclusion.
+  if (lead.decision_v2?.fit?.status === 'NOT_FIT') {
+    return [
+      { label: 'Not In Buy Box',     emoji: '📦', variant: 'primary',   patch: { status: 'not_in_buy_box' } },
+      { label: 'Schedule Follow-Up', emoji: '📅', variant: 'ghost',     patch: { status: 'follow_up' }, requiresDate: 'follow_up_date' },
+      { label: 'Dismiss',            emoji: '✗',  variant: 'ghost',     patch: { status: 'dead_lead' } },
+    ]
+  }
+
   const hasArv      = !!lead.arv
   const hasReno     = !!lead.renovation_cost
   // hasAnalysis is a WORKFLOW gate (has AI been run at least once) —
@@ -199,6 +218,15 @@ export function smartHint(lead, staticHint) {
   if (!hasArv)             return 'Enter the After-Repair Value (ARV) so we can calculate MAO and check if this deal works.'
   if (!hasReno)            return 'Add the estimated renovation cost, then run AI Analysis to get your MAO and starting offer.'
   if (!hasAnalysis)        return "Numbers look ready — run AI Analysis to get the verdict, MAO, and Kevin's take on this deal."
+
+  // Small Change #8, Issue #1 — same root cause/fix as smartActions above:
+  // reuse the canonical, already-computed lead.decision_v2.fit.status
+  // (decisionEngineV2.js/buyBox.js, UNCHANGED) so this hint can never
+  // contradict the primary Acquisition Decision card's PASS — NOT IN
+  // BUY BOX conclusion by framing a hard exclusion as a negotiable gap.
+  if (lead.decision_v2?.fit?.status === 'NOT_FIT') {
+    return 'Property is outside HAT\'s current Buy Box. Pass on this property — a lower price does not change the Buy Box decision.'
+  }
   // UX V2.1, Part 7/18 — consolidated onto the SAME strategy-aware target
   // the primary Overview hero uses, instead of always naming Flip Max
   // Buy even when BRRRR is the preferred strategy (the exact Norfolk

@@ -71,10 +71,16 @@ describe('PART 13 — 7726 Lazeau Dr regression, real engine values only', () =>
   })
   it('J. strategy explanation DESCRIBES the engine\'s own verdict facts — never independently selects a strategy', () => {
     expect(strategyExplanation).toBeTruthy()
-    // Lazeau's real facts: Flip verdict is NO DEAL at current price, BRRRR verdict is not NO DEAL (WATCH)
+    // Lazeau's real facts: Flip verdict is NO DEAL at current price, BRRRR verdict is not NO DEAL (WATCH) —
+    // but BRRRR's WATCH verdict is computed at brrrr.currentOffer (~$118,100, a negotiation anchor),
+    // NOT at the real $160,000 current/asking price, which is above BRRRR's ~$118,900 Max Buy. Small
+    // Change #8, Issue #2 fixed the old wording ("BRRRR meets HAT's target at the current price") because
+    // that claim was factually false at the real current price — see buildStrategyExplanation's own
+    // comment and the SC8 final report for the vite-node reproduction proving this exact mechanism.
     expect(flip.verdict).toBe('NO DEAL')
     expect(brrrr.verdict).not.toBe('NO DEAL')
-    expect(strategyExplanation).toMatch(/BRRRR meets HAT's target at the current price; Flip does not\./)
+    expect(strategyExplanation).toMatch(/BRRRR is the recommended strategy near HAT's target acquisition range; the \$160,000 asking price is above HAT's supported range\./)
+    expect(strategyExplanation).not.toMatch(/BRRRR meets HAT's target at the current price/)
   })
   it('K. no duplicate top "Asking / Max Buy / Needed Reduction" metric row remains once the Deal Opportunity Summary renders', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/DecisionHero.jsx', 'utf8')
@@ -104,9 +110,13 @@ describe('PART 14 — regression matrix', () => {
     }
   })
   it('CASE C — only BRRRR viable: strategy explanation names BRRRR as the reason (Lazeau itself)', () => {
+    // SC8, Issue #2 — at Lazeau's real current price ($160,000, above BRRRR's ~$118,900 Max Buy),
+    // BRRRR only qualifies near its own target acquisition range, not "at the current price" —
+    // the explanation must say so honestly rather than claim a current-price match that isn't true.
     const { decision, strategyExplanation } = decide(LAZEAU)
     expect(decision.targetStrategy).toBe('BRRRR')
-    expect(strategyExplanation).toMatch(/BRRRR meets HAT's target/)
+    expect(strategyExplanation).toMatch(/BRRRR is the recommended strategy near HAT's target acquisition range/)
+    expect(strategyExplanation).not.toMatch(/BRRRR meets HAT's target at the current price/)
   })
   it('CASE D — neither viable at asking price but a viable lower Max Buy exists → NEGOTIATE (1463 Spring)', () => {
     const lead = { id: 'spring', asking_price: 110000, arv: 185000, renovation_cost: 45000, hold_months: 6 }

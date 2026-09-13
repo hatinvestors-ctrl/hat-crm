@@ -890,15 +890,44 @@ export function buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSet
 // return" claims unless that is literally the deciding factor). The
 // engine's own tie-break is simply "does this strategy's verdict clear
 // NO DEAL at the currently evaluated price" — this states exactly that.
-export function buildStrategyExplanation({ flip, brrrr, strategyRec }) {
+export function buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskingPrice }) {
   if (!strategyRec || strategyRec.preferredStrategy === 'NONE') return null
   const flipOk = flip?.available && flip.verdict !== 'NO DEAL'
   const brrrrOk = brrrr?.available && brrrr.verdict !== 'NO DEAL'
 
+  // Small Change #8, Issue #2 — root cause (confirmed via a real Lazeau
+  // fixture, ask $160,000 / ARV $245,000 / rehab $60,000 / rent $1,500):
+  // Flip's verdict is always computed at flip.evaluationPrice, the REAL
+  // current/actual price (dealExplanation.js — actualOffer ?? asking
+  // price), so "Flip meets HAT's target at the current price" is always
+  // literally true whenever flipOk. BRRRR's verdict, by contrast, is
+  // always computed at brrrr.currentOffer — a system-generated
+  // negotiation ANCHOR (getEffectiveOffer/calculateLiveOffer,
+  // calculations.js, UNCHANGED), which sits at or below brrrr.mao by
+  // construction. Whenever the real current price is ABOVE brrrr.mao
+  // (exactly the Lazeau case: $160,000 ask vs. ~$118,900 BRRRR Max Buy),
+  // brrrrOk being true only means BRRRR clears its bar near its own Max
+  // Buy/suggested-offer range — NOT at the real current price — so the
+  // old wording was factually wrong. This computes the real current
+  // price the SAME way Flip already does (evaluationPrice), falling back
+  // to the caller-supplied seller asking price only when Flip itself
+  // could not be evaluated, and never invents a new price concept.
+  const currentPrice = flip?.evaluationPrice ?? (sellerAskingPrice != null ? Number(sellerAskingPrice) : null)
+  const brrrrMeetsAtCurrentPrice = brrrrOk && currentPrice != null && brrrr?.mao != null && currentPrice <= brrrr.mao
+
+  const brrrrNearRangeText = (tail) => {
+    const priceText = currentPrice != null ? fullCurrency(currentPrice) : 'The current'
+    return `BRRRR is the recommended strategy near HAT's target acquisition range; the ${priceText} asking price is above HAT's supported range.${tail}`
+  }
+
   if (strategyRec.preferredStrategy === 'BRRRR' && !flipOk) {
-    return flip?.available
-      ? 'BRRRR meets HAT\'s target at the current price; Flip does not.'
-      : 'BRRRR meets HAT\'s target at the current price. Flip could not be evaluated (renovation or ARV needed).'
+    if (!brrrr?.available) {
+      return 'BRRRR meets HAT\'s target at the current price. Flip could not be evaluated (renovation or ARV needed).'
+    }
+    if (brrrrMeetsAtCurrentPrice) {
+      return 'BRRRR meets HAT\'s target at the current price; Flip does not.'
+    }
+    return brrrrNearRangeText(flip?.available ? ' Flip does not meet target either.' : ' Flip could not be evaluated (renovation or ARV needed).')
   }
   if (strategyRec.preferredStrategy === 'FLIP' && !brrrrOk) {
     return brrrr?.available
@@ -906,7 +935,12 @@ export function buildStrategyExplanation({ flip, brrrr, strategyRec }) {
       : 'Flip meets HAT\'s target at the current price. BRRRR could not be evaluated (rent estimate needed).'
   }
   if (flipOk && brrrrOk) {
-    return `Both strategies meet HAT's target at the current price — ${strategyRec.preferredStrategy} has the stronger verdict.`
+    if (brrrrMeetsAtCurrentPrice) {
+      return `Both strategies meet HAT's target at the current price — ${strategyRec.preferredStrategy} has the stronger verdict.`
+    }
+    return strategyRec.preferredStrategy === 'BRRRR'
+      ? brrrrNearRangeText(' Flip also meets target at the current price.')
+      : `Flip meets HAT's target at the current price; BRRRR only qualifies near its own Max Buy range at this price.`
   }
   return null
 }

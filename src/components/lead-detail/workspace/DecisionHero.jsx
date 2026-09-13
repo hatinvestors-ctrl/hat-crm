@@ -286,7 +286,7 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
   // strategy, derived ONLY from flip.verdict/brrrr.verdict/strategyRec
   // (the SAME facts computeStrategyRecommendation already used) — never
   // an independently-chosen UI explanation.
-  const strategyExplanation = decision?.targetStrategy ? buildStrategyExplanation({ flip, brrrr, strategyRec }) : null
+  const strategyExplanation = decision?.targetStrategy ? buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskingPrice }) : null
 
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
