@@ -19,7 +19,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
-import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary } from '../../../lib/acquisitionDecisionPresentation'
+import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation } from '../../../lib/acquisitionDecisionPresentation'
 import { resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
 import InfoTooltip from '../../ui/InfoTooltip'
@@ -55,29 +55,59 @@ function SummaryMetric({ label, value, tone }) {
   )
 }
 
-// Small Change #3 — DEAL OPPORTUNITY SUMMARY. Compact, read-only "now vs
-// at HAT's Max Buy" comparison, built entirely from
-// buildDealOpportunitySummary() (acquisitionDecisionPresentation.js,
+// Small Change #3/#6 — DEAL OPPORTUNITY SUMMARY. Compact, read-only "now
+// vs at HAT's Max Buy" comparison for BOTH strategies, built entirely
+// from buildDealOpportunitySummary() (acquisitionDecisionPresentation.js,
 // which itself only calls the EXISTING computeFlipBreakdown/
 // computeBrrrrBreakdown at an alternate price for display — no new
 // formula, nothing persisted). This component only arranges/labels
 // those already-computed numbers.
-function DealOpportunitySummary({ summary, flip, decision }) {
+//
+// Small Change #6 audit finding (7726 Lazeau Dr) — BRRRR's own
+// "current price" field is NOT the seller's ask and NOT an evaluation
+// price: it is brrrr.currentOffer, a SYSTEM-COMPUTED negotiation-anchor
+// (calculateLiveOffer, calculations.js) — architecturally different
+// from Flip's evaluationPrice (a REAL price: an actual offer or the
+// asking price itself). Labeled "Suggested Offer" here — the SAME term
+// Small Change #3 already used for flip.currentOffer in Recommended
+// Action — never "Current Price".
+function DealOpportunitySummary({ summary, flip, decision, lead }) {
   const { flip: f, brrrr: b } = summary
   const showAction = decision?.state === 'PASS_NEGOTIABLE' || decision?.state === 'NEGOTIATE'
+  const sellerAsk = lead?.asking_price != null ? Number(lead.asking_price) : null
+  // Small Change #6, Part 8 — fair side-by-side comparison. targetStrategy
+  // is the SAME canonical pick deriveAcquisitionDecision already resolved
+  // (resolveEffectiveStrategy/strategyRec) — never re-decided here.
+  const recommended = decision?.targetStrategy
+  const alternative = recommended === 'BRRRR' ? 'FLIP' : recommended === 'FLIP' ? 'BRRRR' : null
   return (
     <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] space-y-3">
+      {/* Small Change #6, Part 2 — ONE seller-ask line, read directly from
+          the canonical live lead field, shown once instead of repeated/
+          conflated with evaluation price or suggested offer per scenario. */}
+      {sellerAsk != null && (
+        <div className="text-[11px] text-[color:var(--color-text-dim)]">
+          Seller Ask <span className="font-bold text-[color:var(--color-text)] tabular-nums">{fc(sellerAsk)}</span>
+        </div>
+      )}
       {f && (
         <div>
-          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5">Flip</div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Flip</span>
+            {recommended === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">Recommended</span>}
+            {alternative === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Alternative</span>}
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
-            <SummaryMetric label="Current Price" value={f.currentPrice != null ? fc(f.currentPrice) : '—'} />
+            <SummaryMetric
+              label={decision?.priceIsEvaluation ? 'Evaluation Price' : 'Current Price'}
+              value={f.currentPrice != null ? fc(f.currentPrice) : '—'}
+            />
             <SummaryMetric
               label="Profit Now"
               value={f.profitNow != null ? fc(f.profitNow) : '—'}
               tone={f.profitNow != null ? (f.meetsTargetNow ? 'var(--color-success-text)' : 'var(--color-warn-text)') : undefined}
             />
-            <SummaryMetric label="HAT Max Buy" value={f.maxBuy != null ? fc(Math.round(f.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
+            <SummaryMetric label="HAT Flip Max Buy" value={f.maxBuy != null ? fc(Math.round(f.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
             <SummaryMetric
               label="Profit at Max Buy"
               value={f.profitAtMaxBuy != null ? fc(f.profitAtMaxBuy) : '—'}
@@ -104,15 +134,21 @@ function DealOpportunitySummary({ summary, flip, decision }) {
       )}
       {b && !b.needsRent && (
         <div>
-          <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5">BRRRR</div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
-            <SummaryMetric label="Current Price" value={b.currentPrice != null ? fc(b.currentPrice) : '—'} />
-            <SummaryMetric label="Cash Flow Now" value={b.cashFlowNow != null ? `${b.cashFlowNow >= 0 ? '+' : ''}${fc(b.cashFlowNow)}/mo` : '—'} />
-            <SummaryMetric label="HAT BRRRR Max Buy" value={b.maxBuy != null ? fc(Math.round(b.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
-            <SummaryMetric label="At Max Buy" value={b.atMaxBuy ? `${b.atMaxBuy.cashFlow >= 0 ? '+' : ''}${fc(b.atMaxBuy.cashFlow)}/mo` : '—'} />
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">BRRRR</span>
+            {recommended === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">Recommended</span>}
+            {alternative === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Alternative</span>}
           </div>
-          {b.atMaxBuy && (
-            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">Cash left in at Max Buy: <span className="font-semibold text-[color:var(--color-text)]">{fc(b.atMaxBuy.cashLeftIn)}</span></p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
+            <SummaryMetric label="HAT BRRRR Max Buy" value={b.maxBuy != null ? fc(Math.round(b.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
+            <SummaryMetric label="Cash Flow at Max Buy" value={b.atMaxBuy ? `${b.atMaxBuy.cashFlow >= 0 ? '+' : ''}${fc(b.atMaxBuy.cashFlow)}/mo` : '—'} />
+            <SummaryMetric label="Cash Left In at Max Buy" value={b.atMaxBuy ? fc(b.atMaxBuy.cashLeftIn) : '—'} />
+            <SummaryMetric label="Suggested Offer" value={b.suggestedOffer != null ? fc(b.suggestedOffer) : '—'} />
+          </div>
+          {b.suggestedOffer != null && (
+            <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
+              At HAT's suggested {fc(b.suggestedOffer)} offer: {b.cashFlowAtSuggestedOffer != null ? `${b.cashFlowAtSuggestedOffer >= 0 ? '+' : ''}${fc(b.cashFlowAtSuggestedOffer)}/mo cash flow` : '—'}, {b.cashLeftInAtSuggestedOffer != null ? `${fc(b.cashLeftInAtSuggestedOffer)} cash left in` : '—'}.
+            </p>
           )}
         </div>
       )}
@@ -124,6 +160,11 @@ function DealOpportunitySummary({ summary, flip, decision }) {
             <div className="mt-1 flex gap-4 text-[11px] text-[color:var(--color-text-dim)]">
               <span>Suggested Opening Offer <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(flip.currentOffer))}</b></span>
               <span>Flip Max Buy <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(f.maxBuy / 100) * 100)}</b></span>
+            </div>
+          ) : decision.targetStrategy === 'BRRRR' && b?.suggestedOffer != null ? (
+            <div className="mt-1 flex gap-4 text-[11px] text-[color:var(--color-text-dim)]">
+              <span>Suggested Opening Offer <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(b.suggestedOffer))}</b></span>
+              <span>BRRRR Max Buy <b className="text-[color:var(--color-text)] tabular-nums">{fc(Math.round(b.maxBuy / 100) * 100)}</b></span>
             </div>
           ) : (
             <p className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Negotiate toward HAT's buying range.</p>
@@ -241,6 +282,12 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
     ? buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSettings })
     : null
 
+  // Small Change #6, Part 6/7 — WHY the canonical engine picked this
+  // strategy, derived ONLY from flip.verdict/brrrr.verdict/strategyRec
+  // (the SAME facts computeStrategyRecommendation already used) — never
+  // an independently-chosen UI explanation.
+  const strategyExplanation = decision?.targetStrategy ? buildStrategyExplanation({ flip, brrrr, strategyRec }) : null
+
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
 
@@ -285,8 +332,15 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
             (asking/seller price vs target vs gap) only when there is a
             genuine price to compare against. READY_TO_PURSUE (off-market,
             no seller price recorded) never shows a fabricated price row —
-            only HAT's ceiling, explicitly captioned as not an offer. */}
-        {decision?.currentPrice != null && decision.targetPrice != null && (
+            only HAT's ceiling, explicitly captioned as not an offer.
+            Small Change #6, Part 3 — suppressed whenever the Deal
+            Opportunity Summary below is also going to render: that block
+            (plus the headline sentence above) already states the SAME
+            current price / target / gap facts, per-strategy and with
+            full context — this row would only repeat them. Untouched for
+            every state opportunitySummary doesn't cover (READY_TO_PURSUE,
+            NEEDS_RESEARCH, true PASS). */}
+        {decision?.currentPrice != null && decision.targetPrice != null && !opportunitySummary && (
           <div className={`mt-2 grid gap-3 ${decision.actualOffer != null ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <Metric label={decision.currentPriceLabel || (decision.priceIsEvaluation ? 'Evaluation Price' : 'Asking Price')} value={fc(decision.currentPrice)} />
             {/* Part 2C/7 — "Our Offer" only ever from resolveActualOffer's
@@ -346,7 +400,7 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
         {/* Small Change #3 — DEAL OPPORTUNITY SUMMARY. See
             buildDealOpportunitySummary/DealOpportunitySummary above. */}
         {opportunitySummary && (
-          <DealOpportunitySummary summary={opportunitySummary} flip={flip} decision={decision} />
+          <DealOpportunitySummary summary={opportunitySummary} flip={flip} decision={decision} lead={lead} />
         )}
 
         {/* LEVEL 3 — RECOMMENDED STRATEGY: ONE primary, one small optional
@@ -362,9 +416,20 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           <div className="mt-2">
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Recommended Strategy</span>{' '}
             <span className="text-[13px] font-extrabold text-[color:var(--color-text)]">{decision.targetStrategy}</span>
+            {/* Small Change #6, Part 6/7 — WHY, one factual sentence
+                derived from the SAME verdict facts the engine used to
+                pick this strategy (buildStrategyExplanation, presentation
+                layer only — never an independently-chosen reason). */}
+            {strategyExplanation && (
+              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5 leading-snug">{strategyExplanation}</p>
+            )}
           </div>
         )}
-        {decision?.strategyLine?.headline === 'BOTH STRATEGIES WORK' && flip.available && brrrr.available && (
+        {/* Small Change #6, Part 8/10 — suppressed when the Deal
+            Opportunity Summary is also shown: its own Recommended/
+            Alternative badges on the Flip and BRRRR blocks already give
+            the fuller, per-strategy comparison this line only summarized. */}
+        {decision?.strategyLine?.headline === 'BOTH STRATEGIES WORK' && flip.available && brrrr.available && !opportunitySummary && (
           <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">
             Both strategies are viable — Alternative: {decision.targetStrategy === 'BRRRR' ? 'FLIP' : 'BRRRR'} · Max Buy{' '}
             {fc(Math.round(decision.targetStrategy === 'BRRRR' ? flip.mao : brrrr.mao))}
@@ -567,7 +632,7 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           <span className="font-bold text-[color:var(--color-text)]">FLIP</span>{' '}
           {fc(flip.projectedProfit)} projected profit @ {decision?.priceIsEvaluation ? 'evaluation' : 'current'} price
           {brrrr.available && brrrr.monthlyCashFlow != null && (
-            <> · <span className="font-bold text-[color:var(--color-text)]">BRRRR</span> {brrrr.monthlyCashFlow >= 0 ? '+' : ''}{fc(brrrr.monthlyCashFlow)}/mo cash flow at current price</>
+            <> · <span className="font-bold text-[color:var(--color-text)]">BRRRR</span> {brrrr.monthlyCashFlow >= 0 ? '+' : ''}{fc(brrrr.monthlyCashFlow)}/mo cash flow at suggested offer</>
           )}
         </div>
       )}

@@ -117,12 +117,19 @@ describe('CASE F — incomplete lead (NEEDS_RESEARCH) unaffected', () => {
   })
 })
 
+// Small Change #6 audit finding (superseding this SC5 test's own label
+// choice) — traced the actual source further: brrrr.monthlyCashFlow is
+// computed at brrrr.currentOffer, a system-computed negotiation anchor
+// (calculateLiveOffer, calculations.js), NOT literally "the current
+// price". "At current price" was itself imprecise; "at suggested offer"
+// is the truthful label, matching the SAME term Small Change #3 already
+// uses for flip.currentOffer. Underlying value unchanged.
 describe('CASE G — BRRRR cash-flow label truthfully identifies the scenario', () => {
-  it('DecisionHero labels the bottom-strip BRRRR figure "at current price" — the same value/source as before, wording only', () => {
+  it('DecisionHero labels the bottom-strip BRRRR figure "at suggested offer" — the same value/source as before, wording only', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/DecisionHero.jsx', 'utf8')
-    expect(src).toMatch(/mo cash flow at current price/)
+    expect(src).toMatch(/mo cash flow at suggested offer/)
     // the underlying value is still brrrr.monthlyCashFlow — never recalculated
-    expect(src).toMatch(/\{brrrr\.monthlyCashFlow >= 0 \? '\+' : ''\}\{fc\(brrrr\.monthlyCashFlow\)\}\/mo cash flow at current price/)
+    expect(src).toMatch(/\{brrrr\.monthlyCashFlow >= 0 \? '\+' : ''\}\{fc\(brrrr\.monthlyCashFlow\)\}\/mo cash flow at suggested offer/)
   })
 })
 

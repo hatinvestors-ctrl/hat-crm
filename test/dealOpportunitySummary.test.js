@@ -76,12 +76,18 @@ describe('I/J/K — BRRRR presentation', () => {
     const { summary } = decide(SPRING)
     expect(summary.brrrr).toEqual({ needsRent: true })
   })
-  it('I/J. BRRRR current + at-Max-Buy metrics display when genuinely available (rent present)', () => {
+  // Small Change #6 audit finding — brrrr.currentPrice/cashFlowNow were
+  // renamed suggestedOffer/cashFlowAtSuggestedOffer: the value was NEVER
+  // "the current price" (it's brrrr.currentOffer, a system-computed
+  // negotiation anchor — see acquisitionDecisionPresentation.js's own
+  // comment on buildDealOpportunitySummary). Same underlying value
+  // (brrrr.monthlyCashFlow), field renamed for honesty only.
+  it('I/J. BRRRR suggested-offer + at-Max-Buy metrics display when genuinely available (rent present)', () => {
     const lead = { ...SPRING, rent_estimate: 1500 }
     const { brrrr, summary } = decide(lead)
     if (brrrr.available) {
       expect(summary.brrrr.needsRent).toBeUndefined()
-      expect(summary.brrrr.cashFlowNow).toBe(brrrr.monthlyCashFlow)
+      expect(summary.brrrr.cashFlowAtSuggestedOffer).toBe(brrrr.monthlyCashFlow)
       if (brrrr.mao != null) {
         expect(summary.brrrr.atMaxBuy).not.toBeNull()
         expect(typeof summary.brrrr.atMaxBuy.cashFlow).toBe('number')

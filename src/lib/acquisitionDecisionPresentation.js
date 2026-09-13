@@ -314,6 +314,14 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
   const actualOfferInfo = resolveActualOffer(lead)
   const actualOffer = actualOfferInfo.amount
 
+  // Small Change #7 — hoisted from branch #3 below (was previously
+  // computed only there) so the SAME viability facts — never recomputed,
+  // never a new formula/threshold — can also gate the Decision V2 PASS
+  // branch (#2b) just below. A viable Max Buy is one the engine itself
+  // already computed as feasible (flip.maoFeasible / brrrr.mao != null).
+  const viableFlipMao  = flip?.available  && flip.maoFeasible && flip.mao != null ? flip.mao : null
+  const viableBrrrrMao = brrrr?.available && brrrr.mao != null ? brrrr.mao : null
+
   // 1. Missing required inputs — existing readiness logic, never invented.
   if (readiness && readiness.flipReady === false) {
     // readiness.missing entries are {key, label, reason} objects
@@ -363,7 +371,21 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
       actualOffer, actualOfferSource: actualOfferInfo.source,
     }
   }
-  if (decisionV2Recommendation === 'PASS') {
+  // Small Change #7 — root-cause fix (audit-confirmed, see acquisitionDecisionPresentation.js
+  // header/PART commentary). Decision V2's own `recommendation` (a
+  // SEPARATE Opportunity/Confidence/Urgency-scoring pipeline,
+  // decisionEngineV2.js, UNCHANGED) previously hard-PASSed here
+  // unconditionally — even when the SAME flip/brrrr facts below already
+  // show a genuinely feasible, lower Max Buy worth negotiating toward.
+  // Decision V2's stored recommendation is NEVER mutated; this only
+  // decides whether THIS branch is the one that gets to speak for the
+  // lead, or whether control falls through to branch #3, which already
+  // knows how to turn "a viable Max Buy exists below the current price"
+  // into PASS_NEGOTIABLE (Small Change #3, unchanged). A genuinely low
+  // Opportunity Score must not by itself suppress a real, feasible
+  // acquisition price the financial engine already found — but it still
+  // wins outright when NO strategy has a feasible Max Buy at all.
+  if (decisionV2Recommendation === 'PASS' && viableFlipMao == null && viableBrrrrMao == null) {
     return {
       state: 'PASS', ...STATE_META.PASS,
       headline: 'PASS',
@@ -445,11 +467,8 @@ export function deriveAcquisitionDecision({ flip, brrrr, strategyRec, readiness 
     // Small Change #3 — presentation-only distinction (see PASS_NEGOTIABLE
     // above): computeStrategyRecommendation's own 'NONE' conclusion never
     // changes here — this only decides HOW to communicate the SAME
-    // underlying facts. A viable Max Buy is one the engine itself already
-    // computed as feasible (flip.maoFeasible / brrrr.mao != null); this
-    // never invents a threshold or recalculates anything.
-    const viableFlipMao  = flip?.available  && flip.maoFeasible && flip.mao != null ? flip.mao : null
-    const viableBrrrrMao = brrrr?.available && brrrr.mao != null ? brrrr.mao : null
+    // underlying facts. viableFlipMao/viableBrrrrMao are hoisted above
+    // (Small Change #7) — reused here unchanged, never recomputed.
     const genuineSellerPriceForPass = isOffMarket && sellerAskingPrice != null ? num(sellerAskingPrice) : null
     const currentPriceForPass = genuineSellerPriceForPass != null ? genuineSellerPriceForPass
       : (flip?.available ? num(flip.evaluationPrice) : (lead?.asking_price != null ? num(lead.asking_price) : null))
@@ -841,9 +860,20 @@ export function buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSet
       atMaxBuy = { cashFlow: Math.round(b.monthlyCF), cashLeftIn: Math.round(b.totalCashInvested) }
     }
     brrrrSummary = {
-      currentPrice: brrrr.currentOffer,
-      cashFlowNow: brrrr.monthlyCashFlow,
-      cashLeftInNow: brrrr.cashLeftIn,
+      // Small Change #6 audit finding — this is NOT the seller's asking
+      // price and NOT an evaluation price: it is brrrr.currentOffer,
+      // computeBrrrrResult's own SYSTEM-COMPUTED negotiation-anchor
+      // ("the NEGOTIATED offer HAT would extend" — see dealExplanation.js's
+      // own comment on this exact field, and getEffectiveOffer/
+      // calculateLiveOffer in calculations.js for its formula). BRRRR's
+      // cash flow/cash left in are always evaluated AT this anchor, not
+      // at the raw asking price — architecturally different from Flip
+      // (which evaluates at a REAL price: an actual offer, or asking
+      // price). Named `suggestedOffer` here (not `currentPrice`) so the
+      // presentation layer can never mislabel it "Current Price" again.
+      suggestedOffer: brrrr.currentOffer,
+      cashFlowAtSuggestedOffer: brrrr.monthlyCashFlow,
+      cashLeftInAtSuggestedOffer: brrrr.cashLeftIn,
       maxBuy,
       atMaxBuy,
     }
@@ -851,4 +881,32 @@ export function buildDealOpportunitySummary({ lead, flip, brrrr, underwritingSet
 
   if (!flipSummary && !brrrrSummary) return null
   return { flip: flipSummary, brrrr: brrrrSummary }
+}
+
+// Small Change #6 — factual, presentation-only strategy explanation.
+// Derived ONLY from the SAME flip.verdict/brrrr.verdict/strategyRec
+// facts computeStrategyRecommendation (dealExplanation.js, UNCHANGED)
+// already computed — never invents a reason (no "lower risk"/"stronger
+// return" claims unless that is literally the deciding factor). The
+// engine's own tie-break is simply "does this strategy's verdict clear
+// NO DEAL at the currently evaluated price" — this states exactly that.
+export function buildStrategyExplanation({ flip, brrrr, strategyRec }) {
+  if (!strategyRec || strategyRec.preferredStrategy === 'NONE') return null
+  const flipOk = flip?.available && flip.verdict !== 'NO DEAL'
+  const brrrrOk = brrrr?.available && brrrr.verdict !== 'NO DEAL'
+
+  if (strategyRec.preferredStrategy === 'BRRRR' && !flipOk) {
+    return flip?.available
+      ? 'BRRRR meets HAT\'s target at the current price; Flip does not.'
+      : 'BRRRR meets HAT\'s target at the current price. Flip could not be evaluated (renovation or ARV needed).'
+  }
+  if (strategyRec.preferredStrategy === 'FLIP' && !brrrrOk) {
+    return brrrr?.available
+      ? 'Flip meets HAT\'s target at the current price; BRRRR does not.'
+      : 'Flip meets HAT\'s target at the current price. BRRRR could not be evaluated (rent estimate needed).'
+  }
+  if (flipOk && brrrrOk) {
+    return `Both strategies meet HAT's target at the current price — ${strategyRec.preferredStrategy} has the stronger verdict.`
+  }
+  return null
 }
