@@ -1205,3 +1205,30 @@ export function buildCloseCallComparison({ flip, brrrr }) {
 
   return { rows, priceDiff, priceDiffLabel: formatShortK(priceDiff) }
 }
+
+// Small Change #12 — Deal tab close-call explanation. Presentation-only,
+// built ONLY from already-canonical flip.mao/brrrr.mao/flip.verdict
+// fields (the SAME facts resolveStrategyOutlook/buildCloseCallComparison
+// already use) — never a second close-call formula, never touches
+// resolveStrategyOutlook's classification itself. Explicitly separates
+// "at the seller ask" from "near HAT's supported acquisition range" so
+// the Deal tab can never read as "both strategies work at the current
+// price" (the exact Lazeau confusion this mission traces).
+export function buildDealCloseCallExplanation({ flip, brrrr, sellerAsk }) {
+  if (flip?.mao == null || brrrr?.mao == null) return null
+  const askText = sellerAsk != null ? fullCurrency(Math.round(sellerAsk)) : null
+  // Flip's verdict is always computed at the real evaluation price (see
+  // buildStrategyExplanation's own comment) — a direct, reliable "does
+  // Flip meet target AT the seller ask" check.
+  const flipMeetsAtAsk = flip.verdict !== 'NO DEAL'
+  // BRRRR's verdict is computed at brrrr.currentOffer (an anchor), NOT
+  // the seller ask — so whether BRRRR genuinely meets target AT the
+  // seller ask is a separate question: only true when the ask is
+  // already at or below BRRRR's own Max Buy.
+  const brrrrMeetsAtAsk = sellerAsk != null && brrrr.mao != null && sellerAsk <= brrrr.mao
+
+  if (!flipMeetsAtAsk && !brrrrMeetsAtAsk) {
+    return `Neither strategy meets HAT's targets at the${askText ? ` ${askText}` : ''} seller ask. Flip becomes viable around ${fullCurrency(Math.round(flip.mao))} or below; BRRRR around ${fullCurrency(Math.round(brrrr.mao))} or below. Because those acquisition ranges are close, both exits should remain open.`
+  }
+  return `Flip and BRRRR support close acquisition ranges — Flip around ${fullCurrency(Math.round(flip.mao))}, BRRRR around ${fullCurrency(Math.round(brrrr.mao))}. Because those ranges are close, both exits should remain open.`
+}

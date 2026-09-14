@@ -76,7 +76,14 @@ describe('Part 2 — strategy consistency is a release blocker', () => {
     // off-market leads with no seller price yet (previously showed a false
     // "BELOW TARGET"/"None — neither strategy qualifies"). The shared
     // resolveEffectiveStrategy choke point itself is unchanged.
-    expect(dealSrc).toMatch(/import \{ buildStrategyComparison, hasEvaluablePrice \} from '\.\.\/\.\.\/\.\.\/lib\/acquisitionDecisionPresentation'/)
+    // Small Change #12 note (legitimate additive extension, not a
+    // regression): the import line now also pulls in resolveStrategyOutlook/
+    // buildCloseCallComparison/buildDealCloseCallExplanation/buildStrategyExplanation
+    // (all REUSED, read-only, from the SAME acquisitionDecisionPresentation.js
+    // module — no second close-call/strategy-comparison engine). The two
+    // symbols this test protects, buildStrategyComparison and
+    // hasEvaluablePrice, are still both present.
+    expect(dealSrc).toMatch(/import \{ buildStrategyComparison, hasEvaluablePrice,.*\} from '\.\.\/\.\.\/\.\.\/lib\/acquisitionDecisionPresentation'/)
     expect(dealSrc).toMatch(/const comparison = buildStrategyComparison\(\{ flip, brrrr, strategyRec, hasPrice: priceKnown \}\)/)
   })
   it('LeadEssentialsBar.jsx (a third, independent consumer) also uses resolveEffectiveStrategy — a fourth silently-disagreeing surface is now impossible', () => {

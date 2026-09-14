@@ -44,7 +44,7 @@ import { formatCurrency as fc, describeCashLeftIn, roundMaxBuy } from '../../../
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, resolveEffectiveStrategy } from '../../../lib/dealExplanation'
 import { isDistressedLead, resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
-import { buildStrategyComparison, hasEvaluablePrice } from '../../../lib/acquisitionDecisionPresentation'
+import { buildStrategyComparison, hasEvaluablePrice, resolveStrategyOutlook, buildCloseCallComparison, buildDealCloseCallExplanation, buildStrategyExplanation } from '../../../lib/acquisitionDecisionPresentation'
 import { getDealReadiness } from './readiness'
 import EmptyState from './EmptyState'
 import MarginVisualization from './MarginVisualization'
@@ -74,21 +74,28 @@ const STATUS_TONE = {
 // V2.9 — `line` (e.g. "Buy at $147,700 or less" / "Need rent estimate to
 // calculate") replaces the status word whenever there is no price to be
 // WORKS/BELOW TARGET against. Plain English, per Part 4.
-function StrategyCard({ name, status, statusLine, isRecommended, metrics }) {
+// Small Change #12 — `badge` replaces the old boolean `isRecommended`
+// (caller now decides the exact text: "Recommended"/"Best Option" for a
+// clear winner, "Slight Lean"/"Viable" for a genuine close call — see
+// DealDecisionCenter's badge resolution below) so a close call is never
+// mislabeled "Recommended", and `statusText` replaces the raw WORKS/
+// BELOW TARGET word with a price-scenario-qualified label (the mission's
+// core rule: never show a verdict without saying what price it's at).
+function StrategyCard({ name, status, statusLine, statusText, badge, highlighted, metrics }) {
   return (
     <div
       className="rounded-lg border px-3.5 py-3 flex-1 min-w-0"
-      style={{ borderColor: isRecommended ? 'var(--color-accent)' : 'var(--color-line)', borderWidth: isRecommended ? '1.5px' : '1px' }}
+      style={{ borderColor: highlighted ? 'var(--color-accent)' : 'var(--color-line)', borderWidth: highlighted ? '1.5px' : '1px' }}
     >
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <span className="text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--color-text)]">
-          {name}{isRecommended && <span className="text-[color:var(--color-accent-text)]"> — {statusLine ? 'Best Option' : 'Recommended'}</span>}
+          {name}{badge && <span className="text-[color:var(--color-accent-text)]"> — {badge}</span>}
         </span>
       </div>
       {statusLine ? (
         <div className="text-[12px] font-bold mb-1.5" style={{ color: STATUS_TONE[status] }}>{statusLine}</div>
       ) : (
-        <div className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: STATUS_TONE[status] }}>{status}</div>
+        <div className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: STATUS_TONE[status] }}>{statusText || status}</div>
       )}
       <div className="grid grid-cols-2 gap-2">
         {metrics.map(([label, value]) => (
@@ -167,14 +174,70 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
   const priceLabel = isOffMarket ? (genuineSellerAsking != null ? 'Seller Asking' : 'Evaluation Price') : 'Asking Price'
   const priceValue = isOffMarket ? (genuineSellerAsking ?? lead.asking_price) : lead.asking_price
 
+  // Small Change #12 — REUSES resolveStrategyOutlook (Small Change #10,
+  // byte-unchanged) rather than a second close-call formula. Only the 3
+  // fields that function reads are supplied: targetStrategy (the SAME
+  // canonical pick this tab already resolved as `effective`), buyBoxNotFit
+  // (the SAME lead.decision_v2.fit.status Small Change #5/#8 already
+  // reuse — read-only, never recomputed), and priceUnknown (the SAME
+  // priceKnown flag this tab already computed). No new decision object,
+  // no new classification engine.
+  const buyBoxNotFit = lead?.decision_v2?.fit?.status === 'NOT_FIT'
+  const strategyOutlook = resolveStrategyOutlook({ flip, brrrr, decision: { targetStrategy: effective, buyBoxNotFit, priceUnknown: comparison.priceUnknown } })
+  const isCloseCall = strategyOutlook?.kind === 'BOTH_VIABLE_CLOSE_CALL'
+  const closeCallComparison = isCloseCall ? buildCloseCallComparison({ flip, brrrr }) : null
+  const closeCallExplanation = isCloseCall ? buildDealCloseCallExplanation({ flip, brrrr, sellerAsk: priceValue }) : null
+  // Small Change #8's price-scenario-aware wording (buildStrategyExplanation)
+  // replaces buildStrategyComparison's own ad-hoc explanation ONLY for the
+  // clear-winner, price-known case — buildStrategyComparison's sentence
+  // could otherwise claim "BRRRR meets HAT's requirements at the current
+  // evaluation price" when BRRRR's verdict was actually computed at its
+  // negotiation anchor, not the real current price (the exact Lazeau
+  // confusion this mission traces). Falls back to the original sentence
+  // for the symmetric "neither/both already work" cases, which
+  // buildStrategyExplanation doesn't need to re-word.
+  const strategyExplanationText = (priceKnown && !isCloseCall && buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskingPrice: priceValue })) || comparison.explanation
+
+  // Small Change #12 — price-scenario-qualified status labels. The core
+  // rule: never show WORKS/BELOW TARGET without saying what price it's
+  // at. Flip's status (flip.verdict) is always computed at the real
+  // current/evaluation price, so it's qualified with that same label.
+  // BRRRR's status (brrrr.verdict) is always computed at brrrr.currentOffer
+  // — a negotiation anchor near BRRRR's own Max Buy, NEVER the seller
+  // ask — so it is qualified "AT TARGET RANGE," never "AT SELLER ASK."
+  const priceScenarioWord = isDistressedLead(lead) ? 'Evaluation Price' : 'Seller Ask'
+  const flipStatusText = comparison.flip.status === 'WORKS' ? `Viable at ${priceScenarioWord}`
+    : comparison.flip.status === 'BELOW TARGET' ? `Below Target at ${priceScenarioWord}`
+    : comparison.flip.status
+  const brrrrStatusText = comparison.brrrr.status === 'WORKS' ? 'Viable at Target Range'
+    : comparison.brrrr.status === 'BELOW TARGET' ? 'Below Target at Target Range'
+    : comparison.brrrr.status
+
+  // Small Change #12 — badges: a close call never says "Recommended" (the
+  // canonical lean is real but not a strong winner) and the OTHER
+  // strategy is never left unlabeled ("Viable" — it IS genuinely viable,
+  // just not the lean). Clear winners keep the original wording exactly.
+  const flipBadge = isCloseCall
+    ? (effective === 'FLIP' ? 'Slight Lean' : 'Viable')
+    : (effective === 'FLIP' ? (comparison.flip.line ? 'Best Option' : 'Recommended') : null)
+  const brrrrBadge = isCloseCall
+    ? (effective === 'BRRRR' ? 'Slight Lean' : 'Viable')
+    : (effective === 'BRRRR' ? (comparison.brrrr.line ? 'Best Option' : 'Recommended') : null)
+
   // V2.9 — with no price, profit / cash-left-in / cash-flow are all null
   // (they are evaluated AT a price). Showing "—" for each would imply the
   // strategy could not be evaluated, when in fact its Max Buy computed
   // fine. Each card carries only its Max Buy in that state.
+  // Small Change #12 — for a close call, add "Profit @ Max Buy" so the
+  // Flip card visibly separates its Seller-Ask scenario from its
+  // Max-Buy scenario (flip.targetProfit — the SAME field Small Change
+  // #10's comparison table already uses; profit at Max Buy is ≈ target
+  // by construction, never a new calculation).
   const flipMetrics = priceKnown
     ? [
         ['Max Buy', fc(displayMao)],
         ['Profit @ ' + (isDistressedLead(lead) ? 'Evaluation' : 'Current') + ' Price', flip.available ? fc(flip.projectedProfit) : '—'],
+        ...(isCloseCall && flip.targetProfit != null ? [['Profit @ Max Buy', `~${fc(flip.targetProfit)}`]] : []),
       ]
     : [['Max Buy', fc(displayMao)]]
   const brrrrMetrics = !brrrr.available
@@ -185,33 +248,71 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
 
   return (
     <div className="space-y-4">
-      {/* L1 — ONE canonical recommendation + ONE explanation sentence. */}
-      <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
-        <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Recommended Strategy</div>
-        {/* V2.9 — "None — neither strategy qualifies" is only honest when a
-            real price was actually tested. With no price it was a false
-            failure verdict; comparison.recommended now carries the
-            no-price best option instead. */}
-        <div className="text-[18px] font-extrabold text-[color:var(--color-text)] mt-0.5">
-          {effective ?? (comparison.priceUnknown ? 'Need more information' : 'None — neither strategy qualifies')}
+      {/* L1 — Small Change #12: for a genuine close call, "Recommended
+          Strategy: BRRRR" is replaced by "Strategy Outlook — Both Viable"
+          + "Slight lean" (mirrors Overview/Small Change #10-#11 exactly —
+          same isCloseCall gate, same wording pattern), so the Deal tab
+          never contradicts the Overview conclusion. Clear winners/single-
+          strategy/no-price states render the ORIGINAL "Recommended
+          Strategy" block, byte-identical in structure. */}
+      {isCloseCall ? (
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Strategy Outlook</div>
+          <div className="text-[18px] font-extrabold text-[color:var(--color-text)] mt-0.5">BOTH VIABLE — NO CLEAR WINNER</div>
+          <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">Slight lean: {strategyOutlook.lean}</div>
+          {closeCallExplanation && (
+            <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{closeCallExplanation}</p>
+          )}
+          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
+            {priceLabel} {priceValue != null ? fc(priceValue) : '—'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
+          </div>
         </div>
-        <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{comparison.explanation}</p>
-        <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
-          {priceKnown
-            ? `${priceLabel} ${priceValue != null ? fc(priceValue) : '—'}`
-            : 'Seller price: not given yet'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
+      ) : (
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
+          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Recommended Strategy</div>
+          {/* V2.9 — "None — neither strategy qualifies" is only honest when a
+              real price was actually tested. With no price it was a false
+              failure verdict; comparison.recommended now carries the
+              no-price best option instead. */}
+          <div className="text-[18px] font-extrabold text-[color:var(--color-text)] mt-0.5">
+            {effective ?? (comparison.priceUnknown ? 'Need more information' : 'None — neither strategy qualifies')}
+          </div>
+          <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{strategyExplanationText}</p>
+          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
+            {priceKnown
+              ? `${priceLabel} ${priceValue != null ? fc(priceValue) : '—'}`
+              : 'Seller price: not given yet'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
+          </div>
         </div>
+      )}
+
+      {/* L2 — compact strategy comparison, both always visible. Small
+          Change #12 — badge/statusText resolved above so a close call
+          never reads "Recommended"/vague "WORKS", every other state
+          keeps the original wording exactly. */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <StrategyCard name="BRRRR" status={comparison.brrrr.status} statusText={brrrrStatusText} statusLine={comparison.brrrr.line} badge={brrrrBadge} highlighted={effective === 'BRRRR'} metrics={brrrrMetrics} />
+        <StrategyCard name="FLIP" status={comparison.flip.status} statusText={flipStatusText} statusLine={comparison.flip.line} badge={flipBadge} highlighted={effective === 'FLIP'} metrics={flipMetrics} />
       </div>
 
-      {/* L2 — compact strategy comparison, both always visible. */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <StrategyCard name="BRRRR" status={comparison.brrrr.status} statusLine={comparison.brrrr.line} isRecommended={effective === 'BRRRR'} metrics={brrrrMetrics} />
-        <StrategyCard name="FLIP" status={comparison.flip.status} statusLine={comparison.flip.line} isRecommended={effective === 'FLIP'} metrics={flipMetrics} />
-      </div>
+      {/* Small Change #12 — price-closeness callout, reusing SC10's
+          buildCloseCallComparison purely for its already-computed
+          priceDiffLabel (no re-derivation of the close-call rule
+          itself). Keeps the Deal tab's comparison compact — full
+          Max-Buy/Return/Capital/Exit table lives on Overview (SC11);
+          repeating it here would duplicate that surface, which the
+          mission's "no duplication" rule explicitly avoids. */}
+      {isCloseCall && closeCallComparison && (
+        <div className="text-center text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--color-accent-text)]">
+          Only ~{closeCallComparison.priceDiffLabel} apart in buy price
+        </div>
+      )}
 
       {/* L3 — strategy selector, defaulting to the canonical recommendation.
           Never shows both strategies' detail at once (Part 5's explicit
-          requirement). */}
+          requirement). Small Change #12 — label only ("Slight Lean"/
+          "Viable" for a close call); click behavior, selected-strategy
+          state, and default selection are completely unchanged. */}
       <div className="flex items-center gap-2">
         {['BRRRR', 'FLIP'].map(s => (
           <button
@@ -223,7 +324,7 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
               ? { borderColor: 'var(--color-accent)', color: 'var(--color-accent-text)', background: 'var(--color-bg-elev-2)' }
               : { borderColor: 'var(--color-line)', color: 'var(--color-text-dim)' }}
           >
-            {s}{s === effective ? ' — Recommended' : ''}
+            {s}{isCloseCall ? ` — ${s === effective ? 'Slight Lean' : 'Viable'}` : (s === effective ? ' — Recommended' : '')}
           </button>
         ))}
       </div>

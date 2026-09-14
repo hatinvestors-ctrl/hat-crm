@@ -55,14 +55,19 @@ describe('1-4. Canonical recommendation, compact comparison, default selection',
     expect(dealSrc).toMatch(/<StrategyCard name="BRRRR"/)
     expect(dealSrc).toMatch(/<StrategyCard name="FLIP"/)
   })
-  it('3. the recommended strategy is visually distinguished (isRecommended prop drives border/label)', () => {
-    expect(dealSrc).toMatch(/isRecommended=\{effective === 'BRRRR'\}/)
-    expect(dealSrc).toMatch(/isRecommended=\{effective === 'FLIP'\}/)
-    // V2.9 note: the "— Recommended" suffix now has a "— Best Option"
-    // variant for the no-price state (statusLine present) — same
-    // isRecommended-driven visual distinction, honest wording for the
-    // case where nothing has actually been evaluated against a price yet.
-    expect(dealSrc).toMatch(/isRecommended && <span[^>]*> — \{statusLine \? 'Best Option' : 'Recommended'\}<\/span>/)
+  it('3. the recommended strategy is visually distinguished (highlighted prop drives border, badge prop drives label)', () => {
+    // Small Change #12 note (legitimate rename, not a regression): the
+    // boolean `isRecommended` prop was split into `highlighted` (border
+    // only — unchanged semantics, `effective === 'BRRRR'`/`'FLIP'`) and
+    // an explicit `badge` string the caller resolves (still "Recommended"/
+    // "Best Option" for every non-close-call state; "Slight Lean"/
+    // "Viable" ONLY for Small Change #10's BOTH_VIABLE_CLOSE_CALL —
+    // never both at once, never mislabeling a close call "Recommended").
+    expect(dealSrc).toMatch(/highlighted=\{effective === 'BRRRR'\}/)
+    expect(dealSrc).toMatch(/highlighted=\{effective === 'FLIP'\}/)
+    expect(dealSrc).toMatch(/badge && <span[^>]*> — \{badge\}<\/span>/)
+    expect(dealSrc).toMatch(/const flipBadge = isCloseCall/)
+    expect(dealSrc).toMatch(/const brrrrBadge = isCloseCall/)
   })
   it('4. selected strategy defaults to resolveEffectiveStrategy(strategyRec) via buildStrategyComparison\'s .recommended', () => {
     expect(dealSrc).toMatch(/const active = selectedStrategy \|\| effective \|\|/)
@@ -122,7 +127,15 @@ describe('9-14. Redundant/competing verdict surfaces removed from the primary De
   })
   it('14. no redundant "Best Fit" conclusion line — the one-sentence explanation now lives directly under Recommended Strategy', () => {
     expect(dealSrc).not.toMatch(/uppercase tracking-wider[^>]*>Best Fit</)
-    expect(dealSrc).toMatch(/\{comparison\.explanation\}/)
+    // Small Change #12 note (legitimate fix, not a regression): the raw
+    // {comparison.explanation} was replaced by {strategyExplanationText},
+    // which is buildStrategyExplanation's price-scenario-correct wording
+    // (Small Change #8, reused read-only) when available, falling back to
+    // the ORIGINAL comparison.explanation for the symmetric cases that
+    // function doesn't need to re-word — comparison.explanation itself,
+    // and buildStrategyComparison, are completely unchanged.
+    expect(dealSrc).toMatch(/\{strategyExplanationText\}/)
+    expect(dealSrc).toMatch(/const strategyExplanationText = \(priceKnown && !isCloseCall && buildStrategyExplanation/)
   })
   it('underlying functionality preserved, not deleted — FlipMarginOfSafety/FlipRealityCheck/BrrrrRealityCheck remain fully exported from DealAnalysisCard.jsx for a future Advanced Analysis area', () => {
     const dealAnalysisCardSrc = fs.readFileSync('src/components/lead-detail/DealAnalysisCard.jsx', 'utf8')
