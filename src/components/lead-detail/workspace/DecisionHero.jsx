@@ -19,7 +19,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
-import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation, buildStrategyInsights } from '../../../lib/acquisitionDecisionPresentation'
+import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation, buildStrategyInsights, resolveStrategyOutlook, buildCloseCallInsights } from '../../../lib/acquisitionDecisionPresentation'
 import { resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
 import InfoTooltip from '../../ui/InfoTooltip'
@@ -297,6 +297,19 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
   const INSIGHT_TONE = { positive: 'var(--color-success-text)', watch: 'var(--color-warn-text)', info: 'var(--color-text-dim)' }
   const INSIGHT_MARK = { positive: '✓', watch: '⚠', info: '•' }
 
+  // Small Change #10 — STRATEGY OUTLOOK. Classifies whether the SAME
+  // decision.targetStrategy pick should be PRESENTED as a strong/clear
+  // recommendation or a genuine close call (resolveStrategyOutlook,
+  // acquisitionDecisionPresentation.js — never touches
+  // computeStrategyRecommendation itself). A BOTH_VIABLE_CLOSE_CALL
+  // outlook replaces the "Recommended Strategy" + "WHY {STRATEGY}?"
+  // block below with "Strategy Outlook — Both Viable" + "WHY THIS IS A
+  // CLOSE CALL", so BRRRR/FLIP are never presented as a stronger winner
+  // than the underlying economics actually support.
+  const strategyOutlook = resolveStrategyOutlook({ flip, brrrr, decision })
+  const isCloseCall = strategyOutlook?.kind === 'BOTH_VIABLE_CLOSE_CALL'
+  const closeCallInsights = isCloseCall ? buildCloseCallInsights({ flip, brrrr }) : null
+
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
 
@@ -421,7 +434,43 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
         {/* V2.9 — suppressed when the price is unknown: "Best Option" just
             above already answers this, and two labels for one fact is
             exactly the duplication V2.4–V2.8 removed. */}
-        {decision?.targetStrategy && !decision.priceUnknown && (
+        {/* Small Change #10 — when resolveStrategyOutlook classifies this
+            as a genuine close call (both strategies viable, supported
+            acquisition prices materially close, neither side flagged
+            STRONG by the protected engine), the card presents "Strategy
+            Outlook — Both Viable" + "WHY THIS IS A CLOSE CALL" INSTEAD OF
+            a single dominant "Recommended Strategy" line — never
+            overriding decision.targetStrategy itself, which still
+            appears as the quiet "Slight lean" secondary label. */}
+        {isCloseCall && !decision.priceUnknown && (
+          <div className="mt-2">
+            <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Strategy Outlook</span>{' '}
+            <span className="text-[13px] font-extrabold text-[color:var(--color-text)]">BOTH VIABLE — NO CLEAR WINNER</span>
+            <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Slight lean: {strategyOutlook.lean}</div>
+            {closeCallInsights && (
+              <div className="mt-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">{closeCallInsights.title}</div>
+                <ul className="mt-0.5 space-y-1">
+                  {closeCallInsights.items.map((it, i) => (
+                    <li key={i} className="text-[11px] leading-snug">
+                      <span className="font-bold" style={{ color: INSIGHT_TONE[it.tone] }}>{INSIGHT_MARK[it.tone]} {it.label}</span>
+                      <span className="text-[color:var(--color-text-dim)]"> — {it.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Bottom line — plain-language negotiation range using the
+                SAME flip.mao/brrrr.mao already shown above, low/high
+                ordered so the sentence reads naturally either way. */}
+            {flip.mao != null && brrrr.mao != null && (
+              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1.5 leading-snug">
+                <span className="font-semibold text-[color:var(--color-text-muted)]">Bottom line:</span> Negotiate toward approximately HAT's {fc(Math.round(Math.min(flip.mao, brrrr.mao)))}-{fc(Math.round(Math.max(flip.mao, brrrr.mao)))} acquisition range. At that level, both exit strategies remain available.
+              </p>
+            )}
+          </div>
+        )}
+        {decision?.targetStrategy && !decision.priceUnknown && !isCloseCall && (
           <div className="mt-2">
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Recommended Strategy</span>{' '}
             <span className="text-[13px] font-extrabold text-[color:var(--color-text)]">{decision.targetStrategy}</span>
@@ -454,8 +503,11 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
             mission's hierarchy). Reuses the EXISTING
             buildSecondaryStrategyDetail result (decision.secondaryStrategy,
             acquisitionDecisionPresentation.js) — never a second strategy
-            engine, never overrides decision.targetStrategy. */}
-        {decision?.targetStrategy && decision.secondaryStrategy && (
+            engine, never overrides decision.targetStrategy. Small Change
+            #10 — suppressed for a close call: the "WHY THIS IS A CLOSE
+            CALL" block above already covers both strategies together, so
+            a separate "Alternative Strategy" line would only repeat it. */}
+        {decision?.targetStrategy && decision.secondaryStrategy && !isCloseCall && (
           <div className="text-[11px] text-[color:var(--color-text-dim)] mt-1 leading-snug">
             <span className="font-semibold text-[color:var(--color-text-muted)]">Alternative Strategy:</span> {decision.secondaryStrategy.detail}
           </div>

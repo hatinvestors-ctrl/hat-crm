@@ -171,7 +171,18 @@ describe('N/O. No opening-offer formula invented; no component independently sel
   })
   it('O. resolveTargetPrice picks strategy via the existing preferBrrrr/strategyRec facts only, never Math.max/Math.min of the two MAOs', () => {
     const src = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
-    expect(src).not.toMatch(/Math\.max\(.*mao.*mao|Math\.min\(.*mao.*mao/i)
+    // Small Change #10 — this check is now scoped to resolveTargetPrice's
+    // own function body (the function this test is actually about),
+    // rather than the whole file. A whole-file scan would also catch
+    // resolveStrategyOutlook's Math.min(flip.mao, brrrr.mao) — a
+    // presentation-only GAP DISTANCE for the close-call price-closeness
+    // test (never shown to the user as a price, never fed into
+    // resolveTargetPrice or any target/opening-offer price), which is
+    // a different, legitimate purpose this test was never meant to
+    // forbid. resolveTargetPrice itself remains untouched.
+    const fnMatch = src.match(/function resolveTargetPrice\([^)]*\)\s*\{[\s\S]*?\n\}/)
+    expect(fnMatch).toBeTruthy()
+    expect(fnMatch[0]).not.toMatch(/Math\.max\(.*mao.*mao|Math\.min\(.*mao.*mao/i)
   })
 })
 

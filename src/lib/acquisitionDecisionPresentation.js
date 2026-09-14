@@ -1062,3 +1062,99 @@ export function buildStrategyInsights({ flip, brrrr, strategyRec, decision }) {
   if (items.length === 0) return null
   return { title: `WHY ${target}?`, items: items.slice(0, 4) }
 }
+
+// Small Change #10 — STRATEGY OUTLOOK. Presentation-only classification
+// of whether the canonical decision.targetStrategy pick
+// (computeStrategyRecommendation, dealExplanation.js, UNCHANGED — this
+// NEVER recomputes or overrides that pick) should be PRESENTED as a
+// strong/clear recommendation or as a genuine close call. Two
+// deterministic, transparent gates, both over already-canonical fields:
+//
+//  1. PRICE CLOSENESS — |flip.mao - brrrr.mao| <= max($5,000, 5% of the
+//     lower Max Buy). Both numbers already exist (flip.mao/brrrr.mao);
+//     no new formula, just a presentation-only comparison distance.
+//
+//  2. QUALITY DOMINANCE — the winning strategy's OWN canonical verdict
+//     (flip.verdict/brrrr.verdict — STRONG/PASS/WATCH/NO DEAL, computed
+//     entirely inside dealExplanation.js using HAT's existing, UNCHANGED
+//     thresholds) must NOT be STRONG. A STRONG verdict is dealExplanation.js's
+//     own signal that a strategy clears HAT's bar with real room, not
+//     just barely — reusing that qualitative tier is the read-only way
+//     to satisfy the mission's "does one strategy materially exceed
+//     HAT's minimum economics" check without duplicating dealExplanation.js's
+//     internal BRRRR STRONG thresholds (cash flow >= $200/mo, cash left
+//     in < $20,000), which are NOT exported and are deliberately never
+//     re-created here — per the mission's explicit "do not invent a
+//     threshold merely to force classification."
+//
+// A close call fires ONLY when both gates agree: prices are close AND
+// neither side has already been flagged STRONG by the protected engine.
+export function resolveStrategyOutlook({ flip, brrrr, decision }) {
+  if (!decision?.targetStrategy || decision.buyBoxNotFit || decision.priceUnknown) return null
+  const target = decision.targetStrategy
+
+  const flipViable = !!(flip?.available && flip.maoFeasible && flip.mao != null)
+  const brrrrViable = !!(brrrr?.available && brrrr.mao != null)
+
+  if (flipViable && !brrrrViable) return { kind: 'FLIP_ONLY', target: 'FLIP' }
+  if (brrrrViable && !flipViable) return { kind: 'BRRRR_ONLY', target: 'BRRRR' }
+  if (!flipViable && !brrrrViable) return { kind: 'NO_VIABLE_STRATEGY', target }
+
+  // Both have a genuine, feasible supported acquisition price.
+  const gap = Math.abs(flip.mao - brrrr.mao)
+  const lowerMao = Math.min(flip.mao, brrrr.mao)
+  const pricesClose = gap <= Math.max(5000, lowerMao * 0.05)
+
+  const winnerVerdict = target === 'BRRRR' ? brrrr.verdict : flip.verdict
+  const dominant = winnerVerdict === 'STRONG'
+
+  if (pricesClose && !dominant) {
+    return { kind: 'BOTH_VIABLE_CLOSE_CALL', target, lean: target, maoGap: gap }
+  }
+  return { kind: target === 'BRRRR' ? 'CLEAR_BRRRR' : 'CLEAR_FLIP', target }
+}
+
+// Small Change #10 — "WHY THIS IS A CLOSE CALL" insights. Replaces
+// buildStrategyInsights's WHY {STRATEGY}? for a BOTH_VIABLE_CLOSE_CALL
+// outlook only. Every item is deterministic arithmetic/plain restatement
+// of already-canonical flip/brrrr fields (mao, targetProfit,
+// monthlyCashFlow, cashLeftIn) — no invented market intelligence, no
+// claim that either strategy is "universally superior."
+export function buildCloseCallInsights({ flip, brrrr }) {
+  if (!flip?.available || !brrrr?.available || flip.mao == null || brrrr.mao == null) return null
+  const items = []
+
+  const gap = Math.abs(flip.mao - brrrr.mao)
+  items.push({
+    tone: 'info',
+    label: 'Similar acquisition range',
+    detail: `Flip supports approximately ${formatCurrency(Math.round(flip.mao))} and BRRRR approximately ${formatCurrency(Math.round(brrrr.mao))} — only about ${formatCurrency(Math.round(gap))} apart.`,
+  })
+
+  if (brrrr.monthlyCashFlow != null && brrrr.cashLeftIn != null) {
+    items.push({
+      tone: 'info',
+      label: 'BRRRR produces recurring income',
+      detail: `Approximately ${brrrr.monthlyCashFlow >= 0 ? '+' : ''}${formatCurrency(brrrr.monthlyCashFlow)}/mo, but around ${formatCurrency(brrrr.cashLeftIn)} remains invested.`,
+    })
+  }
+
+  if (flip.targetProfit != null) {
+    items.push({
+      tone: 'info',
+      label: 'Flip is equally viable near this price',
+      detail: `Approximately ${formatCurrency(flip.targetProfit)} projected profit near its Max Buy — the price HAT's Flip Max Buy is defined against.`,
+    })
+  }
+
+  if (brrrr.cashLeftIn != null && flip.targetProfit != null) {
+    items.push({
+      tone: 'info',
+      label: 'Capital trade-off',
+      detail: `BRRRR keeps the property and recurring income, with about ${formatCurrency(brrrr.cashLeftIn)} left invested. Flip realizes about ${formatCurrency(flip.targetProfit)} in profit and releases that capital for another project.`,
+    })
+  }
+
+  if (items.length === 0) return null
+  return { title: 'WHY THIS IS A CLOSE CALL', items: items.slice(0, 4) }
+}
