@@ -44,6 +44,18 @@ describe('AI Deal Read block no longer renders on the AI Analysis page', () => {
   })
 })
 
+describe('additional cleanup — the redundant "Deal Analysis" page header no longer renders', () => {
+  it('the Card wrapping this page no longer receives title/subtitle props (Card only renders its header strip when title/action is passed)', () => {
+    expect(cardSrc).not.toMatch(/<Card title="Deal Analysis"/)
+    expect(cardSrc).not.toMatch(/subtitle="Comps, negotiation plan, verdict, and scripts — all from one run"/)
+    expect(cardSrc).toMatch(/<Card>\s*\{hasAnalysis && strategyRecommendation\.summary/)
+  })
+  it('flipResult/brrrrResult/strategyRecommendation computation lines directly above are untouched', () => {
+    expect(cardSrc).toMatch(/const flipResult = hasAnalysis \? computeFlipResult\(lead, underwritingSettings\) : \{ available: false, reason: 'Run analysis first\.' \}/)
+    expect(cardSrc).toMatch(/const strategyRecommendation = computeStrategyRecommendation\(flipResult, brrrrResult\)/)
+  })
+})
+
 describe('data flow unchanged — flipResult/brrrrResult still computed exactly as before, still consumed by sibling blocks', () => {
   it('FlipMarginOfSafety/BrrrrRealityCheck (also hideDecisionSummary-gated) still receive the SAME flipResult/lead — untouched by this fix', () => {
     expect(cardSrc).toMatch(/!hideDecisionSummary && hasAnalysis && strategy !== 'brrrr' && flipResult\.available && \(\s*<FlipMarginOfSafety lead=\{lead\} flipResult=\{flipResult\} \/>/)

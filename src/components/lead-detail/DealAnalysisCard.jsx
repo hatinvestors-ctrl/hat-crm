@@ -1434,7 +1434,14 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
   const strategyRecommendation = computeStrategyRecommendation(flipResult, brrrrResult)
 
   return (
-    <Card title="Deal Analysis" subtitle="Comps, negotiation plan, verdict, and scripts — all from one run">
+    // Small Change #16 (additional cleanup) — the "Deal Analysis" title +
+    // "Comps, negotiation plan, verdict, and scripts — all from one run"
+    // subtitle were a redundant page header (Card only renders its
+    // <header> strip when `title`/`action` is passed — see Card.jsx).
+    // Removing both props drops the header entirely, closing the gap
+    // naturally; every prop/state/calculation/AI result below is
+    // completely unchanged — only this presentation header is gone.
+    <Card>
       {hasAnalysis && strategyRecommendation.summary && (
         <div className="mb-2.5 text-[11.5px]">
           <span className="font-extrabold text-[color:var(--color-text)]">{strategyRecommendation.summary}</span>
