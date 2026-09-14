@@ -70,6 +70,7 @@
 
 import { resolveEffectiveStrategy } from './dealExplanation'
 import { computeFlipBreakdown, computeBrrrrBreakdown } from './calculations'
+import { formatCurrency } from './calculations'
 
 // UX V2.6, Part 3/10 — the ONE canonical strategy-comparison builder.
 // Both DecisionHero (Overview) and DealDecisionCenter (Deal tab) call
@@ -943,4 +944,121 @@ export function buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskin
       : `Flip meets HAT's target at the current price; BRRRR only qualifies near its own Max Buy range at this price.`
   }
   return null
+}
+
+// Small Change #9 — "WHY {STRATEGY}?" acquisition insights. Explains the
+// SAME canonical recommendation computeStrategyRecommendation already
+// made (dealExplanation.js, UNCHANGED) — never recomputes or overrides
+// it. Every insight below is deterministic arithmetic over ALREADY
+// canonical fields (flip.*/brrrr.* from computeFlipResult/
+// computeBrrrrResult) — no invented market intelligence, no rental-area
+// quality claim, no new investment threshold. Returns null for any state
+// where a strategy recommendation doesn't apply (NONE, hard Buy Box
+// PASS, no price yet) — mirrors the exact guards the existing
+// "Recommended Strategy" line already uses in DecisionHero.jsx.
+export function buildStrategyInsights({ flip, brrrr, strategyRec, decision }) {
+  // Guard on decision.targetStrategy — NOT strategyRec.preferredStrategy —
+  // because Small Change #3's PASS_NEGOTIABLE state legitimately sets a
+  // targetStrategy via the MAO-fallback path even when
+  // strategyRec.preferredStrategy is 'NONE' (no strategy clears NO DEAL
+  // at the current price, but a genuinely feasible lower Max Buy still
+  // exists). decision.targetStrategy is itself derived from strategyRec
+  // by deriveAcquisitionDecision — this never recomputes the pick.
+  if (!decision?.targetStrategy || decision.buyBoxNotFit || decision.priceUnknown) return null
+
+  const target = decision.targetStrategy // 'FLIP' | 'BRRRR'
+  const brrrrOk = brrrr?.available && brrrr.verdict !== 'NO DEAL'
+  // Same real current/evaluation price buildStrategyExplanation already
+  // uses (flip.evaluationPrice: actual offer, else asking price) — never
+  // brrrr.currentOffer, which is a negotiation anchor, not a real price.
+  const currentPrice = flip?.evaluationPrice ?? null
+
+  const items = []
+
+  if (target === 'BRRRR' && brrrr?.available) {
+    const brrrrMeetsAtCurrentPrice = currentPrice != null && brrrr.mao != null && currentPrice <= brrrr.mao
+
+    // 1. Cash flow — brrrr.monthlyCashFlow, already canonical.
+    if (brrrr.monthlyCashFlow != null) {
+      items.push({
+        tone: brrrr.monthlyCashFlow > 0 ? 'positive' : 'watch',
+        label: brrrr.monthlyCashFlow > 0 ? 'Positive cash flow' : 'Negative cash flow',
+        detail: `${brrrr.monthlyCashFlow >= 0 ? '+' : ''}${formatCurrency(brrrr.monthlyCashFlow)}/mo ${brrrrMeetsAtCurrentPrice ? 'at the current price' : `at HAT's target acquisition range (${formatCurrency(Math.round(brrrr.currentOffer))})`}.`,
+      })
+    }
+    // 2. Rent ratio vs the target PURCHASE price (brrrr.currentOffer) —
+    // denominator named explicitly per the mission's 1%-rule caution;
+    // never labeled a "rule," never compared to ARV as if it were the
+    // same ratio, no new threshold introduced.
+    if (brrrr.rent != null && brrrr.currentOffer) {
+      const pct = (brrrr.rent / brrrr.currentOffer) * 100
+      items.push({
+        tone: 'info',
+        label: 'Rent-to-price ratio',
+        detail: `${formatCurrency(brrrr.rent)}/mo rent ÷ ${formatCurrency(Math.round(brrrr.currentOffer))} target purchase price ≈ ${pct.toFixed(2)}%.`,
+      })
+    }
+    // 3. Comparison against the alternative (Flip) — factual, not a
+    // second strategy engine: states what Flip's OWN canonical numbers
+    // require, never invents a reason BRRRR is "better."
+    if (flip?.available && flip.maoFeasible && flip.mao != null) {
+      items.push({
+        tone: 'info',
+        label: 'Preserves a rental asset',
+        detail: `BRRRR keeps recurring cash flow, while Flip needs a purchase price near ${formatCurrency(Math.round(flip.mao))} just to reach HAT's ${formatCurrency(flip.targetProfit)} minimum profit target.`,
+      })
+    } else if (flip?.available && !flip.maoFeasible) {
+      items.push({ tone: 'info', label: 'Flip is not viable', detail: 'No purchase price makes Flip meet HAT\'s profit target under current ARV/rehab assumptions.' })
+    } else if (!flip?.available) {
+      items.push({ tone: 'info', label: 'Flip could not be evaluated', detail: 'ARV or renovation cost is missing.' })
+    }
+    // 4. Watch-out — seller price above BRRRR's supported range.
+    if (!brrrrMeetsAtCurrentPrice && currentPrice != null && brrrr.mao != null) {
+      items.push({
+        tone: 'watch',
+        label: "Seller price above HAT's range",
+        detail: `${formatCurrency(currentPrice)} asking price is about ${formatCurrency(Math.round(currentPrice - brrrr.mao))} above HAT's supported BRRRR range.`,
+      })
+    }
+  } else if (target === 'FLIP' && flip?.available) {
+    // 1. Profit vs HAT's own target — flip.projectedProfit/targetProfit,
+    // already canonical, evaluated at the real current price (flip's
+    // verdict is always computed at evaluationPrice — see
+    // buildStrategyExplanation's comment for why this is safe to state
+    // as "at the current price" unconditionally for Flip).
+    if (flip.projectedProfit != null && flip.targetProfit != null) {
+      const cushion = flip.projectedProfit - flip.targetProfit
+      items.push({
+        tone: cushion >= 0 ? 'positive' : 'watch',
+        label: cushion >= 0 ? "Meets HAT's profit target" : "Below HAT's profit target",
+        detail: `Projected profit ${formatCurrency(flip.projectedProfit)} at the current price, ${cushion >= 0 ? `${formatCurrency(cushion)} above` : `${formatCurrency(Math.abs(cushion))} below`} HAT's ${formatCurrency(flip.targetProfit)} minimum.`,
+      })
+    }
+    // 1b. PASS_NEGOTIABLE shape (Small Change #3/#7) — Flip misses target
+    // at the current price but a genuinely feasible, lower Max Buy
+    // exists (flip.maoFeasible, already canonical). States the SAME fact
+    // the primary card's price-gap already shows, in plain language.
+    if (flip.verdict === 'NO DEAL' && flip.maoFeasible && flip.mao != null) {
+      items.push({
+        tone: 'info',
+        label: 'Viable near Max Buy',
+        detail: `Becomes viable near ${formatCurrency(Math.round(flip.mao))} — HAT's Flip Max Buy at the required profit target.`,
+      })
+    }
+    // 2. Comparison against the alternative (BRRRR).
+    if (!brrrrOk) {
+      items.push({
+        tone: 'info',
+        label: !brrrr?.available ? 'BRRRR could not be evaluated' : "BRRRR doesn't meet target",
+        detail: !brrrr?.available ? (brrrr?.reason || 'Rent estimate is missing.') : "BRRRR's cash flow/cash-left-in does not clear HAT's bar at this price.",
+      })
+    }
+    // 3. Watch-out — thin margin (WATCH verdict = clears the bar, little room).
+    if (flip.verdict === 'WATCH') {
+      items.push({ tone: 'watch', label: 'Thin margin', detail: "Profit clears HAT's minimum target, but with little cushion." })
+    }
+  }
+
+  if (items.length === 0) return null
+  return { title: `WHY ${target}?`, items: items.slice(0, 4) }
 }

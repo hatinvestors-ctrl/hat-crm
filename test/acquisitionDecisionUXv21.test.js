@@ -168,8 +168,14 @@ describe('Strategy comparison: preferred visually dominant, alternative secondar
   it('DecisionHero.jsx renders a one-line strategy summary, with a secondary "Alternative" line only when both strategies were genuinely evaluated (V2.4: simplified from an equal-weight comparison box to one primary + one small optional line)', () => {
     const src = fs.readFileSync('src/components/lead-detail/workspace/DecisionHero.jsx', 'utf8')
     expect(src).toMatch(/Recommended Strategy/)
-    expect(src).toMatch(/decision\?\.strategyLine\?\.headline === 'BOTH STRATEGIES WORK' && flip\.available && brrrr\.available/)
-    expect(src).toMatch(/Alternative:/)
+    // Small Change #9 — the old strategyLine-headline-gated condition was
+    // replaced by a generalized `decision?.targetStrategy &&
+    // decision.secondaryStrategy` guard (reusing the SAME
+    // buildSecondaryStrategyDetail result, now shown regardless of which
+    // strategy is primary, not just when BRRRR is) so the alternative
+    // line is never duplicated with the new "WHY {STRATEGY}?" insights.
+    expect(src).toMatch(/decision\?\.targetStrategy && decision\.secondaryStrategy/)
+    expect(src).toMatch(/Alternative Strategy:/)
   })
   it('buildStrategyLine still reports BOTH/FLIP-ONLY/BRRRR-ONLY exactly as before (untouched by V2.1)', () => {
     const flip = computeFlipResult(NORFOLK)
@@ -190,6 +196,11 @@ describe('Deal Safety presentation: raw internal verdict never shown when that s
     // seller price recorded). The Flip-vs-BRRRR gating this test protects
     // is unchanged.
     expect(src).toMatch(/flip\.available && !decision\?\.priceUnknown && decision\?\.targetStrategy !== 'BRRRR'/)
-    expect(src).toMatch(/decision\?\.targetStrategy === 'BRRRR' && decision\.secondaryStrategy/)
+    // Small Change #9 — the duplicate BRRRR-only secondaryStrategy detail
+    // block (that used to sit down here, beside Margin of Safety) was
+    // removed; the SAME decision.secondaryStrategy is now rendered once,
+    // generalized to either primary, directly under the new "WHY
+    // {STRATEGY}?" insights (see the test above for that condition).
+    expect(src).toMatch(/decision\?\.targetStrategy && decision\.secondaryStrategy/)
   })
 })

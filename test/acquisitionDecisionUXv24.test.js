@@ -133,9 +133,15 @@ describe('G. Strategy presentation is one primary + one optional alternative lin
   it('DecisionHero.jsx no longer renders a 2-column equal-weight BRRRR/FLIP comparison box', () => {
     expect(decisionHeroSrc).not.toMatch(/grid-cols-2[^}]*>\s*<div[^}]*BRRRR[\s\S]*?<div[^}]*FLIP/)
   })
-  it('renders "Recommended Strategy" as the primary line and "Alternative:" only when both strategies are genuinely available', () => {
+  it('renders "Recommended Strategy" as the primary line and "Alternative Strategy:" only when both strategies are genuinely available', () => {
     expect(decisionHeroSrc).toMatch(/Recommended Strategy/)
-    expect(decisionHeroSrc).toMatch(/Alternative: \{decision\.targetStrategy/)
+    // Small Change #9 — the old "Both strategies are viable — Alternative:
+    // {decision.targetStrategy === 'BRRRR' ? 'FLIP' : 'BRRRR'}" line was
+    // replaced by the SAME decision.secondaryStrategy detail (already
+    // computed by buildSecondaryStrategyDetail, untouched) rendered once,
+    // generalized to either primary — avoids duplicating the new "WHY
+    // {STRATEGY}?" insights with a second, less specific summary line.
+    expect(decisionHeroSrc).toMatch(/Alternative Strategy:.*decision\.secondaryStrategy\.detail/)
   })
 })
 

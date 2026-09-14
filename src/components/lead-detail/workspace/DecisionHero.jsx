@@ -19,7 +19,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
-import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation } from '../../../lib/acquisitionDecisionPresentation'
+import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation, buildStrategyInsights } from '../../../lib/acquisitionDecisionPresentation'
 import { resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
 import InfoTooltip from '../../ui/InfoTooltip'
@@ -288,6 +288,15 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
   // an independently-chosen UI explanation.
   const strategyExplanation = decision?.targetStrategy ? buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskingPrice }) : null
 
+  // Small Change #9 — replaces the single generic sentence above with a
+  // compact "WHY {STRATEGY}?" evidence list (2-4 items, deterministic
+  // arithmetic over already-canonical flip/brrrr fields only — see
+  // buildStrategyInsights's own comment for the exact rule). Explains,
+  // never re-decides, the SAME decision.targetStrategy pick.
+  const strategyInsights = buildStrategyInsights({ flip, brrrr, strategyRec, decision })
+  const INSIGHT_TONE = { positive: 'var(--color-success-text)', watch: 'var(--color-warn-text)', info: 'var(--color-text-dim)' }
+  const INSIGHT_MARK = { positive: '✓', watch: '⚠', info: '•' }
+
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
 
@@ -416,23 +425,39 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
           <div className="mt-2">
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Recommended Strategy</span>{' '}
             <span className="text-[13px] font-extrabold text-[color:var(--color-text)]">{decision.targetStrategy}</span>
-            {/* Small Change #6, Part 6/7 — WHY, one factual sentence
-                derived from the SAME verdict facts the engine used to
-                pick this strategy (buildStrategyExplanation, presentation
-                layer only — never an independently-chosen reason). */}
-            {strategyExplanation && (
-              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5 leading-snug">{strategyExplanation}</p>
+            {/* Small Change #9 — replaces the single Small Change #6
+                sentence (buildStrategyExplanation, still exported/tested,
+                just no longer rendered here) with 2-4 concise evidence
+                items (buildStrategyInsights) so an acquisition rep sees
+                WHY, not just a fact restated. Every item is deterministic
+                arithmetic over already-canonical flip/brrrr fields —
+                never a fabricated market/rental-quality claim. */}
+            {strategyInsights && (
+              <div className="mt-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">{strategyInsights.title}</div>
+                <ul className="mt-0.5 space-y-1">
+                  {strategyInsights.items.map((it, i) => (
+                    <li key={i} className="text-[11px] leading-snug">
+                      <span className="font-bold" style={{ color: INSIGHT_TONE[it.tone] }}>{INSIGHT_MARK[it.tone]} {it.label}</span>
+                      <span className="text-[color:var(--color-text-dim)]"> — {it.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}
-        {/* Small Change #6, Part 8/10 — suppressed when the Deal
-            Opportunity Summary is also shown: its own Recommended/
-            Alternative badges on the Flip and BRRRR blocks already give
-            the fuller, per-strategy comparison this line only summarized. */}
-        {decision?.strategyLine?.headline === 'BOTH STRATEGIES WORK' && flip.available && brrrr.available && !opportunitySummary && (
-          <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">
-            Both strategies are viable — Alternative: {decision.targetStrategy === 'BRRRR' ? 'FLIP' : 'BRRRR'} · Max Buy{' '}
-            {fc(Math.round(decision.targetStrategy === 'BRRRR' ? flip.mao : brrrr.mao))}
+        {/* Small Change #9 — ONE concise alternative-strategy line, reused
+            regardless of which strategy is primary (previously BRRRR-only
+            — see the generalized Alternative Strategy block below, moved
+            up here to sit directly under the WHY insights per the
+            mission's hierarchy). Reuses the EXISTING
+            buildSecondaryStrategyDetail result (decision.secondaryStrategy,
+            acquisitionDecisionPresentation.js) — never a second strategy
+            engine, never overrides decision.targetStrategy. */}
+        {decision?.targetStrategy && decision.secondaryStrategy && (
+          <div className="text-[11px] text-[color:var(--color-text-dim)] mt-1 leading-snug">
+            <span className="font-semibold text-[color:var(--color-text-muted)]">Alternative Strategy:</span> {decision.secondaryStrategy.detail}
           </div>
         )}
 
@@ -601,14 +626,6 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
             </div>
           </div>
         )}
-        {decision?.targetStrategy === 'BRRRR' && decision.secondaryStrategy && (
-          <div className="mt-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Alternative Strategy — Flip (detail)</span>
-            </div>
-            <p className="text-[11.5px] text-[color:var(--color-text-muted)] mt-0.5 leading-snug">{decision.secondaryStrategy.detail}</p>
-          </div>
-        )}
       </div>
 
       {/* UX V2.4, Part 9 — collapsed to ONE compact line per strategy
@@ -619,8 +636,18 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
       {/* V2.9 — this strip states "profit @ current price"; with no price
           both figures are null and it would read "$— projected profit".
           Hidden entirely in that state (What Works For Us above already
-          carries the useful number). */}
-      {flip.available && !decision?.priceUnknown && (
+          carries the useful number).
+          Small Change #9 — additionally suppressed whenever the Deal
+          Opportunity Summary (opportunitySummary, Small Change #3/#6)
+          already renders: it shows the SAME Flip/BRRRR current-vs-target
+          economics per-strategy, with fuller context — this strip would
+          only redundantly restate them at the bottom of the card. Left
+          in place for every state opportunitySummary doesn't cover
+          (READY_TO_PURSUE, NEEDS_RESEARCH, and — per Small Change #5's
+          own "Economics — Reference Only" precedent — a hard Buy Box
+          PASS, which never produces an opportunitySummary and so keeps
+          this as its one reference-economics strip, unchanged). */}
+      {flip.available && !decision?.priceUnknown && !opportunitySummary && (
         <div className="px-4 py-2 border-t border-[color:var(--color-line)] text-[11.5px] text-[color:var(--color-text-muted)]">
           {/* Small Change #5 — audit Part 2/4: for a hard Buy Box PASS,
               this strip is unavoidably still useful internally but must
