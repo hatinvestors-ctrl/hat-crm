@@ -119,9 +119,8 @@ describe('J/K/L — no other Sep 4 functionality touched', () => {
     expect(compsCardSrc).toMatch(/Comp Confidence/)
     expect(compsCardSrc).toMatch(/HAT Market History/)
   })
-  it('K. AI Deal Read remains exactly as Sep 4 — no hideDecisionSummary guard added, still renders whenever flip/brrrr is available', () => {
-    expect(cardSrc).toMatch(/\{\(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
-    expect(cardSrc).not.toMatch(/!hideDecisionSummary && \(flipResult\.available \|\| brrrrResult\.available\)/)
+  it('K. AI Deal Read — Small Change #16 note (explicitly authorized, not a regression): now gated behind the SAME hideDecisionSummary prop its sibling decision-summary blocks already used, since this exact information duplicated Overview/Deal (SC6-SC14); flipResult/brrrrResult computation itself is untouched', () => {
+    expect(cardSrc).toMatch(/!hideDecisionSummary && \(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
     expect(cardSrc).toMatch(/AI Deal Read — /)
   })
   it('L. Overview (DecisionHero.jsx) is untouched by this mission', () => {

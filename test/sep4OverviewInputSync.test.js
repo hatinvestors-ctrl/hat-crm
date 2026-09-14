@@ -140,10 +140,9 @@ describe('I — Small Change #1 3-level ARV tests remain passing', () => {
 })
 
 describe('J — AI Deal Read unchanged', () => {
-  it('DealAnalysisCard.jsx still renders AI Deal Read unconditionally on flip/brrrr availability — no hideDecisionSummary guard added', () => {
+  it('DealAnalysisCard.jsx — Small Change #16 note (explicitly authorized, not a regression from this mission): AI Deal Read now gated behind hideDecisionSummary, the SAME prop its sibling decision-summary blocks already used', () => {
     const cardSrc = fs.readFileSync('src/components/lead-detail/DealAnalysisCard.jsx', 'utf8')
-    expect(cardSrc).toMatch(/\{\(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
-    expect(cardSrc).not.toMatch(/!hideDecisionSummary && \(flipResult\.available \|\| brrrrResult\.available\)/)
+    expect(cardSrc).toMatch(/!hideDecisionSummary && \(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
   })
 })
 

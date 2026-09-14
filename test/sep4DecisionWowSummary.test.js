@@ -187,9 +187,9 @@ describe('Backward compatibility — Small Changes #1-#4 verified intact', () =>
     expect(src).toMatch(/priceIsEvaluationForPass/)
     expect(src).toMatch(/currentPriceLabelForPass/)
   })
-  it('AI Deal Read, Comps, Acquisition/Deal tabs preserved (no structural removal)', () => {
+  it('AI Deal Read component logic, Comps, Acquisition/Deal tabs preserved (no structural removal) — Small Change #16 note: AI Deal Read\'s RENDER is now gated behind hideDecisionSummary (explicitly authorized, presentation-only; flipResult/brrrrResult computation itself untouched)', () => {
     const cardSrc = fs.readFileSync('src/components/lead-detail/DealAnalysisCard.jsx', 'utf8')
-    expect(cardSrc).toMatch(/\{\(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
+    expect(cardSrc).toMatch(/!hideDecisionSummary && \(flipResult\.available \|\| brrrrResult\.available\) && \(\(\) => \{/)
     const compsSrc = fs.readFileSync('src/components/lead-detail/workspace/ComplsIntelligenceCard.jsx', 'utf8')
     expect(compsSrc).toMatch(/Comparable Sales Evidence/)
   })

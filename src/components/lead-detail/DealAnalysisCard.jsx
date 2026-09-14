@@ -1657,7 +1657,18 @@ export default function DealAnalysisCard({ lead, userId, canEdit, onUpdated, onS
           calculateBrrrrMAO/computeFlipBreakdown/computeBrrrrBreakdown
           functions the rest of the page uses. No LLM call, no invented
           numbers, no cross-strategy leakage. */}
-      {(flipResult.available || brrrrResult.available) && (() => {
+      {/* Small Change #16 — gated behind the SAME hideDecisionSummary prop
+          its sibling decision-summary blocks below (FlipMarginOfSafety/
+          BrrrrRealityCheck) already use, "moved, not duplicated" per this
+          file's own established pattern. AI & Comps passes
+          hideDecisionSummary=true (LeadDetailPage.jsx — the ONLY call
+          site of this component in the app) because this exact
+          information (verdict, projected profit, Starting Offer, Max
+          Buy, why/risk/recommended move) is now shown more clearly in
+          Overview/Deal (SC6-SC14). flipResult/brrrrResult themselves are
+          UNCHANGED and still computed above — only this render is
+          suppressed, so nothing below that reads them regresses. */}
+      {!hideDecisionSummary && (flipResult.available || brrrrResult.available) && (() => {
         const activeResult = strategy === 'brrrr' ? brrrrResult : flipResult
         const theme = VERDICT_THEME[activeResult.verdict] || VERDICT_THEME.WATCH
         // Premium visual pass, Part 19/20 — "AI Deal Read," an executive
