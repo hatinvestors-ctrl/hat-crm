@@ -248,41 +248,52 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
 
   return (
     <div className="space-y-4">
-      {/* L1 — Small Change #12: for a genuine close call, "Recommended
-          Strategy: BRRRR" is replaced by "Strategy Outlook — Both Viable"
-          + "Slight lean" (mirrors Overview/Small Change #10-#11 exactly —
-          same isCloseCall gate, same wording pattern), so the Deal tab
-          never contradicts the Overview conclusion. Clear winners/single-
-          strategy/no-price states render the ORIGINAL "Recommended
-          Strategy" block, byte-identical in structure. */}
+      {/* Small Change #13 — SECTION 1: DEAL INPUTS. Read-only, compact,
+          the primary visible home for Ask/ARV/Rehab/Rent/Hold — reads
+          the SAME lead fields PropertyInfoSection edits below (Property
+          Details, now collapsed by default). Adds no new value, no new
+          state, no editability of its own: editing remains exactly where
+          it always was, byte-identical, just no longer the only place
+          these five numbers are visible. */}
+      <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-2.5">
+        <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-1.5">Deal Inputs</div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+          <Metric label="Ask" value={lead.asking_price != null ? fc(lead.asking_price) : '—'} />
+          <Metric label="ARV" value={fc(lead.arv)} />
+          <Metric label="Rehab" value={fc(lead.renovation_cost)} />
+          <Metric label="Rent" value={lead.rent_estimate != null ? fc(lead.rent_estimate) : 'Not set'} />
+          <Metric label="Hold" value={`${lead.hold_months ?? 6} mo`} />
+        </div>
+      </div>
+
+      {/* Small Change #13 — SECTION 2: STRATEGY STATUS. Same L1
+          (Recommended Strategy / Strategy Outlook) + L2 (comparison
+          cards) logic as Small Change #12, UNCHANGED — only the ARV/Reno
+          trailing repeat is dropped (now covered by Deal Inputs above)
+          and the headline size reduced so this reads as a compact status
+          strip, not a second Overview hero. */}
+      <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Strategy Status</div>
       {isCloseCall ? (
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Strategy Outlook</div>
-          <div className="text-[18px] font-extrabold text-[color:var(--color-text)] mt-0.5">BOTH VIABLE — NO CLEAR WINNER</div>
+          <div className="text-[15px] font-extrabold text-[color:var(--color-text)]">BOTH VIABLE — NO CLEAR WINNER</div>
           <div className="text-[11px] text-[color:var(--color-text-dim)] mt-0.5">Slight lean: {strategyOutlook.lean}</div>
           {closeCallExplanation && (
             <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{closeCallExplanation}</p>
           )}
-          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
-            {priceLabel} {priceValue != null ? fc(priceValue) : '—'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
-          </div>
         </div>
       ) : (
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
-          <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)] font-bold">Recommended Strategy</div>
           {/* V2.9 — "None — neither strategy qualifies" is only honest when a
               real price was actually tested. With no price it was a false
               failure verdict; comparison.recommended now carries the
               no-price best option instead. */}
-          <div className="text-[18px] font-extrabold text-[color:var(--color-text)] mt-0.5">
+          <div className="text-[15px] font-extrabold text-[color:var(--color-text)]">
             {effective ?? (comparison.priceUnknown ? 'Need more information' : 'None — neither strategy qualifies')}
           </div>
           <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{strategyExplanationText}</p>
-          <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">
-            {priceKnown
-              ? `${priceLabel} ${priceValue != null ? fc(priceValue) : '—'}`
-              : 'Seller price: not given yet'} · ARV {fc(lead.arv)} · Reno {fc(lead.renovation_cost)}
-          </div>
+          {!priceKnown && (
+            <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-1.5">Seller price: not given yet</div>
+          )}
         </div>
       )}
 
@@ -328,6 +339,12 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
           </button>
         ))}
       </div>
+
+      {/* Small Change #13 — SECTION 4: SELECTED STRATEGY UNDERWRITING.
+          Label only — the detail panel below (Flip/BRRRR breakdown,
+          CalculationDetails drawers, MarginVisualization) is completely
+          unchanged from Small Change #12. */}
+      <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">{active} Underwriting</div>
 
       {/* V2.9 — with no price there is nothing to evaluate AT: Suggested
           Offer, Profit @ price and All-In are all null. Show the one thing
@@ -491,8 +508,11 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
             })()}
           </div>
         ) : (
-          <div className="rounded-lg border border-[color:var(--color-line)] px-4 py-3 text-[11.5px] text-[color:var(--color-text-dim)]">
-            BRRRR — insufficient data. A rent estimate is needed to evaluate this strategy.
+          <div className="rounded-lg border border-[color:var(--color-line)] px-4 py-3">
+            <div className="text-[12px] font-semibold text-[color:var(--color-text)]">Rent estimate needed</div>
+            <p className="text-[11.5px] text-[color:var(--color-text-dim)] mt-1 leading-snug">
+              Add a rent estimate to calculate BRRRR Max Buy, monthly cash flow, and cash left in.
+            </p>
           </div>
         )
       )}

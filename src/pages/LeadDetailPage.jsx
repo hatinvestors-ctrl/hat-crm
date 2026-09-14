@@ -73,6 +73,12 @@ export default function LeadDetailPage() {
   // Lead Workspace redesign — which of the 5 tabs is active. Overview is
   // the default per mission Section 6.
   const [activeTab, setActiveTab] = useState('overview')
+  // Small Change #13 — Deal tab "Property Details" disclosure. Pure UI
+  // state, collapsed by default (matches UnderwritingAssumptionsPanel's
+  // existing pattern). PropertyInfoSection itself is rendered completely
+  // unchanged when expanded — same component, same props, same
+  // edit/save behavior, same fields. Nothing deleted, only deprioritized.
+  const [showPropertyDetails, setShowPropertyDetails] = useState(false)
   // Lead Workspace redesign, Section 9 — Live Copilot is mounted HERE, as
   // a sibling to the tab content, NOT inside any individual tab pane.
   // Switching `activeTab` never unmounts it — its own internal mic/
@@ -351,28 +357,49 @@ export default function LeadDetailPage() {
           />
 
           <div className="pt-2">
-            <div className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)] mb-2">Property &amp; Assumptions</div>
-            {/* UX V2.7, Part 4 — the standalone "Financials" card
-                (FinancialSection.jsx) removed from this workspace: it
-                duplicated Evaluation Price/Gap to Max Buy/Max Buy (Flip)/
-                "We Offer" already shown correctly by DealDecisionCenter's
-                V2.6 canonical strategy comparison above, and its ONLY-
-                editable-there inputs (ARV/Renovation/Rent/Holding
-                Period/Suggested Offer/legacy Max Offer override) now live
-                in PropertyInfoSection below — the ONE canonical editable
-                home for property/deal inputs. FinancialSection.jsx itself
-                is untouched and still exported (not deleted), simply no
-                longer mounted here. */}
-            <div className="space-y-4">
-              <PropertyInfoSection
-                lead={lead}
-                userId={user.id}
-                members={members}
-                canEdit={canEdit}
-                onUpdated={onLeadUpdated}
-                underwritingSettings={underwritingSettings}
-              />
+            {/* Small Change #13 — SECTION 6: PROPERTY DETAILS, collapsed
+                by default (same disclosure pattern UnderwritingAssumptionsPanel
+                above already uses). PropertyInfoSection itself is 100%
+                unchanged when expanded — same component, same props,
+                same fields (address/city/state/zip/type/year built/beds/
+                baths/sqft/lot size/garage/days on market, plus the
+                canonical Ask/ARV/Renovation/Rent/Holding Period/Suggested
+                Offer editors — see that file's own V2.7 header note),
+                same edit/save behavior, same calculation-drawer/legacy-
+                MAO controls. Nothing deleted, only deprioritized — a
+                collapsed summary line replaces only the always-expanded
+                large card, per the mission's explicit "nothing changed,
+                only visually deprioritized" instruction. */}
+            <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] text-[color:var(--color-text-muted)]">
+                  <span className="uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mr-1.5">Property Details</span>
+                  {[
+                    lead.bedrooms != null ? `${lead.bedrooms} bd` : null,
+                    lead.bathrooms != null ? `${lead.bathrooms} ba` : null,
+                    lead.sqft != null ? `${Number(lead.sqft).toLocaleString()} sqft` : null,
+                    lead.property_type || null,
+                    [lead.city, lead.state].filter(Boolean).join(', ') || null,
+                    lead.zip_code || null,
+                  ].filter(Boolean).join(' · ') || 'No property details on file yet'}
+                </div>
+                <button type="button" onClick={() => setShowPropertyDetails(o => !o)} className="text-[10.5px] font-semibold underline text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text-muted)] shrink-0">
+                  {showPropertyDetails ? 'Hide' : 'View / Edit'}
+                </button>
+              </div>
             </div>
+            {showPropertyDetails && (
+              <div className="mt-2 space-y-4">
+                <PropertyInfoSection
+                  lead={lead}
+                  userId={user.id}
+                  members={members}
+                  canEdit={canEdit}
+                  onUpdated={onLeadUpdated}
+                  underwritingSettings={underwritingSettings}
+                />
+              </div>
+            )}
           </div>
 
           <button

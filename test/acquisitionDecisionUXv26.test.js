@@ -45,8 +45,18 @@ const heroSrc = fs.readFileSync('src/components/lead-detail/workspace/DecisionHe
 
 // ── 1–4: One canonical recommendation, comparison, default selection ───────
 describe('1-4. Canonical recommendation, compact comparison, default selection', () => {
-  it('1. Deal tab renders exactly ONE canonical Recommended Strategy line', () => {
-    expect(dealSrc).toMatch(/Recommended Strategy<\/div>/)
+  it('1. Deal tab renders exactly ONE canonical strategy-status section (still driven by the SAME single `comparison`/`effective` resolution — never a second surface)', () => {
+    // Small Change #13 note (legitimate rename, not a regression): the
+    // "Recommended Strategy" eyebrow label was consolidated under ONE
+    // "Strategy Status" section header (mission's explicit target
+    // architecture) so the Deal tab reads as a compact status strip
+    // rather than a second Overview hero. The protection this test
+    // guards — exactly one canonical recommendation surface, never a
+    // duplicated/divergent one — is unchanged: both the close-call and
+    // clear-winner branches still render from the SAME `effective`/
+    // `strategyOutlook` values computed once above.
+    expect(dealSrc).toMatch(/Strategy Status<\/div>/)
+    expect(dealSrc).toMatch(/effective \?\? \(comparison\.priceUnknown \? 'Need more information' : 'None — neither strategy qualifies'\)/)
     // V2.9 note (post-V2.6 legitimate fix, not a regression): buildStrategyComparison
     // now takes an additive `hasPrice` option (see acquisitionDecisionUXv25.test.js).
     expect(dealSrc).toMatch(/const comparison = buildStrategyComparison\(\{ flip, brrrr, strategyRec, hasPrice: priceKnown \}\)/)
