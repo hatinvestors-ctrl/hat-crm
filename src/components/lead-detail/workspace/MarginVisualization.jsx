@@ -16,24 +16,25 @@
 // "Suggested Offer" to match the identical field's label everywhere else
 // on the page (DealSnapshotCompact.jsx, DealDecisionCenter.jsx's own
 // Metric, both fixed in V2.1/V2.4).
+//
+// Small Change #15A — the horizontal fill bar + ceiling marker (the
+// yellow/orange visual gauge) removed per explicit mission request; the
+// SAME currentOffer/mao/cushion values, same "room from Suggested Offer
+// to Max Buy" text, now render as quiet text only. No calculation
+// changed — cushion is still `mao - currentOffer`, the same arithmetic
+// this component already did.
 import { formatCurrency as fc } from '../../../lib/calculations'
 
 export default function MarginVisualization({ currentOffer, mao }) {
   if (currentOffer == null || mao == null || mao <= 0) return null
   const pct = currentOffer / mao
   const overMax = pct > 1
-  const fillPct = Math.min(pct, 1) * 100
   const cushion = mao - currentOffer
   const color = overMax ? 'var(--color-danger)' : pct > 0.97 ? 'var(--color-warn)' : 'var(--color-success)'
 
   return (
     <div className="px-1">
-      <div className="relative h-2 rounded-full bg-[color:var(--color-bg-elev-2)] overflow-visible">
-        <div className="h-full rounded-full transition-all" style={{ width: `${fillPct}%`, background: color }} />
-        {/* MAO ceiling marker */}
-        <div className="absolute top-1/2 -translate-y-1/2 w-0.5 h-4 bg-[color:var(--color-text-dim)]" style={{ left: overMax ? '100%' : `${fillPct}%` }} />
-      </div>
-      <div className="flex items-center justify-between mt-1">
+      <div className="flex items-center justify-between">
         <span className="text-[10px] text-[color:var(--color-text-dim)]">Suggested Offer {fc(currentOffer)}</span>
         <span className="text-[10px] font-semibold" style={{ color }}>
           {overMax ? `${fc(Math.abs(cushion))} over Max Buy` : `${fc(cushion)} room from Suggested Offer to Max Buy`}
