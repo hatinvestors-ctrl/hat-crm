@@ -100,9 +100,13 @@ describe('5-8. Strategy drill-down — only the selected strategy\'s detail rend
     // FLIP-branch start — the new leading !priceKnown ternary branch
     // introduced an earlier ") : (" in the file that would otherwise make
     // this slice empty/negative.
+    // Small Change #14 note (legitimate layout change, not a regression):
+    // "Flip Max Buy" moved from a standalone CalculationDetails `label=`
+    // prop into a card title (`title: 'Flip Max Buy'`) within the new
+    // 3-price story — still inside this same active==='FLIP' branch.
     const start = dealSrc.indexOf("active === 'FLIP' ? (")
     const flipBranch = dealSrc.slice(start, dealSrc.indexOf(') : (', start))
-    expect(flipBranch).toMatch(/label="Flip Max Buy"/)
+    expect(flipBranch).toMatch(/title: 'Flip Max Buy'/)
     expect(flipBranch).toMatch(/label="All-In Cost"/)
   })
   it('8. BRRRR detail (BRRRR Cash Left In, Monthly Cash Flow) is inside the active!==FLIP (BRRRR) branch only', () => {
@@ -242,7 +246,11 @@ describe('23-27. Price provenance preserved from V2.3-V2.5', () => {
     expect(off.source).toBe('offer_price')
   })
   it('26. Suggested Offer never becomes "Our Offer" — DealDecisionCenter labels flip.currentOffer "Suggested Offer"', () => {
-    expect(dealSrc).toMatch(/label="Suggested Offer"/)
+    // Small Change #14 note (legitimate layout change, not a regression):
+    // "Suggested Offer" moved from a standalone Metric `label=` prop into
+    // a card title within the new 3-price story — see acquisitionDecisionUXv24.test.js's
+    // updated assertion for the exact new source pattern.
+    expect(dealSrc).toMatch(/title: 'Suggested Offer', scenario: flipScenarios\.suggestedOffer/)
     expect(dealSrc).not.toMatch(/label="We Offer"/)
     expect(dealSrc).not.toMatch(/label="Our Offer"/)
   })

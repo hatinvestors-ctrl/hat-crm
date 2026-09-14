@@ -1232,3 +1232,89 @@ export function buildDealCloseCallExplanation({ flip, brrrr, sellerAsk }) {
   }
   return `Flip and BRRRR support close acquisition ranges — Flip around ${fullCurrency(Math.round(flip.mao))}, BRRRR around ${fullCurrency(Math.round(brrrr.mao))}. Because those ranges are close, both exits should remain open.`
 }
+
+// Small Change #14, Part A — Deal tab strategy status, honest about a
+// strategy that fails AT THE SELLER ASK but has a genuinely feasible
+// lower Max Buy (Newman's exact shape: flip.verdict === 'NO DEAL' at the
+// $228,890 ask, but flip.maoFeasible with a real $134,500 Max Buy).
+// buildStrategyComparison (UNCHANGED) correctly reports this as
+// strategyRec.preferredStrategy === 'NONE' — that canonical fact is
+// never overridden — but presenting it as bare "None — neither strategy
+// qualifies" reads as "no viable strategy at all," which is false. This
+// classifies the SAME already-canonical flip.maoFeasible/brrrr.available
+// facts into a small set of Deal-tab-specific presentation labels; it
+// never recomputes a Max Buy, verdict, or strategy preference.
+export function resolveDealStrategyStatus({ flip, brrrr, effective }) {
+  // A real canonical recommendation already exists (clear winner, or a
+  // strategy usable via resolveStrategyOutlook) — nothing to relabel.
+  if (effective) return null
+
+  const flipMao = flip?.available && flip.maoFeasible && flip.mao != null ? flip.mao : null
+  const brrrrMao = brrrr?.available && brrrr.mao != null ? brrrr.mao : null
+  const brrrrNeedsRent = !brrrr?.available && brrrr?.missingField === 'rent estimate'
+
+  const side = (mao, other) => mao != null
+    ? { label: 'Viable at lower price', detail: `Max Buy ${fullCurrency(Math.round(mao))}` }
+    : null
+
+  if (flipMao != null && brrrrMao == null) {
+    return {
+      flip: side(flipMao),
+      brrrr: brrrrNeedsRent ? { label: 'Needs rent estimate', detail: null } : (brrrr?.available ? { label: 'Not viable', detail: null } : { label: 'Could not be evaluated', detail: null }),
+      explanation: `Seller Ask is above HAT's Flip range. Flip becomes viable around ${fullCurrency(Math.round(flipMao))}.${brrrrNeedsRent ? ' Add rent to evaluate BRRRR.' : ''}`,
+    }
+  }
+  if (brrrrMao != null && flipMao == null) {
+    return {
+      brrrr: side(brrrrMao),
+      flip: flip?.available ? { label: 'Not viable', detail: null } : { label: 'Could not be evaluated', detail: null },
+      explanation: `Seller Ask is above HAT's BRRRR range. BRRRR becomes viable around ${fullCurrency(Math.round(brrrrMao))}.`,
+    }
+  }
+  if (flipMao != null && brrrrMao != null) {
+    return {
+      flip: side(flipMao),
+      brrrr: side(brrrrMao),
+      explanation: `Seller Ask is above both strategies' supported range. Flip becomes viable around ${fullCurrency(Math.round(flipMao))}; BRRRR around ${fullCurrency(Math.round(brrrrMao))}.`,
+    }
+  }
+  // Genuinely no viable price under either strategy — the original honest wording.
+  return null
+}
+
+// Small Change #14, Part B — Flip price-scenario economics (Seller Ask /
+// Suggested Offer / Max Buy), all THREE computed the SAME canonical way:
+// computeFlipBreakdown(price, arv, reno, holdMonths, settings)
+// (calculations.js, UNCHANGED — the SAME read-only scenario helper
+// buildDealOpportunitySummary [Small Change #3/#6] already uses for
+// "profit at Max Buy"). No new formula: this only calls that existing
+// function at a THIRD price point (flip.currentOffer, the Suggested
+// Offer) it wasn't already called at here, and reuses it for Max Buy so
+// the Deal tab displays the actual calculated value instead of assuming
+// it always equals FLIP_MIN_PROFIT_TARGET exactly.
+export function buildFlipPriceScenarios({ flip, lead, underwritingSettings = null }) {
+  if (!flip?.available) return null
+  const arv = lead?.arv != null ? Number(lead.arv) : null
+  const reno = lead?.renovation_cost != null ? Number(lead.renovation_cost) : null
+  if (arv == null || reno == null) return null
+  const holdMonths = flip.breakdown?.holdMonths ?? 6
+
+  const scenario = (price) => {
+    if (price == null) return null
+    const breakdown = computeFlipBreakdown(price, arv, reno, holdMonths, underwritingSettings)
+    return {
+      price,
+      profit: breakdown.totalProfit,
+      meetsTarget: flip.targetProfit != null && breakdown.totalProfit >= flip.targetProfit,
+      breakdown,
+    }
+  }
+
+  return {
+    // Seller Ask / evaluation price reuses flip's OWN already-computed
+    // projectedProfit/breakdown (flip.evaluationPrice) — never recomputed.
+    sellerAsk: flip.evaluationPrice != null ? { price: flip.evaluationPrice, profit: flip.projectedProfit, meetsTarget: flip.targetProfit != null && flip.projectedProfit >= flip.targetProfit, breakdown: flip.breakdown } : null,
+    suggestedOffer: scenario(flip.currentOffer),
+    maxBuy: flip.maoFeasible && flip.mao != null ? scenario(flip.mao) : null,
+  }
+}

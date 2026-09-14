@@ -75,7 +75,14 @@ describe('B. Offer/evaluation provenance — Finding B fix', () => {
     expect(dealDecisionCenterSrc).not.toMatch(/label="We Offer"/)
   })
   it('DealDecisionCenter.jsx labels the same flip.currentOffer value "Suggested Offer", matching DealSnapshotCompact.jsx', () => {
-    expect(dealDecisionCenterSrc).toMatch(/label="Suggested Offer"/)
+    // Small Change #14 note (legitimate layout change, not a regression):
+    // "Suggested Offer" moved from a standalone Metric `label=` prop into
+    // a card title (`title: 'Suggested Offer'`) within the new 3-price
+    // story — still the SAME flip.currentOffer value, still explicitly
+    // labeled "Suggested Offer," never "Our Offer"/"We Offer".
+    expect(dealDecisionCenterSrc).toMatch(/title: 'Suggested Offer', scenario: flipScenarios\.suggestedOffer/)
+    const presentationSrc = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
+    expect(presentationSrc).toMatch(/suggestedOffer: scenario\(flip\.currentOffer\)/)
     const snapshotSrc = fs.readFileSync('src/components/lead-detail/workspace/DealSnapshotCompact.jsx', 'utf8')
     expect(snapshotSrc).toMatch(/Suggested Offer/)
   })

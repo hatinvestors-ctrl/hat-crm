@@ -121,7 +121,13 @@ describe('Part 17 — Flip Max Buy and BRRRR Max Buy are explicitly labeled, nev
     expect(decisionHeroSrc).toMatch(/Max Buy/)
   })
   it('DealDecisionCenter.jsx labels its Max Buy as "Flip Max Buy"', () => {
-    expect(dealDecisionCenterSrc).toMatch(/label="Flip Max Buy"/)
+    // Small Change #14 note (legitimate layout change, not a regression):
+    // the Flip Max Buy scenario moved from a standalone CalculationDetails
+    // `label="Flip Max Buy"` prop into a card title within the new 3-price
+    // story (Seller Ask/Suggested Offer/Max Buy) — the explicit "Flip Max
+    // Buy" text itself is unchanged, just rendered as `title: 'Flip Max
+    // Buy'` in that card's config instead of a component prop.
+    expect(dealDecisionCenterSrc).toMatch(/title: 'Flip Max Buy'/)
   })
   it('resolveTargetPrice picks the strategy-appropriate label ("Flip Max Buy" vs "BRRRR Max Buy"), never a bare "Max Buy"', () => {
     const src = fs.readFileSync('src/lib/acquisitionDecisionPresentation.js', 'utf8')
@@ -164,9 +170,19 @@ describe('Part 4 — every profit figure names the price it refers to', () => {
     expect(src).toMatch(/projected profit @ \{decision\?\.priceIsEvaluation \? 'evaluation' : 'current'\} price/)
     expect(src).not.toMatch(/label="Projected Profit"/)
   })
-  it('DealDecisionCenter.jsx\'s Flip profit label includes an explicit price context', () => {
+  it('DealDecisionCenter.jsx\'s Flip profit figures each name their own price scenario', () => {
+    // Small Change #14 note (legitimate layout change, not a regression):
+    // the single "Flip Profit @ Current/Evaluation Price" CalculationDetails
+    // label was replaced by THREE scenario cards (Seller Ask/Suggested
+    // Offer/Max Buy), each showing its own price directly above its own
+    // profit figure — every profit is still visually paired with the exact
+    // price it refers to, now even more explicitly (3 named scenarios
+    // instead of 1). priceScenarioWord carries the SAME Evaluation/Seller
+    // Ask distinction the old label used.
     const src = fs.readFileSync('src/components/lead-detail/workspace/DealDecisionCenter.jsx', 'utf8')
-    expect(src).toMatch(/Flip Profit @ \$\{isDistressedLead\(lead\) \? 'Evaluation' : 'Current'\} Price/)
+    expect(src).toMatch(/const priceScenarioWord = isDistressedLead\(lead\) \? 'Evaluation Price' : 'Seller Ask'/)
+    expect(src).toMatch(/title: priceScenarioWord, scenario: flipScenarios\.sellerAsk/)
+    expect(src).toMatch(/title: 'Suggested Offer', scenario: flipScenarios\.suggestedOffer/)
   })
   it('the decision object always carries currentPrice alongside any gap/target it reports', () => {
     const d = decide(NORFOLK)

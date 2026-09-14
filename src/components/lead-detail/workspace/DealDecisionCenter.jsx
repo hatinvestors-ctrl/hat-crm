@@ -44,7 +44,7 @@ import { formatCurrency as fc, describeCashLeftIn, roundMaxBuy } from '../../../
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation, resolveEffectiveStrategy } from '../../../lib/dealExplanation'
 import { isDistressedLead, resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
-import { buildStrategyComparison, hasEvaluablePrice, resolveStrategyOutlook, buildCloseCallComparison, buildDealCloseCallExplanation, buildStrategyExplanation } from '../../../lib/acquisitionDecisionPresentation'
+import { buildStrategyComparison, hasEvaluablePrice, resolveStrategyOutlook, buildCloseCallComparison, buildDealCloseCallExplanation, buildStrategyExplanation, resolveDealStrategyStatus, buildFlipPriceScenarios } from '../../../lib/acquisitionDecisionPresentation'
 import { getDealReadiness } from './readiness'
 import EmptyState from './EmptyState'
 import MarginVisualization from './MarginVisualization'
@@ -198,6 +198,25 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
   // buildStrategyExplanation doesn't need to re-word.
   const strategyExplanationText = (priceKnown && !isCloseCall && buildStrategyExplanation({ flip, brrrr, strategyRec, sellerAskingPrice: priceValue })) || comparison.explanation
 
+  // Small Change #14, Part A — presentation-only reclassification of the
+  // Deal tab's "None — neither strategy qualifies" headline for the
+  // specific, honest case where a strategy fails AT THE SELLER ASK but
+  // has a genuinely feasible lower Max Buy (Newman's shape). Reuses the
+  // SAME flip.maoFeasible/brrrr.available facts buildStrategyComparison
+  // already computed — never a second strategy engine, never overrides
+  // `effective` (the canonical pick) itself. Returns null (no change in
+  // behavior) whenever a real recommendation already exists, or when
+  // neither strategy has ANY feasible price — the original wording is
+  // preserved exactly for that true "no viable strategy" case.
+  const dealStrategyStatus = priceKnown ? resolveDealStrategyStatus({ flip, brrrr, effective }) : null
+
+  // Small Change #14, Part B — Flip price-scenario economics (Seller
+  // Ask / Suggested Offer / Max Buy), ALL THREE via the SAME canonical
+  // computeFlipBreakdown read-only scenario helper (calculations.js,
+  // UNCHANGED) buildDealOpportunitySummary already uses for "profit at
+  // Max Buy" — no new formula, no duplicated calculation.
+  const flipScenarios = priceKnown && active === 'FLIP' ? buildFlipPriceScenarios({ flip, lead, underwritingSettings }) : null
+
   // Small Change #12 — price-scenario-qualified status labels. The core
   // rule: never show WORKS/BELOW TARGET without saying what price it's
   // at. Flip's status (flip.verdict) is always computed at the real
@@ -280,6 +299,30 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
           {closeCallExplanation && (
             <p className="text-[12px] text-[color:var(--color-text-muted)] mt-1 leading-snug">{closeCallExplanation}</p>
           )}
+        </div>
+      ) : dealStrategyStatus ? (
+        /* Small Change #14, Part A — the honest "viable at a lower price"
+           presentation, in place of the misleading bare "None — neither
+           strategy qualifies" (canonical strategyRec.preferredStrategy
+           === 'NONE' is unchanged; only how it's WORDED changes). */
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {dealStrategyStatus.flip && (
+              <div className="flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Flip</div>
+                <div className="text-[13px] font-extrabold text-[color:var(--color-text)]">{dealStrategyStatus.flip.label}</div>
+                {dealStrategyStatus.flip.detail && <div className="text-[11px] text-[color:var(--color-text-dim)]">{dealStrategyStatus.flip.detail}</div>}
+              </div>
+            )}
+            {dealStrategyStatus.brrrr && (
+              <div className="flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">BRRRR</div>
+                <div className="text-[13px] font-extrabold text-[color:var(--color-text)]">{dealStrategyStatus.brrrr.label}</div>
+                {dealStrategyStatus.brrrr.detail && <div className="text-[11px] text-[color:var(--color-text-dim)]">{dealStrategyStatus.brrrr.detail}</div>}
+              </div>
+            )}
+          </div>
+          <p className="text-[12px] text-[color:var(--color-text-muted)] mt-2 leading-snug">{dealStrategyStatus.explanation}</p>
         </div>
       ) : (
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] px-4 py-3">
@@ -371,46 +414,58 @@ export default function DealDecisionCenter({ lead, onRunAnalysis, underwritingSe
         </div>
       ) : active === 'FLIP' ? (
         <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+          {/* Small Change #14, Part B — the 3-price story: Seller Ask →
+              Suggested Offer → Max Buy, each with its own canonically-
+              computed profit (buildFlipPriceScenarios, ALL via the SAME
+              computeFlipBreakdown read-only helper, calculations.js
+              UNCHANGED) and a "View Calculation" disclosure reusing the
+              SAME CalculationRows the rest of this file already uses —
+              no new formula, no new component. */}
+          {flipScenarios && (
+            <div className="px-4 pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { key: 'sellerAsk', title: priceScenarioWord, scenario: flipScenarios.sellerAsk, failTag: 'Below Target', okTag: 'Viable', tagTone: 'var(--color-danger-text)' },
+                { key: 'suggestedOffer', title: 'Suggested Offer', scenario: flipScenarios.suggestedOffer, failTag: 'Below Target', okTag: 'Viable', tagTone: 'var(--color-success-text)' },
+                { key: 'maxBuy', title: 'Flip Max Buy', scenario: flipScenarios.maxBuy, failTag: 'Below Target', okTag: 'HAT Limit', tagTone: 'var(--color-accent-text)' },
+              ].map(({ key, title, scenario, failTag, okTag, tagTone }) => {
+                const tagText = scenario.meetsTarget ? okTag : failTag
+                return scenario && (
+                <div key={key} className="rounded-md border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">{title}</div>
+                  <div className="text-[15px] font-extrabold tabular-nums text-[color:var(--color-text)]">{fc(Math.round(scenario.price))}</div>
+                  <div className="text-[11px] mt-0.5">
+                    <span className="text-[color:var(--color-text-dim)]">Profit </span>
+                    <span className="font-bold tabular-nums" style={{ color: scenario.meetsTarget ? 'var(--color-success-text)' : 'var(--color-danger-text)' }}>{fc(Math.round(scenario.profit))}</span>
+                  </div>
+                  <div className="text-[9.5px] font-bold uppercase tracking-wide mt-0.5" style={{ color: tagTone }}>{tagText}</div>
+                  {key !== 'sellerAsk' && scenario.breakdown && (
+                    <div className="mt-1.5">
+                      <CalculationDetails
+                        label=""
+                        headline=""
+                        definition={`Estimated Flip profit at the ${title} scenario ($${Math.round(scenario.price).toLocaleString()}), after HML financing, closing, holding, and selling costs currently modeled by HAT's underwriting.`}
+                        rows={[
+                          { label: 'Expected Sale Price (93% of ARV)', value: fc(Math.round(scenario.breakdown.saleProceeds)) },
+                          { separator: true },
+                          { label: 'Purchase Price', value: `−${fc(Math.round(scenario.price))}`, indent: true },
+                          { label: 'Rehab', value: `−${fc(Math.round(lead.renovation_cost))}`, indent: true },
+                          { label: 'HML points/fees (financing)', value: `−${fc(Math.round(scenario.breakdown.points))}`, indent: true },
+                          { label: 'Acquisition closing costs', value: `−${fc(scenario.breakdown.fixedCosts)}`, indent: true },
+                          { label: `Holding costs (${scenario.breakdown.holdMonths}mo)`, value: `−${fc(Math.round(scenario.breakdown.totalHolding))}`, indent: true },
+                          { separator: true },
+                          { label: 'Projected Profit', value: fc(Math.round(scenario.profit)), bold: true, tone: scenario.meetsTarget ? 'success' : 'danger' },
+                        ]}
+                        assumptionNote="Selling costs (7% of ARV) are baked into the 93%-of-ARV sale-proceeds assumption above."
+                      />
+                    </div>
+                  )}
+                </div>
+              )})}
+            </div>
+          )}
+          {/* Secondary detail — All-In Cost remains accessible but no
+              longer competes visually with the 3-price story above. */}
           <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* UX V2.4/V2.5, Part 1 Finding B — this value is flip.currentOffer,
-                a MAO-anchored CALCULATED suggestion (getEffectiveOffer), never
-                an actual submitted offer (lead.offer_price is that field —
-                see acquisitionDecisionPresentation.js's resolveActualOffer).
-                Labeled to match DealSnapshotCompact.jsx (V2.1). */}
-            <Metric label="Suggested Offer" value={flip.currentOffer != null ? fc(flip.currentOffer) : 'Not set'} />
-            <CalculationDetails
-              label="Flip Max Buy"
-              headline={fc(displayMao)}
-              tone="var(--color-accent-text)"
-              definition="Highest purchase price that still meets HAT's minimum Flip profit target, given current ARV/rehab assumptions. Rounded to the nearest $100 for the acquisition workflow."
-              rows={[
-                { label: 'ARV', value: fc(lead.arv) },
-                { label: 'Sale proceeds (93% of ARV)', value: fc(Math.round(lead.arv * 0.93)) },
-                { label: 'Rehab', value: `−${fc(lead.renovation_cost)}` },
-                { label: 'Financing + holding + closing (at Max Buy)', value: 'solved algebraically', indent: true },
-                { separator: true },
-                { label: 'Target profit (HAT minimum)', value: fc(flip.targetProfit), bold: true },
-              ]}
-              assumptionNote="Max Buy is solved so projected profit at that exact price equals HAT's minimum target."
-            />
-            <CalculationDetails
-              label={`Flip Profit @ ${isDistressedLead(lead) ? 'Evaluation' : 'Current'} Price${flip.evaluationPrice != null ? ` (${fc(Math.round(flip.evaluationPrice))})` : ''}`}
-              headline={fc(flip.projectedProfit)}
-              tone={flip.projectedProfit >= flip.targetProfit ? 'var(--color-success-text)' : 'var(--color-danger-text)'}
-              definition="Estimated Flip profit at the current evaluation price, after HML financing, closing, holding, and selling costs currently modeled by HAT's underwriting."
-              rows={flip.breakdown ? [
-                { label: 'Expected Sale Price (93% of ARV)', value: fc(Math.round(flip.breakdown.saleProceeds)) },
-                { separator: true },
-                { label: 'Purchase Price', value: `−${fc(Math.round(flip.evaluationPrice))}`, indent: true },
-                { label: 'Rehab', value: `−${fc(Math.round(lead.renovation_cost))}`, indent: true },
-                { label: 'HML points/fees (financing)', value: `−${fc(Math.round(flip.breakdown.points))}`, indent: true },
-                { label: 'Acquisition closing costs', value: `−${fc(flip.breakdown.fixedCosts)}`, indent: true },
-                { label: `Holding costs (${flip.breakdown.holdMonths}mo)`, value: `−${fc(Math.round(flip.breakdown.totalHolding))}`, indent: true },
-                { separator: true },
-                { label: 'Projected Profit', value: fc(Math.round(flip.projectedProfit)), bold: true, tone: flip.projectedProfit >= flip.targetProfit ? 'success' : 'danger' },
-              ] : []}
-              assumptionNote="Selling costs (7% of ARV) are baked into the 93%-of-ARV sale-proceeds assumption above."
-            />
             {flip.breakdown && (
               <CalculationDetails
                 label="All-In Cost"
