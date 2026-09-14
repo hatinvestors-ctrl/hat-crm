@@ -1158,3 +1158,50 @@ export function buildCloseCallInsights({ flip, brrrr }) {
   if (items.length === 0) return null
   return { title: 'WHY THIS IS A CLOSE CALL', items: items.slice(0, 4) }
 }
+
+// Small Change #11 — compact close-call comparison. Presentation-only
+// polish of the SAME BOTH_VIABLE_CLOSE_CALL state resolveStrategyOutlook
+// already classifies (that function is UNCHANGED — SC11 touches zero
+// classification logic). Replaces the dense 4-sentence bullet list
+// (buildCloseCallInsights, still exported/tested above, unmodified) with
+// a compact 4-row Flip-vs-BRRRR table + a dynamic price-closeness
+// callout, built ONLY from already-canonical flip/brrrr fields — no new
+// calculation, no fabricated value. A missing metric renders '—' rather
+// than a fabricated number (e.g. never "$0" for an unavailable
+// cash-left-in).
+function formatShortK(n) {
+  if (n == null) return '—'
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  return abs >= 1000 ? `${sign}$${(abs / 1000).toFixed(1)}K` : `${sign}$${Math.round(abs)}`
+}
+
+export function buildCloseCallComparison({ flip, brrrr }) {
+  if (!flip?.available || !brrrr?.available || flip.mao == null || brrrr.mao == null) return null
+
+  const priceDiff = Math.abs(flip.mao - brrrr.mao)
+  const rows = [
+    {
+      label: 'Max Buy',
+      flip: formatShortK(Math.round(flip.mao / 100) * 100),
+      brrrr: formatShortK(Math.round(brrrr.mao / 100) * 100),
+    },
+    {
+      label: 'Return',
+      flip: flip.targetProfit != null ? `~${formatShortK(flip.targetProfit)} profit` : '—',
+      brrrr: brrrr.monthlyCashFlow != null ? `${brrrr.monthlyCashFlow >= 0 ? '+' : ''}${formatCurrency(brrrr.monthlyCashFlow)}/mo cash flow` : '—',
+    },
+    {
+      label: 'Capital',
+      flip: 'Capital recycled after sale',
+      brrrr: brrrr.cashLeftIn != null ? `~${formatShortK(brrrr.cashLeftIn)} remains invested` : '—',
+    },
+    {
+      label: 'Exit',
+      flip: 'Sell after renovation',
+      brrrr: 'Hold + recurring income',
+    },
+  ]
+
+  return { rows, priceDiff, priceDiffLabel: formatShortK(priceDiff) }
+}

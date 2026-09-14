@@ -19,7 +19,7 @@ import { getDecisionMaturity, getArvProvenance } from '../../../lib/arvProvenanc
 import { computeFlipResult, computeBrrrrResult, computeStrategyRecommendation } from '../../../lib/dealExplanation'
 import { formatCurrency as fc } from '../../../lib/calculations'
 import { VERDICT_DISPLAY_LABEL } from '../DealAnalysisCard'
-import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation, buildStrategyInsights, resolveStrategyOutlook, buildCloseCallInsights } from '../../../lib/acquisitionDecisionPresentation'
+import { deriveAcquisitionDecision, buildWhyReasons, composeNextActionText, buildDealOpportunitySummary, buildStrategyExplanation, buildStrategyInsights, resolveStrategyOutlook, buildCloseCallComparison } from '../../../lib/acquisitionDecisionPresentation'
 import { resolveMarketType } from '../../../lib/distressInfo'
 import { getSellerIntelligence } from '../../../lib/sellerStrategy'
 import InfoTooltip from '../../ui/InfoTooltip'
@@ -71,7 +71,7 @@ function SummaryMetric({ label, value, tone }) {
 // asking price itself). Labeled "Suggested Offer" here — the SAME term
 // Small Change #3 already used for flip.currentOffer in Recommended
 // Action — never "Current Price".
-function DealOpportunitySummary({ summary, flip, decision, lead }) {
+function DealOpportunitySummary({ summary, flip, decision, lead, isCloseCall }) {
   const { flip: f, brrrr: b } = summary
   const showAction = decision?.state === 'PASS_NEGOTIABLE' || decision?.state === 'NEGOTIATE'
   const sellerAsk = lead?.asking_price != null ? Number(lead.asking_price) : null
@@ -80,6 +80,13 @@ function DealOpportunitySummary({ summary, flip, decision, lead }) {
   // (resolveEffectiveStrategy/strategyRec) — never re-decided here.
   const recommended = decision?.targetStrategy
   const alternative = recommended === 'BRRRR' ? 'FLIP' : recommended === 'FLIP' ? 'BRRRR' : null
+  // Small Change #11 — for a genuine close call (resolveStrategyOutlook's
+  // BOTH_VIABLE_CLOSE_CALL, UNCHANGED classification logic), "Recommended"
+  // overstates the canonical lean and "Alternative" undersells the other
+  // strategy's real viability. Swap ONLY the badge wording — never the
+  // underlying recommended/alternative pick itself, which is untouched.
+  const recommendedBadge = isCloseCall ? 'Slight Lean' : 'Recommended'
+  const alternativeBadge = isCloseCall ? 'Viable' : 'Alternative'
   return (
     <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] space-y-3">
       {/* Small Change #6, Part 2 — ONE seller-ask line, read directly from
@@ -94,8 +101,8 @@ function DealOpportunitySummary({ summary, flip, decision, lead }) {
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">Flip</span>
-            {recommended === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">Recommended</span>}
-            {alternative === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Alternative</span>}
+            {recommended === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">{recommendedBadge}</span>}
+            {alternative === 'FLIP' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">{alternativeBadge}</span>}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
             <SummaryMetric
@@ -136,8 +143,8 @@ function DealOpportunitySummary({ summary, flip, decision, lead }) {
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[9px] uppercase tracking-widest font-bold text-[color:var(--color-text-dim)]">BRRRR</span>
-            {recommended === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">Recommended</span>}
-            {alternative === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Alternative</span>}
+            {recommended === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent-text)]">{recommendedBadge}</span>}
+            {alternative === 'BRRRR' && <span className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">{alternativeBadge}</span>}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5">
             <SummaryMetric label="HAT BRRRR Max Buy" value={b.maxBuy != null ? fc(Math.round(b.maxBuy / 100) * 100) : 'Not feasible'} tone="var(--color-accent-text)" />
@@ -308,7 +315,12 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
   // than the underlying economics actually support.
   const strategyOutlook = resolveStrategyOutlook({ flip, brrrr, decision })
   const isCloseCall = strategyOutlook?.kind === 'BOTH_VIABLE_CLOSE_CALL'
-  const closeCallInsights = isCloseCall ? buildCloseCallInsights({ flip, brrrr }) : null
+  // Small Change #11 — presentation polish only. resolveStrategyOutlook's
+  // classification (above) is byte-unchanged; this replaces the SAME
+  // close-call state's dense 4-sentence bullet list (buildCloseCallInsights,
+  // acquisitionDecisionPresentation.js — still exported/tested, just no
+  // longer rendered here) with a compact Flip-vs-BRRRR comparison table.
+  const closeCallComparison = isCloseCall ? buildCloseCallComparison({ flip, brrrr }) : null
 
   const DECISION_TONE = { success: 'var(--color-success-text)', caution: 'var(--color-warn-text)', info: 'var(--color-text-dim)', danger: 'var(--color-danger-text)' }
   const DECISION_BORDER = { success: 'var(--color-success)', caution: 'var(--color-warn)', info: 'var(--color-line)', danger: 'var(--color-danger)' }
@@ -422,7 +434,7 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
         {/* Small Change #3 — DEAL OPPORTUNITY SUMMARY. See
             buildDealOpportunitySummary/DealOpportunitySummary above. */}
         {opportunitySummary && (
-          <DealOpportunitySummary summary={opportunitySummary} flip={flip} decision={decision} lead={lead} />
+          <DealOpportunitySummary summary={opportunitySummary} flip={flip} decision={decision} lead={lead} isCloseCall={isCloseCall} />
         )}
 
         {/* LEVEL 3 — RECOMMENDED STRATEGY: ONE primary, one small optional
@@ -442,31 +454,57 @@ export default function DecisionHero({ lead, underwritingSettings = null }) {
             a single dominant "Recommended Strategy" line — never
             overriding decision.targetStrategy itself, which still
             appears as the quiet "Slight lean" secondary label. */}
+        {/* Small Change #11 — compact visual comparison replacing the SC10
+            dense bullet list, per the mission's explicit "understandable
+            in ~5 seconds" goal. Still gated on the exact SAME isCloseCall
+            (resolveStrategyOutlook, UNCHANGED) — only the presentation
+            below this line changed. */}
         {isCloseCall && !decision.priceUnknown && (
           <div className="mt-2">
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Strategy Outlook</span>{' '}
             <span className="text-[13px] font-extrabold text-[color:var(--color-text)]">BOTH VIABLE — NO CLEAR WINNER</span>
             <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">Slight lean: {strategyOutlook.lean}</div>
-            {closeCallInsights && (
-              <div className="mt-1.5">
-                <div className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">{closeCallInsights.title}</div>
-                <ul className="mt-0.5 space-y-1">
-                  {closeCallInsights.items.map((it, i) => (
-                    <li key={i} className="text-[11px] leading-snug">
-                      <span className="font-bold" style={{ color: INSIGHT_TONE[it.tone] }}>{INSIGHT_MARK[it.tone]} {it.label}</span>
-                      <span className="text-[color:var(--color-text-dim)]"> — {it.detail}</span>
-                    </li>
+
+            {closeCallComparison && (
+              <>
+                <div className="mt-2 rounded-md border border-[color:var(--color-line)] overflow-hidden">
+                  <div className="grid grid-cols-3 text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)] bg-[color:var(--color-bg-elev-2)] px-2 py-1">
+                    <span></span>
+                    <span className="text-center">Flip</span>
+                    <span className="text-center">BRRRR</span>
+                  </div>
+                  {closeCallComparison.rows.map((row, i) => (
+                    <div key={row.label} className={`grid grid-cols-3 items-center px-2 py-1.5 text-[11px] ${i > 0 ? 'border-t border-[color:var(--color-line)]' : ''}`}>
+                      <span className="text-[9px] uppercase tracking-wide text-[color:var(--color-text-dim)]">{row.label}</span>
+                      <span className="text-center font-semibold text-[color:var(--color-text)] tabular-nums">{row.flip}</span>
+                      <span className="text-center font-semibold text-[color:var(--color-text)] tabular-nums">{row.brrrr}</span>
+                    </div>
                   ))}
-                </ul>
-              </div>
+                </div>
+                {/* Price-closeness callout — the main visual reason for the
+                    close call, per the mission's explicit emphasis. */}
+                <div className="mt-1.5 text-center text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--color-accent-text)]">
+                  Only ~{closeCallComparison.priceDiffLabel} apart in buy price
+                </div>
+              </>
             )}
+
             {/* Bottom line — plain-language negotiation range using the
                 SAME flip.mao/brrrr.mao already shown above, low/high
-                ordered so the sentence reads naturally either way. */}
+                ordered so the sentence reads naturally either way. Given
+                stronger visual hierarchy (its own label + border) per
+                the mission's explicit "buried" complaint — no new
+                recommendation, no claim either strategy is better. */}
             {flip.mao != null && brrrr.mao != null && (
-              <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1.5 leading-snug">
-                <span className="font-semibold text-[color:var(--color-text-muted)]">Bottom line:</span> Negotiate toward approximately HAT's {fc(Math.round(Math.min(flip.mao, brrrr.mao)))}-{fc(Math.round(Math.max(flip.mao, brrrr.mao)))} acquisition range. At that level, both exit strategies remain available.
-              </p>
+              <div className="mt-2 pt-2 border-t border-[color:var(--color-line)]">
+                <div className="text-[9px] font-bold uppercase tracking-widest text-[color:var(--color-text-dim)] mb-0.5">Bottom Line</div>
+                <p className="text-[11.5px] text-[color:var(--color-text)] leading-snug">
+                  Negotiate toward approximately HAT's {fc(Math.round(Math.min(flip.mao, brrrr.mao)))}-{fc(Math.round(Math.max(flip.mao, brrrr.mao)))} acquisition range. Both exit strategies remain viable there.
+                </p>
+                <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1 leading-snug">
+                  Hold (BRRRR) if HAT wants to retain the asset and accepts the capital left invested. Flip if HAT prefers to realize the projected profit and recycle capital.
+                </p>
+              </div>
             )}
           </div>
         )}
