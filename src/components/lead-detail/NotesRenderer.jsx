@@ -1184,18 +1184,42 @@ function RecommendedActionSection({ body }) {
     maxWalk  && { label: 'Walk-Away Max',     value: maxWalk.split('←')[0].split('(')[0].trim(),     accent: false },
   ].filter(Boolean)
 
+  // Small Change #17 — presentation-only lookups into the SAME priceCards
+  // array above (zero new derivation) so the redesigned layout below can
+  // place each value in a specific spot rather than a generic mapped
+  // grid. MAO and Walk-Away Max are DISTINCT underlying concepts (MAO =
+  // canonicalFlipMao, the SAME calculateFlipMAO() figure Deal/Financials
+  // use; Walk-Away Max = a separate AI-generated "Max Walk-Away" field)
+  // and are kept as two separate, separately-labeled rows — never merged.
+  const arvCard   = priceCards.find(c => c.label.startsWith('ARV'))
+  const maoCard   = priceCards.find(c => c.label.startsWith('MAO'))
+  const startCard = priceCards.find(c => c.label === 'Starting Offer')
+  const walkCard  = priceCards.find(c => c.label === 'Walk-Away Max')
+  // Seller Ask — the SAME lead.asking_price already used above for gapAmt,
+  // simply displayed here for the first time in this component (the exact
+  // formatting convention already used elsewhere in this file). No new
+  // field, no new calculation.
+  const sellerAskStr = lead?.asking_price != null ? `$${Math.round(Number(lead.asking_price)).toLocaleString()}` : null
+
   return (
     <div className="space-y-2.5">
 
-      {/* ── VERDICT BANNER ─────────────────────────────── */}
+      {/* ── ACTION HERO ──────────────────────────────────
+          Small Change #17 — the verdict banner's own icon/label/what
+          text is UNCHANGED (same vm object); only the chip row (moved
+          into "Why HAT AI" below, so it's not shown twice) and the
+          heavy "Action" paragraph (also moved into "Why HAT AI") were
+          removed from here, so this reads as a focal action statement
+          rather than a wall of chips + prose. */}
       {verdict && (
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: vm.bdr }}>
-
-          {/* Header row */}
-          <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2" style={{ background: vm.bg }}>
-            <div className="flex items-center gap-2">
-              <span className="text-[22px]">{vm.icon}</span>
-              <span className="text-[16px] font-black tracking-tight leading-tight" style={{ color: vm.txt }}>{vm.label}</span>
+          <div className="flex items-center justify-between gap-3 px-3.5 pt-3.5 pb-2.5" style={{ background: vm.bg }}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[22px] shrink-0">{vm.icon}</span>
+              <div className="min-w-0">
+                <div className="text-[8.5px] uppercase tracking-widest font-bold opacity-70" style={{ color: vm.txt }}>Recommended Action</div>
+                <span className="text-[16px] font-black tracking-tight leading-tight" style={{ color: vm.txt }}>{vm.label}</span>
+              </div>
             </div>
             {computedScore != null && (
               <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full shrink-0" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
@@ -1203,79 +1227,75 @@ function RecommendedActionSection({ body }) {
               </span>
             )}
           </div>
-
-          {/* What this means */}
           {vm.what && (
-            <div className="px-3.5 pb-2" style={{ background: vm.bg }}>
-              <p className="text-[11px] leading-snug" style={{ color: vm.txt, opacity: 0.8 }}>
-                <span className="font-semibold opacity-100">What this means: </span>{vm.what}
-              </p>
-            </div>
-          )}
-
-          {/* Signal chips */}
-          <div className="flex flex-wrap gap-1.5 px-3.5 pb-2.5" style={{ background: vm.bg }}>
-            {strategy && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
-                {strategy}
-              </span>
-            )}
-            {dealMathLabel && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
-                {dealMathLabel}
-              </span>
-            )}
-            {sellerOdds && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
-                {sellerOdds.dot} Seller: {sellerOdds.label}
-              </span>
-            )}
-            {gapStr && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.2)', color: vm.txt }}>
-                ↕ Gap: {gapStr} off ask
-              </span>
-            )}
-          </div>
-
-          {/* Action */}
-          {vm.action && (
-            <div className="px-3.5 py-2.5 border-t" style={{ background: 'var(--color-bg-elev-2)', borderColor: vm.bdr }}>
-              <p className="text-[12.5px] text-[color:var(--color-text)] leading-relaxed">{vm.action}</p>
+            <div className="px-3.5 pb-3" style={{ background: vm.bg }}>
+              <p className="text-[11.5px] leading-snug" style={{ color: vm.txt, opacity: 0.85 }}>{vm.what}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── KEY NUMBERS ────────────────────────────────── */}
-      {priceCards.length > 0 && (
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(priceCards.length, 2)}, 1fr)` }}>
-          {priceCards.map(({ label, value, accent, sub }) => (
-            <div key={label} className="p-3 rounded-xl border"
-              style={accent === 'green'
-                ? { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)' }
-                : accent === 'blue'
-                ? { background: 'var(--color-accent-soft)', borderColor: 'var(--color-accent)' }
-                : accent === 'warn'
-                ? { background: 'var(--color-warn-soft)', borderColor: 'var(--color-warn)' }
-                : { background: 'var(--color-bg-elev-2)', borderColor: 'var(--color-line)' }
-              }
-            >
-              <div className="text-[9px] uppercase tracking-widest mb-1"
-                style={{ color: accent === 'green' ? 'var(--color-success-text)' : accent === 'blue' ? 'var(--color-accent-text)' : accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text-dim)' }}>
-                {label}
+      {/* ── YOUR NEGOTIATION PLAN ─────────────────────────
+          Small Change #17 — the SAME startCard/maoCard/walkCard/gapStr
+          values (unchanged) reorganized as one story — Seller Ask →
+          Start → ceiling(s) → Gap — instead of a generic same-weight
+          KPI grid. Seller Ask is new to THIS component's display only
+          (same lead.asking_price field, formatted above); MAO and
+          Walk-Away Max remain two distinct, distinctly-labeled rows
+          whenever both exist — never collapsed into one "ceiling". */}
+      {(sellerAskStr || startCard || maoCard || walkCard) && (
+        <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Your Negotiation Plan</span>
+          </div>
+          <div className="p-3 space-y-2.5">
+            {sellerAskStr && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10.5px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Seller Ask</span>
+                <span className="text-[14px] font-bold text-[color:var(--color-text)] tabular-nums">{sellerAskStr}</span>
               </div>
-              <div className="text-[16px] font-black leading-none"
-                style={{ color: accent === 'green' ? 'var(--color-success-text)' : accent === 'blue' ? 'var(--color-accent-text)' : accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text)' }}>
-                {value}
+            )}
+            {(startCard || maoCard || walkCard) && (
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${[startCard, maoCard, walkCard].filter(Boolean).length}, 1fr)` }}>
+                {startCard && (
+                  <div className="p-2.5 rounded-lg border" style={{ background: 'var(--color-accent-soft)', borderColor: 'var(--color-accent)' }}>
+                    <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-accent-text)]">Start</div>
+                    <div className="text-[15px] font-black text-[color:var(--color-accent-text)] tabular-nums">{startCard.value}</div>
+                  </div>
+                )}
+                {maoCard && (
+                  <div className="p-2.5 rounded-lg border" style={maoCard.accent === 'warn' ? { background: 'var(--color-warn-soft)', borderColor: 'var(--color-warn)' } : { background: 'var(--color-success-soft)', borderColor: 'var(--color-success)' }}>
+                    <div className="text-[8.5px] uppercase tracking-wider" style={{ color: maoCard.accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-success-text)' }}>{maoCard.label}</div>
+                    <div className="text-[15px] font-black tabular-nums" style={{ color: maoCard.accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-success-text)' }}>{maoCard.value}</div>
+                    {maoCard.sub && <div className="text-[8px] mt-0.5 leading-tight" style={{ color: 'var(--color-warn-text)', opacity: 0.85 }}>{maoCard.sub}</div>}
+                  </div>
+                )}
+                {walkCard && (
+                  <div className="p-2.5 rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
+                    <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Walk-Away Max</div>
+                    <div className="text-[15px] font-black text-[color:var(--color-text)] tabular-nums">{walkCard.value}</div>
+                  </div>
+                )}
               </div>
-              {sub && (
-                <div className="text-[9px] mt-1 leading-tight"
-                  style={{ color: accent === 'warn' ? 'var(--color-warn-text)' : 'var(--color-text-dim)', opacity: 0.8 }}>
-                  {sub}
-                </div>
-              )}
-            </div>
-          ))}
+            )}
+            {gapStr && (
+              <div className="flex items-center justify-between pt-2 border-t border-[color:var(--color-line)]">
+                <span className="text-[10.5px] uppercase tracking-wide text-[color:var(--color-text-dim)]">Gap to Close</span>
+                <span className="text-[13px] font-bold text-[color:var(--color-text)] tabular-nums">{gapStr}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── DEAL CONTEXT ───────────────────────────────────
+          Small Change #17 — ARV moved from a large same-weight KPI card
+          into a quiet supporting line (SAME arvCard.value, unchanged),
+          per the mission's "should not compete visually with the
+          action" instruction. */}
+      {arvCard && (
+        <div className="text-[10.5px] text-[color:var(--color-text-dim)] px-1">
+          <span className="font-semibold text-[color:var(--color-text-muted)]">Deal Context</span> — {arvCard.label}: {arvCard.value}
         </div>
       )}
 
@@ -1342,12 +1362,46 @@ function RecommendedActionSection({ body }) {
         )
       })()}
 
-      {/* ── KEVIN'S READ ─────────────────────────────────── */}
+      {/* ── WHY HAT AI SEES AN OPPORTUNITY ────────────────
+          Small Change #17 — the SAME strategy/dealMathLabel/sellerOdds
+          chips and the SAME vm.action paragraph that used to sit inside
+          the Action Hero above (removed from there, not deleted, so
+          they're never shown twice) — no new reasoning, no new
+          derivation, just reorganized under one clear "why" heading. */}
+      {(strategy || dealMathLabel || sellerOdds || vm.action) && (
+        <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Why HAT AI {isGo ? 'Sees an Opportunity' : 'Recommends This'}</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {(strategy || dealMathLabel || sellerOdds) && (
+              <div className="flex flex-wrap gap-1.5">
+                {strategy && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)]">{strategy}</span>
+                )}
+                {dealMathLabel && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)]">{dealMathLabel}</span>
+                )}
+                {sellerOdds && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--color-bg-elev-2)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)]" title={sellerOdds.tip}>
+                    {sellerOdds.dot} Seller: {sellerOdds.label}
+                  </span>
+                )}
+              </div>
+            )}
+            {vm.action && (
+              <p className="text-[12px] text-[color:var(--color-text)] leading-relaxed">{vm.action}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── KEVIN'S TAKE ─────────────────────────────────── */}
       {kevinsRead && (
         <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)]">
           <div className="shrink-0 w-7 h-7 rounded-full bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)] flex items-center justify-center text-[11px] font-black text-[color:var(--color-accent-text)]">K</div>
           <div>
-            <div className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-1">Kevin's take</div>
+            <div className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-text-dim)] mb-1">Kevin's Take</div>
             {renoIsEstimated && (
               <p className="text-[11px] text-[color:var(--color-warn-text)] bg-[color:var(--color-warn-soft)] rounded px-2 py-1 mb-1.5">
                 ⚠ Reno cost was estimated, not confirmed — these numbers will shift once a contractor walks the property.
