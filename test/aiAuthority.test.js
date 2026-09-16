@@ -11,34 +11,47 @@ import { describe, it, expect } from 'vitest'
 import { SYSTEM_PROMPT } from '../netlify/functions/generate-comps.mjs'
 
 describe('generate-comps.mjs SYSTEM_PROMPT — canonical authority contract (CASE E/F)', () => {
-  it('CASE F — explicitly forbids recalculating or restating a different ARV or Max Buy', () => {
-    expect(SYSTEM_PROMPT).toMatch(/do not calculate, restate, or imply a different arv/i)
+  // Small Change #20 narrowed this guard: the model is now explicitly
+  // authorized to state its own independent ARV opinion inside the
+  // VALUATION content (that is the entire point of SC20), so the blanket
+  // "do not... imply a different ARV" no longer applies there. The Max
+  // Buy/MAO prohibition is untouched and absolute everywhere — that is
+  // the actual Paschal Street failure mode (a competing acquisition
+  // ceiling), and it still has no slot anywhere in the prompt.
+  it('CASE F — explicitly forbids recalculating or restating a different Max Buy anywhere (absolute, untouched by SC20)', () => {
     expect(SYSTEM_PROMPT).toMatch(/do not calculate, restate, or imply a different max buy/i)
   })
 
-  it('CASE E — instructs the model to flag conflicting evidence rather than replace the canonical ARV', () => {
+  it('CASE E — instructs the model to flag conflicting evidence as a review flag, not a correction, outside its own VALUATION opinion', () => {
     expect(SYSTEM_PROMPT).toMatch(/review flag/i)
-    expect(SYSTEM_PROMPT).toMatch(/never as a replacement number/i)
+    expect(SYSTEM_PROMPT).toMatch(/never as a replacement ARV/i)
   })
 
   // Small Change #1 (Sep 4 baseline) — the exact Paschal Street defect was
-  // an AI-proposed ARV competing with an EXISTING canonical ARV. That
-  // specific failure mode is what this test guards, and it still cannot
-  // happen: the MARKET COMPS section (and everywhere ARV is already
-  // provided) still has no such slot, and the new VALUATION section is
-  // explicitly gated to fire ONLY when "ARV: Unknown" — i.e. exactly the
-  // case where no canonical ARV exists yet to contradict. Verified below
-  // instead of banning the words outright.
-  it('the MARKET COMPS section itself still has no "Realistic ARV: $X" slot — the 3-level ARV lives only in the new, separately-gated VALUATION section', () => {
+  // an AI-proposed ARV competing with an EXISTING canonical ARV, framed as
+  // a REPLACEMENT for it. That specific failure mode is what this test
+  // guards. Small Change #20 deliberately authorizes the model to always
+  // state its own independent Conservative/Realistic/Optimistic ARV
+  // opinion (previously gated to fire ONLY when "ARV: Unknown") — the
+  // guard that remains is that this VALUATION content is explicitly
+  // labeled as informational/non-authoritative, never a replacement, and
+  // canonical Max Buy/MAO still has no competing slot anywhere.
+  it('the MARKET COMPS section now DOES carry the always-on VALUATION opinion (Small Change #20), explicitly labeled non-authoritative — never a replacement of the canonical ARV', () => {
     const marketCompsSection = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('MARKET COMPS\n====='), SYSTEM_PROMPT.indexOf('RENTAL COMPS\n====='))
-    expect(marketCompsSection).not.toMatch(/Realistic ARV:/i)
-    expect(marketCompsSection).not.toMatch(/Optimistic ARV:/i)
-    expect(marketCompsSection).not.toMatch(/Conservative ARV:/i)
+    expect(marketCompsSection).toMatch(/Conservative ARV:/i)
+    expect(marketCompsSection).toMatch(/Realistic ARV:/i)
+    expect(marketCompsSection).toMatch(/Optimistic ARV:/i)
+    expect(marketCompsSection).toMatch(/ARV Conclusion:/i)
+    expect(marketCompsSection).toMatch(/informational context for review/i)
+    expect(marketCompsSection).toMatch(/canonical financials above remain authoritative for underwriting/i)
+    // the competing-MAO failure mode is still impossible — no Max Buy/MAO slot anywhere in MARKET COMPS
+    expect(marketCompsSection).not.toMatch(/Max Buy:|MAO:/i)
   })
-  it('the new VALUATION section is explicitly gated to ONLY when no canonical ARV exists yet, and is omitted the moment one is provided', () => {
-    expect(SYSTEM_PROMPT).toMatch(/Include VALUATION only when CANONICAL FINANCIALS below shows "ARV: Unknown" — omit entirely when a canonical ARV is already provided\./)
-    expect(SYSTEM_PROMPT).toMatch(/EXCEPTION — no canonical ARV exists yet/)
-    expect(SYSTEM_PROMPT).toMatch(/never restate a different ARV once one exists/)
+  it('the VALUATION opinion is now ALWAYS produced (no longer gated to "ARV: Unknown"), but is explicitly evidence-only — never anchored to the canonical ARV, asking price, or Max Buy', () => {
+    expect(SYSTEM_PROMPT).not.toMatch(/Include VALUATION only when CANONICAL FINANCIALS below shows "ARV: Unknown"/)
+    expect(SYSTEM_PROMPT).not.toMatch(/EXCEPTION — no canonical ARV exists yet/)
+    expect(SYSTEM_PROMPT).toMatch(/never derived from the canonical ARV above, from asking price, or from Max Buy/i)
+    expect(SYSTEM_PROMPT).toMatch(/canonical financials (above |)remain authoritative for underwriting regardless of what (this|your VALUATION) says/i)
   })
 
   it('the CRM COMPS USED template no longer invites a "Confidence Impact" line that raises ARV confidence to a dollar figure or recommends an alternate MAO', () => {
