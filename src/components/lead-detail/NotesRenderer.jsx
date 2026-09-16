@@ -1674,62 +1674,92 @@ function MarketCompsSection({ body }) {
 
   if (compBlocks.length === 0 && !conservativeARV && !realisticARV && !optimisticARV) return <PlainText body={body} />
 
+  // Small Change #19 — parsed exactly as before (compLine/whyLines,
+  // UNCHANGED); only how each field is LABELED changed. `sold` is the
+  // AI's own raw text for that comp's price/evidence — it is NOT always
+  // a genuine sold price (it can read "Ask $224,900", "Recent listing",
+  // "Prior HAT ARV", etc.). Only color it as a sold-price signal when the
+  // text itself says "Sold" — everything else stays neutral so a listing
+  // or asking price is never visually implied to be a completed sale.
+  const rows = compBlocks.map(({ compLine, whyLines }) => {
+    const content = compLine.replace(/^COMP:\s*/i, '')
+    const parts   = content.split('|').map(s => s.trim())
+    const [area, profile, sqft, sold, ppsf, timeframe, condition] = parts
+    const why = whyLines.join(' ').trim() || null
+    const isGenuinelySold = !!sold && /^sold/i.test(sold.trim())
+    return { area, profile, sqft, sold, ppsf, timeframe, condition, why, isGenuinelySold }
+  })
+
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
+      {/* ── PROPERTY VALUE INTELLIGENCE ─────────────────── */}
       {(conservativeARV || realisticARV || optimisticARV) && (
-        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5 space-y-1.5">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">ARV Range</div>
-          {conservativeARV && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Conservative</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-warn-text)]">{conservativeARV}</span>
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Property Value Intelligence</span>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-[color:var(--color-line)]">
+            <div className="px-3 py-2.5">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Conservative</div>
+              <div className="text-[15px] font-black text-[color:var(--color-text)] tabular-nums truncate">{conservativeARV || '—'}</div>
             </div>
-          )}
-          {realisticARV && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Realistic</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{realisticARV}</span>
+            <div className="px-3 py-2.5 bg-[color:var(--color-accent-soft)]">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] font-bold">Realistic</div>
+              <div className="text-[16px] font-black text-[color:var(--color-accent-text)] tabular-nums truncate">{realisticARV || '—'}</div>
+              {realisticARV && <div className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-accent-text)] opacity-80">Recommended</div>}
             </div>
-          )}
-          {optimisticARV && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Optimistic</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-success-text)]">{optimisticARV}</span>
+            <div className="px-3 py-2.5">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Optimistic</div>
+              <div className="text-[15px] font-black text-[color:var(--color-text)] tabular-nums truncate">{optimisticARV || '—'}</div>
             </div>
-          )}
+          </div>
         </div>
       )}
-      <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Sold Comps Used for ARV</div>
-      {compBlocks.map(({ compLine, whyLines }, i) => {
-        const content = compLine.replace(/^COMP:\s*/i, '')
-        const parts   = content.split('|').map(s => s.trim())
-        const [area, profile, sqft, sold, ppsf, timeframe, condition] = parts
-        const why = whyLines.join(' ').trim() || null
-        return (
-          <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
-            <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
-              <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{area}</span>
-              {sold && <span className="shrink-0 text-[13px] font-bold text-[color:var(--color-success-text)]">{sold.replace('Sold ', '')}</span>}
-            </div>
-            <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
-              {profile    && <span>{profile}</span>}
-              {sqft       && <span>{sqft}</span>}
-              {ppsf       && <span className="text-[color:var(--color-accent-text)] font-medium">{ppsf}</span>}
-              {timeframe  && <span>{timeframe}</span>}
-              {condition  && <span className="italic">{condition}</span>}
-            </div>
-            {why && (
-              <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{why}</p>
-              </div>
-            )}
+
+      {/* ── SOLD COMPS TABLE ─────────────────────────────── */}
+      {rows.length > 0 && (
+        <div>
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Sold Comps Used for ARV</div>
+          <div className="rounded-lg border border-[color:var(--color-line)] overflow-x-auto">
+            <table className="w-full text-[11.5px] border-collapse">
+              <thead>
+                <tr className="bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Property</th>
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Details</th>
+                  <th className="text-right font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Price / Evidence</th>
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Why Relevant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-[color:var(--color-line)] last:border-0 hover:bg-[color:var(--color-bg-elev-2)] transition-colors align-top">
+                    <td className="px-3 py-2.5 font-semibold text-[color:var(--color-text)] whitespace-nowrap">{r.area}</td>
+                    <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">
+                      <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                        {r.profile && <span>{r.profile}</span>}
+                        {r.sqft && <span>{r.sqft}</span>}
+                        {r.ppsf && <span className="text-[color:var(--color-accent-text)]">{r.ppsf}</span>}
+                        {r.timeframe && <span>{r.timeframe}</span>}
+                        {r.condition && <span className="italic">{r.condition}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold tabular-nums whitespace-nowrap" style={{ color: r.isGenuinelySold ? 'var(--color-success-text)' : 'var(--color-text-dim)' }}>
+                      {r.sold || '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-[color:var(--color-text-dim)] italic leading-snug min-w-[180px]">{r.why || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )
-      })}
+        </div>
+      )}
+
+      {/* ── AI INTERPRETATION ────────────────────────────── */}
       {conclusion && (
-        <div className="px-3 py-2.5 rounded-lg bg-[color:var(--color-success-soft)] border border-[color:var(--color-success)]">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-success-text)] mb-1">ARV Conclusion</div>
-          <p className="text-[12px] text-[color:var(--color-success-text)] leading-relaxed">{conclusion}</p>
+        <div className="rounded-lg border border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] px-3.5 py-3">
+          <div className="text-[9.5px] uppercase tracking-wider font-bold text-[color:var(--color-accent-text)] mb-1">AI Interpretation</div>
+          <p className="text-[12px] text-[color:var(--color-accent-text)] leading-relaxed">{conclusion}</p>
         </div>
       )}
     </div>
@@ -1756,35 +1786,28 @@ function RentalCompsSection({ body }) {
   if (!consRent && !realRent && rentalComps.length === 0) return <PlainText body={body} />
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
+      {/* ── RENTAL INTELLIGENCE ──────────────────────────── */}
       {(consRent || realRent || optRent) && (
-        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] px-3 py-2.5 space-y-1.5">
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1">Rent Range</div>
-          {consRent && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Conservative</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-warn-text)]">{consRent}</span>
+        <div className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev)] overflow-hidden">
+          <div className="px-3 py-2 bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-muted)]">Rental Intelligence</span>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-[color:var(--color-line)]">
+            <div className="px-3 py-2.5">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Conservative</div>
+              <div className="text-[15px] font-black text-[color:var(--color-text)] tabular-nums truncate">{consRent || '—'}</div>
             </div>
-          )}
-          {realRent && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Realistic</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-accent-text)]">{realRent}</span>
+            <div className="px-3 py-2.5 bg-[color:var(--color-accent-soft)]">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] font-bold">Realistic</div>
+              <div className="text-[16px] font-black text-[color:var(--color-accent-text)] tabular-nums truncate">{realRent || '—'}</div>
+              {realRent && <div className="text-[8px] font-bold uppercase tracking-wide text-[color:var(--color-accent-text)] opacity-80">Recommended</div>}
             </div>
-          )}
-          {optRent && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-dim)] w-20 shrink-0">Optimistic</span>
-              <span className="text-[12px] font-semibold text-[color:var(--color-success-text)]">{optRent}</span>
+            <div className="px-3 py-2.5">
+              <div className="text-[8.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Optimistic</div>
+              <div className="text-[15px] font-black text-[color:var(--color-text)] tabular-nums truncate">{optRent || '—'}</div>
             </div>
-          )}
-        </div>
-      )}
-
-      {verdict && (
-        <div className={`px-3 py-2 rounded-lg border ${verdictOk ? 'border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]' : verdictBad ? 'border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]' : 'border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]'}`}>
-          <div className={`text-[9.5px] uppercase tracking-wider mb-0.5 ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>Rent Verdict</div>
-          <p className={`text-[12px] font-semibold ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>{verdict}</p>
+          </div>
         </div>
       )}
 
@@ -1813,28 +1836,51 @@ function RentalCompsSection({ body }) {
         </div>
       )}
 
+      {/* ── RENTAL COMPS TABLE ───────────────────────────── */}
       {rentalComps.length > 0 && (
-        <>
-          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)]">Active Rentals Used</div>
-          {rentalComps.map((line, i) => {
-            const content = line.replace(/^RENTAL:\s*/i, '')
-            const parts   = content.split('|').map(s => s.trim())
-            const [area, profile, sqft, rent, note] = parts
-            return (
-              <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
-                <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
-                  <span className="text-[12px] font-semibold text-[color:var(--color-text)]">{area}</span>
-                  {rent && <span className="shrink-0 text-[13px] font-bold text-[color:var(--color-accent-text)]">{rent}</span>}
-                </div>
-                <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
-                  {profile && <span>{profile}</span>}
-                  {sqft    && <span>{sqft}</span>}
-                  {note    && <span className="italic">{note}</span>}
-                </div>
-              </div>
-            )
-          })}
-        </>
+        <div>
+          <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-text-dim)] mb-1.5">Active Rentals Used</div>
+          <div className="rounded-lg border border-[color:var(--color-line)] overflow-x-auto">
+            <table className="w-full text-[11.5px] border-collapse">
+              <thead>
+                <tr className="bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Property</th>
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Details</th>
+                  <th className="text-right font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Rent</th>
+                  <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Comments</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rentalComps.map((line, i) => {
+                  const content = line.replace(/^RENTAL:\s*/i, '')
+                  const parts   = content.split('|').map(s => s.trim())
+                  const [area, profile, sqft, rent, note] = parts
+                  return (
+                    <tr key={i} className="border-b border-[color:var(--color-line)] last:border-0 hover:bg-[color:var(--color-bg-elev-2)] transition-colors align-top">
+                      <td className="px-3 py-2.5 font-semibold text-[color:var(--color-text)] whitespace-nowrap">{area}</td>
+                      <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">
+                        <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                          {profile && <span>{profile}</span>}
+                          {sqft && <span>{sqft}</span>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold text-[color:var(--color-accent-text)] tabular-nums whitespace-nowrap">{rent || '—'}</td>
+                      <td className="px-3 py-2.5 text-[color:var(--color-text-dim)] italic leading-snug min-w-[180px]">{note || '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI INTERPRETATION ────────────────────────────── */}
+      {verdict && (
+        <div className={`rounded-lg border px-3.5 py-3 ${verdictOk ? 'border-[color:var(--color-success)] bg-[color:var(--color-success-soft)]' : verdictBad ? 'border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)]' : 'border-[color:var(--color-warn)] bg-[color:var(--color-warn-soft)]'}`}>
+          <div className={`text-[9.5px] uppercase tracking-wider font-bold mb-1 ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>AI Interpretation</div>
+          <p className={`text-[12px] font-semibold leading-relaxed ${verdictOk ? 'text-[color:var(--color-success-text)]' : verdictBad ? 'text-[color:var(--color-danger-text)]' : 'text-[color:var(--color-warn-text)]'}`}>{verdict}</p>
+        </div>
       )}
     </div>
   )
@@ -1872,38 +1918,70 @@ function CRMCompsUsedSection({ body }) {
 
   if (compBlocks.length === 0) return <PlainText body={body} />
 
+  // Small Change #19 — SECTION 7, "HAT SYSTEM COMPS". Audit-confirmed:
+  // this component already parses genuinely existing HAT/CRM comp data
+  // (prior HAT leads used as comps, per generate-comps.mjs's "CRM COMPS
+  // USED" template) — no new query, no new AI call, no new field. Only
+  // the presentation is redesigned into a table with subtle visual
+  // differentiation (accent-tinted header, 🏛️ icon) from the market-
+  // evidence tables above, per the mission's "our own institutional
+  // memory" framing. Every field below (addrZip/profile/ask/arv/reno/
+  // offer/status/how/zipPattern/confidenceImpact) is parsed exactly as
+  // before.
   return (
-    <div className="space-y-2.5">
-      {compBlocks.map(({ compLine, howLines }, i) => {
-        const content = compLine.replace(/^COMP:\s*/i, '')
-        const parts   = content.split('|').map(s => s.trim())
-        const [addrZip, profile, ask, arv, reno, offer, status] = parts
-        const how = howLines.join(' ').trim() || null
-        return (
-          <div key={i} className="rounded-lg border border-[color:var(--color-line)] bg-[color:var(--color-bg-elev-2)] overflow-hidden">
-            <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-[color:var(--color-line)]">
-              <span className="text-[12px] font-semibold text-[color:var(--color-text)] leading-snug">{addrZip}</span>
-              {status && (
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)]">
-                  {status.replace('Status: ', '')}
-                </span>
-              )}
-            </div>
-            <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[color:var(--color-text-muted)]">
-              {profile && <span>{profile}</span>}
-              {ask     && <span className="text-[color:var(--color-text)]">{ask}</span>}
-              {arv     && <span>ARV {arv.replace('ARV ', '')}</span>}
-              {reno    && <span>Reno {reno.replace('Reno ', '')}</span>}
-              {offer   && <span className="text-[color:var(--color-accent-text)] font-medium">{offer}</span>}
-            </div>
-            {how && (
-              <div className="px-3 pb-2">
-                <p className="text-[11px] italic text-[color:var(--color-text-dim)] leading-relaxed">{how}</p>
-              </div>
-            )}
-          </div>
-        )
-      })}
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[color:var(--color-accent)] overflow-hidden">
+        <div className="px-3 py-2 bg-[color:var(--color-accent-soft)] border-b border-[color:var(--color-accent)] flex items-center gap-1.5">
+          <span className="text-[13px]">🏛️</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-accent-text)]">HAT System Comps</span>
+          <span className="text-[9.5px] text-[color:var(--color-accent-text)] opacity-70 ml-auto">From HAT's own CRM</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11.5px] border-collapse">
+            <thead>
+              <tr className="bg-[color:var(--color-bg-elev-2)] border-b border-[color:var(--color-line)]">
+                <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Property</th>
+                <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Status</th>
+                <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Ask / ARV / Reno</th>
+                <th className="text-right font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Offer</th>
+                <th className="text-left font-bold uppercase tracking-wide text-[9px] text-[color:var(--color-text-dim)] px-3 py-2">Why Relevant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {compBlocks.map(({ compLine, howLines }, i) => {
+                const content = compLine.replace(/^COMP:\s*/i, '')
+                const parts   = content.split('|').map(s => s.trim())
+                const [addrZip, profile, ask, arv, reno, offer, status] = parts
+                const how = howLines.join(' ').trim() || null
+                return (
+                  <tr key={i} className="border-b border-[color:var(--color-line)] last:border-0 hover:bg-[color:var(--color-bg-elev-2)] transition-colors align-top">
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-[color:var(--color-text)] leading-snug whitespace-nowrap">{addrZip}</div>
+                      {profile && <div className="text-[10.5px] text-[color:var(--color-text-dim)] mt-0.5">{profile}</div>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {status && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-bg)] text-[color:var(--color-text-muted)] border border-[color:var(--color-line)] whitespace-nowrap">
+                          {status.replace('Status: ', '')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-[color:var(--color-text-muted)]">
+                      <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                        {ask && <span className="text-[color:var(--color-text)]">{ask}</span>}
+                        {arv && <span>{arv}</span>}
+                        {reno && <span>{reno}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-[color:var(--color-accent-text)] tabular-nums whitespace-nowrap">{offer || '—'}</td>
+                    <td className="px-3 py-2.5 text-[color:var(--color-text-dim)] italic leading-snug min-w-[180px]">{how || '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {(zipPattern || overall) && (
         <div className="px-3 py-2.5 rounded-lg bg-[color:var(--color-accent-soft)] border border-[color:var(--color-accent)]">
           <div className="text-[9.5px] uppercase tracking-wider text-[color:var(--color-accent-text)] mb-1">ZIP Pattern</div>
