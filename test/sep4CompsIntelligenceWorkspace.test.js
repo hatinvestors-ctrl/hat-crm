@@ -50,10 +50,17 @@ describe('Sold Comps table — same compBlocks collection, price/evidence semant
   })
 })
 
-describe('AI Interpretation (sold) — existing conclusion, unmodified', () => {
-  it('the ARV Conclusion line is still read exactly as before and rendered verbatim under "AI Interpretation"', () => {
+describe('HAT AI Verdict (sold) — existing conclusion, unmodified, now renders BEFORE the evidence table (design-polish reorder)', () => {
+  it('the ARV Conclusion line is still read exactly as before and rendered verbatim under "HAT AI Verdict"', () => {
     expect(src).toMatch(/const conclusion = allLines\.find\(l => \/\^ARV Conclusion:\/i\.test\(l\.trim\(\)\)\)\?\.replace\(\/\^ARV Conclusion:\\s\*\/i, ''\)\.trim\(\)/)
-    expect(src).toMatch(/AI Interpretation<\/div>\s*\n\s*<p className="text-\[12px\] text-\[color:var\(--color-accent-text\)\] leading-relaxed">\{conclusion\}<\/p>/)
+    expect(src).toMatch(/<span>HAT AI Verdict<\/span>\s*\n\s*<\/div>\s*\n\s*<p className="text-\[12\.5px\] text-\[color:var\(--color-accent-text\)\] leading-relaxed">\{conclusion\}<\/p>/)
+  })
+  it('the verdict panel sits before the Sold Comps table in source order (CONCLUSION -> EVIDENCE)', () => {
+    const marketSrc = src.slice(src.indexOf('function MarketCompsSection'), src.indexOf('function RentalCompsSection'))
+    const verdictIdx = marketSrc.indexOf('HAT AI Verdict')
+    const tableIdx = marketSrc.indexOf('Sold Comps Used for ARV')
+    expect(verdictIdx).toBeGreaterThan(0)
+    expect(tableIdx).toBeGreaterThan(verdictIdx)
   })
 })
 
@@ -80,12 +87,19 @@ describe('Rental Comps table — same rentalComps collection', () => {
   })
 })
 
-describe('AI Interpretation (rental) — existing verdict, unmodified', () => {
-  it('the Rent Verdict line is still read exactly as before and rendered under "AI Interpretation"', () => {
+describe('HAT AI Verdict (rental) — existing verdict, unmodified, now renders BEFORE the Rental Comps table (design-polish reorder)', () => {
+  it('the Rent Verdict line is still read exactly as before and rendered under "HAT AI Verdict"', () => {
     expect(src).toMatch(/const verdict   = get\('Rent Verdict'\)/)
     const rentalSrc = src.slice(src.indexOf('function RentalCompsSection'), src.indexOf('function CRMCompsUsedSection'))
-    expect(rentalSrc).toMatch(/AI Interpretation<\/div>/)
+    expect(rentalSrc).toMatch(/<span>HAT AI Verdict<\/span>/)
     expect(rentalSrc).toMatch(/\{verdict\}<\/p>/)
+  })
+  it('the verdict panel sits before the Rental Comps table in source order', () => {
+    const rentalSrc = src.slice(src.indexOf('function RentalCompsSection'), src.indexOf('function CRMCompsUsedSection'))
+    const verdictIdx = rentalSrc.indexOf('HAT AI Verdict')
+    const tableIdx = rentalSrc.indexOf('Active Rentals Used')
+    expect(verdictIdx).toBeGreaterThan(0)
+    expect(tableIdx).toBeGreaterThan(verdictIdx)
   })
 })
 
