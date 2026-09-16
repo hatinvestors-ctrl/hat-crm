@@ -2316,16 +2316,60 @@ export default function NotesRenderer({ notes, extraTabs = [], missingFields = [
       >
         {currentTab?.content
           ? currentTab.content
+          : currentTab?.id === 'summary'
+          ? (() => {
+              // Small Change #18 — LAYER 1 / LAYER 2 progressive disclosure.
+              // SAME items, SAME sort, SAME SectionCard component and
+              // render() functions (DealScoreSection/ScoreSection/
+              // BulletSection/InsightsSection — none touched, none
+              // recomputed). Only WHICH items render before/after a new
+              // "Deep Dive" divider, and which start collapsed, changed.
+              // RECOMMENDED ACTION (the SC17 Action Hero/Negotiation Plan/
+              // Why HAT AI/Kevin's Take/Next Steps card) is Layer 1;
+              // everything else (Deal Score/Opportunity Score/Pros/Cons/
+              // Key Insights) is Layer 2 — evidence the user can open, not
+              // required reading.
+              const sorted = [...(currentTab.items || [])].sort((a, b) => {
+                const ORDER = ['RECOMMENDED ACTION', 'DEAL SCORE', 'PROS', 'CONS', 'KEY INSIGHTS']
+                const ai = ORDER.findIndex(o => a.name.toUpperCase().startsWith(o))
+                const bi = ORDER.findIndex(o => b.name.toUpperCase().startsWith(o))
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+              })
+              const layer1 = sorted.filter(s => /^RECOMMENDED ACTION/i.test(s.name))
+              const layer2 = sorted.filter(s => !/^RECOMMENDED ACTION/i.test(s.name))
+              return (
+                <>
+                  {layer1.map(({ name, body }) => (
+                    <SectionCard key={name} name={name} body={body} defaultCollapsed={false} />
+                  ))}
+                  {layer2.length > 0 && (
+                    <div className="pt-3 mt-1 border-t border-[color:var(--color-line)]">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-text-dim)]">Deep Dive</div>
+                      <p className="text-[10.5px] text-[color:var(--color-text-faint)] mt-0.5 mb-2">Detailed evidence behind HAT AI's recommendation</p>
+                      <div className="space-y-2">
+                        {layer2.map(({ name, body }) => (
+                          <SectionCard
+                            key={name}
+                            name={name}
+                            body={body}
+                            // Small Change #18 — DEAL SCORE/OPPORTUNITY SCORE
+                            // now also start collapsed by default (PROS/CONS/
+                            // KEY INSIGHTS already did) — same SectionCard,
+                            // same internal useState, only the initial value
+                            // changed. Nothing about the score/pros/cons
+                            // content, computation, or the AI text itself
+                            // is touched.
+                            defaultCollapsed
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()
           : <>
-              {(currentTab?.id === 'summary'
-                ? [...(currentTab.items || [])].sort((a, b) => {
-                    const ORDER = ['RECOMMENDED ACTION', 'DEAL SCORE', 'PROS', 'CONS', 'KEY INSIGHTS']
-                    const ai = ORDER.findIndex(o => a.name.toUpperCase().startsWith(o))
-                    const bi = ORDER.findIndex(o => b.name.toUpperCase().startsWith(o))
-                    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-                  })
-                : currentTab?.items || []
-              ).map(({ name, body }) => (
+              {(currentTab?.items || []).map(({ name, body }) => (
                 <SectionCard
                   key={name}
                   name={name}
