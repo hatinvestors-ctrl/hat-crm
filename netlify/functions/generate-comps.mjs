@@ -261,8 +261,50 @@ Write MARKET COMPS (including its own VALUATION opinion — Conservative/Realist
 
     const data = await resp.json()
     const raw = data.content?.[0]?.text?.trim() || ''
-    const notes = '=====================================\n' + raw
-    console.log(`[generate-comps] OK total=${Date.now() - t0}ms`)
+    let notes = '=====================================\n' + raw
+
+    // Small Change #20.2 — HAT System Comps reliability/observability.
+    // SC20.1's read-only audit found two indistinguishable missing states
+    // for HAT SYSTEM COMPS (no CRM candidates vs. possible output-length
+    // truncation) because this response never inspected the provider's
+    // own completion signal. `stop_reason`/`usage` are fields Anthropic's
+    // Messages API already returns on every call — reading them adds no
+    // new AI call, no new model/param, no new prompt content. This block
+    // is diagnostic-only (server-side console logging); it is never
+    // written into `notes` and never reaches the client UI.
+    const stopReason     = data.stop_reason || null
+    const truncated      = stopReason === 'max_tokens'
+    const usage           = data.usage || null
+    const candidateCount = comps.length
+    const hasCrmSection  = /={5,}\s*\nCRM COMPS USED/i.test(notes)
+
+    if (truncated) {
+      console.log(`[generate-comps] TRUNCATED total=${Date.now() - t0}ms stop_reason=${stopReason} candidates=${candidateCount} output_tokens=${usage?.output_tokens ?? '?'}`)
+    } else if (candidateCount > 0 && !hasCrmSection) {
+      // CASE 4 — CRM candidates existed and the model completed normally,
+      // yet CRM COMPS USED is absent from the output. This is neither
+      // "no evidence" (candidates existed) nor "truncated" (stop_reason
+      // is normal) — it is a distinct AI free-text inconsistency and must
+      // never be conflated with either of the other two.
+      console.log(`[generate-comps] AI_OUTPUT_INCONSISTENCY total=${Date.now() - t0}ms candidates=${candidateCount} stop_reason=${stopReason} — CRM candidates existed but CRM COMPS USED section is absent despite normal completion`)
+    } else {
+      console.log(`[generate-comps] OK total=${Date.now() - t0}ms stop_reason=${stopReason} candidates=${candidateCount} output_tokens=${usage?.output_tokens ?? '?'}`)
+    }
+
+    // Part B — deterministic, non-AI empty state. fetchComps() already
+    // knows BEFORE the AI call whether any CRM candidates exist; when it
+    // found none, the AI was correctly given no CRM data and (per its
+    // own pre-existing instruction) writes nothing, so the section
+    // silently disappears today. This makes that fact explicit and
+    // honest instead of silent — using the EXISTING "CRM COMPS USED"
+    // section name so SECTION_META/TABS routing and CRMCompsUsedSection
+    // require ZERO changes (no "COMP:" lines means it falls through to
+    // the existing PlainText renderer, unmodified). Purely deterministic
+    // text — the AI is never asked to explain or invent this.
+    if (candidateCount === 0 && !hasCrmSection) {
+      notes += `\n\n=====================================\nCRM COMPS USED\n=====================================\nHAT SYSTEM COMPS\n\nNo sufficiently relevant HAT CRM comps were found for this property using the current CRM candidate search.`
+    }
+
     return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: HEADERS })
   } catch (e) {
     console.log(`[generate-comps] EXCEPTION total=${Date.now() - t0}ms aborted=${abortCtrl.signal.aborted} error=${e.message}`)
