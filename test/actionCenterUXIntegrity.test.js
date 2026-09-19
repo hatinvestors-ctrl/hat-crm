@@ -158,7 +158,10 @@ describe('Part 9 — canonicalEconomics()/classifyLeadV2()/classifyLead() thread
     expect(src).toMatch(/function classifyLead\(lead, rediscovery, underwritingSettings = null\) \{/)
     const calls = src.match(/canonicalEconomics\(lead, underwritingSettings\)/g) || []
     // 1 function definition + 3 call sites (classifyLead + 2 branches of classifyLeadV2)
-    expect(calls.length).toBe(4)
+    // + 1 more call site added by the Action Center Safety Net's
+    // buildOtherActiveItem() — reuses the SAME helper for the SAME reason
+    // (canonical, non-fabricated Expected Profit/Max Buy), never a new calc.
+    expect(calls.length).toBe(5)
   })
 })
 

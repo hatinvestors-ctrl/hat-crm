@@ -95,6 +95,15 @@ const CATEGORY_META = {
   OFF_MARKET:        { icon: '⚠', label: 'Off-Market',          theme: { bg: 'rgba(217,119,6,0.12)', border: 'rgb(217,119,6)', text: 'rgb(180,95,6)' } },
 }
 
+// Action Center Safety Net — "Other Active Leads". Deliberately kept OUT of
+// CATEGORY_META: that object also drives the top 4-number KPI summary strip
+// and the QUICK_FILTERS-driven category rendering, and this fallback must
+// NEVER appear there with equal visual weight to Overdue/Act Now/etc. — it
+// is a muted, secondary safety net, not a priority bucket. Theme uses the
+// same neutral tokens the page already uses elsewhere for non-alerting UI
+// (no new color introduced).
+const OTHER_ACTIVE_THEME = { bg: 'var(--color-bg-elev-2)', border: 'var(--color-line)', text: 'var(--color-text-muted)' }
+
 // #5.1 — Quick filters. Client-side only, filters the already-loaded
 // `items` array — no new query, no backend change. FLIP/BRRRR reuse the
 // existing deal_analysis.strategy field; ACT_NOW/REVIEW_TODAY just narrow
@@ -313,6 +322,37 @@ export function classifyLeadV2(lead, underwritingSettings = null) {
   }
 }
 
+// Action Center Safety Net — builds the fallback item for a lead that IS
+// already returned by the existing (unchanged) leads query and is NOT
+// terminal, but for which classifyLead()/classifyLeadV2() returned no
+// category at all (a V2 MONITOR/PASS-tier lead, a lead with no stored
+// decision_v2 yet, or a V1 lead with no priority/rediscovery/follow-up/
+// distress signal). classifyLead() and classifyLeadV2() themselves are
+// NEVER called from here and never modified — this only decides what
+// happens to their existing `null` result, which today means the lead
+// silently disappears from Action Center entirely. Every classification
+// field (decision/nextAction/opportunity/reason/score) is explicitly null
+// — nothing is fabricated for a lead the existing engines have no opinion
+// on. expectedProfit/maxOffer reuse the SAME canonicalEconomics() helper
+// every other item already uses (no new calculation).
+function buildOtherActiveItem(lead, underwritingSettings) {
+  return {
+    category: 'OTHER_ACTIVE',
+    lead,
+    decision: null,
+    nextAction: null,
+    distressed: false,
+    marketType: resolveMarketType(lead),
+    opportunity: null,
+    ...canonicalEconomics(lead, underwritingSettings),
+    reason: null,
+    score: null,
+    rediscoveredAt: null,
+    followUpStatus: null,
+    strategy: lead.deal_analysis?.strategy ?? null,
+  }
+}
+
 function sortCategory(category, items) {
   switch (category) {
     case 'ACT_NOW':
@@ -404,7 +444,9 @@ function StrategyBadge({ strategy }) {
 // the whole card is already a Link). No fields added or removed, no
 // classification/business-logic change — presentation only.
 function ActionCard({ item, workspaceId, userId, members, onLeadUpdated }) {
-  const theme = CATEGORY_META[item.category].theme
+  // Safety Net — OTHER_ACTIVE is deliberately not in CATEGORY_META (see its
+  // definition above), so it needs an explicit fallback theme here.
+  const theme = CATEGORY_META[item.category]?.theme || OTHER_ACTIVE_THEME
   const [showOutcome, setShowOutcome] = useState(false)
   const actionReason = getActionReason(item.lead, item)
   return (
@@ -647,9 +689,19 @@ export default function ActionCenterPage() {
         }
       }
 
+      // Action Center Safety Net — a lead the existing classifiers give no
+      // category to no longer silently vanishes: it falls back to the
+      // OTHER_ACTIVE item built by buildOtherActiveItem(). classifyLead()/
+      // classifyLeadV2() are called exactly as before, unmodified, with the
+      // exact same arguments — only their `null` result is now handled
+      // instead of filtered out.
       const classified = (leads || [])
-        .map(lead => isV2ActionCenter ? classifyLeadV2(lead, underwritingSettings) : classifyLead(lead, rediscoveryByLead[lead.id], underwritingSettings))
-        .filter(Boolean)
+        .map(lead => {
+          const result = isV2ActionCenter
+            ? classifyLeadV2(lead, underwritingSettings)
+            : classifyLead(lead, rediscoveryByLead[lead.id], underwritingSettings)
+          return result || buildOtherActiveItem(lead, underwritingSettings)
+        })
 
       if (!cancelled) {
         setItems(classified)
@@ -666,7 +718,11 @@ export default function ActionCenterPage() {
   // holds everything (including UPCOMING) so the Upcoming filter can find
   // them; `todayCount` is what Kevin actually sees as his workload.
   const totalCount = items.length
-  const todayCount = useMemo(() => items.filter(i => i.category !== 'UPCOMING').length, [items])
+  // Safety Net — OTHER_ACTIVE is excluded from "Actions Today" for the same
+  // reason UPCOMING already is: it is not a prioritized task, it's a
+  // fallback review list, and must never inflate the headline count Kevin
+  // reads as his actual workload.
+  const todayCount = useMemo(() => items.filter(i => i.category !== 'UPCOMING' && i.category !== 'OTHER_ACTIVE').length, [items])
 
   const filteredItems = useMemo(() => {
     if (filter === 'ALL') return items.filter(i => i.category !== 'UPCOMING') // "Today" — Section 2's core rule
@@ -684,6 +740,10 @@ export default function ActionCenterPage() {
     OFF_MARKET: [...filteredItems.filter(i => i.category === 'OFF_MARKET')]
       .sort((a, b) => (b.opportunity?.opportunity_score ?? -1) - (a.opportunity?.opportunity_score ?? -1)),
     UPCOMING: sortCategory('UPCOMING', items.filter(i => i.category === 'UPCOMING')), // only ever populated when filter==='UPCOMING'
+    // Safety Net — deliberately unsorted (existing array/query order), same
+    // as sortCategory()'s own default case for any unrecognized key. No new
+    // sort/priority formula introduced for this fallback list.
+    OTHER_ACTIVE: items.filter(i => i.category === 'OTHER_ACTIVE'),
   }), [filteredItems, items])
 
   // #5.1 business value summary — simple sum/average over values that
@@ -871,6 +931,29 @@ export default function ActionCenterPage() {
                 </section>
               )
             })}
+
+            {/* Action Center Safety Net — "Other Active Leads". Only shown
+                in the default "Today" view (filter === 'ALL'), never inside
+                a specific quick filter, and only when non-empty — mirrors
+                every existing section's own `if (list.length === 0) return
+                null` pattern. Deliberately outside the CATEGORY_META loop so
+                it can never be mistaken for a priority bucket in the top
+                KPI strip or the quick filters. */}
+            {filter === 'ALL' && byCategory.OTHER_ACTIVE.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="text-[15px]">📋</span>
+                  <h3 className="text-[13.5px] font-bold uppercase tracking-wide text-[color:var(--color-text-dim)]">Other Active Leads</h3>
+                  <span className="text-[11px] text-[color:var(--color-text-dim)] tabular-nums">({byCategory.OTHER_ACTIVE.length})</span>
+                </div>
+                <p className="text-[11.5px] text-[color:var(--color-text-dim)] mb-2.5">Active leads not currently prioritized by HAT.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {byCategory.OTHER_ACTIVE.map(item => (
+                    <ActionCard key={item.lead.id} item={item} workspaceId={workspaceId} userId={user.id} members={members} onLeadUpdated={() => setRefreshTick(t => t + 1)} />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
