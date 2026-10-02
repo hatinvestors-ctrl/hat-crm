@@ -138,7 +138,7 @@ function MetricRow({ label, value, highlight, positive, negative }) {
 }
 
 // Live calculation panel — shown sticky on the right
-function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
+function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo, setFinancials, save, canEdit }) {
   if (!calc) return (
     <div className="text-[12px] text-[color:var(--color-text-dim)] py-6 text-center">
       Fill in deal details to see live calculations.
@@ -241,18 +241,35 @@ function LiveCalcPanel({ calc, financials, ratingKey, ratingInfo }) {
           </div>
           <Row label="Sale Price" value={fmtUSD(profitResult.sellPrice)} />
           <Row label="Selling Costs" value="" divider />
-          {calc.agentCommissionPct > 0 && (
-            <Row label={`Listing Agent (${fmtPct(calc.agentCommissionPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.agentCommissionPct)}`} indent={1} />
-          )}
-          {calc.buyerAgentPct > 0 && (
-            <Row label={`Buyer's Agent (${fmtPct(calc.buyerAgentPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.buyerAgentPct)}`} indent={1} />
-          )}
-          {calc.sellingClosingPct > 0 && (
-            <Row label={`Title & Closing (${fmtPct(calc.sellingClosingPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.sellingClosingPct)}`} indent={1} />
-          )}
-          {calc.sellingOtherPct > 0 && (
-            <Row label={`Other (${fmtPct(calc.sellingOtherPct)})`} value={`− ${fmtUSD(profitResult.sellPrice * calc.sellingOtherPct)}`} indent={1} />
-          )}
+          {/* Editable inline — same deal_financials fields/save() path as the
+              Sale/Exit tab's "Selling Costs Breakdown" (agent_commission_pct,
+              buyer_agent_pct, selling_closing_pct, selling_other_pct). Added
+              here, in the always-visible sticky panel, because that Exit-tab
+              section can currently fail to render for some projects; no
+              calculation changed — dealCalculations.js already summed these
+              same four fields into sellingCostPct/sellingCosts/netProfit. */}
+          {setFinancials && save && [
+            { label: 'Listing Agent',  field: 'agent_commission_pct', pct: calc.agentCommissionPct },
+            { label: "Buyer's Agent",  field: 'buyer_agent_pct',      pct: calc.buyerAgentPct },
+            { label: 'Title & Closing', field: 'selling_closing_pct', pct: calc.sellingClosingPct },
+            { label: 'Other',          field: 'selling_other_pct',    pct: calc.sellingOtherPct },
+          ].map(({ label, field, pct }) => (
+            <div key={field} className="flex items-center justify-between gap-1.5 py-[3px]" style={{ paddingLeft: 12 }}>
+              <span className={`${dim} truncate`}>{label} %</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="w-14 shrink-0">
+                  <NumInput
+                    value={financials?.[field] != null ? financials[field] * 100 : pct * 100}
+                    onChange={n => setFinancials(prev => prev ? { ...prev, [field]: n / 100 } : prev)}
+                    onBlur={v => save({ [field]: v === '' ? 0 : Number(v) / 100 })}
+                    disabled={!canEdit}
+                    placeholder="0"
+                  />
+                </div>
+                <span className={`${muted} tabular-nums text-right`} style={{ minWidth: 58 }}>{`− ${fmtUSD(profitResult.sellPrice * pct)}`}</span>
+              </div>
+            </div>
+          ))}
           <Row label={`  Total (${fmtPct(calc.sellingCostPct)})`} value={`− ${fmtUSD(profitResult.sellingCosts)}`} indent={1} total />
           <Row label="− Total All-In Cost" value={`− ${fmtUSD(calc.totalAllInCost)}`} />
           {calc.isJV && profitResult.totalDealProfit != null && (
@@ -2376,7 +2393,7 @@ export default function ProjectDetailPage() {
               ? <LiveBRRRRPanel bc={bCalc} />
               : brrrScenarioOpen
                 ? <LiveBRRRRPanel bc={bCalcScenario} />
-                : <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} />
+                : <LiveCalcPanel calc={calc} financials={financials} ratingKey={ratingKey} ratingInfo={ratingInfo} setFinancials={setFinancials} save={save} canEdit={canEdit} />
             }
           </div>
         </div>
